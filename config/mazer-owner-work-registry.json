@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-14T08:20:51.000Z",
+  "updatedAt": "2026-11-15T15:52:40.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 241,
+    "stableIdentityCount": 272,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 94,
-    "completedCardCount": 121,
-    "deferredCardCount": 26,
+    "openCardCount": 118,
+    "completedCardCount": 124,
+    "deferredCardCount": 30,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-14T08:20:51.000Z",
-      "appliedEventCount": 126,
-      "lastEventId": "55ef6bd3fa1c"
+      "at": "2026-11-15T15:52:40.000Z",
+      "appliedEventCount": 282,
+      "lastEventId": "09eff8851bdd"
     }
   },
   "workItems": [
@@ -62,11 +62,11 @@
     {
       "id": "MAZER-NATIVE-001",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:18.000Z",
+      "updatedAt": "2026-11-14T16:48:37.000Z",
       "sourceId": "mazer-mobile-plan",
       "sourceRef": "docs/mobile-plan.md#capacitor--app-store-path-later",
       "title": "Plan the native app-store wrapper after web stabilization",
-      "description": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified. Board update 2026-11-14: Deferred 2026-11-14: web first and installed web app only; a native wrapper is not planned.",
+      "description": "Prepare a Capacitor-based native wrapper only after the web gameplay and UI baseline is stable and independently verified. Board update 2026-11-14: Deferred 2026-11-14: web first and installed web app only; a native wrapper is not planned. Board update 2026-11-14: Deferred: web first, installed web app only; a native wrapper is not planned.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -401,11 +401,11 @@
     {
       "id": "MAZER-VIS-018",
       "status": "planning",
-      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "updatedAt": "2026-11-14T16:49:49.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-018",
       "title": "Trail colour reported static on the owner phone: not reproduced, needs device data",
-      "description": "The owner reports the trail colour looks static on the phone. Headless runs do not reproduce it: the colour at a fixed point changes strongly every 250 ms. Not fixed and not confirmed as a defect. Needs the phone model plus the Trail Shine and Reduce Motion settings from the owner, or a real-device check. Not started. Update 2026-11-11: the menu demo colour clock was play-only and is fixed (PR #421, deployed), so on a phone the remaining likely cause is the OS Reduce Motion setting or Trail Shine off; this still needs the owner phone settings. Headless-only, not device-checked.",
+      "description": "The owner reports the trail colour looks static on the phone. Headless runs do not reproduce it: the colour at a fixed point changes strongly every 250 ms. Not fixed and not confirmed as a defect. Needs the phone model plus the Trail Shine and Reduce Motion settings from the owner, or a real-device check. Not started. Update 2026-11-11: the menu demo colour clock was play-only and is fixed (PR #421, deployed), so on a phone the remaining likely cause is the OS Reduce Motion setting or Trail Shine off; this still needs the owner phone settings. Headless-only, not device-checked. Board update 2026-11-14: Owner phone pass, tracked in the single phone checklist; nothing to build.",
       "cardType": "bug",
       "priority": "medium",
       "dependencies": [],
@@ -548,40 +548,40 @@
     },
     {
       "id": "MAZER-VIS-011",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T03:45:14.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-011",
       "title": "Regenerate the HUD icons as one matched set and atlas",
-      "description": "The three header icons are 1254 px AI-style PNGs in three different styles and glow treatments, shown at under 25 px, 1.5 MB in total. Plan: redraw as one outline icon family from scripted SVG, bake a single small atlas, and add the missing glyphs (close, check, info, share, install). Not started.",
+      "description": "The three header icons are 1254 px AI-style PNGs in three different styles and glow treatments, shown at under 25 px, 1.5 MB in total. Plan: redraw as one outline icon family from scripted SVG, bake a single small atlas, and add the missing glyphs (close, check, info, share, install). Not started. Board update 2026-11-14: Part 1 of 2: shared glyph-box crop path for the HUD icons, no visual change yet; atlas swap is part 2; merged, not deployed PR #564 merged (310abd78). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-14: Part 2 of 2: HUD icons now one 5.6 KB outline atlas instead of three 1.2 MB bitmaps; header icons are cyan outlines now; merged, not deployed, headless only PR #568 merged (efa9f891). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Follow-up: the offline-shell check expected five boot-art cache entries; after the HUD icon atlas it is three. Check script fixed, offline shell passes locally. The check is not part of CI. PR #574 merged (9a7852e6). Deployed: production build none. No device surface.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-020"
       ],
       "acceptanceCriteria": [
-        "Profile, leaderboard and settings icons share one stroke style and optical size",
-        "One small icon atlas replaces the three large PNGs",
-        "Asset manifest validation passes"
+        "All header icons come from one scripted outline family and one atlas image under 100 KB replaces the three large images.",
+        "The missing glyphs (close, check, info, share, install) exist in the family and appear in the atlas test.",
+        "Every icon is legible at 24 px on a 3x phone frame, proven by one captured frame."
       ]
     },
     {
       "id": "MAZER-VIS-012",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:01:58.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:17:47.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-012",
       "title": "Unify the backdrop across boot, install gate and sign-in",
-      "description": "Three visual dialects exist: the game (black space, dot matrix), the teal-black install and sign-in pages, and the account portal. Plan: one near-black canvas color, calmer starfield on gates, the app icon on the install screen, and a dot-matrix wordmark on boot. Portal alignment is in a separate repo. Not started. Board update 2026-11-14: Backdrop pick recorded 2026-11-14: one near-black canvas across boot, install gate and sign-in. This card is the build; portal alignment is a separate card in another repository.",
+      "description": "Three visual dialects exist: the game (black space, dot matrix), the teal-black install and sign-in pages, and the account portal. Plan: one near-black canvas color, calmer starfield on gates, the app icon on the install screen, and a dot-matrix wordmark on boot. Portal alignment is in a separate repo. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-14: Menu and gate now share one backdrop (#02080f); calmer-starfield criterion has nothing to calm and needs a decision; merged, not deployed, headless only PR #561 merged (7c35763f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner decision 2026-11-14: drop the calmer-starfield criterion; stars instead keep a few rainbow stars in the shared rainbow UI colours (see MAZER-VIS-035).",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-020"
       ],
       "acceptanceCriteria": [
-        "Boot, install gate and in-game sign-in share the game's background color",
-        "Install screen shows the app icon and a share illustration on iOS",
-        "Cross-repo portal alignment tracked separately"
+        "Boot, install gate and sign-in share one near-black canvas colour, proven by a test that reads the one shared constant.",
+        "The gate starfield is calmer: lower density and no fast motion, and it respects Reduce Motion.",
+        "Frames of the three surfaces at phone width show the same background, checked in one captured frame set."
       ]
     },
     {
@@ -749,21 +749,21 @@
     },
     {
       "id": "MAZER-UI-010",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:18:53.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-010",
       "title": "Define one type scale and a second display typeface",
-      "description": "The audit found 7 font stacks, 11 text sizes, text that shrinks to 8 px at 320 wide, and label formats that change with width. Proposal: keep Space Grotesk for body, add one squared techno display face for short uppercase labels, and set a fixed scale with a floor of 12 px for body copy. Not started beyond the font file itself.",
+      "description": "The audit found 7 font stacks, 11 text sizes, text that shrinks to 8 px at 320 wide, and label formats that change with width. Proposal: keep Space Grotesk for body, add one squared techno display face for short uppercase labels, and set a fixed scale with a floor of 12 px for body copy. Not started beyond the font file itself. Board update 2026-11-15: Surface 1 of 3: dev-only watch-pass text 11px to 12px; merged, not deployed, headless only PR #565 merged (394da323). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Surface 2 of 3: board renderer text moved from Courier New to the shared body face; merged, not deployed, headless only PR #566 merged (a871b2ca). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Surface 3 (type scale and legacy font stacks) merged. PR #567 merged (27aa79da). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "architecture",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-020"
       ],
       "acceptanceCriteria": [
-        "A written type scale (roles, sizes, weights) is adopted",
-        "Body text never shrinks below 12 px at 320 wide",
-        "State text (On/Off) is always its own element, never merged into a label"
+        "Body copy keeps its current face and never renders below 12 px at 320 px width; a test fails on any smaller body size.",
+        "Exactly one new display face is added and used only for short uppercase labels; distinct font stacks drop from 7 to 2 or fewer.",
+        "A fixed size scale replaces ad hoc sizes (from 11 distinct sizes to the scale steps only), proven by a source ratchet test plus one phone-width frame per surface."
       ]
     },
     {
@@ -840,31 +840,31 @@
     },
     {
       "id": "MAZER-UI-015",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T04:12:50.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-015",
       "title": "Build one shared button kit",
-      "description": "There are 10 distinct button looks across 5 surfaces and no shared primary, secondary or destructive convention; START is a bare wordmark with a full-screen hit area. Proposal: 5 variants plus a toggle row and an explicit START hit zone. Not started.",
+      "description": "There are 10 distinct button looks across 5 surfaces and no shared primary, secondary or destructive convention; START is a bare wordmark with a full-screen hit area. Proposal: 5 variants plus a toggle row and an explicit START hit zone. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-14: PR 553 merged: shared button kit table and explicit front-door Start/Login hit zone; button chrome migration still to do; not device-checked PR #553 merged (be5d3a54). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Action-button chrome for sign out, reset progress, guide and the secondary auth button now draws from the kit table with the same colours. Start, login, icon buttons, primary auth button and the install surface are still hand-styled. PR #576 merged (a58b9f70). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-020"
       ],
       "acceptanceCriteria": [
-        "Primary, secondary, ghost, danger and icon variants exist with a 44 px minimum",
-        "START has an explicit hit zone instead of the full screen",
-        "Sign out, Guide, auth and install buttons use the kit"
+        "A shared kit offers primary, secondary and destructive variants plus a toggle row, and each existing button maps to one variant.",
+        "START keeps its wordmark look but only a defined hit zone starts a run, proven by tap tests inside and outside the zone.",
+        "Distinct button looks across surfaces drop from 10 to the kit variants, proven by a source ratchet and one frame per surface."
       ]
     },
     {
       "id": "MAZER-UI-016",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:19.000Z",
+      "updatedAt": "2026-11-14T16:48:45.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-016",
       "title": "Frame the game on desktop instead of stretching the phone layout",
-      "description": "At 1280x720 the menu is the phone layout stretched: tiny wordmarks and a 1100 px horizontal corridor. Proposal: a centered column or a scaled UI. Low priority because the game is phone-first. Board update 2026-11-14: Deferred 2026-11-14: the game is phone first and install gated, so desktop framing is low value.",
+      "description": "At 1280x720 the menu is the phone layout stretched: tiny wordmarks and a 1100 px horizontal corridor. Proposal: a centered column or a scaled UI. Low priority because the game is phone-first. Board update 2026-11-14: Deferred 2026-11-14: the game is phone first and install gated, so desktop framing is low value. Board update 2026-11-14: Deferred: desktop framing is parked until the phone layout work settles.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
@@ -968,11 +968,11 @@
     {
       "id": "MAZER-MOTION-002",
       "status": "review",
-      "updatedAt": "2026-11-13T17:32:38.000Z",
+      "updatedAt": "2026-11-15T00:18:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-002",
       "title": "Animate overlays, controls and the Start and splash transitions",
-      "description": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started. Board update 2026-11-13: Start, overlay open/close and the splash crossfade from a snapshot (merged PR 505); rise and staggered rows not built. Deploy pending. PR #505 merged (4cb1a2dd). Merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Start, overlay open/close and the splash crossfade from a snapshot (skipped below 30 fps); loader pulse retuned to 1200 ms. Rise and staggered rows, and eased hover/press, are not built. PR #505 merged (4cb1a2dd). Deployed: production build fawxzzy-mazer-qbu403nwk. Checked only in headless Chromium, not on a real phone.",
+      "description": "Overlay open and close, hover, press, toggles and toasts are instant while maze transitions get eased motion, and pressing Start removes the title, icons and corridor in one frame while the HTML splash hard-cuts to the game. The plan is a 200 ms panel rise with staggered rows, 120 ms state changes, a short exit of menu chrome and a splash fade with a shared loader period. Not started. Board update 2026-11-13: Start, overlay open/close and the splash crossfade from a snapshot (merged PR 505); rise and staggered rows not built. Deploy pending. PR #505 merged (4cb1a2dd). Merged, not deployed. Board update 2026-11-13: Merged and deployed; headless only. Start, overlay open/close and the splash crossfade from a snapshot (skipped below 30 fps); loader pulse retuned to 1200 ms. Rise and staggered rows, and eased hover/press, are not built. PR #505 merged (4cb1a2dd). Deployed: production build fawxzzy-mazer-qbu403nwk. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner decision 2026-11-14: accept as complete with hover and press easing dropped.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
@@ -1041,11 +1041,11 @@
     {
       "id": "MAZER-PERF-002",
       "status": "review",
-      "updatedAt": "2026-11-13T01:30:00.000Z",
+      "updatedAt": "2026-11-15T00:17:54.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-002",
       "title": "Cut canvas redraw cost: trail gate merged and live; backdrop bake still open",
-      "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no more lag I think\". Still phone-unverified: no frame trace and no timed check.",
+      "description": "Re-scoped on 2026-11-12 after measuring. PR #459 is merged (7d6312eb) AND deployed to production (main 34b428fd, later builds include it): the play trail is rebuilt only when it can differ, with a gap of max(33 ms, 2x the last rebuild) capped at 250 ms, and the shortest route is memoised. Finding: while standing still the trail was rebuilt in full on every redraw, its cost grows with route length and plateaus at level 268; in a phone-sized headless profile at level 300 and 1x scale a still frame fell from 93 ms to 39 ms (a headless proxy, not a phone). Frame cost while walking is unchanged (MAZER-PERF-004 targets it). Device check pending: open a level 300 preview (previewLevel 300), stand still 10 seconds (should be smooth), then walk continuously (may still stutter). Still open: bake the backdrop, raise the throttle floor, and attach a real-device frame trace. Kept in review: deployed, checked only in headless Chromium, not on a real phone. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no more lag I think\". Still phone-unverified: no frame trace and no timed check. Board update 2026-11-15: Owner decision 2026-11-14: close as sufficient; frame trace carried in the phone checklist.",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [],
@@ -1133,11 +1133,11 @@
     {
       "id": "MAZER-PROG-005",
       "status": "planning",
-      "updatedAt": "2026-11-10T00:00:00.000Z",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-roadmap",
       "sourceRef": "docs/roadmap.md#phase-order",
       "title": "Decide what happens past level 198 so levels keep getting harder",
-      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (completed) extended it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone.",
+      "description": "The felt-difficulty ladder rises strictly through level 198 on a fixed board with no zoom or size lever. Measured 2026-11-10: the explorer number cannot rise further because the board is at its 50 percent floor limit, so MAZER-PROG-013 (completed) extended the ladder to level 268 with zero-felt-cost side stubs and MAZER-PROG-014 (completed) extended it to level 388 with mazes that are also hard to solve from the goal end, then declares the plateau there. What stays open is the lever after level 388: sign the hazard contract (MAZER-HAZ-002, hazardBudgetLevels starts at 388) or, only if hazards are rejected, a bigger board past a level, which is the zoom lever the owner ruled out. The owner wants levels to keep getting harder forever, so this decision cannot be settled by generation alone. Board update 2026-11-14: Needs owner decision: same as the hazard contract (HAZ-002); not started.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [
@@ -1404,12 +1404,12 @@
     },
     {
       "id": "MAZER-HAZ-002",
-      "status": "blocked",
-      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:17:40.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-002",
       "title": "Sign or reject the endless hazard product contract",
-      "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off.",
+      "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant).",
       "cardType": "governance",
       "priority": "high",
       "dependencies": [],
@@ -1533,12 +1533,12 @@
     },
     {
       "id": "MAZER-FLOW-001",
-      "status": "planning",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:10:56.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-001",
       "title": "Teach the controls and the goal on level 1",
-      "description": "Nothing teaches movement today: the only legend is in a collapsed Guide inside Settings, and the touch stick appears only while touching. A tutorial module exists in source but no app code imports it, and level 1 is now a straight corridor so its content needs refreshing. Plan: a non-blocking ghost stick and one line (drag anywhere, or arrow keys) that fades on the first move, reusing the tutorial store.",
+      "description": "Nothing teaches movement today: the only legend is in a collapsed Guide inside Settings, and the touch stick appears only while touching. A tutorial module exists in source but no app code imports it, and level 1 is now a straight corridor so its content needs refreshing. Plan: a non-blocking ghost stick and one line (drag anywhere, or arrow keys) that fades on the first move, reusing the tutorial store. Board update 2026-11-15: One-time level 1 controls hint (merged, not deployed, headless only) PR #542 merged (751dc215). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "high",
       "dependencies": [],
@@ -1780,11 +1780,11 @@
     {
       "id": "MAZER-AUDIO-002",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:08.000Z",
+      "updatedAt": "2026-11-14T16:48:58.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AUDIO-002",
       "title": "Compose and wire original Mazer music from the music-language brief",
-      "description": "A research pass defined an original music language: restrained, weather-touched and ancient, with small modal motifs, and explicitly no lifted melodies from existing game scores. It recommends prototyping one title sting, one ambient loop and one storm cue first. Nothing is wired at runtime, and wiring waits until the shell audio setting is deliberately re-enabled. Board update 2026-11-14: Deferred 2026-11-14: music waits until the first sound effects ship.",
+      "description": "A research pass defined an original music language: restrained, weather-touched and ancient, with small modal motifs, and explicitly no lifted melodies from existing game scores. It recommends prototyping one title sting, one ambient loop and one storm cue first. Nothing is wired at runtime, and wiring waits until the shell audio setting is deliberately re-enabled. Board update 2026-11-14: Deferred 2026-11-14: music waits until the first sound effects ship. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until sound effects ship and the shell audio setting returns.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -1868,12 +1868,12 @@
     },
     {
       "id": "MAZER-ACCT-003",
-      "status": "blocked",
-      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "status": "planning",
+      "updatedAt": "2026-11-15T00:18:11.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-003",
       "title": "Prove installed-app sign-in and progress end to end",
-      "description": "Code fixes for retired-target rejection, AI progression hydration, menu-AI pause, session refresh and callback-error visibility are merged (PR #364, #367, #368, #369, #370). No end-to-end acceptance run exists yet: installed-app proof, natural session refresh, account recovery, cross-user isolation, authenticated progress hydration and whether the account handoff keeps an installed app standalone. It needs a real phone and a throwaway test account.",
+      "description": "Code fixes for retired-target rejection, AI progression hydration, menu-AI pause, session refresh and callback-error visibility are merged (PR #364, #367, #368, #369, #370). No end-to-end acceptance run exists yet: installed-app proof, natural session refresh, account recovery, cross-user isolation, authenticated progress hydration and whether the account handoff keeps an installed app standalone. It needs a real phone and a throwaway test account. Board update 2026-11-14: Owner phone pass, tracked in the single phone checklist; nothing to build. Board update 2026-11-15: Owner will run the phone checklist once everything is deployed.",
       "cardType": "reliability",
       "priority": "high",
       "dependencies": [
@@ -1889,11 +1889,11 @@
     {
       "id": "MAZER-ACCT-004",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:09.000Z",
+      "updatedAt": "2026-11-14T16:48:22.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-004",
       "title": "Harden progress reset across devices with a reset epoch",
-      "description": "Reset progress works server-first for one device, but a second device holding higher local progress would show the old level after a merge. The complete fix adds a reset counter on the server and makes both merge paths discard local data when it advances, which needs an approved database change. It has been held since 2026-11-06; version one may accept the residual risk. The owner delegated judgement calls on 2026-11-10 but a database change still needs explicit approval. Board update 2026-11-14: Deferred 2026-11-14: the residual cross-device reset risk is accepted for version one; no database change.",
+      "description": "Reset progress works server-first for one device, but a second device holding higher local progress would show the old level after a merge. The complete fix adds a reset counter on the server and makes both merge paths discard local data when it advances, which needs an approved database change. It has been held since 2026-11-06; version one may accept the residual risk. The owner delegated judgement calls on 2026-11-10 but a database change still needs explicit approval. Board update 2026-11-14: Deferred 2026-11-14: the residual cross-device reset risk is accepted for version one; no database change. Board update 2026-11-14: Deferred: the residual risk is accepted for version one, no change planned now.",
       "cardType": "migration",
       "priority": "medium",
       "dependencies": [
@@ -1924,12 +1924,12 @@
     },
     {
       "id": "MAZER-DATA-002",
-      "status": "blocked",
-      "updatedAt": "2026-11-06T00:00:00.000Z",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DATA-002",
       "title": "Decide whether to raise the server-side difficulty cap and rank steps",
-      "description": "The server keeps its own copy of the older difficulty ladder (a fixed cap and fixed rank thresholds), and the client ladder to level 198 deliberately stays inside it so no database change was needed. Raising the cap, changing the rank steps or adding a new ruleset needs an approved database change and is on hold.",
+      "description": "The server keeps its own copy of the older difficulty ladder (a fixed cap and fixed rank thresholds), and the client ladder to level 198 deliberately stays inside it so no database change was needed. Raising the cap, changing the rank steps or adding a new ruleset needs an approved database change and is on hold. Board update 2026-11-14: Parked: later, until a server cap change is wanted (phase 2).",
       "cardType": "migration",
       "priority": "low",
       "dependencies": [
@@ -1943,12 +1943,12 @@
     },
     {
       "id": "MAZER-DATA-003",
-      "status": "blocked",
-      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DATA-003",
       "title": "Finish the remote run receipt and playbook sync bridge",
-      "description": "Remote receipts go through the completion outbox. The ATLAS and playbook sync parts still need provider or ATLAS steps with explicit owner approval.",
+      "description": "Remote receipts go through the completion outbox. The ATLAS and playbook sync parts still need provider or ATLAS steps with explicit owner approval. Board update 2026-11-14: Parked: later, needs provider approval; outbox half to be verified first.",
       "cardType": "architecture",
       "priority": "medium",
       "dependencies": [],
@@ -2016,11 +2016,11 @@
     {
       "id": "MAZER-PWA-004",
       "status": "in_progress",
-      "updatedAt": "2026-11-14T08:20:51.000Z",
+      "updatedAt": "2026-11-15T04:46:36.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-004",
       "title": "Settle the install gate policy and prove the offline shell",
-      "description": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof. Board update 2026-11-13: Offline-shell headless proof merged and deployed (19 of 19 checks; HUD icons and tile-font atlas now runtime-cached). Install gate policy decision and a real-device airplane-mode check are still open. PR #501 merged (e2e84c62). Deployed: production build fawxzzy-mazer-1n3xcc1qg. Checked only in headless Chromium, not on a real phone. Board update 2026-11-14: Decision recorded 2026-11-14: the install gate stays as shipped with no skip until entitlements exist. Open: the airplane-mode offline reload on a real phone. Board update 2026-11-14: Install gate decision recorded; only the airplane-mode offline launch on a phone is open.",
+      "description": "The manifest, offline shell, lifecycle handling and the install gate (PR #372) exist. Open points: the boot-time install gate blocks boot in some install modes without a skip, which clashes with the plan that access is enforced by entitlement, and offline reload after a warm install has no real-device proof. Board update 2026-11-14: Decision recorded 2026-11-14: the install gate stays as shipped with no skip until entitlements exist. Open: the airplane-mode offline reload on a real phone. Board update 2026-11-14: Install gate decision recorded; only the airplane-mode offline launch on a phone is open. Board update 2026-11-15: Offline shell check now runs nightly and on demand in its own workflow, not as a pull request check. First run still to be proven. PR #583 merged (e51f81a0). Deployed: production build none. No device surface.",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [
@@ -2052,11 +2052,11 @@
     {
       "id": "MAZER-QA-001",
       "status": "blocked",
-      "updatedAt": "2026-11-09T00:00:00.000Z",
+      "updatedAt": "2026-11-15T15:52:40.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-001",
       "title": "Verify deployed Mazer changes on a real phone and installed app",
-      "description": "Everything shipped since 2026-11-06 was checked against bundles, tests and harness frames only. Real phone frame rate, touch feel, pixel density, iOS home-screen behaviour, hardware back, real backgrounding and felt difficulty at levels 60, 100 and 190 remain unchecked. The owner has not reported a phone pass in the late transcript.",
+      "description": "Everything shipped since 2026-11-06 was checked against bundles, tests and harness frames only. Real phone frame rate, touch feel, pixel density, iOS home-screen behaviour, hardware back, real backgrounding and felt difficulty at levels 60, 100 and 190 remain unchecked. The owner has not reported a phone pass in the late transcript. Board update 2026-11-14: Owner phone pass, tracked in the single phone checklist; nothing to build. Board update 2026-11-15: Waiting on the owner phone pass: every deployed change is checked headless only, so this stays blocked until the owner runs the single phone checklist.",
       "cardType": "reliability",
       "priority": "high",
       "dependencies": [],
@@ -2068,12 +2068,12 @@
     },
     {
       "id": "MAZER-QA-002",
-      "status": "in_progress",
-      "updatedAt": "2026-11-05T00:00:00.000Z",
+      "status": "planning",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-002",
       "title": "Close the mobile shell device harness with real-device proof",
-      "description": "The harness exists but closure needs real-device proof, which has not happened.",
+      "description": "The harness exists but closure needs real-device proof, which has not happened. Board update 2026-11-14: Folded into the single phone checklist card (QA-009); owner device pass pending.",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [
@@ -2279,11 +2279,11 @@
     {
       "id": "MAZER-AI-002",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:10.000Z",
+      "updatedAt": "2026-11-14T16:48:52.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AI-002",
       "title": "Add AI-assisted maze completion with spendable hints",
-      "description": "The board wanted a way for a player to spend an allowance to have AI help finish a maze. Not started; depends on the economy contract. Board update 2026-11-14: Deferred 2026-11-14: spendable hints wait on the economy contract.",
+      "description": "The board wanted a way for a player to spend an allowance to have AI help finish a maze. Not started; depends on the economy contract. Board update 2026-11-14: Deferred 2026-11-14: spendable hints wait on the economy contract. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until the shop and economy contract is signed.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -2315,11 +2315,11 @@
     {
       "id": "MAZER-RUN-003",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:11.000Z",
+      "updatedAt": "2026-11-14T16:49:09.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-003",
       "title": "Decide how run quality gates leaderboard and achievement entries",
-      "description": "Two board cards cover admitting runs to the leaderboard and to achievements by quality. Leaderboard authority is server-side, so a change is provider-gated; the achievement rule is an owner decision. Neither started. Board update 2026-11-14: Deferred 2026-11-14: low priority, and leaderboard admission is a provider-side change.",
+      "description": "Two board cards cover admitting runs to the leaderboard and to achievements by quality. Leaderboard authority is server-side, so a change is provider-gated; the achievement rule is an owner decision. Neither started. Board update 2026-11-14: Deferred 2026-11-14: low priority, and leaderboard admission is a provider-side change. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until the leaderboard rule is decided; low priority.",
       "cardType": "architecture",
       "priority": "low",
       "dependencies": [
@@ -2334,11 +2334,11 @@
     {
       "id": "MAZER-RUN-004",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:20.000Z",
+      "updatedAt": "2026-11-14T16:49:13.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-RUN-004",
       "title": "Build the shared run status panel",
-      "description": "A panel showing run status across surfaces was started and is early. Board update 2026-11-14: Deferred 2026-11-14: only the view model exists and wiring touches the contended menu scene; low priority.",
+      "description": "A panel showing run status across surfaces was started and is early. Board update 2026-11-14: Deferred 2026-11-14: only the view model exists and wiring touches the contended menu scene; low priority. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until the menu scene carve-out lands, then wire the run panel.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
@@ -2406,11 +2406,11 @@
     {
       "id": "MAZER-CHAL-001",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:15.000Z",
+      "updatedAt": "2026-11-14T16:49:04.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CHAL-001",
       "title": "Add shared-seed daily and weekly challenges",
-      "description": "Daily and weekly challenges from a shared seed. Not started; server seed and leaderboard parts would be provider-gated, and the design needs an owner decision. Board update 2026-11-14: Deferred 2026-11-14: parked until the economy and hazard contracts are settled.",
+      "description": "Daily and weekly challenges from a shared seed. Not started; server seed and leaderboard parts would be provider-gated, and the design needs an owner decision. Board update 2026-11-14: Deferred 2026-11-14: parked until the economy and hazard contracts are settled. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until the economy and hazard contracts settle.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -2773,12 +2773,12 @@
     },
     {
       "id": "MAZER-PWA-005",
-      "status": "planning",
-      "updatedAt": "2026-11-11T12:00:00.000Z",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-005",
       "title": "Provide approved app icon art with proper corners and a clean screenshot capture route",
-      "description": "Carried from MAZER-PWA-002. The icon master has baked black corners and new icon art is owner-gated; the manifest screenshots carry a small preview label because the capture route has no clean mode. Needs approved icon art from the owner, then a screenshot route without the label. Not started.",
+      "description": "Carried from MAZER-PWA-002. The icon master has baked black corners and new icon art is owner-gated; the manifest screenshots carry a small preview label because the capture route has no clean mode. Needs approved icon art from the owner, then a screenshot route without the label. Not started. Board update 2026-11-14: Deferred by owner call on 2026-11-14: parked until approved icon art with clean corners exists. Board update 2026-11-14: Parked: later, waits on owner-approved icon art with clean corners.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
@@ -2812,21 +2812,21 @@
     },
     {
       "id": "MAZER-MOTION-007",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:02:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:24.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-007",
       "title": "Decide off-scale loops and durations and sweep dead motion code",
-      "description": "Some loops and durations do not sit on the motion scale, and some motion definitions and DOM motion code drive nothing. The owner decides which off-scale values stay or move onto the scale (each move is a visible retune); then the dead code is swept. Completes criterion 3 of MAZER-MOTION-001. No decision recorded. Board update 2026-11-14: Decision recorded 2026-11-14: anything the owner has not named stays unchanged; the dead tuning sweep ran under MAZER-MOTION-010. Open only the dead DOM motion code check.",
+      "description": "Some loops and durations do not sit on the motion scale, and some motion definitions and DOM motion code drive nothing. The owner decides which off-scale values stay or move onto the scale (each move is a visible retune); then the dead code is swept. Completes criterion 3 of MAZER-MOTION-001. No decision recorded. Board update 2026-11-14: Decision recorded 2026-11-14: anything the owner has not named stays unchanged; the dead tuning sweep ran under MAZER-MOTION-010. Open only the dead DOM motion code check. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-15: Unused pulse helper removed (merged, not deployed, headless only) PR #547 merged (c82fe1fd). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "governance",
       "priority": "low",
       "dependencies": [
         "MAZER-MOTION-001"
       ],
       "acceptanceCriteria": [
-        "Owner decides which off-scale loops and durations move onto the scale",
-        "Dead tuning and unused DOM motion code are removed",
-        "Each retuned value has before and after capture proof"
+        "A written list names every motion definition and motion helper with zero production callers; each is deleted with its own test.",
+        "Anything the owner has not named stays at its current value: a before and after check shows no loop or duration changed.",
+        "The motion scale test and full unit suite pass, and bundle size does not grow."
       ]
     },
     {
@@ -2870,11 +2870,11 @@
     {
       "id": "MAZER-ACCT-009",
       "status": "review",
-      "updatedAt": "2026-11-11T23:00:00.000Z",
+      "updatedAt": "2026-11-15T04:16:21.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-009",
       "title": "Make the Create Account result honest",
-      "description": "The account site Create Account form showed the success-styled notice Your account request is complete. You can continue to your account when a session is available. whenever sign-up returned no session (already registered, a weak new login choice, rate limit, network, unknown) and also after a successful sign-up without a Mazer return context. A family member reported a session was not available, which matches it. FawxzzyWeb PR 121 is MERGED (main bcfc556d) with an honest neutral message instead of the false success text, and a real session now continues straight into the account. It is NOT live: the FawxzzyWeb release carrying it is not yet aliased to the live domains. Residual: with auto-confirm on, a successful sign-up returns a session and a duplicate does not, so whether an account already exists can still be inferred by whether the user ends up signed in; closing that means turning auto-confirm off (see MAZER-ACCT-010). Not checked on a device.",
+      "description": "The account site Create Account form showed the success-styled notice Your account request is complete. You can continue to your account when a session is available. whenever sign-up returned no session (already registered, a weak new login choice, rate limit, network, unknown) and also after a successful sign-up without a Mazer return context. A family member reported a session was not available, which matches it. FawxzzyWeb PR 121 is MERGED (main bcfc556d) with an honest neutral message instead of the false success text, and a real session now continues straight into the account. It is NOT live: the FawxzzyWeb release carrying it is not yet aliased to the live domains. Residual: with auto-confirm on, a successful sign-up returns a session and a duplicate does not, so whether an account already exists can still be inferred by whether the user ends up signed in; closing that means turning auto-confirm off (see MAZER-ACCT-010). Not checked on a device. Board update 2026-11-15: Create Account result honesty change is in the deployed account-site builds (site PR 121 is an ancestor); earlier 'not live' wording was stale. Device check pending. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "bug",
       "priority": "high",
       "dependencies": [
@@ -2946,11 +2946,11 @@
     {
       "id": "MAZER-ACCT-013",
       "status": "planning",
-      "updatedAt": "2026-11-11T23:00:00.000Z",
+      "updatedAt": "2026-11-14T16:49:35.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-013",
       "title": "Confirm where sign-in lands on the installed Android app",
-      "description": "One candidate for the Galaxy S21 report is that sign-in completes in a different context than the one that started it: the installed app versus a Chrome tab, where the pending sign-in record (kept per tab) is missing and the player sees the different-screen message. This needs a real Android phone. The owner runs the three device steps on the card. Related: MAZER-ACCT-003, the full installed-app proof. Not started.",
+      "description": "One candidate for the Galaxy S21 report is that sign-in completes in a different context than the one that started it: the installed app versus a Chrome tab, where the pending sign-in record (kept per tab) is missing and the player sees the different-screen message. This needs a real Android phone. The owner runs the three device steps on the card. Related: MAZER-ACCT-003, the full installed-app proof. Not started. Board update 2026-11-14: Owner phone pass, tracked in the single phone checklist; nothing to build.",
       "cardType": "reliability",
       "priority": "high",
       "dependencies": [
@@ -3003,11 +3003,11 @@
     {
       "id": "MAZER-ACCT-016",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:21.000Z",
+      "updatedAt": "2026-11-14T16:49:17.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-016",
       "title": "Collect the Galaxy S21 sign-in details from the owner family member",
-      "description": "Owner relay. The root cause of the Galaxy S21 sign-in failure is not confirmed; candidates are the misleading Create Account notice hiding a failed sign-up, the 5-minute Mazer window against the account site's 15 minutes, the installed app versus a Chrome tab, the 15-minute username rate limit, and duplicate usernames. Five questions are open, see the ask. Not resolved until she answers; the owner relays her answers. Board update 2026-11-14: Deferred 2026-11-14: every candidate cause was fixed or replaced since; reopen if the reporter sees it again.",
+      "description": "Owner relay. The root cause of the Galaxy S21 sign-in failure is not confirmed; candidates are the misleading Create Account notice hiding a failed sign-up, the 5-minute Mazer window against the account site's 15 minutes, the installed app versus a Chrome tab, the 15-minute username rate limit, and duplicate usernames. Five questions are open, see the ask. Not resolved until she answers; the owner relays her answers. Board update 2026-11-14: Deferred 2026-11-14: every candidate cause was fixed or replaced since; reopen if the reporter sees it again. Board update 2026-11-14: Deferred: waiting on the family member's answers; nothing to build meanwhile.",
       "cardType": "research",
       "priority": "medium",
       "dependencies": [
@@ -3079,12 +3079,12 @@
     },
     {
       "id": "MAZER-ACCT-020",
-      "status": "planning",
-      "updatedAt": "2026-11-12T20:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:11:08.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-020",
       "title": "Fix the four account-site usernames longer than 15 characters",
-      "description": "Four account-site usernames are longer than the 15-character limit because the stored metadata on the account site bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs explicit approval from the owner first. Related: MAZER-ACCT-030 (a few usernames over the limit are never indexed for sign-in by username). Not started.",
+      "description": "Four account-site usernames are longer than the 15-character limit because the stored metadata on the account site bypassed validation; those players fall back to generated Mazer names. Plan: close the bypass and decide how to shorten the four names. Any data change needs explicit approval from the owner first. Related: MAZER-ACCT-030 (a few usernames over the limit are never indexed for sign-in by username). Not started. Board update 2026-11-14: Client half: a stored username over 15 characters is never shown as the name; database half and sign-in-by-username lookup still open PR #558 merged (8372df75). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner approved 2026-11-14: one-off collision-safe shortening of the four long usernames; exact SQL, preimage and rollback file still go in a box before apply. Board update 2026-11-15: Applied 2026-11-14 (owner approved exact SQL hash 15faee0d): three account usernames over 15 characters shortened collision-safe (codex-treatment, codex-treatmen2, codex-history-c); read-back shows zero over-15 and all three in the sign-in index. Rollback file kept. Client half (PR 558) still not deployed. Deployed: production build none. No device surface.",
       "cardType": "bug",
       "priority": "low",
       "dependencies": [
@@ -3208,11 +3208,11 @@
     {
       "id": "MAZER-MOTION-008",
       "status": "planning",
-      "updatedAt": "2026-11-12T12:00:00.000Z",
+      "updatedAt": "2026-11-14T16:49:40.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-008",
       "title": "Device check: reduced motion on a real phone",
-      "description": "Reduce Motion (PR #425) was checked only in headless Chromium. The owner checks on a real phone that, with Reduce Motion on, movement and pulsing stop and colours keep shifting. Not started.",
+      "description": "Reduce Motion (PR #425) was checked only in headless Chromium. The owner checks on a real phone that, with Reduce Motion on, movement and pulsing stop and colours keep shifting. Not started. Board update 2026-11-14: Owner phone pass, tracked in the single phone checklist; nothing to build.",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [
@@ -3399,11 +3399,11 @@
     {
       "id": "MAZER-ACCT-023",
       "status": "review",
-      "updatedAt": "2026-11-13T01:30:00.000Z",
+      "updatedAt": "2026-11-15T04:16:27.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-023",
       "title": "Account-site sign-out no longer races to login: merged, not live until aliases move",
-      "description": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) adds a signing-out flag so the sign-out event handler no longer races the return to Mazer. MERGED-NOT-DEPLOYED to the live site until the production aliases are moved to the new build. Checked in tests only, not on a real phone. The separate design question (signing out on the account site does not end the Mazer sign-in) remains open.",
+      "description": "Code-read only, not reproduced: on the account site the sign-out event handler in usePortalSession can send the player to the login page before the return to Mazer runs. Proposed fix: a signing-out flag that stops the event handler racing the return. Separate design question: signing out on the account site does not end the Mazer sign-in session. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) adds a signing-out flag so the sign-out event handler no longer races the return to Mazer. MERGED-NOT-DEPLOYED to the live site until the production aliases are moved to the new build. Checked in tests only, not on a real phone. The separate design question (signing out on the account site does not end the Mazer sign-in) remains open. Board update 2026-11-15: Account-site sign-out fix is in the deployed site builds (site PR 130 is an ancestor); earlier 'not live' wording was stale. Superseded in design by the host sign-out endpoint work. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "bug",
       "priority": "medium",
       "dependencies": [
@@ -3418,11 +3418,11 @@
     {
       "id": "MAZER-ACCT-024",
       "status": "review",
-      "updatedAt": "2026-11-12T23:00:00.000Z",
+      "updatedAt": "2026-11-15T00:17:30.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-024",
       "title": "Receipt typed columns now filled by a trigger and backfill; run-quality use still open",
-      "description": "APPLIED in production by the owner approval of the exact files and verified by readback. A before-insert trigger on the completion receipts fills the typed columns (completion time, path length and the rest), and a batched backfill filled 24,437 existing receipts in 13 batches of 2,000. Readback: all 26,308 receipts have a path length and completion time above zero, the trigger is enabled, no long transactions. Old values are saved in a preimage table; rollback files exist, but a rollback would overwrite later real values on those rows. Limits: the values are asserted by the client and outliers exist (one completion time above 42 million ms), so any run-quality gating must validate them; the typed columns are metadata only today. Lesson recorded: SQL hash guards must be computed from the LIVE function body (the repository copy had LF line endings while the live body had CRLF, so a first version of a stale-name script would have aborted on production), and the production SQL runner role cannot drop or disable triggers on the auth users table (owned by the auth admin role), so rollbacks drop the function with CASCADE. Not a device surface; kept in review until run-quality use is decided.",
+      "description": "APPLIED in production by the owner approval of the exact files and verified by readback. A before-insert trigger on the completion receipts fills the typed columns (completion time, path length and the rest), and a batched backfill filled 24,437 existing receipts in 13 batches of 2,000. Readback: all 26,308 receipts have a path length and completion time above zero, the trigger is enabled, no long transactions. Old values are saved in a preimage table; rollback files exist, but a rollback would overwrite later real values on those rows. Limits: the values are asserted by the client and outliers exist (one completion time above 42 million ms), so any run-quality gating must validate them; the typed columns are metadata only today. Lesson recorded: SQL hash guards must be computed from the LIVE function body (the repository copy had LF line endings while the live body had CRLF, so a first version of a stale-name script would have aborted on production), and the production SQL runner role cannot drop or disable triggers on the auth users table (owned by the auth admin role), so rollbacks drop the function with CASCADE. Not a device surface; kept in review until run-quality use is decided. Board update 2026-11-15: Owner decision 2026-11-14: close as applied; run-quality gating does not use the typed columns for now (best decision delegated to Claude).",
       "cardType": "migration",
       "priority": "medium",
       "dependencies": [],
@@ -3454,11 +3454,11 @@
     {
       "id": "MAZER-ACCT-026",
       "status": "review",
-      "updatedAt": "2026-11-13T12:00:00.000Z",
+      "updatedAt": "2026-11-15T00:17:34.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-026",
       "title": "Username sign-in lockout (v4) live and sign-in verified; v5 proposal open, not applied",
-      "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live. Status 2026-11-13: FawxzzyWeb PR #133 (v5) is still unmerged and unapplied. It needs a database approval box and an owner decision on the exact change; v4 is already live from another session.",
+      "description": "Before this change, repeated wrong tries on a username could also block the real owner's correct sign-in for a while, so someone else could lock a player out of username sign-in. Wrong tries are now counted per username and per client, so in the common case the lockout blocks the person who is guessing, not the real owner. FawxzzyWeb PR #129 (merged as 137d8a51) and sign-in function version 12 are live, and the database change (four new functions) was applied on 2026-11-12 with the owner's approval of the exact SQL, then read back and matched to the repo. Checked beforehand in an isolated in-memory database (45 of 45 checks) and by an independent read-only review; the function items it raised were fixed before merge. Update 2026-11-13: the coordinator verified a live sign-in with both sign-in methods (by username and by the account’s other method) after version 12; the live per-client behavior is not separately verified. Known limits are tracked privately. Kept in review: deployed and checked by the coordinator’s live sign-in, but not on a real phone. PROPOSAL ONLY, NOT MERGED, SQL NOT APPLIED: FawxzzyWeb PR #133 (lockout v5) adds failures-only check and record functions keyed by username and client, with no forwarded-address header, on top of the live v4. Nothing of v5 is live. Status 2026-11-13: FawxzzyWeb PR #133 (v5) is still unmerged and unapplied. It needs a database approval box and an owner decision on the exact change; v4 is already live from another session. Board update 2026-11-15: Owner decision 2026-11-14: close at lockout v4 and park v5 (FawxzzyWeb #133 stays unmerged).",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [],
@@ -3470,12 +3470,12 @@
     },
     {
       "id": "MAZER-ACCT-027",
-      "status": "planning",
-      "updatedAt": "2026-11-12T20:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-14T22:30:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-027",
       "title": "Resolve the duplicate-username collisions with the oldest account winning",
-      "description": "A few accounts share two usernames, which the new duplicate-username guard does not change. Proposed resolution file 05: the oldest account keeps the name and the others lose the username key only. They keep sign-in with the account address and lose the greeting name in the menu. Not applied: the owner must flip the pair_extension_recorded flag, then the flipped file is hashed for approval.",
+      "description": "A few accounts share two usernames, which the new duplicate-username guard does not change. Proposed resolution file 05: the oldest account keeps the name and the others lose the username key only. They keep sign-in with the account address and lose the greeting name in the menu. Not applied: the owner must flip the pair_extension_recorded flag, then the flipped file is hashed for approval. Board update 2026-11-14: Collision resolution applied 2026-11-14: 3 loser username keys removed, backup table kept, 0 duplicates, headless readback verified, device false.",
       "cardType": "migration",
       "priority": "low",
       "dependencies": [
@@ -3489,12 +3489,12 @@
     },
     {
       "id": "MAZER-ACCT-028",
-      "status": "planning",
-      "updatedAt": "2026-11-13T12:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:19:01.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-028",
       "title": "Verify the before-user-created auth hook is registered at the provider",
-      "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started. Re-checked 2026-11-13: still UNKNOWN. It needs an owner look at the auth provider dashboard hook list; nothing was changed.",
+      "description": "UNKNOWN: whether the before-user-created hook that calls the new username guard is registered at the auth provider. It needs an owner dashboard read or a live probe. Checked 2026-11-12 on production: the hook function reads the Mazer profile table as the auth admin role, which has a column grant on username plus a row-level access policy, so the Mazer branch should work if the hook is registered (read from the grants, not proven by a live sign-up). Registration itself is still not confirmed. Not started. Re-checked 2026-11-13: still UNKNOWN. It needs an owner look at the auth provider dashboard hook list; nothing was changed. Board update 2026-11-15: Verified 2026-11-14 in the Supabase dashboard (Auth, Hooks): the Before User Created hook is ENABLED and points at the Postgres function mazer.mazer_before_user_created. Headless dashboard read, no change made. Deployed: production build none. No device surface.",
       "cardType": "reliability",
       "priority": "medium",
       "dependencies": [
@@ -3509,11 +3509,11 @@
     {
       "id": "MAZER-ACCT-029",
       "status": "review",
-      "updatedAt": "2026-11-14T08:02:05.000Z",
+      "updatedAt": "2026-11-15T04:16:32.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-029",
       "title": "Taken username named on the account site: merged, not live; Fitness patch proposed as text",
-      "description": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) shows \"That username is taken. Pick another one.\" inline on the account site; a duplicate-account notice and a generic database error still read as neutral text. MERGED-NOT-DEPLOYED until the production aliases are moved. Caveat: that message only appears if the before-user-created hook is registered at the provider, which is UNKNOWN (MAZER-ACCT-028). The Fitness side is not changed: a patch for the raw sign-up error text (the auth actions file of the Fitness app) is proposed as text only. Board update 2026-11-14: Decision recorded 2026-11-14: naming a taken username on sign-up is accepted; the generic database error stays vague. Merged on the account site, not yet live; the Fitness change is a separate Fitness card.",
+      "description": "A taken username and a generic database error during sign-up or rename reach the player as unclear copy on the account site and on Fitness sign-up and rename. Plan: map both to plain messages. Open question for the owner: how much a message may disclose about whether a username exists. Update 2026-11-13: FawxzzyWeb PR #130 (merged as 15ee11a1) shows \"That username is taken. Pick another one.\" inline on the account site; a duplicate-account notice and a generic database error still read as neutral text. MERGED-NOT-DEPLOYED until the production aliases are moved. Caveat: that message only appears if the before-user-created hook is registered at the provider, which is UNKNOWN (MAZER-ACCT-028). The Fitness side is not changed: a patch for the raw sign-up error text (the auth actions file of the Fitness app) is proposed as text only. Board update 2026-11-14: Decision recorded 2026-11-14: naming a taken username on sign-up is accepted; the generic database error stays vague. Merged on the account site, not yet live; the Fitness change is a separate Fitness card. Board update 2026-11-15: Taken-username message on the account site is in the deployed site builds (site PR 130 is an ancestor); earlier 'not live' wording was stale. Fires only if the sign-up hook is registered, which is not provable headless. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "bug",
       "priority": "low",
       "dependencies": [],
@@ -3525,12 +3525,12 @@
     },
     {
       "id": "MAZER-ACCT-030",
-      "status": "planning",
-      "updatedAt": "2026-11-12T20:00:00.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:11:15.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-030",
       "title": "Shorten or index the usernames over 15 characters for sign-in",
-      "description": "A few usernames over the 15-character limit (MAZER-ACCT-020) are silently never indexed for sign-in by username, so that way of signing in cannot find them; sign-in with the account address still works. Plan: shorten them or index them, together with MAZER-ACCT-020. Any data change needs approval from the owner first.",
+      "description": "A few usernames over the 15-character limit (MAZER-ACCT-020) are silently never indexed for sign-in by username, so that way of signing in cannot find them; sign-in with the account address still works. Plan: shorten them or index them, together with MAZER-ACCT-020. Any data change needs approval from the owner first. Board update 2026-11-15: Applied 2026-11-14 (owner approved exact SQL hash 15faee0d): three account usernames over 15 characters shortened collision-safe (codex-treatment, codex-treatmen2, codex-history-c); read-back shows zero over-15 and all three in the sign-in index. Rollback file kept. Client half (PR 558) still not deployed. Deployed: production build none. No device surface.",
       "cardType": "bug",
       "priority": "low",
       "dependencies": [
@@ -3544,21 +3544,21 @@
     },
     {
       "id": "MAZER-ACCT-031",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:02:06.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:14.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-031",
       "title": "Show a failure code a player can read off a phone",
-      "description": "Sign-in failure codes (MAZER-ACCT-014) are only visible with the runtime diagnostics switch, which a player cannot easily turn on from a phone. Plan: show a short code on a surface that carries nothing that identifies a person, so a player can read it out. The owner decides which surface. Board update 2026-11-14: Decision recorded 2026-11-14: a small line under the failure message shows the short code only, with nothing that identifies a person. This card is the build.",
+      "description": "Sign-in failure codes (MAZER-ACCT-014) are only visible with the runtime diagnostics switch, which a player cannot easily turn on from a phone. Plan: show a short code on a surface that carries nothing that identifies a person, so a player can read it out. The owner decides which surface. Board update 2026-11-14: Decision recorded 2026-11-14: a small line under the failure message shows the short code only, with nothing that identifies a person. This card is the build. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-15: Readable failure code (merged, not deployed, headless only) PR #545 merged (e8d9aca5). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
         "MAZER-ACCT-014"
       ],
       "acceptanceCriteria": [
-        "The owner picks a surface that shows no personal data",
-        "A failed sign-in shows a short readable code on a phone",
-        "A test confirms the code never includes personal data"
+        "After a failed sign-in the failure message shows one small line with the short failure code and nothing else.",
+        "The line carries no player details of any kind, proven by a unit test over every failure kind.",
+        "The line renders on a 320 px wide phone viewport without wrapping off screen, proven by a headless frame."
       ]
     },
     {
@@ -3604,11 +3604,11 @@
     {
       "id": "MAZER-ACCT-034",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:12:28.000Z",
+      "updatedAt": "2026-11-14T16:48:28.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-034",
       "title": "Optionally backfill the stored display name for already renamed profiles",
-      "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned",
+      "description": "The display name fix (MAZER-ACCT-025) only affects new renames. 51 of 132 profiles still have a display name that differs from the username and 25 are empty. An optional backfill file exists. Recommendation: do NOT run it, because it overwrites values players may have chosen on purpose. Owner decision; planning only, nothing applied. Board update 2026-11-14: Will not do, 2026-11-14: the stored display name backfill would overwrite names players may have chosen. Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned Board update 2026-11-14: Deferred: the stored display name backfill would overwrite names players may have chosen; not planned.",
       "cardType": "migration",
       "priority": "low",
       "dependencies": [
@@ -3697,11 +3697,11 @@
     {
       "id": "MAZER-PROG-019",
       "status": "planning",
-      "updatedAt": "2026-11-12T23:30:00.000Z",
+      "updatedAt": "2026-11-14T21:40:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-019",
       "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
-      "description": "The no-stub rule (MAZER-GEN-006) shortened the strictly rising ladder from 268 to 218 and lowered held-out difficulty of late mazes while the felt number stayed the same. Decide how to restore headroom past 218: find another lever that costs no felt difficulty, or let the hazard layer supply difficulty (MAZER-HAZ-002, blocked on an owner decision). Needs the owner's reaction to the shorter ladder first. Not started.",
+      "description": "The no-stub rule (MAZER-GEN-006) shortened the strictly rising ladder from 268 to 218 and lowered held-out difficulty of late mazes while the felt number stayed the same. Decide how to restore headroom past 218: find another lever that costs no felt difficulty, or let the hazard layer supply difficulty (MAZER-HAZ-002, blocked on an owner decision). Needs the owner's reaction to the shorter ladder first. Not started. Board update 2026-11-14: Needs owner decision: is a ladder ending at level 218 acceptable? Not started.",
       "cardType": "research",
       "priority": "medium",
       "dependencies": [
@@ -3851,11 +3851,11 @@
     {
       "id": "MAZER-VIS-031",
       "status": "deferred_candidate",
-      "updatedAt": "2026-11-14T08:02:24.000Z",
+      "updatedAt": "2026-11-14T16:49:26.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-031",
       "title": "Lower the edge beam draw-call count if a phone hitches",
-      "description": "The redesigned edge beams (MAZER-VIS-030) draw a bloom and a body as stacked layers, set by BEAM_BODY_LAYERS and BEAM_BLOOM_LAYERS in the beam art file. Plan: if a real phone hitches during a level change, lower the layer counts or merge spans and re-measure. Do nothing until a phone check shows a hitch. Not started. Board update 2026-11-14: Deferred 2026-11-14: do nothing unless a phone shows a hitch from the edge beam draw calls.",
+      "description": "The redesigned edge beams (MAZER-VIS-030) draw a bloom and a body as stacked layers, set by BEAM_BODY_LAYERS and BEAM_BLOOM_LAYERS in the beam art file. Plan: if a real phone hitches during a level change, lower the layer counts or merge spans and re-measure. Do nothing until a phone check shows a hitch. Not started. Board update 2026-11-14: Deferred 2026-11-14: do nothing unless a phone shows a hitch from the edge beam draw calls. Board update 2026-11-14: Deferred: only revisit if a phone shows a hitch at level change.",
       "cardType": "reliability",
       "priority": "low",
       "dependencies": [
@@ -3942,11 +3942,11 @@
     {
       "id": "MAZER-VIS-035",
       "status": "review",
-      "updatedAt": "2026-11-13T17:25:38.000Z",
+      "updatedAt": "2026-11-15T02:14:39.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-035",
       "title": "Keep a few background stars rainbow-coloured",
-      "description": "About 20 percent of backdrop stars (chosen by a stable per-star seed) keep a dim rainbow hue that cycles once per 24 s with per-star phase offsets. Reduce Motion stops drift and twinkle but colours keep shifting. Board update 2026-11-13: Merged and deployed; headless only. About 20 percent of background stars keep a slow dim rainbow hue; tint visibility unverified on a phone. PR #498 merged (d5a354c6). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone.",
+      "description": "About 20 percent of backdrop stars (chosen by a stable per-star seed) keep a dim rainbow hue that cycles once per 24 s with per-star phase offsets. Reduce Motion stops drift and twinkle but colours keep shifting. Board update 2026-11-13: Merged and deployed; headless only. About 20 percent of background stars keep a slow dim rainbow hue; tint visibility unverified on a phone. PR #498 merged (d5a354c6). Deployed: production build fawxzzy-mazer-5dfftudqq. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Backdrop stars use the shared rainbow UI palette, near-black backdrop kept; stars small and dim in screenshots PR #573 merged (20160d6f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
@@ -3995,11 +3995,11 @@
     {
       "id": "MAZER-GOV-010",
       "status": "review",
-      "updatedAt": "2026-11-13T17:25:50.000Z",
+      "updatedAt": "2026-11-14T23:54:55.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-010",
       "title": "Board updates by event log and milestone fold, not per PR",
-      "description": "Board changes are recorded as one event line each (board-events branch) and folded by a deterministic script at milestones into the registry, ledger, export, work report and Web snapshot. Replaces the per-PR agent edit. The process is written up in the Mazer board sync process document. Board update 2026-11-13: Merged (PR 495); no runtime surface. Board rule, project-board-sync agent and mazer-batch skill rewritten to the event and milestone process. The Board sync workflow has not run on GitHub yet. PR #495 merged (14c85ca1). No runtime surface to deploy. No device surface.",
+      "description": "Board changes are recorded as one event line each (board-events branch) and folded by a deterministic script at milestones into the registry, ledger, export, work report and Web snapshot. Replaces the per-PR agent edit. The process is written up in the Mazer board sync process document. Board update 2026-11-13: Merged (PR 495); no runtime surface. Board rule, project-board-sync agent and mazer-batch skill rewritten to the event and milestone process. The Board sync workflow has not run on GitHub yet. PR #495 merged (14c85ca1). No runtime surface to deploy. No device surface. Board update 2026-11-14: Board fold now applies a card's new event first, allows no-runtime cards created completed, and skips a duplicate new; plan passes on the live event log. Merged, tooling only, apply not run. PR #569 merged (7bbfe810). Deployed: production build none. No device surface.",
       "cardType": "governance",
       "priority": "medium",
       "dependencies": [],
@@ -4011,12 +4011,12 @@
     },
     {
       "id": "MAZER-PWA-006",
-      "status": "planning",
-      "updatedAt": "2026-11-13T17:24:53.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:08.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PWA-006",
       "title": "Trim dev pages from the precache and decide update behaviour on deploy",
-      "description": "The production precache ships about 300 KiB of dev and QA pages plus the legacy service worker script, and a new deploy reloads a running session about 1.5 s after the update check with no prompt. Decide the update behaviour (prompt or deferred) and measure mid-level restore.",
+      "description": "The production precache ships about 300 KiB of dev and QA pages plus the legacy service worker script, and a new deploy reloads a running session about 1.5 s after the update check with no prompt. Decide the update behaviour (prompt or deferred) and measure mid-level restore. Board update 2026-11-15: Precache trim and deferred update reload (merged, not deployed, headless only) PR #544 merged (bfeefba4). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "reliability",
       "priority": "low",
       "dependencies": [
@@ -4030,12 +4030,12 @@
     },
     {
       "id": "MAZER-VIS-037",
-      "status": "planning",
-      "updatedAt": "2026-11-13T17:26:34.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:10:50.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-037",
       "title": "Bound the trail canvas colour step at the sheen crossing",
-      "description": "The wrap-dock glow colour is now limited to 8 of 255 per redraw (PERF-007) but the trail canvas core still steps up to 20 per 33 ms there. Apply the same bound after draft #461 settles, and check the dock band alpha step on a phone.",
+      "description": "The wrap-dock glow colour is now limited to 8 of 255 per redraw (PERF-007) but the trail canvas core still steps up to 20 per 33 ms there. Apply the same bound after draft #461 settles, and check the dock band alpha step on a phone. Board update 2026-11-15: Dock band alpha step (merged, not deployed, headless only) PR #541 merged (cc7f87c5). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "reliability",
       "priority": "low",
       "dependencies": [
@@ -4314,12 +4314,12 @@
     },
     {
       "id": "MAZER-VIS-042",
-      "status": "planning",
-      "updatedAt": "2026-11-14T06:37:59.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:10:44.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-042",
       "title": "Mirror the Fitness loader hardening in the Mazer loader",
-      "description": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling.",
+      "description": "The Fitness loader rebuild is live and shares the same timing numbers (150 ms delay, 350 ms hold, 200 ms in, 300 ms out, 1200 ms pulse). It also fixed three bugs worth checking in Mazer: the icon ghosting in while the cover fades out on a load faster than 150 ms, a late start letting a failsafe-hidden cover flash back opaque, and an error in the frame callback or an early unmount leaving an opaque cover. Also consider a boot failsafe and a wait ceiling. Board update 2026-11-15: Loader hardening (merged, not deployed, headless only) PR #540 merged (8b9435d4). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "reliability",
       "priority": "low",
       "dependencies": [
@@ -4334,68 +4334,68 @@
     {
       "id": "MAZER-UI-027",
       "status": "planning",
-      "updatedAt": "2026-11-14T08:01:41.000Z",
+      "updatedAt": "2026-11-14T18:00:00.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-027",
       "title": "Split the menu scene into smaller owned modules",
-      "description": "Child of the UI rework umbrella. The menu scene is about 16,600 lines and every lane edits it. Plan: carve out one section at a time behind its existing tests, keeping player-visible behaviour identical. Not started.",
+      "description": "Child of the UI rework umbrella. The menu scene is about 16,600 lines and every lane edits it. Plan: carve out one section at a time behind its existing tests, keeping player-visible behaviour identical. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped.",
       "cardType": "architecture",
       "priority": "medium",
       "dependencies": [
         "MAZER-UI-019"
       ],
       "acceptanceCriteria": [
-        "Each extracted section keeps its existing tests green with no player-visible change",
-        "The menu scene shrinks by the extracted lines and each new module has one owner",
-        "No frozen visual rule changes (board size, zoom, tile style, dark neon look)"
+        "One named section moves into its own module with no change to player-visible behaviour, proven by the existing menu tests passing unchanged.",
+        "The menu scene line count drops by at least the size of the moved section and no new import cycles appear, proven by the dependency check.",
+        "A frame comparison of the affected surface before and after is identical at phone and desktop widths."
       ]
     },
     {
       "id": "MAZER-UI-028",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:01:42.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-14T23:41:55.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-028",
       "title": "Give every UI rework wave a visual proof surface (Wave 6)",
-      "description": "Child of the UI rework umbrella. The wave status report found the migration layer not started and no wave carrying visual proof. Plan: one captured proof surface per wave before it is called done. Not started.",
+      "description": "Child of the UI rework umbrella. The wave status report found the migration layer not started and no wave carrying visual proof. Plan: one captured proof surface per wave before it is called done. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-14: Per-wave proof-surface manifest plus a test that fails a done wave with no committed capture; docs and test only; wave 3A owes a capture PR #559 merged (b9fbf3a2). Deployed: production build none. No device surface.",
       "cardType": "migration",
       "priority": "low",
       "dependencies": [
         "MAZER-UI-019"
       ],
       "acceptanceCriteria": [
-        "Each wave lists the surfaces it changes and a capture for each",
-        "A wave cannot be marked done without its capture",
-        "Captures run headless and are stored with the wave evidence"
+        "Each rework wave has one named capture route that renders its surface deterministically.",
+        "A test captures each route and fails when the capture is missing or blank.",
+        "The wave status report lists the capture route per wave, and no wave is called done without one."
       ]
     },
     {
       "id": "MAZER-UI-029",
       "status": "planning",
-      "updatedAt": "2026-11-14T08:01:43.000Z",
+      "updatedAt": "2026-11-15T02:13:25.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-029",
       "title": "Retire the future-phaser path",
-      "description": "Child of the UI rework umbrella. The wave status report found DOM primitives unused in production and a parallel future-phaser path. Plan: prove what is unused, then delete it with its tests. Not started.",
+      "description": "Child of the UI rework umbrella. The wave status report found DOM primitives unused in production and a parallel future-phaser path. Plan: prove what is unused, then delete it with its tests. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-15: Audit 2026-11-14: future-phaser entry is still used by future runtime proof scripts, future-lane-health gates 6 to 8 and the decision registry (retire, not yet implemented); safe deletion needs those retired together. Evidence list is in PR 572. Needs a retirement slice, not a plain delete. Deployed: production build none. No device surface.",
       "cardType": "technical-debt",
       "priority": "low",
       "dependencies": [
         "MAZER-UI-019"
       ],
       "acceptanceCriteria": [
-        "Each remaining future-phaser piece is proven unused or kept with a reason",
-        "Unused pieces are deleted with their tests",
-        "No player-visible change"
+        "A written evidence list shows each removed item has no production import.",
+        "Each removed item is deleted together with its tests, and the production bundle does not grow.",
+        "The full unit suite and the build pass, and a headless smoke run shows no runtime behaviour change."
       ]
     },
     {
       "id": "MAZER-FLOW-016",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:01:44.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:03.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-016",
       "title": "Keep the same maze after quit or reload",
-      "description": "Decision recorded 2026-11-14: quitting or reloading mid-level resumes the same maze, so quitting is not a free re-roll. Plan: persist the maze seed for the current attempt at level start, restore it on the next Start, clear it on completion and on a deliberate reset. Not started.",
+      "description": "Decision recorded 2026-11-14: quitting or reloading mid-level resumes the same maze, so quitting is not a free re-roll. Plan: persist the maze seed for the current attempt at level start, restore it on the next Start, clear it on completion and on a deliberate reset. Not started. Board update 2026-11-15: Keep the same maze after quit or reload (merged, not deployed, headless only) PR #543 merged (18fd48f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
@@ -4409,40 +4409,592 @@
     },
     {
       "id": "MAZER-AUDIO-003",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:01:45.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:30.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-AUDIO-003",
       "title": "Add small synthesized sound effects with a Settings toggle, default off",
-      "description": "Decision recorded 2026-11-14: sound is allowed as small synthesized effects behind a Settings toggle that defaults to off. Plan: a small effects module unlocked on the first tap, one Settings row, one Guide row (guide sync rule). Not started.",
+      "description": "Decision recorded 2026-11-14: sound is allowed as small synthesized effects behind a Settings toggle that defaults to off. Plan: a small effects module unlocked on the first tap, one Settings row, one Guide row (guide sync rule). Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-15: Synthesized sound effects with a Settings toggle, default off (merged, not deployed, headless only) PR #548 merged (9a8cc95e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
         "MAZER-AUDIO-001"
       ],
       "acceptanceCriteria": [
-        "Sound is off by default and the Settings toggle turns it on and off",
-        "The in-app Guide describes the toggle",
-        "Audio unlock is checked on a real phone before the card is called done"
+        "A Settings row turns sound effects on or off, defaults to off, and the choice persists across reload.",
+        "With the toggle off no audio context is created; with it on the first tap unlocks audio and one effect plays, proven by a unit test with a fake audio context.",
+        "The in-app Guide gains one row describing sound, and the guide sync test passes."
       ]
     },
     {
       "id": "MAZER-UI-030",
-      "status": "planning",
-      "updatedAt": "2026-11-14T08:01:46.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-14T23:27:03.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-030",
       "title": "Show the offline cache update warning in the message toast",
-      "description": "Decision recorded 2026-11-14: remote sync stays silent and boot errors stay on the splash; the only new toast is the service worker warning that the offline cache could not update. Plan: one message from the service worker into the existing toast queue with friendly copy. Not started.",
+      "description": "Decision recorded 2026-11-14: remote sync stays silent and boot errors stay on the splash; the only new toast is the service worker warning that the offline cache could not update. Plan: one message from the service worker into the existing toast queue with friendly copy. Not started. Board update 2026-11-14: Triaged ready: blocker cleared, three acceptance criteria written, smallest change scoped. Board update 2026-11-14: Offline cache failure shows one friendly toast per page load via the message queue; merged, not deployed, headless only PR #552 merged (cd8e6455). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [
         "MAZER-UI-021"
       ],
       "acceptanceCriteria": [
-        "The warning reaches the toast with friendly copy",
-        "Sync failures stay silent and boot errors stay on the splash",
-        "The message inventory test pins the new row"
+        "When the service worker fails to update the offline cache, one friendly line appears in the existing message toast.",
+        "Remote sync errors stay silent and boot errors stay on the splash, proven by tests for both.",
+        "The message is shown at most once per session, proven by a unit test with a simulated worker message."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-043",
+      "status": "review",
+      "updatedAt": "2026-11-14T16:25:20.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-043",
+      "title": "Keep edge diamonds inside the screen with the outer tip on the edge",
+      "description": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The behaviour is covered by a test",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-FLOW-017",
+      "status": "review",
+      "updatedAt": "2026-11-14T22:48:01.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FLOW-017",
+      "title": "Touch-first level 1 hint that follows the input in use",
+      "description": "The level 1 controls hint said arrow keys first. It now defaults to touch wording and swaps to mouse or keyboard wording when that input is used. Board update 2026-11-14: Touch-first level 1 hint that follows the input in use: touch, mouse and keys wording, Guide and accessibility text touch-first; not device-checked PR #557 merged (ecd0d61e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The behaviour is covered by a test",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-011",
+      "status": "review",
+      "updatedAt": "2026-11-15T04:51:08.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-011",
+      "title": "Run the owner export checks inside board apply",
+      "description": "Board apply runs the same export checks CI runs, so wording misses surface before the board pull request. Tooling only, no player-facing change. Board update 2026-11-15: Board tooling: completed cards can now be archived with an archive flag (PR 570). Archived cards export as lifecycle archived and sit in the collapsed Completed archive on the Web board. PR #570 merged (73189106). Deployed: production build none. No device surface. Board update 2026-11-15: Correction: GOV-011 is the board-sync tooling card; an earlier planning event was recorded in error. Work is merged (PRs 569 and 570) and awaiting the next deploy and fold. Deployed: production build none. No device surface. Board update 2026-11-15: Reopened: the board-sync tooling work (PRs 569 and 570) is merged but not deployed, so review is the accurate status until the next deploy and fold.",
+      "cardType": "automation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Apply runs the export checks on its result",
+        "A failing check restores every file and exits non-zero",
+        "A test covers the failure path"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-011",
+      "status": "review",
+      "updatedAt": "2026-11-14T23:02:29.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-011",
+      "title": "Rise and stagger entrance for overlays and controls",
+      "description": "MOTION-002 is in review; the rise and stagger entrance part is not built. Add one shared entrance that lifts a panel and staggers its rows, reading the motion scale. Board update 2026-11-14: Overlay rise and stagger on labels and row fills, reduce-motion static; headless Chromium+WebKit only, no device or fps check PR #562 merged (a25519b8). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-MOTION-002"
+      ],
+      "acceptanceCriteria": [
+        "Overlay panels and their rows enter with a short rise and a stagger on the shared motion scale, no new off-scale values.",
+        "With Reduce Motion on, the entrance is a plain crossfade of the shared length with no movement.",
+        "A unit test pins the stagger step and the reduced-motion branch, and a headless frame shows the resting layout unchanged."
+      ]
+    },
+    {
+      "id": "MAZER-UI-031",
+      "status": "review",
+      "updatedAt": "2026-11-15T04:55:16.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-031",
+      "title": "Migrate stray colour literals to theme values in slices",
+      "description": "UI-013 landed a ratchet that stops new stray colours; about 290 existing literals remain. Map them to theme values or named material extensions one surface per change, lowering the ratchet each time. Board update 2026-11-15: Slice 1 merged: Navigation Core energy stops moved into the shared trail palette, colour ratchet down by 8. PR #549 merged (835e5bad). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Slice 3 merged: four render files now take white, mask black and the player accent from the shared trail palette with identical values; colour ratchet down by 7 (292 stray literals left). PR #580 merged (5193028b). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Slice 4 merged: proof-view files now take their colours from the shared palette with identical values; colour ratchet down by 13 (279 stray literals left). PR #582 merged (2ffba994). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-UI-013"
+      ],
+      "acceptanceCriteria": [
+        "Each slice maps one surface's literals to theme values or named extensions with no visible colour change, proven by a frame comparison.",
+        "The ratchet allowance is lowered by exactly the number of literals removed in the slice.",
+        "The five near-black backgrounds and three energy greens converge to one named value each by the last slice."
+      ]
+    },
+    {
+      "id": "MAZER-UI-032",
+      "status": "review",
+      "updatedAt": "2026-11-15T00:11:19.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-032",
+      "title": "Finish the wave 1C diagnostics type cleanup",
+      "description": "UI-023 narrowed the menu diagnostics form mode to login only; loose diagnostics types and unused modes remain. Tighten the types and remove the dead branches. Board update 2026-11-15: Menu diagnostics type cleanup (merged, not deployed, headless only) PR #546 merged (f07cdf7c). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-UI-023"
+      ],
+      "acceptanceCriteria": [
+        "Diagnostics form mode and related types admit only values that production code produces, enforced by the type checker.",
+        "Dead diagnostics branches are removed together with their tests and no runtime behaviour changes.",
+        "The type check, unit suite and diagnostics smoke run pass unchanged."
+      ]
+    },
+    {
+      "id": "MAZER-QA-009",
+      "status": "review",
+      "updatedAt": "2026-11-14T22:26:49.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-009",
+      "title": "One ordered phone check list that closes several cards",
+      "description": "Many cards wait on real phone checks (ACCT-003, ACCT-013, MOTION-008, QA-001, VIS-018). Combine them into one ordered list so a single owner session closes several cards. Board update 2026-11-14: Headless phone sweep merged with an ordered real-device checklist; not device-checked PR #554 merged (df764154). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "documentation",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-QA-001"
+      ],
+      "acceptanceCriteria": [
+        "One checklist lists every pending phone step in order with the expected result and the card each step closes.",
+        "Each step is a single action and a single expected result, readable on a phone.",
+        "The checklist is linked from the board and each referenced card names it as its device step."
+      ]
+    },
+    {
+      "id": "MAZER-GOV-013",
+      "status": "planning",
+      "updatedAt": "2026-11-14T18:00:02.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-013",
+      "title": "Dispatch the Board sync workflow once on GitHub and record the run",
+      "description": "The Board sync workflow exists but has never been dispatched on GitHub, so its behaviour is unproven. Dispatch it once and record the outcome.",
+      "cardType": "automation",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-GOV-010"
+      ],
+      "acceptanceCriteria": [
+        "The workflow is dispatched once on GitHub and its run result (pass or fail) is recorded as a board event.",
+        "If it fails, the failure cause is written as one new bug card with the fix scope.",
+        "The process document states the verified trigger, permissions and what the run did or did not change."
+      ]
+    },
+    {
+      "id": "MAZER-UI-033",
+      "status": "review",
+      "updatedAt": "2026-11-14T22:59:08.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-033",
+      "title": "Shrink the menu online counter to username text size and add an Online label",
+      "description": "The online-players number in the main menu header is far larger than the old username text and has no Online label on phones. Make the number the same height as the old username text and add a small Online label under it, with nothing else moving. Board update 2026-11-14: Online counter is an exact copy of the web counter (dot, number, online); word drops at 380px and narrower like the web header; headless/WebKit emulation only PR #556 merged (3b19f6bc). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-UI-024"
+      ],
+      "acceptanceCriteria": [
+        "The counter number is drawn at the same height as the old 14px username text.",
+        "A small Online label sits under the number on phone widths, as on the website.",
+        "Long counts such as 999 and 99K never overlap the leading icon or the title at 320, 360, 390, 412 and desktop widths.",
+        "Nothing else in the header moves."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-044",
+      "status": "review",
+      "updatedAt": "2026-11-14T23:16:14.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-044",
+      "title": "Keep the four corner edge diamonds anchored in the screen corners",
+      "description": "The corner edge diamonds sat pushed in from the corners. They now sit with the outer tip on the screen corner at every viewport size, scaling about the corner. Board update 2026-11-14: Corner diamonds anchored at 0px inset in all 4 corners; merged, headless Chromium and WebKit only, no device check PR #560 merged (ce27e952). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Each corner diamond outer tip touches the viewport corner at 0px inset at phone, landscape and desktop sizes",
+        "A test measures the corner offset",
+        "Checked in Chromium and WebKit phone emulation"
+      ]
+    },
+    {
+      "id": "MAZER-DEBT-001",
+      "status": "deferred_candidate",
+      "updatedAt": "2026-11-15T05:45:29.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DEBT-001",
+      "title": "Retire the future-phaser dependency",
+      "description": "Remove the unused future-phaser entry so the install and bundle stay smaller. Board update 2026-11-15: Duplicate of MAZER-UI-029 (retire the future-phaser path); keep that one. Board update 2026-11-15: Deferred: this card duplicates MAZER-UI-029 (retire the future-phaser path), so it is parked and UI-029 carries the work. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-DEBT-002",
+      "status": "review",
+      "updatedAt": "2026-11-15T04:34:18.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DEBT-002",
+      "title": "Stop publishing constant formMode and invalidFields in menu diagnostics",
+      "description": "MenuScene publishes two diagnostics fields that never change; remove them. Board update 2026-11-15: Split 1 of 3 merged: the menu diagnostics type now marks the constant form-mode and invalid-fields entries optional and deprecated. Next: the menu scene stops publishing them, then the type fields are deleted. PR #575 merged (5c42d7f2). Deployed: production build none. No device surface. Board update 2026-11-15: Split 2 of 3 merged: the menu scene no longer publishes the constant form-mode and invalid-fields entries. Last step: delete the deprecated type fields and test fixture. PR #579 merged (e59b726b). Deployed: production build none. No device surface. Board update 2026-11-15: Split 3 of 3 merged: the deprecated form-mode and invalid-fields entries are gone from the menu diagnostics type and its test. Code complete; awaiting the next deploy and fold. PR #581 merged (862e7c11). Deployed: production build none. No device surface.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-UI-034",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:14:29.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-034",
+      "title": "Smaller font for the sign-in failure code line",
+      "description": "The failure code line under a sign-in error uses body size and crowds the message; give it a smaller size. Board update 2026-11-15: Sign-in failure code line now uses the smaller caption type step PR #573 merged (20160d6f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-UI-035",
+      "status": "review",
+      "updatedAt": "2026-11-15T05:01:26.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-035",
+      "title": "Move the settings gear off the top-right corner diamond at 390 wide",
+      "description": "At 390 px wide the settings gear overlaps the corner diamond; give it room. Board update 2026-11-15: Settings gear clears the corner diamond at 375 wide and up; narrower phones keep the old inset PR #573 merged (20160d6f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Narrow-phone fix merged: under 375 wide the corner diamonds peak at 70% so the top-right one clears the settings gear; 375 and wider unchanged. Headless only, not checked on a real phone. PR #584 merged (8d6e0523). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-QA-010",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:12:32.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-010",
+      "title": "Make the online counter measurement check stable",
+      "description": "verify-menu-online-counter failed once with control delta 4 and passed on rerun; remove the flake. Board update 2026-11-15: Counter check now reads until four readings agree; 10 green runs PR #571 merged (7a4622a4). Deployed: production build none. No device surface.",
+      "cardType": "reliability",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-UI-036",
+      "status": "planning",
+      "updatedAt": "2026-11-14T23:59:07.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-036",
+      "title": "Move remaining legacy font stacks to the shared type scale",
+      "description": "Segoe UI Variable and IBM Plex Mono stacks still appear outside the shared type scale.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-GOV-014",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:12:43.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GOV-014",
+      "title": "Capture owed for wave 3A and a Wave 0C capture script",
+      "description": "Wave 3A has no committed capture and no script exists for Wave 0C. Board update 2026-11-15: Wave 0C capture script and 0C/3A capture packets committed PR #571 merged (7a4622a4). Deployed: production build none. No device surface.",
+      "cardType": "governance",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-QA-011",
+      "status": "review",
+      "updatedAt": "2026-11-15T02:12:37.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-011",
+      "title": "Player-reachable route to levels 60, 100 and 190 for checks",
+      "description": "QA cannot reach the late levels through play; add a supported route. Board update 2026-11-15: Sweep levels flag and level-access doc (levels 60/100/190 were already reachable) PR #571 merged (7a4622a4). Deployed: production build none. No device surface.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-011",
+      "status": "review",
+      "updatedAt": "2026-11-15T03:11:47.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-011",
+      "title": "Drop the 934 KB app icon from the service worker precache",
+      "description": "mazer-app-icon.png is precached but only needed at install time; stop precaching it. Board update 2026-11-15: App icon (934 KB) removed from the offline precache; precache 18 to 17 entries; install icons stay precached PR #572 merged (26fef11b). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "reliability",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The change is covered by a test or a verify script",
+        "Checked in Chromium and WebKit phone emulation",
+        "Nothing else in the menu or game changes"
+      ]
+    },
+    {
+      "id": "MAZER-MOTION-020",
+      "status": "completed",
+      "updatedAt": "2026-11-15T15:36:17.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-MOTION-020",
+      "title": "Replace the maze fade in and out with a smooth build and tear-down",
+      "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "No whole-maze opacity fade is used between mazes; the build and tear-down read as motion on the maze itself",
+        "Works at 60 fps class pacing on a phone profile and respects reduced motion",
+        "Headless phone captures show frames mid-build and mid-tear-down"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-050",
+      "status": "review",
+      "updatedAt": "2026-11-15T07:08:53.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-050",
+      "title": "Remove the thin white pre-draw line and the centre dot on every maze tile",
+      "description": "A thin white line draws out the maze spots before the rest of the maze draws, and every tile has a dot in its middle. The owner wants both gone. Board update 2026-11-15: Centre dot on maze tiles removed and merged (bake version bumped). The thin white line before the reveal is not isolated: it looks like the 1px rim of the first faint tiles showing before their dark fill; it will be fixed as part of the new build and tear-down animation (MOTION-020), so it stays open. PR #586 merged (31bf2bb2). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: White line ahead of the fill removed together with MOTION-020 (PR 590): nothing is drawn at partial opacity now. Headless only, not deployed. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "No thin white line is drawn ahead of the maze during the reveal",
+        "No dot is drawn in the middle of maze tiles",
+        "Headless phone captures of a fresh maze mid-reveal and settled show neither"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-051",
+      "status": "completed",
+      "updatedAt": "2026-11-15T15:36:23.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-051",
+      "title": "Make trail colours bolder and more arcade, less pastel",
+      "description": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Merged first pass: cyan is now fully neon and bloom is stronger. Violet, magenta and blue stay lighter because of the contrast floor on the trail, so a second pass is needed. Headless only. PR #588 merged (2ab307ea). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Trail colours come from the shared palette module and are visibly more saturated than before",
+        "Contrast against the board stays readable on a phone-size screenshot",
+        "The in-app guide and its icons match the new trail colours"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-052",
+      "status": "review",
+      "updatedAt": "2026-11-15T05:22:04.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-052",
+      "title": "Main menu: restore bleed-off paths that run off the screen edge",
+      "description": "The owner sees fewer bleed-off paths on the main menu than expected. Find out whether a generation or menu-demo change removed them and restore the intended amount. Board update 2026-11-15: Finding: fewer menu bleed-off paths is a side effect of the difficulty ladder (feeder count set to 0 on 2026-11-06) plus wrap fade from level 140, not a bug. Implementing a menu-demo-only profile that restores the old density without touching real levels. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Merged: the menu demo now has its own profile with bleed-off paths restored (about 4 openings at level 20-30, about 15 at level 60, about 19 at 100 and up); real levels and ladder untouched and pinned by a test. Headless only; density at level 100 and up may be too heavy, one clamp dials it down. PR #587 merged (cf7ee62e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Root cause is stated: a change that removed them, or an unchanged setting",
+        "Main menu demo mazes show bleed-off paths at the intended rate across many seeds",
+        "A test or measurement script guards the rate"
+      ]
+    },
+    {
+      "id": "MAZER-UI-050",
+      "status": "planning",
+      "updatedAt": "2026-11-15T15:38:27.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-050",
+      "title": "Touch up the Start, Mazer title and Level text designs",
+      "description": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Start, Mazer title and Level text are distinct in role but one visual family",
+        "Readable at 320 to 430 px wide",
+        "Headless phone captures of menu and in-game views"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-020",
+      "status": "review",
+      "updatedAt": "2026-11-15T04:58:50.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-020",
+      "title": "Revisit diagonal maze paths now that movement is automatic",
+      "description": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Written assessment of generation, navigation core, rendering and controls impact",
+        "Go or no-go recommendation with the reasons",
+        "If go, a flagged prototype that does not change current mazes"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-053",
+      "status": "planning",
+      "updatedAt": "2026-11-15T04:50:47.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-053",
+      "title": "Spiral start marker synced with the end star; polish start and end tiles",
+      "description": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Start marker is a spiral, same size as before, spinning slowly in phase with the end star",
+        "End star border uses the same shared colour as the corner diamond border",
+        "Start and end tile designs are polished and pass headless phone captures; reduced motion stops the spin"
+      ]
+    },
+    {
+      "id": "MAZER-PROG-021",
+      "status": "review",
+      "updatedAt": "2026-11-15T05:32:39.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-021",
+      "title": "Research and design an endless maze progression engine",
+      "description": "Survey maze generation and difficulty measurement techniques and propose a progression engine that keeps getting harder for as long as a player can play. Board update 2026-11-15: Research done (report on file, 18 sources): difficulty today is capped by the fixed board (scale 35, about 25x49 tiles), geometry stops rising at level 288; a smaller tile scale of 38 to 40 gives 2 to 5 more tiles across and 4 to 10 more down on phones with a 10 px tile floor; truly endless needs a camera on a board bigger than the screen. Build slices S0 to S5 planned. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner decisions: tile floor 10 px yes; no camera or zoom yet, the board stays fully on screen with only a slight size increase; difficulty rise by the felt-plus-density ladder; no leaderboard reset and no reset of anyone's current level; breather levels not added. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "research",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A written research note cites sources on maze generation algorithms and measurable difficulty (solution length, branching, dead-end depth, decision density) and says which fit Mazer.",
+        "The note proposes an endless curve: what grows (board size, branching, deception, solution length), how it is measured per generated maze, and what stops it plateauing.",
+        "The proposal respects the owner direction on obstacles and enemies being decided one by one later, and lists what it needs from those cards.",
+        "A first build slice is named with tests, ready as a follow-up card."
+      ]
+    },
+    {
+      "id": "MAZER-PROG-020",
+      "status": "review",
+      "updatedAt": "2026-11-15T07:53:18.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-020",
+      "title": "Grow the maze board with progression (2-5 more tiles each way)",
+      "description": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: Building slices S0 (calibration table) and S1/S2 (scale 38 growing to 40 by level, 10 px tile floor) first; camera for endless play and leaderboard policy await Zac. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-021"
+      ],
+      "acceptanceCriteria": [
+        "Board gains 2 to 5 tiles in each direction compared with today, growing with level, with tiles staying large enough to read and touch on a 320 to 430 wide phone.",
+        "The growth curve is continuous with no visible jump between levels and is covered by a test over a wide level range.",
+        "Existing guarantees hold: edge wrap, no one-tile stubs, ladder gauges, menu demo, run receipts and leaderboard fairness (or a documented migration).",
+        "Headless phone screenshots at several levels show the board fitting the viewport without clipping, checked and described."
+      ]
+    },
+    {
+      "id": "MAZER-GEN-021",
+      "status": "in_progress",
+      "updatedAt": "2026-11-15T05:46:30.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-021",
+      "title": "Make generated mazes feel like a real maze",
+      "description": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PROG-020",
+        "MAZER-PROG-021"
+      ],
+      "acceptanceCriteria": [
+        "Contact sheets of generated mazes at levels 1, 10, 30, 60, 100, 200 and 400 on the new board are reviewed and the parts that do not feel like a real maze are named.",
+        "A tuning plan combines the existing generator features to fix them, with measured gauges (route length, dead-end depth, branching, decision points) before and after.",
+        "Changes ship behind the felt-plus-density ladder slice with tests, and no player level or leaderboard entry is reset.",
+        "Headless phone screenshots of before and after mazes are looked at and described."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-054",
+      "status": "completed",
+      "updatedAt": "2026-11-15T15:36:32.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-054",
+      "title": "Corner diamonds fully visible on rounded displays",
+      "description": "The four corner edge diamonds sit on the exact screen corner and a rounded phone display hides them at rest. Slide them in along the diagonal so the tip touches the curved edge on tall phones. Board update 2026-11-15: Corner diamonds now fully visible on tall rounded phones (tip 16 px in from both edges). Trade-off: top header icons and title sit further in, so the title is about 25 percent smaller at 390 wide. Headless Chromium only, not deployed, not checked on a real phone. PR #593 merged (b76551a4). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Corner diamonds now fully visible on tall rounded phones; header title sits further in. Live, headless checks only. PR #593 merged (b76551a4). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Corner diamond painted shape is clear of a 55 px rounded corner at 50, 75 and 100 percent size on tall phones",
+        "Desktop and short or narrow phones keep the current corner anchor",
+        "Header controls clear the corner diamonds on both sides without shrinking the title",
+        "Phone checklist lists the real-device corner check"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-055",
+      "status": "planning",
+      "updatedAt": "2026-11-15T15:38:35.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-055",
+      "title": "Edge marker redesign",
+      "description": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [
+        "MAZER-VIS-054"
+      ],
+      "acceptanceCriteria": [
+        "Owner picks one of the proposed marker looks",
+        "The chosen shape keeps the beam, fill and size-cycle behaviour working",
+        "Corner markers stay fully visible on rounded displays",
+        "Reduced motion keeps a static marker"
       ]
     }
   ]
