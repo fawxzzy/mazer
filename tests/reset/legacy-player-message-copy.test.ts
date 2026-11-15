@@ -40,11 +40,11 @@ describe('player message copy rows', () => {
     }).toMatchInlineSnapshot(`
       {
         "auth": {
-          "accountUnavailable": "Account service is unavailable right now. Try again shortly.",
-          "authUnavailable": "Account access is unavailable right now. Try again shortly.",
+          "accountUnavailable": "Sign-in is unavailable right now. Try again in a minute.",
+          "authUnavailable": "Sign-in is unavailable right now. Try again in a minute.",
           "emailInvalid": "Enter a valid email address.",
-          "loginNotConfigured": "Account access is unavailable right now. Try again shortly.",
-          "networkUnavailable": "Account service is unreachable. Try again shortly.",
+          "loginNotConfigured": "Sign-in is unavailable right now. Try again in a minute.",
+          "networkUnavailable": "No connection. Check your internet and try again.",
           "passwordPolicy": "Choose a different, stronger password that meets the account security requirements.",
           "signedIn": "Signed in.",
           "signedOut": "Signed out.",
@@ -52,18 +52,18 @@ describe('player message copy rows', () => {
           "usernameTaken": "That username is already taken.",
         },
         "boot": {
-          "bootError": "The maze did not finish loading. Try refreshing once.",
+          "bootError": "Check your connection and try again.",
           "serviceWorkerError": "The offline cache could not update. The game can still run online.",
         },
         "oauthFailure": {
-          "cancelled": "Sign-in did not finish. Choose Sign in to try again.",
-          "connection": "Mazer could not finish connecting to your account. Try again in a moment.",
-          "contextLost": "Sign-in came back to a different screen than where you started. Open Mazer from your home screen icon and try again.",
-          "generic": "Could not reach your account. Try again.",
-          "providerUnreachable": "Sign-in is unavailable right now. Try again in a few minutes.",
-          "session": "Your account could not be confirmed. Try signing in again.",
-          "storage": "This browser is blocking what Mazer needs to sign in. Turn off private browsing or allow site data, then try again.",
-          "timedOut": "Sign-in took too long. Choose Sign in to start again.",
+          "cancelled": "Sign-in did not finish. Tap Sign in to try again.",
+          "connection": "We could not finish signing you in. Sign in again.",
+          "contextLost": "We could not finish signing you in. Sign in again.",
+          "generic": "Sign-in is unavailable right now. Try again in a minute.",
+          "providerUnreachable": "Sign-in is unavailable right now. Try again in a minute.",
+          "session": "Your session ended. Sign in again to continue.",
+          "storage": "This browser is blocking site data. Allow it, then tap Sign in.",
+          "timedOut": "Sign-in took too long. Tap Sign in to try again.",
         },
         "offline": {
           "saved": "You are offline. Progress is saved on this device and will sync when you reconnect.",

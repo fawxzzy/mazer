@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { LEGACY_AUTH_FAILURE_CODES } from '../../src/legacy-runtime/legacyAuthFailureCodes';
-import { LEGACY_OAUTH_FAILURE_MESSAGE_COPY } from '../../src/legacy-runtime/legacyPlayerMessage';
+import { LEGACY_OAUTH_FAILURE_MESSAGE_COPY, resolveLegacyOAuthCurrentFailureCopy } from '../../src/legacy-runtime/legacyPlayerMessage';
 import { MAZER_OAUTH_SAFE_ERROR_MESSAGE, type MazerOAuthBootResult } from '../../src/legacy-runtime/legacyAccountPortal';
 
 // MAZER-ACCT-014: the quarantine and session-read failures at boot used to show
@@ -121,7 +121,7 @@ describe('boot sign-in failure codes', () => {
     })).readSnapshot();
     expect(quarantined.errorCode).not.toBe(readFailed.errorCode);
     expect(quarantined.error).toBe(readFailed.error);
-    expect(quarantined.error).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
+    expect(resolveLegacyOAuthCurrentFailureCopy(quarantined.error ?? '')).toBe(LEGACY_OAUTH_FAILURE_MESSAGE_COPY.generic);
   });
 
   test('a callback failure from the same boot keeps its own copy and code over the generic ones', async () => {

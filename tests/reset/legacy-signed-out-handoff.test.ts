@@ -333,6 +333,6 @@ describe('the real hand-off, offline and provider down', () => {
     await expect(runMazerSignedOutHandoff(h.deps)).resolves.toEqual({ category: 'provider_unreachable', status: 'failed' });
     expect(down.assign).not.toHaveBeenCalled();
     expect(readMazerOAuthBootResult()).toEqual({ category: 'provider_unreachable', status: 'failed' });
-    expect(resolveLegacyOAuthFailureCopy('provider_unreachable')).toBe('Sign-in is unavailable right now. Try again in a few minutes.');
+    expect(resolveLegacyOAuthFailureCopy('provider_unreachable')).toBe('Sign-in is unavailable right now. Try again in a minute.');
   });
 });
