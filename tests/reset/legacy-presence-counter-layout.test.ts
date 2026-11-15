@@ -14,7 +14,7 @@ import {
 } from '../../src/legacy-runtime/legacyPresenceCounterLayout';
 import { formatOnline } from '../../src/legacy-runtime/legacyPresenceContract';
 
-// 13px UI font stand-in: about 7px per character.
+// UI font stand-in (12px counter font): about 7px per character.
 const measure = (value: string): number => value.length * 7;
 
 const VIEWPORTS = [
