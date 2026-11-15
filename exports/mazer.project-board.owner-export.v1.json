@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_f12bec89a832",
+  "export_id": "pbe_mazer_owner_registry_326ab3df9bf2",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:f12bec89a832925407990e45516bf7de56406b1f19ab7a850ae62858c3aaee22",
-  "generated_at": "2026-11-15T15:52:40.000Z",
+  "source_revision": "sha256:326ab3df9bf2fb18f56e40b59f3000d9ac3551f3073791a2cb9421150a5a21f4",
+  "generated_at": "2026-11-15T18:40:01.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:7a6cfe3a18e71f92acda911b308f3b05e783afeeb7979e322e9d7feb22c69a13",
-      "observed_at": "2026-11-15T15:52:40.000Z"
+      "revision": "sha256:18923356e50afe94d22ca7f5bbcf7742158d48244f8d27e1e7345aec98794902",
+      "observed_at": "2026-11-15T18:40:01.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-15T15:52:40.000Z"
+      "observed_at": "2026-11-15T18:40:01.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-15T15:52:40.000Z"
+      "observed_at": "2026-11-15T18:40:01.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-15T15:52:40.000Z"
+      "observed_at": "2026-11-15T18:40:01.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-15T15:52:40.000Z"
+      "observed_at": "2026-11-15T18:40:01.000Z"
     }
   ],
   "cards": [
@@ -2628,6 +2628,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-audio-004_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-AUDIO-004",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Gentler step sound and Sound on by default",
+        "description": "The step tick was harsh. A gentler tick is back, Sound defaults on through a one-time marker migration, and audio unlocks on the first gesture. Merged in PR 605, headless only. Board update 2026-11-15: PR 605 merged: gentler step tick back, Sound default on via one-time marker migration, audio unlock on first gesture; queued for the one deploy, headless only PR #605 merged (74613f02). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-15T18:12:17.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AUDIO-004",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-AUDIO-004",
+        "source_status": "current",
+        "source_updated_at": "2026-11-15T18:12:17.000Z"
+      },
+      "content": {
+        "summary": "The step tick was harsh. A gentler tick is back, Sound defaults on through a one-time marker migration, and audio unlocks on the first gesture. Merged in PR 605, headless only. Board update 2026-11-15: PR 605 merged: gentler step tick back, Sound default on via one-time marker migration, audio unlock on first gesture; queued for the one deploy, headless only PR #605 merged (74613f02). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The step tick was harsh. A gentler tick is back, Sound defaults on through a one-time marker migration, and audio unlocks on the first gesture. Merged in PR 605, headless only. Board update 2026-11-15: PR 605 merged: gentler step tick back, Sound default on via one-time marker migration, audio unlock on first gesture; queued for the one deploy, headless only PR #605 merged (74613f02). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "The step tick is gentler than the previous sound",
+          "Sound is on by default for a new player and a stored choice is kept for an existing player",
+          "Audio plays after the first tap or drag without a separate unlock step"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-auth-email-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -4606,7 +4657,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "No one-tile dead-end stubs in generated mazes",
-        "description": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted.",
+        "description": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted. Board update 2026-11-15: PR 603 merged (3c217c90), no one-tile stubs in menu demo or at start/goal, census 0 at levels 1-300, queued for the one deploy, headless only PR #603 merged (3c217c90). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -4615,7 +4666,7 @@
           "MAZER-PROG-013"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-14T08:18:16.000Z",
+        "updated_at": "2026-11-15T17:50:11.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
         "extensions": {
           "owner_status": "review",
@@ -4626,11 +4677,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-14T08:18:16.000Z"
+        "source_updated_at": "2026-11-15T17:50:11.000Z"
       },
       "content": {
-        "summary": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted.",
-        "objective": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted.",
+        "summary": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted. Board update 2026-11-15: PR 603 merged (3c217c90), no one-tile stubs in menu demo or at start/goal, census 0 at levels 1-300, queued for the one deploy, headless only PR #603 merged (3c217c90). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner request, with a screenshot of a late maze full of one-tile nubs: stop generating single-tile side branches. Mazer PR #464 is merged (951ef3cf) and deployed to production (the build before it was main 0537aa61). Rule: every generated ladder maze (levels 2 and up) has no dead-end branch shorter than 2 cells; a stub is a dead end whose only neighbour is a junction, and the start and goal caps are exempt. One-cell nubs are lengthened by one cell where the wall has room, else walled up, and each edit is kept only if the felt-difficulty number is unchanged; the fringe (levels 199 to 268 before this change) now carves 2 to 3 cell stubs only. The constant MIN_DEAD_END_BRANCH_CELLS is 2; 3 was not validated. Census before: 1.6 to 3.9 stubs per maze in the middle of the ladder and 51 to 57 per maze at level 268 and up, with 49 to 60 of 60 mazes holding at least one; after: 0 on every band and both boards. AI runner solvability 340 of 340 (levels 1 to 999, both boards, ranks E and S). Headless browser counts: phone level 50 4 to 0, level 150 1 to 0, level 300 32 to 0; desktop level 50 8 to 0, level 150 1 to 0, level 300 51 to 0. CONTRACT CHANGE: the fringe capacity falls from 70 to 20 cells, so the strictly rising ladder now ends at level 218 (was 268) and levels 219 and up are the plateau class. Late mazes lose held-out difficulty (dead ends 81-86 to 31 and decision points 34-40 to 11-13 at the plateau) while the felt number is unchanged; hazards (MAZER-HAZ-002) are meant to supply difficulty past 218. Player impact: most ladder layouts change (157 of 197 phone levels 2 to 198 and 166 of 197 desktop; every level 199 to 300); level 1 is unchanged; progress, receipts and the leaderboard are keyed by level number and seed, not layouts. Only the golden ladder fixture was regenerated. Pull request #464 and its commit named this rule MAZER-GEN-004 before that id was found already used by the wrap-fade card; this card is its board entry. Checked only in headless Chromium and tests, not on a real phone; the owner judgement on the shorter rising ladder is open. Owner informal feedback 2026-11-12 evening, NOT a formal device check: \"no single tiles so far\". The ladder-end judgement and the preview levels 150, 218 and 300 are still unchecked. Board update 2026-11-14: Decision recorded 2026-11-14: the minimum 2-tile stub rule and the shorter ladder are accepted. Open: the phone look, carried by MAZER-GEN-007. Board update 2026-11-14: Phone look is carried by MAZER-GEN-007, so this card no longer lists its own device steps; the shorter ladder decision is already accepted. Board update 2026-11-15: PR 603 merged (3c217c90), no one-tile stubs in menu demo or at start/goal, census 0 at levels 1-300, queued for the one deploy, headless only PR #603 merged (3c217c90). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "No generated ladder maze (levels 2 and up) has a dead-end branch shorter than 2 cells",
           "Felt-difficulty number unchanged by every stub edit; AI runner solves 340 of 340",
@@ -6591,17 +6642,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Replace the maze fade in and out with a smooth build and tear-down",
-        "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+        "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "completed",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T15:36:17.000Z",
+        "updated_at": "2026-11-15T18:35:03.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-020",
         "extensions": {
-          "owner_status": "completed",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -6609,11 +6660,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T15:36:17.000Z"
+        "source_updated_at": "2026-11-15T18:35:03.000Z"
       },
       "content": {
-        "summary": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Maze build and tear-down now flow by geometry (corridors extrude from their parent along a travelling front, tear-down is the build reversed), no opacity fade; VIS-050 lone rim line gone. Merged PR 590; headless Chromium and WebKit filmstrips viewed, CI 12 of 12. Not deployed, not checked on a real phone. Reduce Motion keeps the existing short crossfade. PR #590 merged (be2fff01). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "No whole-maze opacity fade is used between mazes; the build and tear-down read as motion on the maze itself",
           "Works at 60 fps class pacing on a phone profile and respects reduced motion",
@@ -11544,24 +11595,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ui-050_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-UI-050",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Touch up the Start, Mazer title and Level text designs",
-        "description": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 598 merged (a4ab33e4), TAP TO PLAY with LEVEL line, queued for the one deploy, headless only PR #598 merged (a4ab33e4). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T15:38:27.000Z",
+        "updated_at": "2026-11-15T17:49:58.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-050",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -11569,15 +11620,66 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-050",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T15:38:27.000Z"
+        "source_updated_at": "2026-11-15T17:49:58.000Z"
       },
       "content": {
-        "summary": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 598 merged (a4ab33e4), TAP TO PLAY with LEVEL line, queued for the one deploy, headless only PR #598 merged (a4ab33e4). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The Start text, the Mazer title text and the Level text are similar and need a slight rework so each has its own clear role while staying one family. Board update 2026-11-15: Owner asked for clearer START wording (for example Tap to enter or Tap to play). Six wordings mocked up for the owner to pick; recommendation Tap to enter with the level under it. Not started. Board update 2026-11-15: Start text decided by owner: TAP TO PLAY with the level number under it. Ready to build, together with the Mazer and Level text changes. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 598 merged (a4ab33e4), TAP TO PLAY with LEVEL line, queued for the one deploy, headless only PR #598 merged (a4ab33e4). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Start, Mazer title and Level text are distinct in role but one visual family",
           "Readable at 320 to 430 px wide",
           "Headless phone captures of menu and in-game views"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-056_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-056",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Online counter readability on the menu",
+        "description": "The online player counter was hard to read against the menu art. Brighter text, a dark outline and 12px size. Merged in PR 604, headless only. Board update 2026-11-15: PR 604 merged, online counter text brighter with dark outline and 12px, queued for the one deploy, headless only PR #604 merged (6aac131f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-15T17:58:19.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-056",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-056",
+        "source_status": "current",
+        "source_updated_at": "2026-11-15T17:58:19.000Z"
+      },
+      "content": {
+        "summary": "The online player counter was hard to read against the menu art. Brighter text, a dark outline and 12px size. Merged in PR 604, headless only. Board update 2026-11-15: PR 604 merged, online counter text brighter with dark outline and 12px, queued for the one deploy, headless only PR #604 merged (6aac131f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The online player counter was hard to read against the menu art. Brighter text, a dark outline and 12px size. Merged in PR 604, headless only. Board update 2026-11-15: PR 604 merged, online counter text brighter with dark outline and 12px, queued for the one deploy, headless only PR #604 merged (6aac131f). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Counter text is brighter than before and has a dark outline",
+          "Counter text is at least 12px on a 390x844 phone viewport",
+          "Counter stays readable over the menu art in both a light and a dark maze region"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -14168,26 +14270,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-055_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-055",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Edge marker redesign",
-        "description": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 602 merged (5023dd2a), edge markers now concave four-point stars, queued for the one deploy, headless only PR #602 merged (5023dd2a). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-VIS-054"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-15T15:38:35.000Z",
+        "updated_at": "2026-11-15T17:49:43.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-055",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -14195,11 +14297,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-055",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T15:38:35.000Z"
+        "source_updated_at": "2026-11-15T17:49:43.000Z"
       },
       "content": {
-        "summary": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 602 merged (5023dd2a), edge markers now concave four-point stars, queued for the one deploy, headless only PR #602 merged (5023dd2a). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Redesign the eight edge markers into a more on-theme shape. Owner picks from six mock-ups, then the chosen look is built with the corner fix. Board update 2026-11-15: Owner rejected the first six marker looks. Six new animated looks drafted (round 2) and waiting for a pick. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 602 merged (5023dd2a), edge markers now concave four-point stars, queued for the one deploy, headless only PR #602 merged (5023dd2a). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Owner picks one of the proposed marker looks",
           "The chosen shape keeps the beam, fill and size-cycle behaviour working",
@@ -14275,10 +14377,10 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 272,
-    "exported_public_card_count": 272,
-    "exported_open_card_count": 118,
-    "exported_completed_card_count": 124,
+    "stable_identity_count": 274,
+    "exported_public_card_count": 274,
+    "exported_open_card_count": 121,
+    "exported_completed_card_count": 123,
     "exported_deferred_card_count": 30,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
