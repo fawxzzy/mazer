@@ -711,7 +711,7 @@ describe('menu runtime diagnostics auth form mode (MAZER-UI-023)', () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
-    expect(source).toContain("formMode: 'login';");
+    expect(source).toContain("formMode?: 'login';");
     expect(source).not.toContain("'signup'");
   });
 });
@@ -721,7 +721,7 @@ describe('menu runtime diagnostics type cleanup (MAZER-UI-032)', () => {
     const { readFileSync } = await import('node:fs');
     const { resolve } = await import('node:path');
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
-    expect(source).toContain('invalidFields: never[];');
+    expect(source).toContain('invalidFields?: never[];');
     expect(source).toContain("source: LegacyPlayerMessage['source'];");
     expect(source).toContain("tone: LegacyPlayerMessage['tone'];");
     expect(source).toContain('trailModeCounts: Partial<Record<DemoTrailMode, number>>;');
