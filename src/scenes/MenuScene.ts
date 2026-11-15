@@ -1568,6 +1568,10 @@ const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
 // asset (see drawLegacyMenuPathTitle) instead of the maze-path dot-cell
 // glyph it used to be drawn from exclusively.
 const LEGACY_TITLE_WORD = 'MAZER';
+// MAZER-UI-050: the front-door play label sits this far above the old Start spot, and the level line
+// under it this far below the label's centre (px, whole numbers so Images stay pixel-aligned).
+const LEGACY_MENU_PLAY_LABEL_RISE_PX = 14;
+const LEGACY_MENU_LEVEL_LINE_DROP_PX = 30;
 // "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
 // title wordmark and both primary front-door button labels with no waste.
 const LEGACY_WORDMARK_TILE_FONT_GLYPH_POOL_SIZE = 5;
@@ -11072,17 +11076,32 @@ export class MenuScene extends Phaser.Scene {
           );
           this.createLegacySignedOutOAuthFailure();
         } else {
+          // MAZER-UI-050: "TAP TO PLAY" is 11 glyphs, so it gets the full screen width (the glyph cell
+          // size is derived from it) and sits a little above the old Start spot; the level line below
+          // takes the old spot's lower half, clear of the bottom edge marker.
+          const playLabelY = this.layout.centerButtonY - LEGACY_MENU_PLAY_LABEL_RISE_PX;
           this.uiButtons.push(
             this.createButton(
               this.layout.centerButtonX,
-              this.layout.centerButtonY,
-              primaryButtonWidth,
+              playLabelY,
+              Math.max(primaryButtonWidth, this.layout.width),
               this.layout.buttonHeight,
               startLabel,
               () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
               { explicitHitZone: true }
             )
           );
+          const levelLineFontPx = 13;
+          this.uiTexts.push(this.add.text(
+            this.layout.centerButtonX,
+            playLabelY + LEGACY_MENU_LEVEL_LINE_DROP_PX,
+            `LEVEL ${this.progressionState.tracks[this.resolveActiveLegacyProgressionTrackId()].level}`,
+            {
+              fontFamily: LEGACY_UI_FONT_FAMILY,
+              fontSize: `${levelLineFontPx}px`,
+              color: MENU_TEXT_COLOR
+            }
+          ).setOrigin(0.5).setAlpha(0.82));
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
@@ -13613,7 +13632,7 @@ export class MenuScene extends Phaser.Scene {
     // bordered cyber panel every other button keeps -- ties the primary menu
     // action into the title wordmark's crystal/glow language regardless of
     // which label is showing (signed-out vs signed-in).
-    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === 'Start' || text === 'Login');
+    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === MAIN_MENU_BUTTONS[0] || text === 'Login');
     const frontDoorChrome = isMenuFrontDoor
       ? resolveLegacyMenuButtonChrome({
         width,
