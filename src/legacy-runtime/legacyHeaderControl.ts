@@ -82,7 +82,9 @@ export const LEGACY_HEADER_CORNER_DIAMOND_GAP_PX = 4;
 
 /**
  * Below this width the header row has no room to spare (the title already shrinks at 320: widening the gear inset there
- * cut it from 123 to 82 px), so the narrow-phone inset stays as it was; 375 and up get the corner clearance.
+ * cut it from 123 to 82 px), so the narrow-phone inset stays as it was; 375 and up get the corner clearance. Under it the corner
+ * diamond gives instead: it keeps its corner but peaks at EDGE_CORNER_NARROW_MAX_SCALE (edgeCornerAnchor.ts), which keeps the
+ * glyph clear of it (tests/render/edgeCornerNarrowCap.test.ts).
  */
 export const LEGACY_HEADER_CORNER_CLEARANCE_MIN_WIDTH_PX = 375;
 
