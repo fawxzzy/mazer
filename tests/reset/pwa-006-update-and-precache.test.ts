@@ -87,3 +87,20 @@ describe('trimmed precache (MAZER-PWA-006)', () => {
     }
   });
 });
+
+describe('app icon out of the precache (MAZER-PERF-011)', () => {
+  const config = readFileSync(resolve(__dirname, '../../vite.config.ts'), 'utf8');
+  const includeAssets = config.slice(config.indexOf('includeAssets: ['), config.indexOf(']', config.indexOf('includeAssets: [')));
+
+  test('the 934 KB 1024 px icon is not precached, the install icons still are', () => {
+    expect(includeAssets).not.toContain('icons/mazer-app-icon.png');
+    for (const icon of ['icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-192-maskable.png', 'icons/icon-512-maskable.png']) {
+      expect(includeAssets).toContain(icon);
+    }
+  });
+
+  test('the file is still served from public/ and the manifest still points at it', () => {
+    expect(readFileSync(resolve(__dirname, '../../public/manifest.webmanifest'), 'utf8')).toContain('/icons/mazer-app-icon.png?v=');
+    expect(readFileSync(resolve(__dirname, '../../public/icons/mazer-app-icon.png')).length).toBeGreaterThan(0);
+  });
+});

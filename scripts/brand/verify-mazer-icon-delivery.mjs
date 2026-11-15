@@ -17,6 +17,10 @@ export const MAZER_ICON_DELIVERY_PATHS = Object.freeze([
   'icons/icon-512-maskable.png'
 ]);
 
+// MAZER-PERF-011: the 1024 px 'any' manifest icon (934 KB) is served and byte-checked but NOT precached; it is fetched
+// on demand at install time. Every other icon stays in the offline precache.
+export const MAZER_ICON_NOT_PRECACHED_PATHS = Object.freeze(['icons/mazer-app-icon.png']);
+
 const sha256 = (payload) => createHash('sha256').update(payload).digest('hex');
 const workboxRevision = (payload) => createHash('md5').update(payload).digest('hex');
 
@@ -321,7 +325,11 @@ const main = async () => {
     })))
     : await readAssetRecords(options.deliveryRoot, MAZER_ICON_DELIVERY_PATHS);
   const entries = extractWorkboxPrecacheEntries(serviceWorkerSource);
-  const precache = verifyWorkboxPrecacheCoverage({ baseUrl: options.baseUrl, entries, expectedAssets });
+  const precache = verifyWorkboxPrecacheCoverage({
+    baseUrl: options.baseUrl,
+    entries,
+    expectedAssets: expectedAssets.filter((asset) => !MAZER_ICON_NOT_PRECACHED_PATHS.includes(asset.url))
+  });
   const assets = verifyDeliveredAssetBytes({ actualAssets, baseUrl: options.baseUrl, expectedAssets });
   console.log(JSON.stringify({
     assets,
