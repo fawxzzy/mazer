@@ -320,6 +320,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: PR 553 shipped the table and the Start hit zone but nothing drew from it. Values are the exact pre-kit colours, so this is look-neutral; the ratchet test now pins the migrated set.
 - Rule: a button picks a kit variant, never a colour; flip its `chromeViaKit` entry in the same PR that migrates it.
 - Status: Applied (review); NOT migrated: Start/Login (front-door renderer), settings cog and overlay close (icon variant), auth primary (unified dock gradient look), DOM install surface. Headless only, nothing checked on a real phone.
+## 2026-11-14 - diagnostics auth formMode/invalidFields become optional + deprecated (MAZER-DEBT-002, PR 1 of 2)
+- WHAT changed: in `src/scenes/menuRuntimeDiagnostics.ts` (Wave 1C only) `auth.formMode` and `auth.invalidFields` are now optional and marked `@deprecated`; the source-text assertions in `tests/scenes/menu-runtime-diagnostics.test.ts` follow. MenuScene still publishes the constants (still type-valid).
+- WHY it changed: dropping them touches Wave 1C diagnostics and Wave 5C MenuScene.ts together, which the integrator wave-mix test rejects. Order: diagnostics first (optional), MenuScene stops publishing second, then the fields are deleted.
+- Follow-up (PR 2, Wave 5C only): delete `formMode: 'login'` / `invalidFields: []` at `src/scenes/MenuScene.ts` ~3678; then PR 3 (Wave 1C) deletes the two type fields and the `menu-runtime-diagnostics.test.ts` ~305 fixture/714-728 assertions. Only consumers found: MenuScene, the type, that test (legacyAuth.ts formMode is an unrelated internal).
+- Status: Applied (review), headless only.
+
 
 ## 2026-11-14 (offline shell proof script)
 
