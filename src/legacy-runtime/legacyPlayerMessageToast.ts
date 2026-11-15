@@ -24,6 +24,8 @@ export interface LegacyPlayerMessageToastRow {
   codeLine: string | null;
   color: string;
   copy: string;
+  /** MAZER-UI-034: the message copy without the code line, so the scene can draw the code line at a smaller type step. */
+  messageCopy: string;
   id: string;
   tone: LegacyQueuedPlayerMessage['message']['tone'];
 }
@@ -68,6 +70,7 @@ export const resolveLegacyPlayerMessageToastFrame = (
         copy: codeLine === null ? entry.message.copy : `${entry.message.copy}
 ${codeLine}`,
         id: entry.message.id,
+        messageCopy: entry.message.copy,
         tone: entry.message.tone
       };
     })

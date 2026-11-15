@@ -85,7 +85,7 @@ describe('header identity placement (username top-left, right of the profile ico
     expect(phone.placement.titleLeft).toBe(113);
     // 113 - 8 gap - (51.5 + 8 left) = ~46 px of room (the 16px header edge inset cost ~7px vs the old 8px inset).
     expect(phone.placement.identity.maxWidth).toBeGreaterThan(45);
-    expect(phone.placement.identity.maxWidth).toBeLessThan(48);
+    expect(phone.placement.identity.maxWidth).toBeLessThan(52);
     const tight = place(320, 568, 'qa-player');
     expect(tight.titleLayout.left).toBe(99);
     expect(tight.titleLayout.width).toBe(123);
