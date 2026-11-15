@@ -1,3 +1,4 @@
+import { PROOF_CUE_CYAN_CSS, PROOF_CUE_OUTLINE_CSS, PROOF_ENEMY_CSS, PROOF_OBJECTIVE_CSS, PROOF_PLAYER_CORE_CSS } from '../render/trailPalette';
 import type { TrailPoint } from './trail/TrailRenderer';
 
 export interface ReadabilityGateThresholds {
@@ -83,14 +84,14 @@ interface RgbaColor {
 }
 
 const DEFAULT_TOKEN_VALUES: CuePalette = Object.freeze({
-  playerCore: '#FFFFFF',
-  playerHalo: '#53E6FF',
-  trailHead: '#53E6FF',
+  playerCore: PROOF_PLAYER_CORE_CSS,
+  playerHalo: PROOF_CUE_CYAN_CSS,
+  trailHead: PROOF_CUE_CYAN_CSS,
   trailBody: 'rgba(27, 207, 234, 0.70)',
   trailOld: 'rgba(27, 207, 234, 0.28)',
-  cueOutline: '#03141A',
-  objective: '#FFD166',
-  enemy: '#FF5C8A'
+  cueOutline: PROOF_CUE_OUTLINE_CSS,
+  objective: PROOF_OBJECTIVE_CSS,
+  enemy: PROOF_ENEMY_CSS
 });
 
 const COLLAPSED_TOKEN_VALUES: CuePalette = Object.freeze({
@@ -101,7 +102,7 @@ const COLLAPSED_TOKEN_VALUES: CuePalette = Object.freeze({
   trailOld: 'rgba(118, 185, 193, 0.28)',
   cueOutline: 'rgba(3, 20, 26, 0.28)',
   objective: 'rgba(118, 185, 193, 0.38)',
-  enemy: '#FF5C8A'
+  enemy: PROOF_ENEMY_CSS
 });
 
 export const DEFAULT_READABILITY_GATES: ReadabilityGateThresholds = Object.freeze({

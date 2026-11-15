@@ -363,3 +363,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `scripts/playbook-runtime.mjs` `DEFAULT_PLAYBOOK_VERSION`, and the `Playbook clean-environment validation` job fallback URL and SHA-256 in `.github/workflows/verify.yml`, moved from the Playbook v0.54.1 release tarball to v0.74.0 (SHA-256 `6b0abf33835c57331f0ef471fef2a803e2cbabc1d673f528e62b2f5213462ac7`, hashed from the published release asset).
 - WHY it changed: v0.74.0 carries Playbook #74 (doctor tells product repos from consumer repos), so Mazer doctor runs stop reporting the Playbook product docs layout as errors.
 - Rule: version, URL and digest move together; no deploy surface touched.
+
+## 2026-11-15 - visual-proof stray colour literals move into trailPalette (MAZER-UI-031, slice 4)
+- WHAT changed: `src/render/trailPalette.ts` gains `PROOF_*_CSS` constants; `src/visual-proof/readability.ts`, `scenarioLibrary.ts` and `trail/TrailRenderer.ts` import them instead of holding the hex strings. Values identical, no visual change. Off-theme ratchet offToken 227 to 214 (-13), total 292 to 279; three files drop out of the baseline. MenuScene.ts untouched.
+- WHY it changed: MAZER-UI-031 migrates stray literals one wave at a time; this slice is the internal visual-proof `.ts` files only so the wave-mix test stays green.
+- Note: MenuScene's baseline entry is looser than its real count (regenerating gives 51/55 vs 53/57); left as is for the MenuScene PR.
+- Status: headless gates only, nothing checked on a real phone.

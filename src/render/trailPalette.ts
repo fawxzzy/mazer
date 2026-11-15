@@ -43,6 +43,18 @@ export const PALETTE_WHITE_CSS = '#ffffff';
 export const PALETTE_MASK_BLACK_CSS = '#000';
 export const PALETTE_PLAYER_ACCENT = 0x2bb868;
 
+/** Internal visual-proof tool CSS colours (values unchanged from their former call sites in src/visual-proof/*). */
+export const PROOF_TRAIL_ACTIVE_CSS = '#1BCFEA';
+export const PROOF_CUE_OUTLINE_CSS = '#03141A';
+export const PROOF_HEAD_FILL_CSS = '#f8fbff';
+export const PROOF_PLAYER_CORE_CSS = '#FFFFFF';
+export const PROOF_CUE_CYAN_CSS = '#53E6FF';
+export const PROOF_OBJECTIVE_CSS = '#FFD166';
+export const PROOF_ENEMY_CSS = '#FF5C8A';
+export const PROOF_SHELL_OUTER_ACCENT_CSS = '#5fe3ff';
+export const PROOF_SHELL_MIDDLE_ACCENT_CSS = '#84ffbe';
+export const PROOF_SHELL_CORE_ACCENT_CSS = '#ffd678';
+
 export const PLAYER_COLOR: number = cyberArcadeMaterial.signal.player;
 
 /** The crest colour the lifts ease the core toward (pure white, so a lift can only brighten). */
