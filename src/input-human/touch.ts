@@ -144,7 +144,7 @@ const resolveTopRightPauseRect = (
   // (shared edge inset + safe-area), so the header mirrors left/right and the
   // glyph never hugs the screen edge.
   const glyphSize = clamp(Math.round(Math.min(viewport.width, viewport.height) * 0.085), 36, 40);
-  const glyphCenterX = viewport.width - safeInsets.right - resolveLegacyHeaderTrailingEdgeInset(viewport.width, glyphSize) - (glyphSize / 2);
+  const glyphCenterX = viewport.width - safeInsets.right - resolveLegacyHeaderTrailingEdgeInset(viewport.width, glyphSize, viewport.height) - (glyphSize / 2);
   const left = clamp(
     Math.round(glyphCenterX - (size / 2)),
     safeInsets.left + 4,

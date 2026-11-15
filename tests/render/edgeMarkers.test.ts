@@ -93,7 +93,9 @@ const isOnPolygonEdge = (vertices: ReadonlyArray<{ x: number; y: number }>, poin
 const VIEWPORTS = [
   { width: 390, height: 844 },
   { width: 1280, height: 720 },
-  { width: 499, height: 958 }
+  { width: 499, height: 958 },
+  { width: 375, height: 667 },
+  { width: 430, height: 932 }
 ] as const;
 
 const MIRROR_VIEWPORTS = [
@@ -103,7 +105,7 @@ const MIRROR_VIEWPORTS = [
 ] as const;
 
 describe('edge marker stations', () => {
-  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge (corner diamonds: in the corner, 0 px inset, MAZER-VIS-044)', (viewport) => {
+  test.each(VIEWPORTS)('all 8 kites rest fully inside a $width x $height viewport with the PAINTED outer tip touching the screen edge (corner diamonds: tip inset 0, or 16 px on a tall rounded-display phone, MAZER-VIS-044 / VIS-054)', (viewport) => {
     const stations = resolveEdgeStations(viewport);
     expect(stations).toHaveLength(EDGE_STATION_COUNT);
     for (const station of stations) {
@@ -128,8 +130,8 @@ describe('edge marker stations', () => {
       };
       if (station.isCorner) {
         // MAZER-VIS-044: the same distance from BOTH edges of the screen corner it sits in.
-        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
-        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(), 9);
+        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
       } else {
         expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
       }
@@ -172,19 +174,24 @@ describe('edge marker stations', () => {
     }
   });
 
-  test.each(VIEWPORTS)('the corner diamond of $width x $height has its painted outer tip ON the screen corner (0 px from both edges)', (viewport) => {
+  test.each(VIEWPORTS)('the corner diamond of $width x $height has its painted outer tip at the viewport tip inset from both edges (0 px, or 16 px on a tall phone, MAZER-VIS-054)', (viewport) => {
     const corner = resolveEdgeStations(viewport)[0] as { x: number; y: number; inwardAngle: number };
     const cornerPaint = resolveEdgeMarkerPaintedPolygon(corner);
-    expect(Math.min(...cornerPaint.map((point) => point.x))).toBeCloseTo(0, 9);
-    expect(Math.min(...cornerPaint.map((point) => point.y))).toBeCloseTo(0, 9);
-    expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(), 9);
-    expect(corner.y).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(Math.min(...cornerPaint.map((point) => point.x))).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+    expect(Math.min(...cornerPaint.map((point) => point.y))).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+    expect(corner.x).toBeCloseTo(resolveEdgeCornerInset(viewport), 9);
+    expect(corner.y).toBeCloseTo(resolveEdgeCornerInset(viewport), 9);
   });
 
   test('fixed positions: top row is inset / w/2 / w-inset (the corner diamonds sit in the corners, MAZER-VIS-044) and the layout depends on the viewport size and the resolution ONLY', () => {
-    const inset = resolveEdgeCornerInset();
-    expect(inset).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
-    expect(inset).toBeLessThan(8);
+    // No viewport (and every square-cornered viewport): the tip is ON the corner, so the centre is one half-extent in.
+    expect(resolveEdgeCornerInset()).toBeCloseTo((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2, 9);
+    expect(resolveEdgeCornerInset()).toBeLessThan(8);
+    expect(resolveEdgeCornerInset({ width: 375, height: 667 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(resolveEdgeCornerInset({ width: 1280, height: 720 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    // MAZER-VIS-054: a tall rounded-display phone slides the corner diamonds 16 px in along the diagonal.
+    const inset = resolveEdgeCornerInset({ width: 390, height: 844 });
+    expect(inset).toBeCloseTo(16 + ((10 + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2), 9);
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     expect(stations[0]?.x).toBeCloseTo(inset, 9);
     expect(stations[0]?.y).toBeCloseTo(inset, 9);
@@ -200,10 +207,11 @@ describe('edge marker stations', () => {
     expect(stations[3]?.y).toBeCloseTo(422, 9);
     expect(stations[7]?.y).toBeCloseTo(422, 9);
     expect(resolveEdgeStations.length).toBe(1);
+    const squareInset = resolveEdgeCornerInset();
     const wide = resolveEdgeStations({ width: 1280, height: 720 });
-    expect(wide[0]?.x).toBeCloseTo(inset, 9);
+    expect(wide[0]?.x).toBeCloseTo(squareInset, 9);
     expect(wide[1]?.x).toBeCloseTo(640, 9);
-    expect(wide[2]?.x).toBeCloseTo(1280 - inset, 9);
+    expect(wide[2]?.x).toBeCloseTo(1280 - squareInset, 9);
     // The painted canvas ends at round(css * resolution) / resolution: at 2.63 (the 2.625 resolution rounded to hundredths) 390 css px
     // is a 1026 px backing store, i.e. 390.1141 px of world: the right midpoint's painted tip touches THAT edge.
     const dpr = resolveEdgeStations({ width: 390, height: 844 }, 2.63);
@@ -954,7 +962,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
         expect(minY, label).toBeGreaterThanOrEqual(-1e-9);
         expect(maxX, label).toBeLessThanOrEqual(viewport.width + 1e-9);
         expect(maxY, label).toBeLessThanOrEqual(viewport.height + 1e-9);
-        const cornerLift = resolveEdgeCornerInset() - resolveEdgeStationNormalExtent(0);
+        const cornerLift = resolveEdgeCornerInset(viewport) - resolveEdgeStationNormalExtent(0);
         if (station.side === 'top') {
           expect(minY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
           if (Math.abs(minY) < 1e-9) flushSamples += 1;

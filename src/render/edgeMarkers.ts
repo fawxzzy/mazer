@@ -218,11 +218,12 @@ const resolveEdgeKiteOutwardReach = (inwardAngle: number, side: EdgeSide): numbe
 
 /**
  * The distance, on BOTH axes, from the screen corner to the CENTRE of a corner diamond (the inset of the perimeter rectangle the
- * stations are laid on): the painted outer tip sits resolveEdgeCornerTipInset() (0 px) from both edges and a 45 degree corner
- * kite paints ~7.8 px to either side of its centre, so ~7.8 px. Constant at every viewport size.
+ * stations are laid on): the painted outer tip sits resolveEdgeCornerTipInset(viewport) from both edges (0 px, or 16 px on a tall
+ * rounded-display phone, MAZER-VIS-054) and a 45 degree corner kite paints ~7.8 px to either side of its centre, so ~7.8 px or
+ * ~23.8 px. Without a viewport: the square-corner value.
  */
-export const resolveEdgeCornerInset = (): number => (
-  resolveEdgeCornerTipInset() + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
+export const resolveEdgeCornerInset = (viewport?: EdgeViewport): number => (
+  resolveEdgeCornerTipInset(viewport) + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
 );
 
 /**
@@ -243,7 +244,7 @@ export const resolveEdgeVisibleExtent = (cssPx: number, devicePixelRatio = 1): n
 export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1): ReadonlyArray<EdgeStation> => {
   const width = resolveEdgeVisibleExtent(viewport.width, devicePixelRatio);
   const height = resolveEdgeVisibleExtent(viewport.height, devicePixelRatio);
-  const inset = resolveEdgeCornerInset();
+  const inset = resolveEdgeCornerInset(viewport);
   const left = inset;
   const right = Math.max(left, width - inset);
   const top = inset;
@@ -315,7 +316,7 @@ export const resolveOrbitingEdgeStation = (
   const u = (s - (2 * sideIndex)) / 2;
   const angle = ((s + 1) * Math.PI) / 4;
   const reach = resolveEdgeKiteOutwardReach(angle, side);
-  const inset = resolveEdgeCornerInset();
+  const inset = resolveEdgeCornerInset(viewport);
   const left = inset;
   const right = Math.max(left, viewport.width - inset);
   const cornerReach = resolveEdgeStationNormalExtent(0);

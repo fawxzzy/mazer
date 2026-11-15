@@ -251,7 +251,8 @@ describe('legacy header identity: layout rules', () => {
   });
 
   test('a short name that fits whole is shown even though it has fewer than 6 characters', () => {
-    const layout = layoutFor(430, 'Zac');
+    // 600 wide: not a rounded-display phone, so the plain edge inset applies (a 430x844 phone now leaves no room under the assumed footprint, MAZER-VIS-054).
+    const layout = layoutFor(600, 'Zac');
     expect(layout.visible).toBe(true);
     expect(layout.displayText).toBe('Zac');
   });
@@ -303,8 +304,8 @@ describe('legacy header identity: layout rules', () => {
 describe('legacy header identity: phone widths under the DERIVED title-footprint assumption', () => {
   const widths = [320, 360, 390, 430];
 
-  test('the assumption reproduces the 390x844 figures (icon right edge 52 = 16px edge inset + 36px glyph box, title ~85)', () => {
-    expect(profileFrameRightAt(390)).toBe(52);
+  test('the assumption reproduces the 390x844 figures (icon right edge 75 = 39px leading inset (clears the rounded-display corner diamond, MAZER-VIS-054; was 16) + 36px glyph box, title ~85)', () => {
+    expect(profileFrameRightAt(390)).toBe(75);
     expect(assumedTitleLeft(390)).toBe(85);
   });
 
@@ -333,12 +334,12 @@ describe('legacy header identity: phone widths under the DERIVED title-footprint
     }
   });
 
-  // Under this 220px ASSUMED footprint the 16px header edge inset leaves ~17px at 390, so even a
-  // 3-char name collapses to icon-only here; the REAL footprint (164px) leaves ~46px, which
+  // Under this 220px ASSUMED footprint the 39px header leading inset (VIS-054) leaves no room at 390, so even a
+  // 3-char name collapses to icon-only here; the REAL footprint (123px) leaves ~47px, which
   // legacy-header-identity-placement.test.ts pins.
-  test('records what fits at 390 under the assumed footprint (nothing: the room is only ~17px)', () => {
+  test('records what fits at 390 under the assumed footprint (nothing: no room once the leading inset clears the corner diamond)', () => {
     const layout390 = layoutFor(390, 'Zac');
-    expect(layout390.maxWidth).toBe(85 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX - (profileFrameRightAt(390) + LEGACY_HEADER_IDENTITY_ICON_GAP_PX));
+    expect(layout390.maxWidth).toBe(Math.max(0, 85 - LEGACY_HEADER_IDENTITY_TITLE_GAP_PX - (profileFrameRightAt(390) + LEGACY_HEADER_IDENTITY_ICON_GAP_PX)));
     expect(layout390.visible).toBe(false);
     expect(layoutFor(390, 'fawxzzy').visible).toBe(false);
     expect(layoutFor(390, 'maze_runner').visible).toBe(false);

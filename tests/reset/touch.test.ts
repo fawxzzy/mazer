@@ -48,8 +48,9 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(layout.controls.pause.top).toBeLessThan(layout.controls.move_up.top);
     expect(layout.controls.pause.top).toBeLessThan(16);
-    expect(layout.controls.pause.right).toBeGreaterThan(370);
-    expect(layout.frames?.[0].right).toBeGreaterThan(370);
+    // MAZER-VIS-054: 390x844 is a tall rounded-display phone, so the control clears the corner diamond (about 32 px in, was 16).
+    expect(layout.controls.pause.right).toBeGreaterThan(350);
+    expect(layout.frames?.[0].right).toBeGreaterThan(350);
     expect(layout.frames?.[0]).toEqual(layout.controls.pause);
     expect(layout.controls.pause.width).toBeLessThan(90);
     expect(layout.controls.pause.left).toBeGreaterThan(280);
@@ -256,7 +257,7 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.pause.width).toBeGreaterThanOrEqual(44);
     expect(layout.controls.pause.width).toBeLessThanOrEqual(56);
     expect(layout.controls.pause.top).toBeLessThan(16);
-    expect(layout.controls.pause.right).toBeGreaterThan(370);
+    expect(layout.controls.pause.right).toBeGreaterThan(350);
     expect(layout.frames?.[0]).toEqual(layout.controls.pause);
 
     const ultraNarrow = resolveTouchControlLayout({
