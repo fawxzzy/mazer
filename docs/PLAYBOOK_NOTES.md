@@ -340,6 +340,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: a verify script that hard-codes an asset count must be updated in the same PR that changes the asset set. This script is not run by CI or any npm script (two production builds plus headless Chromium, minutes), which is how the drift went unseen.
 - Status: headless Chromium only, nothing checked on a real phone.
 
+## 2026-11-14 - stray colour literals in render files move into trailPalette (MAZER-UI-031, slice 3)
+- WHAT changed: `PALETTE_WHITE`, `PALETTE_WHITE_CSS`, `PALETTE_MASK_BLACK_CSS` and `PALETTE_PLAYER_ACCENT` live in `src/render/trailPalette.ts`; `phaserTileContext.ts`, `teleportTransferConduitCanvas.ts`, `boardTileLayer.ts` and `playerMarker.ts` import them instead of holding `0xffffff` / `'#ffffff'` / `'#000'` / `0x2bb868`. Values are identical, no visual change. Off-theme ratchet offToken 234 to 227 (-7), total 299 to 292; four files drop out of the baseline. MenuScene.ts untouched (separate PR).
+- WHY it changed: MAZER-UI-031 migrates stray literals into the palette modules one wave at a time; this slice is `src/render/*` only so the wave-mix test stays green.
+- Rule: a render module needing white/black/the player accent imports the trailPalette constant; do not reintroduce the literal (ratchet fails).
+- Status: Applied (review); headless gates only, nothing checked on a real phone.
 ## 2026-11-14 (MenuScene stops publishing auth formMode/invalidFields)
 
 - WHAT changed: `src/scenes/MenuScene.ts` no longer publishes `auth.formMode: 'login'` / `auth.invalidFields: []` in the runtime diagnostics (and the stale comment is gone). No Wave 1C file touched.

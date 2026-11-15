@@ -38,6 +38,7 @@ import {
 } from './boardTileBake';
 import { resolveRevealMaskLength } from './boardRevealMask';
 import { toWholeImagePosition } from './pixelAlignment';
+import { PALETTE_MASK_BLACK_CSS } from './trailPalette';
 import { resolveStartDirection, type StartDirection } from './startDirection';
 import {
   clampBoardDevicePixelRatio,
@@ -206,7 +207,7 @@ export const composeBoardTileReveal = (
 
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = PALETTE_MASK_BLACK_CSS;
   ctx.beginPath();
   for (const [y, x0, x1] of hiddenRuns) {
     const left = ox + layout.xs[x0]!;

@@ -49,25 +49,9 @@
       "offToken": 9,
       "total": 9
     },
-    "src/render/boardTileLayer.ts": {
-      "offToken": 1,
-      "total": 1
-    },
     "src/render/cyberArcadeMaterial.ts": {
       "offToken": 1,
       "total": 1
-    },
-    "src/render/phaserTileContext.ts": {
-      "offToken": 3,
-      "total": 3
-    },
-    "src/render/playerMarker.ts": {
-      "offToken": 1,
-      "total": 1
-    },
-    "src/render/teleportTransferConduitCanvas.ts": {
-      "offToken": 2,
-      "total": 2
     },
     "src/scenes/MenuScene.ts": {
       "offToken": 53,
@@ -124,12 +108,8 @@
     "src/future-runtime/phaser/config.ts",
     "src/future-runtime/phaser/main.ts",
     "src/future-runtime/planet3d/runtime.ts",
-    "src/render/boardTileLayer.ts",
     "src/render/cyberArcadeMaterial.ts",
-    "src/render/playerMarker.ts",
     "src/watch-pass-paywall/styles.css",
-    "src/render/teleportTransferConduitCanvas.ts",
-    "src/render/phaserTileContext.ts",
     "src/topology-proof/index.ts",
     "src/visual-proof/scenarioLibrary.ts",
     "src/visual-proof/trail/TrailRenderer.ts",
@@ -148,8 +128,8 @@
   ],
   "schemaVersion": 1,
   "totals": {
-    "files": 28,
-    "offToken": 234,
-    "total": 299
+    "files": 24,
+    "offToken": 227,
+    "total": 292
   }
 }

@@ -14,6 +14,7 @@
  */
 import type Phaser from 'phaser';
 import type { TileBakeContext2D } from './boardTileBake';
+import { PALETTE_WHITE } from './trailPalette';
 
 interface StyleState {
   fill: { color: number; alpha: number };
@@ -27,7 +28,7 @@ const RGBA = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)
 export const parseCssRgba = (value: unknown): { color: number; alpha: number } => {
   const match = typeof value === 'string' ? RGBA.exec(value) : null;
   if (!match) {
-    return { color: 0xffffff, alpha: 1 };
+    return { color: PALETTE_WHITE, alpha: 1 };
   }
   const r = Math.min(255, Number(match[1]));
   const g = Math.min(255, Number(match[2]));
@@ -44,8 +45,8 @@ export class PhaserGraphicsTileContext implements TileBakeContext2D {
   opacity = 1;
 
   private state: StyleState = {
-    fill: { color: 0xffffff, alpha: 1 },
-    stroke: { color: 0xffffff, alpha: 1 },
+    fill: { color: PALETTE_WHITE, alpha: 1 },
+    stroke: { color: PALETTE_WHITE, alpha: 1 },
     lineWidth: 1,
     globalAlpha: 1
   };
