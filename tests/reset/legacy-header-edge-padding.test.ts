@@ -9,11 +9,19 @@ import {
   LEGACY_HEADER_EDGE_INSET_MIN_PX,
   LEGACY_HEADER_ICON_GLYPH_SCALE,
   resolveLegacyHeaderControlFrame,
+  resolveLegacyHeaderCornerDiamondReach,
   resolveLegacyHeaderEdgeInset,
+  resolveLegacyHeaderLeadingEdgeInset,
   resolveLegacyHeaderTrailingEdgeInset
 } from '../../src/legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../../src/legacy-runtime/legacyHitTarget';
-import { resolveEdgeCornerInset } from '../../src/render/edgeMarkers';
+import { resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
+import {
+  anchorStationToOuterTip,
+  resolveEdgeCornerInset,
+  resolveEdgeMarkerPaintedPolygon,
+  resolveEdgeStations
+} from '../../src/render/edgeMarkers';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 
 const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
@@ -21,9 +29,18 @@ const normalizeSourceLineEndings = (source: string): string => source.replace(/\
 const VIEWPORTS = [
   { height: 568, width: 320 },
   { height: 640, width: 360 },
+  { height: 667, width: 375 },
   { height: 844, width: 390 },
   { height: 932, width: 430 },
   { height: 720, width: 1280 }
+] as const;
+/** Tall portrait phones with rounded display corners (MAZER-VIS-054): the corner diamonds sit 16 px in from the corner. */
+const ROUNDED_PHONES = [
+  { height: 812, width: 375 },
+  { height: 844, width: 390 },
+  { height: 852, width: 393 },
+  { height: 915, width: 412 },
+  { height: 932, width: 430 }
 ] as const;
 
 const measureHeader = (
@@ -57,7 +74,7 @@ describe('header edge padding (Wave 5C)', () => {
     expect(resolveLegacyHeaderEdgeInset(100)).toBe(LEGACY_HEADER_EDGE_INSET_MIN_PX);
   });
 
-  test('left (leaderboard) and right (settings) controls share the edge gap on every viewport; the settings side is widened only enough to clear the corner diamond (MAZER-UI-035)', () => {
+  test('left (leaderboard) and right (settings) controls share the edge gap on every viewport; each side is widened only enough to clear the corner diamond (MAZER-UI-035, VIS-054)', () => {
     const rows: string[] = [];
     for (const viewport of VIEWPORTS) {
       const { leaderboard, settings } = measureHeader(viewport);
@@ -65,27 +82,56 @@ describe('header edge padding (Wave 5C)', () => {
       const leftGap = leaderboard.left;
       const rightGap = viewport.width - settings.right;
       rows.push(`${viewport.width}: left ${leftGap} right ${rightGap} (edge ${edge})`);
-      expect(leftGap).toBe(edge);
-      expect(rightGap).toBe(resolveLegacyHeaderTrailingEdgeInset(viewport.width, settings.width));
+      // Square-cornered viewports keep the UI-035 behaviour exactly (leading = edge); rounded-display phones clear the moved diamond.
+      expect(leftGap).toBe(resolveLegacyHeaderLeadingEdgeInset(viewport.width, leaderboard.width, viewport.height));
+      if (resolveEdgeCornerTipInset(viewport) === 0) expect(leftGap).toBe(edge);
+      expect(rightGap).toBe(resolveLegacyHeaderTrailingEdgeInset(viewport.width, settings.width, viewport.height));
       expect(rightGap).toBeGreaterThanOrEqual(edge);
       expect(leftGap).toBeGreaterThanOrEqual(LEGACY_HEADER_EDGE_INSET_MIN_PX);
     }
-    // 390 is the reference phone: at least 16px on both edges.
+    // 390 is the reference phone: at least 16px on both edges (36+ once the corner diamond sits 16 px in, MAZER-VIS-054).
     const phone = measureHeader({ height: 844, width: 390 });
-    expect(phone.leaderboard.left).toBeGreaterThanOrEqual(16);
-    expect(390 - phone.settings.right).toBeGreaterThanOrEqual(20);
+    expect(phone.leaderboard.left).toBeGreaterThanOrEqual(36);
+    expect(390 - phone.settings.right).toBeGreaterThanOrEqual(36);
+    // Desktop and square-cornered phones: the pre-VIS-054 numbers.
+    expect(measureHeader({ height: 667, width: 375 }).leaderboard.left).toBe(resolveLegacyHeaderEdgeInset(375));
+    expect(measureHeader({ height: 720, width: 1280 }).leaderboard.left).toBe(LEGACY_HEADER_EDGE_INSET_MAX_PX);
     expect(rows).toHaveLength(VIEWPORTS.length);
   });
 
-  test('the settings gear glyph clears the full-size top-right corner diamond box at 390 wide (MAZER-UI-035)', () => {
+  test('the corner diamond reach constants are pinned to edgeMarkers.ts (square corners: 2 x the half extent; rounded phones: plus the 16 px tip inset)', () => {
     expect(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX).toBeGreaterThanOrEqual(2 * resolveEdgeCornerInset());
-    const { settings } = measureHeader({ height: 844, width: 390 });
-    const overhang = (settings.width * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1)) / 2;
-    const glyphRight = settings.right + overhang;
-    const glyphTop = settings.top - overhang;
-    const diamondLeft = 390 - LEGACY_HEADER_CORNER_DIAMOND_REACH_PX;
-    expect(glyphRight).toBeLessThanOrEqual(diamondLeft - LEGACY_HEADER_CORNER_DIAMOND_GAP_PX + 0.5);
-    expect(glyphTop).toBeLessThan(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX);
+    expect(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX - (2 * resolveEdgeCornerInset())).toBeLessThan(1);
+    expect(resolveLegacyHeaderCornerDiamondReach(1280, 720)).toBe(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX);
+    expect(resolveLegacyHeaderCornerDiamondReach(390)).toBe(LEGACY_HEADER_CORNER_DIAMOND_REACH_PX);
+    for (const viewport of ROUNDED_PHONES) {
+      const tip = resolveEdgeCornerTipInset(viewport);
+      expect(tip).toBe(16);
+      const reach = resolveLegacyHeaderCornerDiamondReach(viewport.width, viewport.height);
+      expect(reach).toBe(16 + LEGACY_HEADER_CORNER_DIAMOND_REACH_PX);
+      expect(reach).toBeGreaterThanOrEqual(tip + (2 * (resolveEdgeCornerInset(viewport) - tip)));
+    }
+  });
+
+  test('both header glyphs clear the full-size top corner diamonds by the UI-035 gap on 375..430 wide rounded-display phones (MAZER-VIS-054)', () => {
+    for (const viewport of ROUNDED_PHONES) {
+      const { leaderboard, settings } = measureHeader(viewport);
+      const stations = resolveEdgeStations(viewport);
+      const box = (id: 0 | 2) => {
+        const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(stations[id]!, 1), 1);
+        return { left: Math.min(...painted.map((p) => p.x)), right: Math.max(...painted.map((p) => p.x)) };
+      };
+      const overhang = (settings.width * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1)) / 2;
+      const topLeft = box(0);
+      const topRight = box(2);
+      expect(leaderboard.left - overhang, `${viewport.width} leaderboard glyph vs top-left diamond`)
+        .toBeGreaterThanOrEqual(topLeft.right + LEGACY_HEADER_CORNER_DIAMOND_GAP_PX - 0.5);
+      expect(settings.right + overhang, `${viewport.width} settings glyph vs top-right diamond`)
+        .toBeLessThanOrEqual(topRight.left - LEGACY_HEADER_CORNER_DIAMOND_GAP_PX + 0.5);
+      // The reach constant matches the real painted box (rounded up, within a pixel).
+      expect(viewport.width - topRight.left).toBeLessThanOrEqual(resolveLegacyHeaderCornerDiamondReach(viewport.width, viewport.height));
+      expect(viewport.width - topRight.left).toBeGreaterThan(resolveLegacyHeaderCornerDiamondReach(viewport.width, viewport.height) - 1);
+    }
   });
 
   test('the 44px hit zones stay on screen and the glyph boxes do not overlap at every width', () => {

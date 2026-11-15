@@ -78,12 +78,12 @@ describe('header identity placement (username top-left, right of the profile ico
     expect(placement.identity.fontPx).toBeGreaterThanOrEqual(LEGACY_HEADER_IDENTITY_MIN_FONT_PX);
   });
 
-  test('replaces the assumed 220 px title width with the real title footprint (measured 390: left 113 / width 164)', () => {
+  test('replaces the assumed 220 px title width with the real title footprint (measured 390: left 134 / width 123 once both header sides clear the rounded-display corner diamonds, MAZER-VIS-054; was 113 / 164)', () => {
     const phone = place(390, 844, 'qa-player');
-    expect(phone.titleLayout.left).toBe(113);
-    expect(phone.titleLayout.width).toBe(164);
-    expect(phone.placement.titleLeft).toBe(113);
-    // 113 - 8 gap - (51.5 + 8 left) = ~46 px of room (the 16px header edge inset cost ~7px vs the old 8px inset).
+    expect(phone.titleLayout.left).toBe(134);
+    expect(phone.titleLayout.width).toBe(123);
+    expect(phone.placement.titleLeft).toBe(134);
+    // 134 - 8 gap - (71 + 8 left) = ~47 px of room (the leading inset is 39 px on a tall phone so the glyph clears the corner diamond).
     expect(phone.placement.identity.maxWidth).toBeGreaterThan(45);
     expect(phone.placement.identity.maxWidth).toBeLessThan(52);
     const tight = place(320, 568, 'qa-player');

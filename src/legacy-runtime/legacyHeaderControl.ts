@@ -1,3 +1,5 @@
+import { resolveEdgeCornerTipInset } from '../render/edgeCornerAnchor';
+
 export type LegacyHeaderControlPlacement = 'leading' | 'trailing';
 
 export interface LegacyHeaderControlFrame {
@@ -72,13 +74,24 @@ export const resolveLegacyHeaderEdgeInset = (viewportWidth: number): number => c
 /** Visible icon size over the control frame: MenuScene draws the settings icon at 1.15x the frame. */
 export const LEGACY_HEADER_ICON_GLYPH_SCALE = 1.15;
 /**
- * How far in from the screen corner (per axis) a full-size corner diamond paints: 2 x resolveEdgeCornerInset() = ~15.6 px,
- * rounded up (tests/reset/legacy-header-edge-padding.test.ts pins it against edgeMarkers.ts). Not imported, so the touch
- * layout does not pull the whole edge-marker module in.
+ * How far in from the diamond's outer tip (per axis) a full-size corner diamond paints: 2 x the kite's ~7.8 px half extent =
+ * ~15.6 px, rounded up (tests/reset/legacy-header-edge-padding.test.ts pins it against edgeMarkers.ts). Not imported, so the touch
+ * layout does not pull the whole edge-marker module in. From the SCREEN corner add the tip inset
+ * (resolveLegacyHeaderCornerDiamondReach: 0 on square-cornered viewports, 16 on a tall rounded-display phone, MAZER-VIS-054).
  */
 export const LEGACY_HEADER_CORNER_DIAMOND_REACH_PX = 16;
 /** Gap kept between the trailing icon glyph and the full-size top-right corner diamond (css px). */
 export const LEGACY_HEADER_CORNER_DIAMOND_GAP_PX = 4;
+
+/**
+ * How far in from the screen corner (per axis) a full-size corner diamond's painted box reaches for this viewport:
+ * LEGACY_HEADER_CORNER_DIAMOND_REACH_PX plus the corner tip inset (resolveEdgeCornerTipInset). 16 px on desktop, small and
+ * square-cornered phones; 32 px on a tall rounded-display phone. Without a height there is no rounded-display phone: 16.
+ */
+export const resolveLegacyHeaderCornerDiamondReach = (viewportWidth: number, viewportHeight?: number): number => (
+  LEGACY_HEADER_CORNER_DIAMOND_REACH_PX
+    + resolveEdgeCornerTipInset(viewportHeight === undefined ? undefined : { height: viewportHeight, width: viewportWidth })
+);
 
 /**
  * Below this width the header row has no room to spare (the title already shrinks at 320: widening the gear inset there
@@ -95,14 +108,42 @@ export const LEGACY_HEADER_CORNER_CLEARANCE_MIN_WIDTH_PX = 375;
  * overhangs its control frame by (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2 of the frame size, so that overhang is added.
  * Only the trailing side moves: at 390 wide the old 16 px inset let the gear and the diamond box overlap.
  */
-export const resolveLegacyHeaderTrailingEdgeInset = (viewportWidth: number, controlSize: number): number => Math.max(
+export const resolveLegacyHeaderTrailingEdgeInset = (
+  viewportWidth: number,
+  controlSize: number,
+  viewportHeight?: number
+): number => Math.max(
   resolveLegacyHeaderEdgeInset(viewportWidth),
   viewportWidth < LEGACY_HEADER_CORNER_CLEARANCE_MIN_WIDTH_PX ? 0 : Math.ceil(
-    LEGACY_HEADER_CORNER_DIAMOND_REACH_PX
+    resolveLegacyHeaderCornerDiamondReach(viewportWidth, viewportHeight)
       + LEGACY_HEADER_CORNER_DIAMOND_GAP_PX
       + (controlSize * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2)
   )
 );
+
+/**
+ * MAZER-VIS-054: the leading (leaderboard / account) edge inset. On a tall rounded-display phone the top-left corner diamond now
+ * sits 16 px in from the corner, so its full-size box reaches 32 px in; the leading glyph clears it by the same gap as the
+ * trailing side. Everywhere else (no tip inset) this is exactly resolveLegacyHeaderEdgeInset, as before.
+ */
+export const resolveLegacyHeaderLeadingEdgeInset = (
+  viewportWidth: number,
+  controlSize: number,
+  viewportHeight?: number
+): number => {
+  const edge = resolveLegacyHeaderEdgeInset(viewportWidth);
+  const tipInset = viewportHeight === undefined
+    ? 0
+    : resolveEdgeCornerTipInset({ height: viewportHeight, width: viewportWidth });
+  if (tipInset <= 0) {
+    return edge;
+  }
+  return Math.max(edge, Math.ceil(
+    resolveLegacyHeaderCornerDiamondReach(viewportWidth, viewportHeight)
+      + LEGACY_HEADER_CORNER_DIAMOND_GAP_PX
+      + (controlSize * (LEGACY_HEADER_ICON_GLYPH_SCALE - 1) / 2)
+  ));
+};
 
 /**
  * Progression is an unbounded completion ordinal, so the glyph scales its
@@ -138,8 +179,8 @@ export const resolveLegacyHeaderControlFrame = (
   const safeLeft = Math.max(0, Math.round(input.safeArea?.left ?? 0));
   const safeRight = Math.max(0, Math.round(input.safeArea?.right ?? 0));
   const edgeInset = input.placement === 'trailing'
-    ? resolveLegacyHeaderTrailingEdgeInset(input.width, size)
-    : resolveLegacyHeaderEdgeInset(input.width);
+    ? resolveLegacyHeaderTrailingEdgeInset(input.width, size, input.height)
+    : resolveLegacyHeaderLeadingEdgeInset(input.width, size, input.height);
   const slot = Math.max(0, Math.round(input.slot ?? 0));
   const gap = Math.max(8, Math.round(size * 0.18));
   const top = clamp(
