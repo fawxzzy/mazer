@@ -3686,9 +3686,6 @@ export class MenuScene extends Phaser.Scene {
         displayName: this.authSnapshot.displayName,
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
-        // MAZER-ACCT-043: the credential form is gone; these two stay as constants until the 1C diagnostics type drops them.
-        formMode: 'login',
-        invalidFields: [],
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
