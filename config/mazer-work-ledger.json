@@ -4114,7 +4114,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5g35npa39"
       },
       "blocker": null,
       "verify": [],
@@ -4254,10 +4254,16 @@
     },
     "MAZER-GEN-021": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 611,
+            "mergedSha": "8e2a75f1"
+          }
+        ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5g35npa39"
       },
       "blocker": null,
       "verify": [],
@@ -4311,7 +4317,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5g35npa39"
       },
       "blocker": null,
       "verify": [],
@@ -4329,7 +4335,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "5g35npa39"
       },
       "blocker": null,
       "verify": [],

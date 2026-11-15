@@ -3,11 +3,11 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-15T20:42:43.000Z",
+    "registryUpdatedAt": "2026-11-15T22:39:14.000Z",
     "boardSync": {
-      "at": "2026-11-15T20:42:43.000Z",
-      "appliedEventCount": 293,
-      "lastEventId": "6b1a376842c0"
+      "at": "2026-11-15T22:39:14.000Z",
+      "appliedEventCount": 298,
+      "lastEventId": "ddb511c686a0"
     }
   },
   "counters": {
@@ -17,10 +17,10 @@
     "deferred": 30,
     "buckets": {
       "needs-you": 33,
-      "in-review": 78,
+      "in-review": 79,
       "blocked": 3,
       "ready": 0,
-      "in-progress": 2,
+      "in-progress": 1,
       "unclassified": 5,
       "deferred": 30,
       "completed": 123
@@ -2185,6 +2185,14 @@
       "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
     },
     {
+      "id": "MAZER-GEN-021",
+      "title": "Make generated mazes feel like a real maze",
+      "status": "review",
+      "priority": "high",
+      "prs": "#611",
+      "note": ""
+    },
+    {
       "id": "MAZER-MOTION-020",
       "title": "Replace the maze fade in and out with a smooth build and tear-down",
       "status": "review",
@@ -2801,13 +2809,6 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
-    },
-    {
-      "id": "MAZER-GEN-021",
-      "title": "Make generated mazes feel like a real maze",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
     }
   ],
   "deferred": [
@@ -4167,7 +4168,7 @@
       "sub": null
     },
     "MAZER-GEN-021": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-054": {
