@@ -217,7 +217,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'sound',
-    text: 'Sound is off until you turn it on in Settings. Then bumps and wins chirp.'
+    text: 'Sound is on by default. Soft ticks play on steps, bumps and wins. Turn it off in Settings.'
   }
 ]);
 

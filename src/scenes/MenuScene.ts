@@ -138,6 +138,7 @@ import {
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import {
   createLegacySoundEffects,
+  installLegacyAudioUnlock,
   type LegacySoundEffectKind
 } from '../legacy-runtime/legacySoundEffects';
 import {
@@ -2471,6 +2472,14 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
+    // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
+    // context on the first real pointerdown/touchend/keydown (no context is built while the setting is off).
+    const disposeAudioUnlock = installLegacyAudioUnlock(
+      this.legacySoundEffects,
+      () => this.settings.soundEnabled,
+      typeof window === 'undefined' ? undefined : window
+    );
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, disposeAudioUnlock);
     this.playerMessageToastGraphics = this.add.graphics()
       .setDepth(LEGACY_PLAYER_MESSAGE_TOAST_DEPTH)
       .setVisible(false);
@@ -7238,6 +7247,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardDynamicDirty = true;
     this.triggerLegacyHapticPulse(LEGACY_HAPTIC_PATTERNS.step);
+    this.playLegacySoundEffect('step');
     return {
       accepted: true,
       events: [{ type: 'player-moved', entityId: 'player' }]
@@ -10506,7 +10516,7 @@ export class MenuScene extends Phaser.Scene {
   // reduced motion, and is a no-op where navigator.vibrate is missing (iOS Safari, most desktops).
   private readonly legacySoundEffects = createLegacySoundEffects();
 
-  // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default off.
+  // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default on (MAZER-AUDIO-004).
   private playLegacySoundEffect(kind: LegacySoundEffectKind): void {
     this.legacySoundEffects.play(kind, this.settings.soundEnabled, this.time.now);
   }

@@ -13,6 +13,44 @@ import {
 
 export const LEGACY_GAME_TOGGLE_STORAGE_KEY = 'mazer.game-toggles.v1';
 
+/**
+ * MAZER-AUDIO-004 one-time migration marker. Sound effects used to default OFF, so stored settings (local blob and
+ * the account profile `settings` JSON) hold `soundEnabled: false` for people who never touched it. The marker is
+ * written next to the toggles by every write from this build on. A blob/remote settings object WITHOUT the marker is
+ * pre-migration and reads as sound ON, once; one WITH the marker is a real choice and is respected. The marker is
+ * not a setting: it is never part of the picked preferences or of the sync fingerprint's comparison (the
+ * fingerprint carries it only so an old fingerprint can be told apart, see canonicalizeGameToggleFingerprint).
+ */
+export const LEGACY_SOUND_DEFAULT_ON_MARKER_KEY = 'soundDefaultOnV1';
+
+/** True when a stored toggle object (local blob or remote settings JSON) is pre-migration for sound. */
+export const needsLegacySoundDefaultOnMigration = (value: unknown): boolean => (
+  value === null
+  || typeof value !== 'object'
+  || Array.isArray(value)
+  || (value as Record<string, unknown>)[LEGACY_SOUND_DEFAULT_ON_MARKER_KEY] !== true
+);
+
+/** Adds the marker to a picked-preferences object for storage / the remote settings JSON. */
+export const withLegacySoundDefaultOnMarker = (
+  preferences: LegacyGameTogglePreferences
+): LegacyGameTogglePreferences & { soundDefaultOnV1: true } => ({
+  ...preferences,
+  [LEGACY_SOUND_DEFAULT_ON_MARKER_KEY]: true
+} as LegacyGameTogglePreferences & { soundDefaultOnV1: true });
+
+/**
+ * Applies the one-time migration to a stored toggle object: pre-migration objects read as sound ON, marked ones are
+ * returned untouched. Pure; callers decide whether to persist (a later write adds the marker).
+ */
+export const applyLegacySoundDefaultOnMigration = <T extends Partial<LegacyGameTogglePreferences>>(
+  value: T | null | undefined
+): T | null | undefined => (
+  value !== null && value !== undefined && typeof value === 'object' && needsLegacySoundDefaultOnMigration(value)
+    ? { ...value, soundEnabled: true }
+    : value
+);
+
 export interface LegacyGameTogglePreferences {
   controlMode: LegacyControlMode;
   darkMode: boolean;
@@ -146,7 +184,7 @@ export const readLegacyGameToggleSettings = (
 
     return mergeLegacyGameTogglePreferences(
       fallback,
-      JSON.parse(raw) as Partial<LegacyGameTogglePreferences>
+      applyLegacySoundDefaultOnMigration(JSON.parse(raw) as Partial<LegacyGameTogglePreferences>)
     );
   } catch {
     return copyLegacySettings(fallback);
@@ -165,7 +203,7 @@ export const writeLegacyGameToggleSettings = (
   try {
     storage.setItem(
       LEGACY_GAME_TOGGLE_STORAGE_KEY,
-      JSON.stringify(pickLegacyGameTogglePreferences(normalizedSettings))
+      JSON.stringify(withLegacySoundDefaultOnMarker(pickLegacyGameTogglePreferences(normalizedSettings)))
     );
   } catch {
     // Browser storage is best-effort; gameplay must continue if storage is blocked.
@@ -285,13 +323,22 @@ export const canonicalizeGameToggleFingerprint = (fingerprint: string): string =
     // A fingerprint stored before Sound effects existed has no soundEnabled: add the default in the picked key
     // position so the first load of the new build is not a phantom local edit.
     const missingSound = hasOwn('hapticsEnabled') && !hasOwn('soundEnabled');
-    if (!hasRetired && !missingSound) {
+    // MAZER-AUDIO-004: a fingerprint from before the sound-default-on migration has no marker and holds the old
+    // "off" value; the migrated local settings read as ON, so rewrite it the same way (once) or the first load would
+    // see a phantom local edit and overwrite the account settings with this device's.
+    const missingMarker = hasOwn('hapticsEnabled') && !hasOwn(LEGACY_SOUND_DEFAULT_ON_MARKER_KEY);
+    if (!hasRetired && !missingSound && !missingMarker) {
       return fingerprint;
     }
     const entries = Object.entries(record).filter(([key]) => !RETIRED_GAME_TOGGLE_KEYS.includes(key));
     if (missingSound) {
       const at = entries.findIndex(([key]) => key === 'hapticsEnabled');
       entries.splice(at + 1, 0, ['soundEnabled', LEGACY_DEFAULTS.soundEnabled]);
+    }
+    if (missingMarker) {
+      const soundAt = entries.findIndex(([key]) => key === 'soundEnabled');
+      entries[soundAt] = ['soundEnabled', true];
+      entries.push([LEGACY_SOUND_DEFAULT_ON_MARKER_KEY, true]);
     }
     return JSON.stringify(Object.fromEntries(entries));
   } catch {
