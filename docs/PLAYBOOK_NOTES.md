@@ -394,3 +394,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `src/legacy-runtime/legacySoundEffects.ts` drops the `step` kind (tone and throttle gap); `MenuScene.ts` no longer plays it on a player move. Wall-bump, goal and toggle chirps and the step haptic are unchanged. The Sound setting description, the in-app guide row, the message inventory (test and doc) and the sound tests now say bumps and wins only.
 - WHY it changed: owner request, the chirp on every tile the player travels was unwanted.
 - Status: headless only (tsc and the three affected test files), nothing checked on a real phone.
+## 2026-11-15 - MAZER-VIS-055: edge markers become concave four-point stars
+- WHAT changed: the 8 edge markers are now the Star Zac picked (concave four-point star, outer tip on the screen edge, inner tip = beam port) instead of a kite. `edgeMarkers.ts` flattens the star (4 quadratic sides, 8 segments each) into a 32-point outline; fill/drain still clip that outline with a half-plane anchored at the inner tip. Half-height is 8.8 so the header reach budget (16 px) still holds; `EDGE_CORNER_NARROW_MAX_SCALE` 0.7 -> 0.6 so the capped corner star still clears the settings glyph. Guide copy and message inventory say "edge stars".
+- WHY: owner design pick (ideas4 Star); needle tips are thinner, so pixel tests use a 4-row edge window and a concave inside check.
+- Status: headless (tsc, vitest, software raster captures at 390x844 DPR3); nothing checked on a real phone.

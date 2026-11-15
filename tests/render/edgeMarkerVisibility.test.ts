@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import {
+  EDGE_STAR_CURVE_SEGMENTS,
   EDGE_STATION_COUNT,
   drawEdgeMarkers,
   resolveEdgeMarkerPaintedPolygon,
@@ -115,7 +116,7 @@ describe('all 8 edge diamonds are visible on the canvas in play (MAZER-VIS-033)'
     drawEdgeMarkers(drawn, stations, states);
     expect(drawn.paths).toHaveLength(8);
     for (const path of drawn.paths) {
-      expect(path).toHaveLength(4);
+      expect(path).toHaveLength(4 * EDGE_STAR_CURVE_SEGMENTS);
       for (const point of path) {
         expect(point.x).toBeGreaterThanOrEqual(0);
         expect(point.y).toBeGreaterThanOrEqual(0);
