@@ -384,3 +384,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the geometry ladder (336f2f2a) set borderFeederTargetPerSide 0 and GEN-004 fades wraps to none by level 140, so the demo had 0-4 openings against 12-28 before. Measured (8 seeds, scale 35): level 20/30 about 4, level 60 about 15, level 100+ about 19.
 - Rule: gameplay levels, ladder and difficulty gauges are untouched; demo is attract-loop art, not a calibrated difficulty.
 - Status: headless only, nothing checked on a real phone.
+## 2026-11-15 - MAZER-UI-050: menu primary label is TAP TO PLAY with a level line under it
+- WHAT changed: `MAIN_MENU_BUTTONS[0]` is now `TAP TO PLAY` (was `Start`); the tile-glyph alphabet (legacyMenuTitle.ts) gained P, Y and a blank word-space; MenuScene gives that button full screen width (glyph cell derives from it), lifts it 14 px and draws a `LEVEL n` line under it. New `tests/legacy-runtime/legacy-play-label-glyphs.test.ts`; `legacy-reset.test.ts` updated for the label. Login label unchanged.
+- WHY it changed: owner decision to make the tap target explicit. The first-run subline ("HOLD + SLIDE TO MOVE") is NOT included: no first-run flag exists (the guide lists `first-run-coach` as a pending owner decision). The in-app guide has no copy naming the menu Start label (its Start row is the board marker), so no guide change.
+- Rule: edge marker files untouched (MAZER-VIS-055 lane).
+- Status: headless 390x844 and 320x568 at DPR 3 viewed, no clipping; nothing checked on a real phone.
