@@ -1,0 +1,39 @@
+name: Verify (board-only companion)
+
+# Companion to verify.yml. verify.yml skips board-only pull requests (paths-ignore), so the
+# ruleset's required checks "TypeScript, contracts, and build" and "Playbook clean-environment
+# validation" would never report and the PR would stay BLOCKED. This workflow runs ONLY when a
+# pull request touches the board files and reports those exact check names as successes.
+# Board PRs are validated by the "Owner export" workflow (ci.yml).
+#
+# KEEP IN SYNC with .github/workflows/verify.yml: `paths:` below must equal its `paths-ignore:` list.
+# Mixed PRs (board + code files) run BOTH workflows; same-named checks must all pass, so the real
+# verify jobs still gate the code.
+
+on:
+  pull_request:
+    paths:
+      - "config/mazer-owner-work-registry.json"
+      - "config/mazer-work-ledger.json"
+      - "config/mazer-board-events.jsonl"
+      - "docs/ops/MAZER-WORK-REPORT.md"
+      - "docs/ops/MAZER-WORK-REPORT.json"
+      - "exports/mazer.project-board.owner-export.v1.json"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: TypeScript, contracts, and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "Board-only change; code verification is not applicable (see Owner export workflow)."
+
+  playbook-clean-environment:
+    name: Playbook clean-environment validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - run: echo "Board-only change; Playbook clean-environment validation is not applicable."
