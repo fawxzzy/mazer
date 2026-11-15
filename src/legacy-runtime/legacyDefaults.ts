@@ -35,7 +35,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   },
   darkMode: true,
   hapticsEnabled: true,
-  soundEnabled: false,
+  soundEnabled: true,
   toggleReducedMotion: false,
   controlMode: 'stick'
 };
