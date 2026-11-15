@@ -4,6 +4,7 @@ import {
   LEGACY_BUTTON_MAP,
   LEGACY_BUTTON_VARIANTS,
   LEGACY_TOGGLE_ROW,
+  resolveLegacyActionTone,
   resolveLegacyButtonSize,
   resolveLegacyButtonVariant
 } from '../../src/legacy-runtime/legacyButtonKit';
@@ -37,7 +38,16 @@ describe('legacy button kit', () => {
     expect(resolveLegacyButtonSize('primary', { width: 200, height: 60 })).toEqual({ width: 200, height: 60 });
   });
 
-  test('migration ratchet: no button draws its chrome from the kit yet (flip entries as surfaces migrate)', () => {
-    expect(LEGACY_BUTTON_MAP.filter((entry) => entry.chromeViaKit)).toEqual([]);
+  test('migration ratchet: the action-button factory surfaces draw from the kit table (flip entries as surfaces migrate)', () => {
+    expect(LEGACY_BUTTON_MAP.filter((entry) => entry.chromeViaKit).map((entry) => entry.id).sort()).toEqual(
+      ['auth-secondary', 'guide', 'reset-progress', 'sign-out']
+    );
+  });
+
+  test('action tones resolve to a kit variant and keep the pre-kit colours', () => {
+    expect(resolveLegacyActionTone('primary')).toMatchObject({ variant: 'primary', chrome: { fillKey: 'primary', textKey: 'bright', litWhenIdle: true } });
+    expect(resolveLegacyActionTone('secondary')).toMatchObject({ variant: 'secondary', chrome: { fillKey: 'control', textKey: 'soft', litWhenIdle: false } });
+    expect(resolveLegacyActionTone('danger')).toMatchObject({ variant: 'danger', chrome: { fillKey: 'dangerFilled', textKey: 'signOut' } });
+    expect(resolveLegacyActionTone('danger-outline')).toMatchObject({ variant: 'danger', chrome: { fillKey: 'control', textKey: 'signOut' } });
   });
 });
