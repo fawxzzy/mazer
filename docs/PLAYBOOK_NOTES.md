@@ -374,3 +374,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the script was fixed in #574 but no workflow ran it, which hid drift.
 - Rule: not a PR check and not in the required set; a red nightly is a signal to investigate, never a merge blocker. package.json untouched.
 - Status: YAML parsed only; first real run is the first dispatch after merge.
+## 2026-11-15 - MAZER-VIS-052: main-menu demo shows bleed-off paths again
+- WHAT changed: `resolveLegacyMenuDemoMazeGenerationProfileForProgression` (legacyProgression.ts) gives the MENU demo the band profile (feeders + both border connections, no budget-ladder gate, no fade at level 140); MenuScene uses it for mode 'menu' only. New `scripts/analysis/menu-demo-bleed-rate.ts` measures edge openings per level; new `tests/reset/legacy-menu-demo-bleed.test.ts` pins a demo opening floor and a sha256 of the gameplay profiles (unchanged).
+- WHY it changed: the geometry ladder (336f2f2a) set borderFeederTargetPerSide 0 and GEN-004 fades wraps to none by level 140, so the demo had 0-4 openings against 12-28 before. Measured (8 seeds, scale 35): level 20/30 about 4, level 60 about 15, level 100+ about 19.
+- Rule: gameplay levels, ladder and difficulty gauges are untouched; demo is attract-loop art, not a calibrated difficulty.
+- Status: headless only, nothing checked on a real phone.
