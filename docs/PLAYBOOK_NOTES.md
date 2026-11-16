@@ -436,3 +436,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added migration 20260828160000_mazer_leaderboard_hide_qa_accounts.sql (mazer_profiles.leaderboard_hidden, a trigger so client roles cannot write it, and `not p.leaderboard_hidden` in both mazer_leaderboard_page and mazer_leaderboard_self_rank), a rollback and live preimage under docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116, and a migration contract test.
 - WHY it changed: QA accounts (mzr-qa-1112, mzr-qa-2, cqa-a-1105, claude) were ranked beside real players; page and self ranks must exclude the same population so ranks stay consistent.
 - Status: scratch-tested on pglite (36/36); not applied to production, not yet run on PostgreSQL 17 scratch, no independent review yet.
+
+## 2026-11-16 Board fold keeps checkedOn through the evidence merge
+- WHAT changed: `mergeEvidence` (scripts/board/board-events.mjs) now carries `evidence.checkedOn` into the stored card evidence and clears it when the device check is withdrawn; tests/board-sync.test.mjs covers a completed card with a real-device check and the still-refused missing label.
+- WHY it changed: the merge dropped `checkedOn`, so every `completed` event with `deviceChecked: true` failed `completedProblems` and refused the whole fold.
+- Status: headless (board-sync tests 39/39, plan dry run accepts the pending events); board tooling only, nothing player-visible.
