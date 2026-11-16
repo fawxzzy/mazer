@@ -29,3 +29,33 @@ export const resolveLegacyGenerationTrack = (
   state: Pick<LegacyProgressionState, 'tracks'>,
   mode: LegacyGenerationTrackMode
 ): LegacyProgressionTrack => state.tracks[resolveLegacyGenerationTrackId(mode)];
+
+/**
+ * The menu demo must START on the player's current level when the app loads, then climb.
+ * If the persisted ai-runner track sits below the player track, lift it to the player's
+ * level (a climbing demo already above the player is left alone). Pure; returns the same
+ * state object when nothing changes.
+ */
+export const seedLegacyMenuDemoTrackFromPlayer = <T extends Pick<LegacyProgressionState, 'tracks'>>(
+  state: T
+): T => {
+  const player = state.tracks.player;
+  const ai = state.tracks['ai-runner'];
+  if (ai.targetComplexity >= player.targetComplexity) {
+    return state;
+  }
+  return {
+    ...state,
+    tracks: {
+      ...state.tracks,
+      'ai-runner': {
+        ...ai,
+        colorTier: player.colorTier,
+        level: player.level,
+        peakComplexity: Math.max(ai.peakComplexity, player.targetComplexity),
+        rank: player.rank,
+        targetComplexity: player.targetComplexity
+      }
+    }
+  };
+};
