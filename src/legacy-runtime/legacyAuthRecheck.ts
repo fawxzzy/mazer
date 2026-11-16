@@ -15,10 +15,14 @@
  *  - Throttled: at most one check per LEGACY_AUTH_RECHECK_THROTTLE_MS (a focus and a visibilitychange from the same
  *    return count once), one in flight at a time, and none while the browser reports offline.
  *  - Never mid-run: the safe point is the same as the deferred service-worker update (MAZER-PWA-006): the scene's run
- *    state is `menu`. A check that comes due during a run waits for the next safe point; a revocation that comes back
- *    while a run started in the meantime waits too before the session is dropped.
- *  - No redirect: a drop shows the existing signed-out status screen with the copy-matrix row `signin.session`
- *    ("Your session ended. Sign in again to continue."). It does not record an explicit sign-out and never navigates.
+ *    state is `menu`. A check that comes due during a run waits for the next safe point; a revocation (or a session
+ *    found already removed) that comes back after a run started waits too, and the drop re-checks the safe point
+ *    inside the auth lock right before it removes anything.
+ *  - Only the rejected session: the answer carries the session it is about (LegacyAuthRecheckDropTarget); the drop
+ *    refuses when the stored session is a different one (the same user signed in again in another tab).
+ *  - Local only, no redirect: the drop removes the stored session without any provider call and shows the existing
+ *    signed-out status screen with the copy-matrix row `signin.session` ("Your session ended. Sign in again to
+ *    continue."). It does not record an explicit sign-out and never navigates.
  *
  * The decision and the controller are pure (clock, network and run state injected); `installLegacyAuthRecheckInBrowser`
  * is the only part that touches `window`/`document`.
@@ -180,9 +184,84 @@ export const decideLegacyAuthRecheck = (input: LegacyAuthRecheckDecisionInput): 
 };
 
 /**
+ * Which stored session a provider answer is about: the user plus a session key, so a later sign-in of the SAME user
+ * (a new session in another tab, shared storage) is never dropped by an answer about the old one. The key is the
+ * access token's `session_id` claim (stable across token refreshes) or, when the token has none, an in-memory FNV-1a
+ * fingerprint of the token. Neither is a credential; never log either.
+ */
+export interface LegacyAuthRecheckDropTarget {
+  sessionKey: string;
+  userId: string;
+}
+
+export const deriveLegacyAuthSessionKey = (accessToken: unknown): string | null => {
+  if (typeof accessToken !== 'string' || accessToken.length === 0) {
+    return null;
+  }
+  const parts = accessToken.split('.');
+  if (parts.length === 3 && typeof atob === 'function') {
+    try {
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload: unknown = JSON.parse(atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4)));
+      const sessionId = payload !== null && typeof payload === 'object'
+        ? (payload as { session_id?: unknown }).session_id
+        : undefined;
+      if (typeof sessionId === 'string' && sessionId.length > 0) {
+        return `sid:${sessionId}`;
+      }
+    } catch {
+      // Not a readable JWT: fall back to the fingerprint.
+    }
+  }
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < accessToken.length; index += 1) {
+    hash ^= accessToken.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `tok:${hash.toString(16)}:${accessToken.length}`;
+};
+
+/** Reads the identity of the session stored under `storageKey` right now; null when absent or unreadable. */
+export const readLegacyAuthStoredSessionIdentity = (
+  storage: Pick<Storage, 'getItem'> | null | undefined,
+  storageKey: string | undefined
+): LegacyAuthRecheckDropTarget | null => {
+  if (!storage || typeof storageKey !== 'string' || storageKey.length === 0) {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(storageKey);
+    const parsed: unknown = raw === null ? null : JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    const value = parsed as { access_token?: unknown; user?: { id?: unknown } | null };
+    const userId = typeof value.user?.id === 'string' ? value.user.id : null;
+    const sessionKey = deriveLegacyAuthSessionKey(value.access_token);
+    return userId !== null && sessionKey !== null ? { sessionKey, userId } : null;
+  } catch {
+    return null;
+  }
+};
+
+export const isSameLegacyAuthSession = (
+  left: LegacyAuthRecheckDropTarget | null,
+  right: LegacyAuthRecheckDropTarget | null
+): boolean => left !== null && right !== null && left.userId === right.userId && left.sessionKey === right.sessionKey;
+
+/**
+ * What a drop did. `deferred`: a run started before the removal (checked inside the auth lock, right before it);
+ * `kept`: the stored session is not the rejected one any more (another sign-in), or the removal could not be verified.
+ */
+export type LegacyAuthRecheckDropResult<TSnapshot> =
+  | { status: 'dropped'; snapshot: TSnapshot }
+  | { status: 'deferred' }
+  | { status: 'kept' };
+
+/**
  * What one provider check found.
  *  - `valid`: the provider confirmed the same user.
- *  - `revoked`: the provider says the session/account is gone; the session is still stored (drop it).
+ *  - `revoked`: the provider says the session/account is gone; that exact session (`target`) is still stored.
  *  - `removed`: the stored session was already gone when the check finished (an auth-js refresh found it dead, or
  *    another tab dropped it) and the player did not choose Sign out: only the signed-out notice is applied.
  *  - `transient`: network, offline, server or unclear answer: keep everything.
@@ -190,14 +269,17 @@ export const decideLegacyAuthRecheck = (input: LegacyAuthRecheckDecisionInput): 
  */
 export type LegacyAuthRecheckProbe =
   | { status: 'valid' }
-  | { status: 'revoked'; userId: string }
+  | { status: 'revoked'; target: LegacyAuthRecheckDropTarget }
   | { status: 'removed' }
   | { status: 'transient' }
   | { status: 'skipped' };
 
 export interface LegacyAuthRecheckDeps<TSnapshot> {
-  /** Drops the stored session without recording an explicit sign-out; null when the drop did not happen. */
-  drop(userId: string): Promise<TSnapshot | null>;
+  /**
+   * Drops `target` locally without recording an explicit sign-out, only if that exact session is still stored and
+   * `stillSafe()` holds right before the removal. Never sends anything to the provider.
+   */
+  drop(target: LegacyAuthRecheckDropTarget, stillSafe: () => boolean): Promise<LegacyAuthRecheckDropResult<TSnapshot>>;
   isAuthenticated(): boolean;
   isOnline(): boolean;
   isSafePoint(): boolean;
@@ -213,7 +295,8 @@ export interface LegacyAuthRecheckController {
   /** For tests and diagnostics: what the controller is holding. */
   readonly state: Readonly<{
     deferredCheck: boolean;
-    deferredDropUserId: string | null;
+    deferredDrop: LegacyAuthRecheckDropTarget | null;
+    deferredSignedOutNotice: boolean;
     inFlight: boolean;
     lastCheckedAtMs: number | null;
   }>;
@@ -228,27 +311,39 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
 ): LegacyAuthRecheckController => {
   const state = {
     deferredCheck: false,
-    deferredDropUserId: null as string | null,
+    deferredDrop: null as LegacyAuthRecheckDropTarget | null,
+    deferredSignedOutNotice: false,
     disposed: false,
     inFlight: false,
     lastCheckedAtMs: null as number | null
   };
 
-  const finishSignedOut = (snapshot: TSnapshot | null): void => {
-    if (snapshot !== null && !state.disposed) {
+  const finishSignedOut = (snapshot: TSnapshot): void => {
+    if (!state.disposed) {
       deps.onSignedOut(snapshot);
     }
   };
 
-  const runDrop = async (userId: string): Promise<void> => {
-    state.deferredDropUserId = null;
+  const runDrop = async (target: LegacyAuthRecheckDropTarget): Promise<void> => {
+    state.deferredDrop = null;
     state.inFlight = true;
+    let result: LegacyAuthRecheckDropResult<TSnapshot>;
     try {
-      finishSignedOut(await deps.drop(userId));
+      result = await deps.drop(target, () => !state.disposed && deps.isSafePoint());
     } catch {
       // A failed drop keeps the session; the next check asks again.
+      result = { status: 'kept' };
     } finally {
       state.inFlight = false;
+    }
+    if (state.disposed) {
+      return;
+    }
+    if (result.status === 'dropped') {
+      finishSignedOut(result.snapshot);
+    } else if (result.status === 'deferred') {
+      // A run started while the drop waited for the auth lock: try again at the next safe point.
+      state.deferredDrop = target;
     }
   };
 
@@ -268,7 +363,12 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
       return;
     }
     if (probe.status === 'removed') {
-      finishSignedOut(deps.signedOutSnapshot());
+      if (deps.isSafePoint()) {
+        finishSignedOut(deps.signedOutSnapshot());
+      } else {
+        // Never change the screen mid-run: the notice waits for the next safe point.
+        state.deferredSignedOutNotice = true;
+      }
       return;
     }
     if (probe.status !== 'revoked') {
@@ -276,10 +376,10 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
     }
     if (!deps.isSafePoint()) {
       // A run started while the provider answered: drop at the next safe point, never mid-run.
-      state.deferredDropUserId = probe.userId;
+      state.deferredDrop = probe.target;
       return;
     }
-    await runDrop(probe.userId);
+    await runDrop(probe.target);
   };
 
   const request = async (trigger: LegacyAuthRecheckTrigger): Promise<LegacyAuthRecheckDecision> => {
@@ -307,11 +407,19 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
     if (state.disposed || state.inFlight || !deps.isSafePoint()) {
       return;
     }
-    if (state.deferredDropUserId !== null) {
+    if (state.deferredDrop !== null) {
       if (deps.isAuthenticated()) {
-        await runDrop(state.deferredDropUserId);
+        await runDrop(state.deferredDrop);
       } else {
-        state.deferredDropUserId = null;
+        state.deferredDrop = null;
+      }
+      return;
+    }
+    if (state.deferredSignedOutNotice) {
+      state.deferredSignedOutNotice = false;
+      // Only when still signed out: a sign-in that happened meanwhile wins.
+      if (!deps.isAuthenticated()) {
+        finishSignedOut(deps.signedOutSnapshot());
       }
       return;
     }
@@ -324,7 +432,8 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
     get state() {
       return {
         deferredCheck: state.deferredCheck,
-        deferredDropUserId: state.deferredDropUserId,
+        deferredDrop: state.deferredDrop,
+        deferredSignedOutNotice: state.deferredSignedOutNotice,
         inFlight: state.inFlight,
         lastCheckedAtMs: state.lastCheckedAtMs
       };
@@ -332,7 +441,8 @@ export const createLegacyAuthRecheckController = <TSnapshot>(
     dispose: () => {
       state.disposed = true;
       state.deferredCheck = false;
-      state.deferredDropUserId = null;
+      state.deferredDrop = null;
+      state.deferredSignedOutNotice = false;
     },
     notifySafePoint,
     request

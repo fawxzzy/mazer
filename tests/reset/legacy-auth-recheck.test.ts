@@ -7,11 +7,16 @@ import {
   classifyLegacyAuthRecheckResponse,
   createLegacyAuthRecheckController,
   decideLegacyAuthRecheck,
+  deriveLegacyAuthSessionKey,
   installLegacyAuthRecheckInBrowser,
+  isSameLegacyAuthSession,
+  readLegacyAuthStoredSessionIdentity,
   requestLegacyAuthProviderUser,
   type LegacyAuthRecheckBrowserTarget,
   type LegacyAuthRecheckDecisionInput,
   type LegacyAuthRecheckDeps,
+  type LegacyAuthRecheckDropResult,
+  type LegacyAuthRecheckDropTarget,
   type LegacyAuthRecheckProbe
 } from '../../src/legacy-runtime/legacyAuthRecheck';
 import { AUTH_SURFACE_MESSAGES } from '../../src/brand/authSurfaceCopy';
@@ -19,6 +24,18 @@ import { resolveLegacyAccountStatusNotice } from '../../src/legacy-runtime/legac
 import { resolveLegacyOAuthFailureCopy } from '../../src/legacy-runtime/legacyPlayerMessage';
 
 const USER = '11111111-2222-4333-8444-555555555555';
+const TARGET: LegacyAuthRecheckDropTarget = { sessionKey: 'sid:session-1', userId: USER };
+const AUTH_KEY = 'sb-bxtcuhkotumitoqtrcej-auth-token';
+
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>();
+  get length(): number { return this.values.size; }
+  clear(): void { this.values.clear(); }
+  getItem(key: string): string | null { return this.values.get(key) ?? null; }
+  key(index: number): string | null { return [...this.values.keys()][index] ?? null; }
+  removeItem(key: string): void { this.values.delete(key); }
+  setItem(key: string, value: string): void { this.values.set(key, value); }
+}
 
 const response = (status: number, code: string | null = null, userId: string | null = null) => ({ code, status, userId });
 
@@ -172,7 +189,10 @@ interface Harness {
 const createHarness = (probeResult: LegacyAuthRecheckProbe | (() => Promise<LegacyAuthRecheckProbe>)): Harness => {
   const world = { authenticated: true, nowMs: 5_000_000, online: true, safePoint: true };
   const probe = vi.fn(typeof probeResult === 'function' ? probeResult : async () => probeResult);
-  const drop = vi.fn(async (_userId: string) => 'revoked-snapshot' as string | null);
+  const drop = vi.fn(async (
+    _target: LegacyAuthRecheckDropTarget,
+    _stillSafe: () => boolean
+  ): Promise<LegacyAuthRecheckDropResult<string>> => ({ snapshot: 'revoked-snapshot', status: 'dropped' }));
   const onSignedOut = vi.fn();
   return {
     deps: {
@@ -194,10 +214,10 @@ const createHarness = (probeResult: LegacyAuthRecheckProbe | (() => Promise<Lega
 
 describe('createLegacyAuthRecheckController', () => {
   test('revoked: the session is dropped and the signed-out snapshot applied', async () => {
-    const harness = createHarness({ status: 'revoked', userId: USER });
+    const harness = createHarness({ status: 'revoked', target: TARGET });
     const controller = createLegacyAuthRecheckController(harness.deps);
     await controller.request('boot');
-    expect(harness.drop).toHaveBeenCalledWith(USER);
+    expect(harness.drop).toHaveBeenCalledWith(TARGET, expect.any(Function));
     expect(harness.onSignedOut).toHaveBeenCalledWith('revoked-snapshot');
   });
 
@@ -219,7 +239,7 @@ describe('createLegacyAuthRecheckController', () => {
   });
 
   test('offline: the provider is not asked at all', async () => {
-    const harness = createHarness({ status: 'revoked', userId: USER });
+    const harness = createHarness({ status: 'revoked', target: TARGET });
     harness.world.online = false;
     const controller = createLegacyAuthRecheckController(harness.deps);
     expect(await controller.request('resume')).toEqual({ action: 'skip', reason: 'offline' });
@@ -248,7 +268,7 @@ describe('createLegacyAuthRecheckController', () => {
   });
 
   test('mid-run: the check waits for the next safe point, then runs once', async () => {
-    const harness = createHarness({ status: 'revoked', userId: USER });
+    const harness = createHarness({ status: 'revoked', target: TARGET });
     harness.world.safePoint = false;
     const controller = createLegacyAuthRecheckController(harness.deps);
     expect(await controller.request('resume')).toEqual({ action: 'defer', reason: 'mid-run' });
@@ -265,26 +285,26 @@ describe('createLegacyAuthRecheckController', () => {
   });
 
   test('a revocation that lands after a run started is dropped only at the next safe point', async () => {
-    const harness = createHarness({ status: 'revoked', userId: USER });
+    const harness = createHarness({ status: 'revoked', target: TARGET });
     harness.probe.mockImplementation(async () => {
       harness.world.safePoint = false; // the boot run started while the provider answered
-      return { status: 'revoked', userId: USER };
+      return { status: 'revoked', target: TARGET };
     });
     const controller = createLegacyAuthRecheckController(harness.deps);
     await controller.request('boot');
     expect(harness.drop).not.toHaveBeenCalled();
     expect(harness.onSignedOut).not.toHaveBeenCalled();
-    expect(controller.state.deferredDropUserId).toBe(USER);
+    expect(controller.state.deferredDrop).toEqual(TARGET);
     harness.world.safePoint = true;
     await controller.notifySafePoint();
-    expect(harness.drop).toHaveBeenCalledWith(USER);
+    expect(harness.drop).toHaveBeenCalledWith(TARGET, expect.any(Function));
     expect(harness.onSignedOut).toHaveBeenCalledWith('revoked-snapshot');
   });
 
   test('a deferred drop is forgotten when the player is already signed out by then', async () => {
     const harness = createHarness(async () => {
       harness.world.safePoint = false;
-      return { status: 'revoked', userId: USER };
+      return { status: 'revoked', target: TARGET };
     });
     const controller = createLegacyAuthRecheckController(harness.deps);
     await controller.request('boot');
@@ -292,7 +312,7 @@ describe('createLegacyAuthRecheckController', () => {
     harness.world.authenticated = false;
     await controller.notifySafePoint();
     expect(harness.drop).not.toHaveBeenCalled();
-    expect(controller.state.deferredDropUserId).toBeNull();
+    expect(controller.state.deferredDrop).toBeNull();
   });
 
   test('removed (already gone after the check): only the signed-out notice is applied', async () => {
@@ -303,9 +323,68 @@ describe('createLegacyAuthRecheckController', () => {
     expect(harness.onSignedOut).toHaveBeenCalledWith('removed-snapshot');
   });
 
+  test('removed while a run started: the notice waits for the next safe point (never mid-run)', async () => {
+    const harness = createHarness(async () => {
+      harness.world.safePoint = false;
+      harness.world.authenticated = false;
+      return { status: 'removed' };
+    });
+    const controller = createLegacyAuthRecheckController(harness.deps);
+    await controller.request('boot');
+    expect(harness.onSignedOut).not.toHaveBeenCalled();
+    expect(controller.state.deferredSignedOutNotice).toBe(true);
+    await controller.notifySafePoint();
+    expect(harness.onSignedOut).not.toHaveBeenCalled();
+    harness.world.safePoint = true;
+    await controller.notifySafePoint();
+    expect(harness.onSignedOut).toHaveBeenCalledWith('removed-snapshot');
+    expect(controller.state.deferredSignedOutNotice).toBe(false);
+  });
+
+  test('a deferred removed notice is dropped when the player signed in again meanwhile', async () => {
+    const harness = createHarness(async () => {
+      harness.world.safePoint = false;
+      return { status: 'removed' };
+    });
+    const controller = createLegacyAuthRecheckController(harness.deps);
+    await controller.request('boot');
+    harness.world.safePoint = true;
+    harness.world.authenticated = true;
+    await controller.notifySafePoint();
+    expect(harness.onSignedOut).not.toHaveBeenCalled();
+  });
+
+  test('a run that starts while the drop waits for the auth lock defers the drop (stillSafe re-checked inside)', async () => {
+    const harness = createHarness({ status: 'revoked', target: TARGET });
+    harness.drop.mockImplementationOnce(async (_target, stillSafe) => {
+      harness.world.safePoint = false; // the player started a run during the lock wait
+      return stillSafe() ? { snapshot: 'revoked-snapshot', status: 'dropped' } : { status: 'deferred' };
+    });
+    const controller = createLegacyAuthRecheckController(harness.deps);
+    await controller.request('boot');
+    expect(harness.onSignedOut).not.toHaveBeenCalled();
+    expect(controller.state.deferredDrop).toEqual(TARGET);
+    harness.world.safePoint = true;
+    await controller.notifySafePoint();
+    expect(harness.drop).toHaveBeenCalledTimes(2);
+    expect(harness.onSignedOut).toHaveBeenCalledWith('revoked-snapshot');
+    expect(controller.state.deferredDrop).toBeNull();
+  });
+
+  test('a drop that keeps the session (another sign-in is stored) shows nothing and is not retried', async () => {
+    const harness = createHarness({ status: 'revoked', target: TARGET });
+    harness.drop.mockResolvedValue({ status: 'kept' });
+    const controller = createLegacyAuthRecheckController(harness.deps);
+    await controller.request('boot');
+    await controller.notifySafePoint();
+    expect(harness.drop).toHaveBeenCalledTimes(1);
+    expect(harness.onSignedOut).not.toHaveBeenCalled();
+    expect(controller.state.deferredDrop).toBeNull();
+  });
+
   test('a drop that could not be verified shows nothing and keeps asking later', async () => {
-    const harness = createHarness({ status: 'revoked', userId: USER });
-    harness.drop.mockResolvedValue(null);
+    const harness = createHarness({ status: 'revoked', target: TARGET });
+    harness.drop.mockResolvedValue({ status: 'kept' });
     const controller = createLegacyAuthRecheckController(harness.deps);
     await controller.request('boot');
     expect(harness.onSignedOut).not.toHaveBeenCalled();
@@ -319,7 +398,7 @@ describe('createLegacyAuthRecheckController', () => {
     const controller = createLegacyAuthRecheckController(harness.deps);
     const pending = controller.request('boot');
     controller.dispose();
-    release({ status: 'revoked', userId: USER });
+    release({ status: 'revoked', target: TARGET });
     await pending;
     expect(harness.drop).not.toHaveBeenCalled();
     expect(harness.onSignedOut).not.toHaveBeenCalled();
@@ -353,7 +432,7 @@ describe('installLegacyAuthRecheckInBrowser', () => {
     let nowMs = 1_000_000;
     const probe = vi.fn(async (): Promise<LegacyAuthRecheckProbe> => ({ status: 'valid' }));
     const binding = installLegacyAuthRecheckInBrowser<string>({
-      drop: async () => null,
+      drop: async () => ({ status: 'kept' }),
       isAuthenticated: () => true,
       isSafePoint: () => true,
       now: () => nowMs,
@@ -376,7 +455,7 @@ describe('installLegacyAuthRecheckInBrowser', () => {
     const { doc, fire, listeners, target } = createTarget();
     const probe = vi.fn(async (): Promise<LegacyAuthRecheckProbe> => ({ status: 'valid' }));
     const binding = installLegacyAuthRecheckInBrowser<string>({
-      drop: async () => null,
+      drop: async () => ({ status: 'kept' }),
       isAuthenticated: () => true,
       isSafePoint: () => true,
       onSignedOut: () => undefined,
@@ -396,9 +475,9 @@ describe('installLegacyAuthRecheckInBrowser', () => {
   test('offline in the browser: no provider call', async () => {
     const { fire, target } = createTarget();
     (target.navigator as { onLine: boolean }).onLine = false;
-    const probe = vi.fn(async (): Promise<LegacyAuthRecheckProbe> => ({ status: 'revoked', userId: USER }));
+    const probe = vi.fn(async (): Promise<LegacyAuthRecheckProbe> => ({ status: 'revoked', target: TARGET }));
     installLegacyAuthRecheckInBrowser<string>({
-      drop: async () => 'x',
+      drop: async () => ({ status: 'dropped', snapshot: 'x' }),
       isAuthenticated: () => true,
       isSafePoint: () => true,
       onSignedOut: () => undefined,
@@ -412,13 +491,154 @@ describe('installLegacyAuthRecheckInBrowser', () => {
 
   test('no browser: nothing is installed', () => {
     expect(installLegacyAuthRecheckInBrowser<string>({
-      drop: async () => null,
+      drop: async () => ({ status: 'kept' }),
       isAuthenticated: () => true,
       isSafePoint: () => true,
       onSignedOut: () => undefined,
       probe: async () => ({ status: 'valid' }),
       signedOutSnapshot: () => 'x'
     }, null)).toBeNull();
+  });
+});
+
+const base64Url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const fakeJwt = (sessionId: string | null, userId = USER) => [
+  base64Url({ alg: 'HS256', typ: 'JWT' }),
+  base64Url({ sub: userId, ...(sessionId === null ? {} : { session_id: sessionId }) }),
+  'signature'
+].join('.');
+const storedSession = (sessionId: string, userId = USER) => JSON.stringify({
+  access_token: fakeJwt(sessionId, userId),
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  refresh_token: `refresh-${sessionId}`,
+  user: { email: 'player@example.test', id: userId, user_metadata: { username: 'player' } }
+});
+
+describe('session identity (which session an answer is about)', () => {
+  test('the key is the session_id claim, stable across refreshed tokens of one session', () => {
+    expect(deriveLegacyAuthSessionKey(fakeJwt('s-1'))).toBe('sid:s-1');
+    expect(deriveLegacyAuthSessionKey(`${fakeJwt('s-1')}`.replace('signature', 'other'))).toBe('sid:s-1');
+    expect(deriveLegacyAuthSessionKey(fakeJwt('s-2'))).toBe('sid:s-2');
+  });
+
+  test('a token without a session_id falls back to a fingerprint that never contains the token', () => {
+    const token = fakeJwt(null);
+    const key = deriveLegacyAuthSessionKey(token)!;
+    expect(key).toMatch(/^tok:[0-9a-f]+:\d+$/);
+    expect(key).not.toContain(token.split('.')[1]);
+    expect(deriveLegacyAuthSessionKey('opaque-token')).toBe(deriveLegacyAuthSessionKey('opaque-token'));
+    expect(deriveLegacyAuthSessionKey('opaque-token')).not.toBe(deriveLegacyAuthSessionKey('opaque-token2'));
+    expect(deriveLegacyAuthSessionKey('')).toBeNull();
+    expect(deriveLegacyAuthSessionKey(undefined)).toBeNull();
+  });
+
+  test('the stored identity is read from the raw session; same user with a new session is a different session', () => {
+    const storage = new MemoryStorage();
+    expect(readLegacyAuthStoredSessionIdentity(storage, AUTH_KEY)).toBeNull();
+    storage.setItem(AUTH_KEY, storedSession('s-1'));
+    const first = readLegacyAuthStoredSessionIdentity(storage, AUTH_KEY);
+    expect(first).toEqual({ sessionKey: 'sid:s-1', userId: USER });
+    storage.setItem(AUTH_KEY, storedSession('s-2'));
+    const second = readLegacyAuthStoredSessionIdentity(storage, AUTH_KEY);
+    expect(isSameLegacyAuthSession(first, second)).toBe(false);
+    expect(isSameLegacyAuthSession(first, { sessionKey: 'sid:s-1', userId: USER })).toBe(true);
+    expect(isSameLegacyAuthSession(first, null)).toBe(false);
+    storage.setItem(AUTH_KEY, 'not json');
+    expect(readLegacyAuthStoredSessionIdentity(storage, AUTH_KEY)).toBeNull();
+  });
+});
+
+describe('dropRevokedLegacyAuthSession / probeLegacyAuthSessionWithProvider (real module, mocked auth-js)', () => {
+  const loadAuth = async (initialSessionId: string) => {
+    const storage = new MemoryStorage();
+    storage.setItem(AUTH_KEY, storedSession(initialSessionId));
+    const removeSession = vi.fn(async () => { storage.removeItem(AUTH_KEY); });
+    const signOut = vi.fn(async () => { storage.removeItem(AUTH_KEY); return { error: null }; });
+    const adminFetch = vi.fn();
+    const auth = {
+      admin: { fetch: adminFetch },
+      getSession: vi.fn(async () => {
+        const raw = storage.getItem(AUTH_KEY);
+        return { data: { session: raw === null ? null : JSON.parse(raw) }, error: null };
+      }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      storage,
+      storageKey: AUTH_KEY,
+      _removeSession: removeSession,
+      _signOut: signOut
+    };
+    vi.resetModules();
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-key');
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://bxtcuhkotumitoqtrcej.supabase.co');
+    vi.stubGlobal('navigator', {
+      locks: { request: async (_name: string, _options: unknown, callback: (lock: object) => unknown) => callback({}) },
+      onLine: true
+    });
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn(),
+      localStorage: storage,
+      location: { pathname: '/' },
+      sessionStorage: new MemoryStorage()
+    });
+    vi.doMock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => ({ auth })) }));
+    const legacyAuth = await import('../../src/legacy-runtime/legacyAuth');
+    return { adminFetch, legacyAuth, removeSession, signOut, storage };
+  };
+
+  afterEach(() => {
+    vi.doUnmock('@supabase/supabase-js');
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  const S1: LegacyAuthRecheckDropTarget = { sessionKey: 'sid:s-1', userId: USER };
+
+  test('the same user signed in again (new session in another tab) before the drop: no sign-out, no /logout', async () => {
+    const { adminFetch, legacyAuth, removeSession, signOut, storage } = await loadAuth('s-2');
+    const before = storage.getItem(AUTH_KEY);
+    const result = await legacyAuth.dropRevokedLegacyAuthSession(S1, () => true);
+    expect(result).toEqual({ status: 'kept' });
+    expect(storage.getItem(AUTH_KEY)).toBe(before);
+    expect(removeSession).not.toHaveBeenCalled();
+    expect(signOut).not.toHaveBeenCalled();
+    expect(adminFetch).not.toHaveBeenCalled();
+  });
+
+  test('the rejected session still stored: removed locally only (no /logout), session-ended notice', async () => {
+    const { adminFetch, legacyAuth, removeSession, signOut, storage } = await loadAuth('s-1');
+    const result = await legacyAuth.dropRevokedLegacyAuthSession(S1, () => true);
+    expect(result.status).toBe('dropped');
+    expect(result.status === 'dropped' ? result.snapshot.errorCode : null).toBe('session_invalid');
+    expect(storage.getItem(AUTH_KEY)).toBeNull();
+    expect(removeSession).toHaveBeenCalledTimes(1);
+    expect(signOut).not.toHaveBeenCalled();
+    expect(adminFetch).not.toHaveBeenCalled();
+  });
+
+  test('a run started before the removal (stillSafe false inside the lock): deferred, session kept', async () => {
+    const { legacyAuth, removeSession, storage } = await loadAuth('s-1');
+    const result = await legacyAuth.dropRevokedLegacyAuthSession(S1, () => false);
+    expect(result).toEqual({ status: 'deferred' });
+    expect(storage.getItem(AUTH_KEY)).not.toBeNull();
+    expect(removeSession).not.toHaveBeenCalled();
+  });
+
+  test('the probe skips an answer when the same user signed in again with a new session while it was asked', async () => {
+    const { legacyAuth, storage } = await loadAuth('s-1');
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      storage.setItem(AUTH_KEY, storedSession('s-2')); // another tab signed in again meanwhile
+      return new Response(JSON.stringify({ code: 403, error_code: 'session_not_found' }), { status: 403 });
+    }));
+    expect(await legacyAuth.probeLegacyAuthSessionWithProvider()).toEqual({ status: 'skipped' });
+  });
+
+  test('the probe names the exact session it asked about when the provider rejects it', async () => {
+    const { legacyAuth } = await loadAuth('s-1');
+    vi.stubGlobal('fetch', vi.fn(async () => (
+      new Response(JSON.stringify({ code: 403, error_code: 'session_not_found' }), { status: 403 })
+    )));
+    expect(await legacyAuth.probeLegacyAuthSessionWithProvider()).toEqual({ status: 'revoked', target: S1 });
   });
 });
 
@@ -439,6 +659,12 @@ describe('copy and wiring pins', () => {
     expect(dropBody).not.toContain('recordMazerExplicitSignOut');
     expect(dropBody).not.toContain('runMazerHostSignOut');
     expect(dropBody).not.toContain('location');
+    // Local removal only: the provider already ended the session, so no /logout (and no refresh) is sent.
+    expect(dropBody).not.toContain('_signOut');
+    expect(dropBody).not.toContain('invokeLegacyLocalSignOutWithTimeout');
+    expect(dropBody).toContain('_removeSession()');
+    expect(dropBody.indexOf('isSameLegacyAuthSession(')).toBeLessThan(dropBody.indexOf('stillSafe()'));
+    expect(dropBody.indexOf('stillSafe()')).toBeLessThan(dropBody.indexOf('_removeSession()'));
     const probeStart = source.indexOf('export const probeLegacyAuthSessionWithProvider');
     const probeBody = source.slice(probeStart, dropStart);
     // auth-js getUser() removes the session itself on session_not_found (mid-run); the probe must not use it.

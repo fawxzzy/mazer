@@ -25,7 +25,12 @@ import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyA
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
 import {
   classifyLegacyAuthRecheckResponse,
+  deriveLegacyAuthSessionKey,
+  isSameLegacyAuthSession,
+  readLegacyAuthStoredSessionIdentity,
   requestLegacyAuthProviderUser,
+  type LegacyAuthRecheckDropResult,
+  type LegacyAuthRecheckDropTarget,
   type LegacyAuthRecheckProbe
 } from './legacyAuthRecheck';
 import { isMazerExplicitSignOutRecorded, recordMazerExplicitSignOut } from './legacySignedOutHandoff';
@@ -917,6 +922,12 @@ export const probeLegacyAuthSessionWithProvider = async (): Promise<LegacyAuthRe
       // No usable token (a refresh is pending or failed transiently): auth-js owns that path; ask next time.
       return { status: 'transient' };
     }
+    // The answer is about THIS session (the token sent), not about whoever is stored when it arrives.
+    const sessionKey = deriveLegacyAuthSessionKey(session.access_token);
+    if (sessionKey === null) {
+      return { status: 'transient' };
+    }
+    const asked: LegacyAuthRecheckDropTarget = { sessionKey, userId: expectedUserId };
     const response = await requestLegacyAuthProviderUser({
       accessToken: session.access_token,
       anonKey: config.anonKey,
@@ -926,17 +937,17 @@ export const probeLegacyAuthSessionWithProvider = async (): Promise<LegacyAuthRe
     if (isMazerOAuthSessionQuarantined()) {
       return { status: 'skipped' };
     }
-    const storedUserId = readStoredUserId();
-    if (storedUserId === null) {
+    if (readStoredUserId() === null) {
       return sessionRemovedOrSkipped();
     }
-    if (storedUserId !== expectedUserId) {
-      // Another account signed in meanwhile (another tab): this answer is about a session that is no longer shown.
+    if (!isSameLegacyAuthSession(readLegacyAuthStoredSessionIdentity(authStorage, authStorageKey), asked)) {
+      // Another sign-in meanwhile (another account, or the same account with a new session in another tab):
+      // this answer is about a session that is no longer stored.
       return { status: 'skipped' };
     }
     const verdict = classifyLegacyAuthRecheckResponse(response, expectedUserId);
     return verdict === 'revoked'
-      ? { status: 'revoked', userId: expectedUserId }
+      ? { status: 'revoked', target: asked }
       : { status: verdict };
   } catch {
     return { status: 'transient' };
@@ -944,40 +955,55 @@ export const probeLegacyAuthSessionWithProvider = async (): Promise<LegacyAuthRe
 };
 
 /**
- * Drops the stored session after the provider said it is gone. Same verified local removal as signOutLegacyAuth, but
- * the player did not choose it: no explicit-sign-out record (so no host sign-out and launch rules stay as they are)
- * and the session-ended notice instead of "Signed out.". Resolves null when nothing was dropped (another account is
- * stored now, or the removal could not be verified).
+ * Drops the rejected session after the provider said it is gone. The player did not choose it: no explicit-sign-out
+ * record (so no host sign-out and launch rules stay as they are) and the session-ended notice instead of
+ * "Signed out.". Inside the cross-tab auth lock, right before removing, it re-reads the stored session and refuses
+ * (`kept`) unless it is still exactly `target` (a fresh sign-in of the same user in another tab is never touched), and
+ * defers (`deferred`) if a run started. The removal is local only (auth-js `_removeSession`: storage + SIGNED_OUT):
+ * the provider already ended this session, so nothing is sent (no `/logout`, no refresh), and there is no network wait
+ * between the safe-point check and the removal. Only a verified removal counts as `dropped`.
  */
 export const dropRevokedLegacyAuthSession = async (
-  expectedUserId: string
-): Promise<LegacyAuthSessionSnapshot | null> => {
+  target: LegacyAuthRecheckDropTarget,
+  stillSafe: () => boolean
+): Promise<LegacyAuthRecheckDropResult<LegacyAuthSessionSnapshot>> => {
   const client = await getLegacyAuthClient();
   if (!client) {
-    return null;
+    return { status: 'kept' };
   }
-  const directSignOut = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
-  const authStorage = directSignOut.storage ?? null;
-  const authStorageKey = directSignOut.storageKey;
-  let dropped = false;
+  const directAuth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient> & {
+    _removeSession?: () => Promise<void>;
+  };
+  const authStorage = directAuth.storage ?? null;
+  const authStorageKey = directAuth.storageKey;
+  // Set inside the lock callback (an `as` initializer keeps TS from narrowing it to 'kept').
+  let outcome = 'kept' as 'deferred' | 'dropped' | 'kept';
   await runLegacyAuthDirectSessionMutation(authStorageKey, async () => {
-    const stored = readLegacyPersistedAuthSessionSnapshot(authStorage, undefined, authStorageKey);
-    if (stored === null || stored.userId !== expectedUserId) {
+    if (!isSameLegacyAuthSession(readLegacyAuthStoredSessionIdentity(authStorage, authStorageKey), target)) {
+      return { snapshot: createLegacyGuestAuthSnapshot() };
+    }
+    if (!stillSafe()) {
+      outcome = 'deferred';
+      return { snapshot: createLegacyGuestAuthSnapshot() };
+    }
+    if (typeof directAuth._removeSession !== 'function') {
       return { snapshot: createLegacyGuestAuthSnapshot() };
     }
     try {
-      await invokeLegacyLocalSignOutWithTimeout(directSignOut);
+      await directAuth._removeSession();
     } catch {
-      // Judged by the storage read below, like signOutLegacyAuth: only a verified removal counts.
+      // Judged by the storage read below: only a verified removal counts.
     }
-    dropped = isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey);
-    if (dropped) {
+    if (isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
+      outcome = 'dropped';
       legacyAuthLastSessionSignature = null;
       markLegacyRememberedIdentityReauthRequired(authStorage ?? undefined);
     }
     return { snapshot: createLegacyGuestAuthSnapshot() };
   });
-  return dropped ? createLegacyRevokedSessionSnapshot() : null;
+  return outcome === 'dropped'
+    ? { status: 'dropped', snapshot: createLegacyRevokedSessionSnapshot() }
+    : { status: outcome };
 };
 
 export const subscribeLegacyAuthState = (
