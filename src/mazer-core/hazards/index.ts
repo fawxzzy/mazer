@@ -10,5 +10,7 @@ export * from './overlay';
 export * from './placement';
 export * from './schedule';
 export * from './serialization';
+export * from './shardSolvability';
+export * from './shards';
 export * from './solvability';
 export * from './validation';
