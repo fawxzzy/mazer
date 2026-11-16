@@ -26,6 +26,8 @@ import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
+import { resolveStartSpiralRotation } from '../render/endpointSpiral';
+import { resolveSharedBorderColor } from '../render/trailPalette';
 import {
   resolveBleedGlowColor,
   resolveBleedGlowEnvelope,
@@ -10373,7 +10375,11 @@ export class MenuScene extends Phaser.Scene {
       phase,
       reducedMotion: this.prefersLegacyReducedMotion(),
       // The slow spin (goalStarSpin.ts): from the shared scene clock; 0 (tip up, static) under Reduce Motion.
-      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0
+      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      // MAZER-VIS-053: the start spiral turns on the SAME clock and period as the star (in phase), and the star's border is
+      // the shared border colour of the edge diamonds (same function, same trail head, same reduced-motion rule).
+      startSpiralRotation: kind === 'start' ? resolveStartSpiralRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      endpointBorderColor: resolveSharedBorderColor(this.trailPaletteHead, time ?? 0, this.prefersLegacyReducedMotion())
     };
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
     // any more); Trace: its own marker artwork. Both go through the same call.

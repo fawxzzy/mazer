@@ -252,10 +252,13 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
     /** Goal star radii as a share of the half-tile. */
     goalStarOuterOfRadius: 0.7,
     goalStarInnerOfRadius: 0.32,
-    /** Start play arrow, as shares of the half-tile: half height, length along the direction of travel, round-join stroke. */
-    startPlayHalfHeightOfRadius: 0.5,
-    startPlayLengthOfRadius: 0.95,
-    startPlayStrokeOfRadius: 0.12
+    /**
+     * Start spiral (MAZER-VIS-053), as shares of the half-tile: the outer radius of its centre line (the circle that
+     * circumscribes the old play triangle, 0.5 half height x 0.95 length, = hypot(0.475, 0.5), which is also the goal star's
+     * tip radius), and the stroke of the gold arm (the old play-arrow stroke was 0.12).
+     */
+    startSpiralOuterOfRadius: 0.69,
+    startSpiralStrokeOfRadius: 0.2
   })
 } as const);
 
