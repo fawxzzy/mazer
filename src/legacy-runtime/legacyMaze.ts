@@ -1,6 +1,7 @@
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL } from './legacyGeometryBudget';
 import { fillFloorIslands } from './legacyMazeIslands';
+import type { LegacyStaircaseStats } from './legacyMazeStaircase';
 import { resolveLegacyMenuSnapshotBlueprint } from './legacyMenuSnapshot';
 import { legacyTuning } from '../config/tuning';
 
@@ -194,6 +195,8 @@ export interface LegacyMazeSnapshot {
   fringeStats?: {
     cells: number;
   };
+  // MAZER-GEN-020 (flagged prototype): what the staircase pass re-laid. Absent unless the flag is on.
+  staircaseStats?: LegacyStaircaseStats;
   // One-tile stub rule (legacyMazeStubs.ts, MAZER-GEN-004): how the ladder tuner cleared the dead-end
   // nubs it was left with: cells opened to lengthen a stub to MIN_DEAD_END_BRANCH_CELLS, tips walled
   // up, and tips walled up unverified as the last resort (forced). Absent when the maze had none.

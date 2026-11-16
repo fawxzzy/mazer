@@ -34,6 +34,7 @@ import {
 import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
 import { forceRemoveOneTileStubs } from './legacyMazeStubs';
 import { applyOneTileStubRule } from './legacyMazeStubPass';
+import { applyStaircasePass, readLegacyStaircaseFlagFromLocation } from './legacyMazeStaircase';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
@@ -165,6 +166,9 @@ export interface LegacyGenerationSelectionOptions {
   wrapRungs?: number;
   targetComplexity?: number | null;
   tolerance?: number;
+  // MAZER-GEN-020 (flagged prototype, QA only): true re-lays corridors as staircases after the build (legacyMazeStaircase.ts).
+  // Undefined reads the page's ?staircase=1; absent and off leave every maze byte-identical.
+  staircase?: boolean;
 }
 
 export interface LegacyGenerationSelectionReview {
@@ -1000,7 +1004,9 @@ const generateLegacyRuntimeMazeForMode = (
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale, profile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const gate = resolveLegacyGenerationTickGateContract();
-  const { maze, profile: builtProfile, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
+  const selected = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
+  const { profile: builtProfile, review } = selected;
+  const maze = (selectionOptions.staircase ?? readLegacyStaircaseFlagFromLocation()) ? applyStaircasePass(selected.maze) : selected.maze;
 
   return {
     ...maze,

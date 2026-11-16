@@ -23,7 +23,17 @@ import {
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyAuthFailureCodes';
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
-import { recordMazerExplicitSignOut } from './legacySignedOutHandoff';
+import {
+  classifyLegacyAuthRecheckResponse,
+  deriveLegacyAuthSessionKey,
+  isSameLegacyAuthSession,
+  readLegacyAuthStoredSessionIdentity,
+  requestLegacyAuthProviderUser,
+  type LegacyAuthRecheckDropResult,
+  type LegacyAuthRecheckDropTarget,
+  type LegacyAuthRecheckProbe
+} from './legacyAuthRecheck';
+import { isMazerExplicitSignOutRecorded, recordMazerExplicitSignOut } from './legacySignedOutHandoff';
 import { LEGACY_STORED_USERNAME_PATTERN, sanitizeStoredLegacyUsername } from './legacyStoredUsername';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
@@ -843,6 +853,157 @@ export const signOutLegacyAuth = async (
       })
     };
   });
+};
+
+/**
+ * The signed-out snapshot shown after the provider ended the session elsewhere (legacyAuthRecheck.ts): the copy-matrix
+ * row `signin.session` with the existing `session_invalid` diagnostics code. No explicit sign-out is recorded.
+ */
+export const createLegacyRevokedSessionSnapshot = (
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): LegacyAuthSessionSnapshot => createGuestSnapshot(isLegacyAuthConfigured(env), {
+  error: resolveLegacyOAuthFailureCopy('session_invalid'),
+  errorCode: 'session_invalid'
+});
+
+/**
+ * One server-validated provider check of the stored session (legacyAuthRecheck.ts). Never throws and never removes
+ * the session itself (the controller drops it at a safe point). The access token comes from auth-js `getSession()`,
+ * which refreshes it when due; an auth-js refresh that already removed the session is reported as `removed`.
+ */
+export const probeLegacyAuthSessionWithProvider = async (): Promise<LegacyAuthRecheckProbe> => {
+  try {
+    if (isMazerOAuthSessionQuarantined()) {
+      return { status: 'skipped' };
+    }
+    const config = resolveLegacyAuthConfig();
+    const client = await getLegacyAuthClient();
+    if (!client || !config) {
+      return { status: 'skipped' };
+    }
+    const directAuth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient>;
+    const authStorage = directAuth.storage ?? null;
+    const authStorageKey = directAuth.storageKey;
+    const readStoredUserId = (): string | null => (
+      readLegacyPersistedAuthSessionSnapshot(authStorage, undefined, authStorageKey)?.userId ?? null
+    );
+    // Gone while asking: the session-ended notice, unless the player chose Sign out (that path shows its own line).
+    const sessionRemovedOrSkipped = (): LegacyAuthRecheckProbe => (
+      isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)
+        && !isMazerExplicitSignOutRecorded(authStorage ?? undefined)
+        ? { status: 'removed' }
+        : { status: 'skipped' }
+    );
+    const expectedUserId = readStoredUserId();
+    if (expectedUserId === null) {
+      return { status: 'skipped' };
+    }
+    let session: Session | null;
+    try {
+      const result = await client.auth.getSession();
+      if (result.error) {
+        return { status: 'transient' };
+      }
+      session = result.data.session;
+    } catch {
+      return { status: 'transient' };
+    }
+    if (session === null) {
+      return sessionRemovedOrSkipped();
+    }
+    if (session.user?.id !== expectedUserId) {
+      return { status: 'skipped' };
+    }
+    if (
+      typeof session.access_token !== 'string'
+      || session.access_token.length === 0
+      || (typeof session.expires_at === 'number' && session.expires_at * 1000 <= Date.now())
+    ) {
+      // No usable token (a refresh is pending or failed transiently): auth-js owns that path; ask next time.
+      return { status: 'transient' };
+    }
+    // The answer is about THIS session (the token sent), not about whoever is stored when it arrives.
+    const sessionKey = deriveLegacyAuthSessionKey(session.access_token);
+    if (sessionKey === null) {
+      return { status: 'transient' };
+    }
+    const asked: LegacyAuthRecheckDropTarget = { sessionKey, userId: expectedUserId };
+    const response = await requestLegacyAuthProviderUser({
+      accessToken: session.access_token,
+      anonKey: config.anonKey,
+      fetch: (input, init) => globalThis.fetch(input, init),
+      projectUrl: config.url
+    });
+    if (isMazerOAuthSessionQuarantined()) {
+      return { status: 'skipped' };
+    }
+    if (readStoredUserId() === null) {
+      return sessionRemovedOrSkipped();
+    }
+    if (!isSameLegacyAuthSession(readLegacyAuthStoredSessionIdentity(authStorage, authStorageKey), asked)) {
+      // Another sign-in meanwhile (another account, or the same account with a new session in another tab):
+      // this answer is about a session that is no longer stored.
+      return { status: 'skipped' };
+    }
+    const verdict = classifyLegacyAuthRecheckResponse(response, expectedUserId);
+    return verdict === 'revoked'
+      ? { status: 'revoked', target: asked }
+      : { status: verdict };
+  } catch {
+    return { status: 'transient' };
+  }
+};
+
+/**
+ * Drops the rejected session after the provider said it is gone. The player did not choose it: no explicit-sign-out
+ * record (so no host sign-out and launch rules stay as they are) and the session-ended notice instead of
+ * "Signed out.". Inside the cross-tab auth lock, right before removing, it re-reads the stored session and refuses
+ * (`kept`) unless it is still exactly `target` (a fresh sign-in of the same user in another tab is never touched), and
+ * defers (`deferred`) if a run started. The removal is local only (auth-js `_removeSession`: storage + SIGNED_OUT):
+ * the provider already ended this session, so nothing is sent (no `/logout`, no refresh), and there is no network wait
+ * between the safe-point check and the removal. Only a verified removal counts as `dropped`.
+ */
+export const dropRevokedLegacyAuthSession = async (
+  target: LegacyAuthRecheckDropTarget,
+  stillSafe: () => boolean
+): Promise<LegacyAuthRecheckDropResult<LegacyAuthSessionSnapshot>> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return { status: 'kept' };
+  }
+  const directAuth = client.auth as unknown as Partial<LegacyAuthDirectSignOutClient> & {
+    _removeSession?: () => Promise<void>;
+  };
+  const authStorage = directAuth.storage ?? null;
+  const authStorageKey = directAuth.storageKey;
+  // Set inside the lock callback (an `as` initializer keeps TS from narrowing it to 'kept').
+  let outcome = 'kept' as 'deferred' | 'dropped' | 'kept';
+  await runLegacyAuthDirectSessionMutation(authStorageKey, async () => {
+    if (!isSameLegacyAuthSession(readLegacyAuthStoredSessionIdentity(authStorage, authStorageKey), target)) {
+      return { snapshot: createLegacyGuestAuthSnapshot() };
+    }
+    if (!stillSafe()) {
+      outcome = 'deferred';
+      return { snapshot: createLegacyGuestAuthSnapshot() };
+    }
+    if (typeof directAuth._removeSession !== 'function') {
+      return { snapshot: createLegacyGuestAuthSnapshot() };
+    }
+    try {
+      await directAuth._removeSession();
+    } catch {
+      // Judged by the storage read below: only a verified removal counts.
+    }
+    if (isLegacyPersistedAuthSessionRemoved(authStorage, authStorageKey)) {
+      outcome = 'dropped';
+      legacyAuthLastSessionSignature = null;
+      markLegacyRememberedIdentityReauthRequired(authStorage ?? undefined);
+    }
+    return { snapshot: createLegacyGuestAuthSnapshot() };
+  });
+  return outcome === 'dropped'
+    ? { status: 'dropped', snapshot: createLegacyRevokedSessionSnapshot() }
+    : { status: outcome };
 };
 
 export const subscribeLegacyAuthState = (

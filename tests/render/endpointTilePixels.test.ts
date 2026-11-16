@@ -12,6 +12,7 @@ import {
 import { boardMaterial } from '../../src/render/boardTileStyle';
 import { resolveGoalStarCentre } from '../../src/render/endpointOpticalCentre';
 import { START_DIRECTIONS, type StartDirection } from '../../src/render/startDirection';
+import { resolveSharedBorderColor } from '../../src/render/trailPalette';
 import { RasterContext, type Rgba } from './support/rasterContext';
 
 /**
@@ -23,8 +24,9 @@ import { RasterContext, type Rgba } from './support/rasterContext';
  *    tile (where the retired square pad and the rounded-square backdrop used to show) are untouched baked chip fill;
  *    the old pad tint colours never appear, only the glyph colour and the dark keyline do;
  *  - the goal star is centred on the tile and stays inside it;
- *  - the start arrow points along the direction the tile was given: its filled mass sits BEHIND the cell centre and
- *    its apex AHEAD of it, for all four directions;
+ *  - the start SPIRAL (MAZER-VIS-053, it replaced the play arrow) is centred on the tile at every angle it turns through,
+ *    and no longer depends on the first-step direction;
+ *  - the goal star paints three colours only: the goal red, its border in the shared border colour, the dark keyline;
  *  - both stay inside the tile's own device-pixel rectangle.
  */
 const ROWS = [
@@ -70,7 +72,14 @@ const wholeGlyphCells = (): BoardCell[] => {
 
 interface Rendered { base: RasterContext; marked: RasterContext; rect: { x0: number; y0: number; x1: number; y1: number }; }
 
-const render = (tileSize: number, dpr: number, cell: BoardCell, kind: 'goal' | 'start', direction: StartDirection = 'right'): Rendered => {
+const render = (
+  tileSize: number,
+  dpr: number,
+  cell: BoardCell,
+  kind: 'goal' | 'start',
+  direction: StartDirection = 'right',
+  rotation = 0
+): Rendered => {
   const input = inputFor(tileSize, dpr, cell);
   const layout = computeBoardTileLayout(input);
   const surface = new RasterContext(layout.pixelWidth, layout.pixelHeight);
@@ -82,7 +91,8 @@ const render = (tileSize: number, dpr: number, cell: BoardCell, kind: 'goal' | '
   marked.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawBoardMarkers(marked, {
     style: 'chip', tileSize, devicePixelRatio: dpr, originX: layout.originX, originY: layout.originY,
-    [kind]: cell, [kind === 'goal' ? 'goalTile' : 'startTile']: tile
+    [kind]: cell, [kind === 'goal' ? 'goalTile' : 'startTile']: tile,
+    ...(kind === 'start' ? { startSpiralRotation: rotation } : { goalStarRotation: rotation })
   });
   const x0 = Math.round((layout.originX + tile.left) * dpr);
   const y0 = Math.round((layout.originY + tile.top) * dpr);
@@ -97,6 +107,8 @@ const render = (tileSize: number, dpr: number, cell: BoardCell, kind: 'goal' | '
 const chip = rgb(boardMaterial.chip);
 const VOID = rgb(boardMaterial.void);
 const GLYPH_COLORS = { goal: rgb(boardMaterial.goal), start: rgb(boardMaterial.start) };
+/** The goal star's border when no live colour is passed: the shared border colour at its static start (what the Guide shows). */
+const BORDER = rgb(resolveSharedBorderColor(null, 0, true));
 
 interface Changed { x: number; y: number; dx: number; dy: number; color: Rgba }
 
@@ -137,7 +149,7 @@ describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as cons
           // ...and inside the inscribed circle (a rounded-square plate would reach the corners)
           expect(Math.hypot(px.dx, px.dy), `outside the inscribed circle (${px.x},${px.y})`).toBeLessThanOrEqual(half + 0.75);
           // only the glyph colour or the keyline colour: no tinted pad / disc / ring colour
-          expect(same(px.color, GLYPH_COLORS[kind]) || same(px.color, VOID), `unexpected colour ${px.color} at (${px.x},${px.y})`).toBe(true);
+          expect(same(px.color, GLYPH_COLORS[kind]) || same(px.color, VOID) || (kind === 'goal' && same(px.color, BORDER)), `unexpected colour ${px.color} at (${px.x},${px.y})`).toBe(true);
         }
         // (a 6 device-px tile is the physical floor: the 1 px stroke and 1 px keyline minimums can touch its corner)
         const corners = tileSize * dpr >= 10
@@ -196,22 +208,23 @@ describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, 
   (tileSize, dpr) => {
     // one cell per tile kind (cap, straight, corner, junction) plus one with a concave corner keeps this fast
     const cells = wholeGlyphCells();
+    // The start spiral is checked at several angles of its turn (the goal star at its rest angle). The `direction` key stays
+    // so the call sites read the same; the spiral ignores it.
     const cases = [
-      ...(['goal'] as const).map((kind) => ({ kind, direction: 'right' as StartDirection })),
-      ...START_DIRECTIONS.map((direction) => ({ kind: 'start' as const, direction }))
+      ...(['goal'] as const).map((kind) => ({ kind, direction: 'right' as StartDirection, rotation: 0 })),
+      ...[0, 0.4, 1.3, 2.2, 3.0].map((rotation) => ({ kind: 'start' as const, direction: 'right' as StartDirection, rotation }))
     ];
-    // The play arrow is NOT centred by its bounding box either (MAZER-VIS-036): like the goal star (MAZER-VIS-034) its
-    // painted centroid goes on the tile's painted-interior centre. tests/render/endpointOpticalCentre.test.ts and
-    // startArrowOpticalCentre.test.ts pin the centroid over the full matrix; here the arrow's centroid is checked on
-    // this suite's cells and tile sizes (down to 6.4 css px, where the glyph is fitted small).
+    // The start spiral is centred on its spin axis (MAZER-VIS-053: two arms half a turn apart are 2-fold symmetric), which is the
+    // tile's painted-interior centre like the goal star (MAZER-VIS-034); the painted centroid must stay there at every angle.
+    // Checked here on this suite's cells and tile sizes (down to 6.4 css px, where the glyph is fitted small).
     const arrowCases = cases.filter((c) => c.kind === 'start');
 
-    test.each(arrowCases)('$kind ($direction): painted centroid within 0.5 device px of the painted-interior centre', ({ kind, direction }) => {
+    test.each(arrowCases)('$kind (turned $rotation rad): painted centroid within 0.5 device px of the painted-interior centre', ({ kind, direction, rotation }) => {
       for (const cell of cells) {
         const input = inputFor(tileSize, dpr, cell);
         const layout = computeBoardTileLayout(input);
         const tile = computeChipTileAt(input, cell)!;
-        const r = render(tileSize, dpr, cell, kind, direction);
+        const r = render(tileSize, dpr, cell, kind, direction, rotation);
         const changed = changedPixels(r);
         expect(changed.length).toBeGreaterThan(0);
         const cx = changed.reduce((n, px) => n + px.x + 0.5, 0) / changed.length;
@@ -222,11 +235,11 @@ describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, 
       }
     });
 
-    test.each(cases)('$kind ($direction): nothing reaches the tile edge or its rim', ({ kind, direction }) => {
+    test.each(cases)('$kind (rotation $rotation): nothing reaches the tile edge or its rim', ({ kind, direction, rotation }) => {
       for (const cell of cells) {
         const input = inputFor(tileSize, dpr, cell);
         const tile = computeChipTileAt(input, cell)!;
-        const r = render(tileSize, dpr, cell, kind, direction);
+        const r = render(tileSize, dpr, cell, kind, direction, rotation);
         const layout = computeBoardTileLayout(input);
         const f = {
           x0: Math.round((layout.originX + tile.fill.left) * dpr),
@@ -244,28 +257,20 @@ describe.each(WHOLE_GLYPH_TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, 
   }
 );
 
-describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start arrow direction: tile %f css px at DPR %i', (tileSize, dpr) => {
+describe.each([[14.72, 3], [25.44, 2], [10, 3]] as const)('start spiral: tile %f css px at DPR %i', (tileSize, dpr) => {
   const cell = { x: 5, y: 3 };
-  const along = (direction: StartDirection, px: { dx: number; dy: number }): number => (
-    direction === 'right' ? px.dx : direction === 'left' ? -px.dx : direction === 'down' ? px.dy : -px.dy
-  );
+  const sig = (direction: StartDirection, rotation: number): string => changedPixels(render(tileSize, dpr, cell, 'start', direction, rotation)).map((px) => `${px.x},${px.y}`).join('|');
 
-  test.each(START_DIRECTIONS)('the arrow points %s: its apex is ahead of the centre, its flat back behind it, and the apex leans forward', (direction) => {
-    const r = render(tileSize, dpr, cell, 'start', direction);
-    const gold = changedPixels(r).filter((px) => same(px.color, GLYPH_COLORS.start));
-    expect(gold.length).toBeGreaterThan(4);
-    const ahead = gold.filter((px) => along(direction, px) > 0).length;
-    const behind = gold.filter((px) => along(direction, px) < 0).length;
-    const maxAhead = Math.max(...gold.map((px) => along(direction, px)));
-    const maxBehind = -Math.min(...gold.map((px) => along(direction, px)));
-    // the glyph's CENTROID is on the centre (MAZER-VIS-036), not its bounding box: the apex reaches further ahead of the
-    // centre than the flat back sits behind it (a triangle is heavy at its base, so the point leans forward)
-    expect(maxAhead).toBeGreaterThan(maxBehind);
+  test('it is gold and keyline only, and the first-step direction no longer changes a pixel (it points nowhere)', () => {
+    const gold = changedPixels(render(tileSize, dpr, cell, 'start')).filter((px) => same(px.color, GLYPH_COLORS.start));
+    expect(gold.length).toBeGreaterThan(8);
+    const sigs = START_DIRECTIONS.map((d) => sig(d, 0));
+    expect(new Set(sigs).size).toBe(1);
   });
 
-  test('the four directions are four distinct renderings', () => {
-    const sigs = START_DIRECTIONS.map((d) => changedPixels(render(tileSize, dpr, cell, 'start', d)).map((px) => `${px.x},${px.y}`).join('|'));
-    expect(new Set(sigs).size).toBe(4);
+  test('turning it changes the pixels (it spins), and the same angle is the same pixels', () => {
+    expect(sig('right', 0)).not.toBe(sig('right', 0.9));
+    expect(sig('right', 0.9)).toBe(sig('right', 0.9));
   });
 });
 
