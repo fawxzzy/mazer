@@ -1,0 +1,6 @@
+# 2026-11-15 MOTION-020 Reduce Motion instant maze + online counter check determinism
+
+- WHAT changed: (1) under Reduce Motion the maze board no longer crossfades over 200 ms; `resolveReducedBoardFade` (src/render/mazeRevealTimeline.ts) always returns null, so the board appears on the first build frame and disappears on the first tear-down frame. Non-reduced behaviour unchanged; tests and docs/ui/MAZER-SOFT-MAZE-REVEAL-2026-11-13.md updated. (2) `scripts/analysis/verify-menu-online-counter.mjs` now runs each layout's released / shown / released measurement series only while the menu demo lifecycle stays 'settled' (page-side watcher, series re-run otherwise), and the page load waits on 'load' plus the existing fixture-ready condition instead of 'networkidle'.
+- WHY it changed: owner rule, reduced motion never changes colour and stops movement. The counter check flaked about 1 run in 3 because the menu demo loops build/deconstruct every few seconds under the header slot, so readings straddled a backdrop change; it was not the presence grace window (releasing the QA count resets the display to hidden at once).
+- Rule: a canvas ink differential must be taken inside one stable backdrop state, gated on the real lifecycle state, never on a fixed sleep.
+- Status: headless only; nothing checked on a real phone.
