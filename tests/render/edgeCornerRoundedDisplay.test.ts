@@ -127,12 +127,10 @@ const polygonSamples = (polygon: ReadonlyArray<Point>, step = 0.02): Point[] => 
 };
 
 const expectInsideCanvas = (points: ReadonlyArray<Point>, viewport: Viewport, label: string): void => {
-  for (const point of points) {
-    expect(point.x, `${label} x`).toBeGreaterThanOrEqual(-1e-9);
-    expect(point.y, `${label} y`).toBeGreaterThanOrEqual(-1e-9);
-    expect(point.x, `${label} x max`).toBeLessThanOrEqual(viewport.width + 1e-9);
-    expect(point.y, `${label} y max`).toBeLessThanOrEqual(viewport.height + 1e-9);
-  }
+  expect(Math.min(...points.map((point) => point.x)), `${label} x`).toBeGreaterThanOrEqual(-1e-9);
+  expect(Math.min(...points.map((point) => point.y)), `${label} y`).toBeGreaterThanOrEqual(-1e-9);
+  expect(Math.max(...points.map((point) => point.x)), `${label} x max`).toBeLessThanOrEqual(viewport.width + 1e-9);
+  expect(Math.max(...points.map((point) => point.y)), `${label} y max`).toBeLessThanOrEqual(viewport.height + 1e-9);
 };
 
 /** True when a star centred at `station` (half extent about 12 px at full size) can reach a bottom corner box of a R66 corner. */
@@ -338,7 +336,9 @@ describe('bottom corner stars clear the real (continuous, up to R66) display cor
           const label = `phase ${phase.toFixed(4)} id ${station.id}@${scale}`;
           expectInsideCanvas(painted, viewport, label);
           if (rounded) {
-            expect(bottomContinuousDepth(polygonSamples(painted, 0.1), viewport, EDGE_CORNER_DISPLAY_RADIUS_PX), label).toBeLessThanOrEqual(0);
+            // The visible region (the canvas with convex rounded corners) is convex, so a polygon whose vertices are all visible is
+            // visible everywhere: the vertices suffice (the rest test above samples the edges too, and agrees).
+            expect(bottomContinuousDepth(painted, viewport, EDGE_CORNER_DISPLAY_RADIUS_PX), label).toBeLessThanOrEqual(0);
           }
           nearCornerChecks += 1;
         }
