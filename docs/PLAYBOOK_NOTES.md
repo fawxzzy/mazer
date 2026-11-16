@@ -445,3 +445,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: index.html boot splash now shows the MAZER kicker above the icon and the static "Could not load" fallback shows the app icon (copied from the splash image); appLoader.ts adds LOADER_KICKER_* and LoaderLayout.kickerCentreY; MenuScene draws the same kicker on the canvas loader cover; legacyAccountStatusState.ts shifts kickerCentreY with the loader on short screens; tests pin the offset and the markup.
 - WHY it changed: the gallery cross-check found the HTML splash lacked the kicker the canvas screens have, and the fallback lacked the icon the boot-error screen has. The kicker sits at one offset in splash and canvas so the crossfade stays identical.
 - Status: headless (typecheck, unit tests, Chromium 390x844 splash DOM and screenshot); canvas loader kicker and real phone not checked.
+
+## 2026-11-16 Owner export tests count archived cards
+- WHAT changed: tests/project-board-owner-export.test.mjs now adds `exported_archived_card_count` to the open+completed+deferred reconciliation, maps `archived` to the active/archived lifecycle, and makes the archived-card test relative to the real archived count of the registry instead of assuming zero.
+- WHY it changed: the exporter and its docs already export archived cards, but three tests assumed none existed, so folding the first 68 archive close-outs was refused by the owner-export preflight (283 cards vs 215 counted). The exporter itself is unchanged.
+- Status: headless (owner-export tests 19/19 on a locally applied 79-event fold; board-sync tests 39/39); nothing player-visible.
