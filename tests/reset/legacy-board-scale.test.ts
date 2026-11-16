@@ -138,6 +138,28 @@ describe('MAZER-PROG-020 board scale and the tile floor', () => {
     }
   }, 60_000);
 
+  test('the tile floor holds at every level on a 300..430 px sweep, including 350x568 menu-demo levels 214-219 (9.87 px before)', () => {
+    const widths = [350, 351];
+    for (let width = 300; width <= 430; width += 5) { widths.push(width); }
+    for (const width of widths) {
+      for (const height of [568, 667]) {
+        if (height <= width) { continue; }
+        for (const surface of ['play', 'menu-demo'] as const) {
+          const viewport = { width, height, safeArea: { top: 0, bottom: 0 }, useFloatingTouchControls: true };
+          let previous = 0;
+          for (let level = 1; level <= 260; level += 1) {
+            const scale = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), { surface, viewport }).scale;
+            const label = `${width}x${height} ${surface} level ${level} s${scale}`;
+            expect(planLegacyBoard(viewport, scale, surface === 'play' ? 'play' : 'menu').tileSize, label).toBeGreaterThanOrEqual(LEGACY_BOARD_MIN_TILE_PX);
+            expect(scale, label).toBeGreaterThanOrEqual(previous);
+            expect(scale, label).toBeLessThanOrEqual(resolveLegacyBoardScaleForLevel(level));
+            previous = scale;
+          }
+        }
+      }
+    }
+  }, 120_000);
+
   test('the five reference phones draw tiles of at least 10 CSS px at the base scale, untouched by the floor', () => {
     expect(LEGACY_BOARD_MIN_TILE_PX).toBe(10);
     for (const viewport of BOARD_SCALE_REFERENCE_VIEWPORTS) {
