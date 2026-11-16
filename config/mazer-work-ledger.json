@@ -889,12 +889,13 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 629,
-            "mergedSha": "e5031c136eb27722ac0ca5adfc600715aafae956"
+            "mergedSha": "e5031c13"
           }
         ],
         "headless": true,
-        "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deviceChecked": true,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "checkedOn": "Zac's phone (owner report), build fawxzzy-mazer-pakov2avo"
       },
       "blocker": {
         "kind": "deferred-by-owner",
@@ -976,12 +977,13 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 625,
-            "mergedSha": "9e81a96da3833efcaeae5a63a7fc44736e6ec296"
+            "mergedSha": "9e81a96d"
           }
         ],
         "headless": true,
-        "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deviceChecked": true,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "checkedOn": "Zac's phone (owner report), build fawxzzy-mazer-pakov2avo"
       },
       "blocker": {
         "kind": "deferred-by-owner",
@@ -1829,8 +1831,7 @@
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "FawxzzyWeb PR #121 is merged and NOT live: the release carrying it still needs the requester alias moves."
+      "filesHint": []
     },
     "MAZER-ACCT-010": {
       "evidence": {
@@ -2280,8 +2281,7 @@
       "blocker": null,
       "verify": [],
       "lane": "owner-only",
-      "filesHint": [],
-      "note": "The off-scale list was not supplied to this board sync; it is in the notes of PR #441 and the 2026-11-06 motion audit, and is not copied here."
+      "filesHint": []
     },
     "MAZER-ACCT-017": {
       "evidence": {
@@ -2373,8 +2373,7 @@
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
-      "filesHint": [],
-      "note": "Any data change needs the owner's explicit approval first."
+      "filesHint": []
     },
     "MAZER-ACCT-021": {
       "evidence": {
@@ -3015,8 +3014,7 @@
         "src/legacy-runtime/legacyMazeStubs.ts",
         "src/legacy-runtime/legacyMazeFeltTuning.ts",
         "src/legacy-runtime/legacyGeometryBudget.ts"
-      ],
-      "note": "PR #464 merged and deployed (951ef3cf). Device check and owner judgement on the ladder ending at 218 pending."
+      ]
     },
     "MAZER-GEN-005": {
       "evidence": {
@@ -4306,12 +4304,13 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 627,
-            "mergedSha": "fe4cc750b8e81b243b5da44c1eef9b71f1173573"
+            "mergedSha": "fe4cc750"
           }
         ],
         "headless": true,
-        "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deviceChecked": true,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "checkedOn": "Zac's phone (owner report), build fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4459,12 +4458,13 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 631,
-            "mergedSha": "8253accd37643fdb3b6d2cb4cb6c11a0b5e21dcd"
+            "mergedSha": "8253accd"
           }
         ],
         "headless": true,
-        "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deviceChecked": true,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "checkedOn": "Zac's phone (owner report), build fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4481,8 +4481,9 @@
           }
         ],
         "headless": true,
-        "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deviceChecked": true,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "checkedOn": "Zac's phone (owner report), build fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4502,6 +4503,58 @@
         "deviceChecked": false,
         "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-044": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 632,
+            "mergedSha": "bb8bd5a5"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-010": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-011": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-019": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-057": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-090": {
+      "evidence": null,
       "blocker": null,
       "verify": [],
       "lane": null,
