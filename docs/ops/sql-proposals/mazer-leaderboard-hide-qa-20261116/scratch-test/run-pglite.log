@@ -1,0 +1,40 @@
+migration sha256: 0fe2aca3560f731144296ed7bb344e0733655c5d36f88028e2c139cd5c17d2fd
+rollback  sha256: d433e16c426956727626cbce38dfeeccfb15da740c6f03f1e7eab4f7288393ff
+PASS  baseline: all 10 accounts ranked before migration  [mzr-qa-1112,claude,MazerMaster,fawxzzy,cqa-a-1105,cudding_muisc,cuddlingmuisc,mzr-qa-2,Mazer-269110,someplayer]
+PASS  page excludes all 4 hidden accounts  [MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110,someplayer]
+PASS  page keeps all 6 real accounts
+PASS  ranks contiguous 1..N and in row order  [1,2,3,4,5,6]
+PASS  ordering unchanged (level desc, reached_at asc nulls last, user_id asc)  [MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110,someplayer]
+PASS  limit/offset still work and keep global ranks  [["3","4"]]
+PASS  limit cap/offset floor unchanged
+PASS  flag set for exactly the 4 target usernames
+PASS  real accounts (fawxzzy, MazerMaster, cudding_muisc, cuddlingmuisc, Mazer-269110) not hidden
+PASS  self_rank == page rank for every visible user
+PASS  hidden user self_rank is safe: 1 row, rank null, level present, has_username true  [[{"rank":null,"player_level":"50","has_username":true}]]
+PASS  is_requesting_user marks only the caller
+PASS  hidden caller sees no is_requesting_user row
+PASS  unknown caller (no progression row) self_rank returns zero rows (unchanged)
+PASS  grants: page anon+authenticated yes, public/service_role per original
+PASS  grants: self_rank authenticated yes, anon no
+PASS  SECURITY DEFINER, search_path empty, STABLE, owner postgres on both  [[{"proname":"mazer_leaderboard_page","prosecdef":true,"cfg":"{\"search_path=\\\"\\\"\"}","provolatile":"s","o":"postgres"},{"proname":"mazer_leaderboard_self_rank","prosecdef":true,"cfg":"{\"search_path=\\\"\\\"\"}","provolatile":"s","o":"postgres"}]]
+PASS  signatures unchanged
+PASS  authenticated UPDATE own row set hidden=true is a no-op (stays false)
+PASS  authenticated UPDATE of a hidden row cannot unhide it (other columns still update)
+PASS  authenticated INSERT with hidden=true is forced to false
+PASS  authenticated upsert cannot set hidden
+PASS  service_role can set the flag (operator path)
+PASS  postgres (migration/operator) can set the flag
+PASS  trigger function not directly executable by authenticated
+PASS  re-apply is a clean no-op (catalog identical)
+PASS  re-apply: page identical and contiguous
+PASS  rollback: catalog (function md5/acl/owner/comment, columns, triggers, grants, policies) equals pre-apply
+PASS  rollback: page shows all 10 again
+PASS  rollback is itself re-runnable
+PASS  apply after rollback works again
+PASS  drifted page body: migration aborts with MAZER_LB_HIDE_PREIMAGE_DRIFT_PAGE  [MAZER_LB_HIDE_PREIMAGE_DRIFT_PAGE]
+PASS  drift abort leaves catalog untouched (no column, no trigger)
+PASS  pre-flagged real player: post-image guard aborts  [MAZER_LB_HIDE_POSTIMAGE_UNEXPECTED_HIDDEN]
+PASS  post-image abort rolls back the whole migration (functions + trigger unchanged)
+PASS  replay on a DB without the QA accounts: clean, nobody hidden
+
+36 passed, 0 failed

@@ -431,3 +431,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: `seedLegacyMenuDemoTrackFromPlayer` (legacyMenuDemoTrack.ts) lifts a lower ai-runner track to the player's level when progression loads, so the main-menu demo starts on the player's level and then climbs. `isFrontDoorTapAnywhereStart` (legacyFrontDoorHitZone.ts) plus `MenuScene.handleFrontDoorTapAnywhere` make a tap almost anywhere on the front door start a run, except within 28 px of any other UI button (settings cog, leaderboard) or when an overlay, level preview or sign-in gate is active.
 - WHY it changed: the demo restarted at a fixed low level and only the small label was tappable. Play access gating and the Start hit zone are unchanged.
 - Status: headless (typecheck, unit tests); nothing checked in a browser or on a real phone.
+
+## 2026-11-16 Leaderboard hides QA accounts (SQL proposal, not applied)
+- WHAT changed: Added migration 20260828160000_mazer_leaderboard_hide_qa_accounts.sql (mazer_profiles.leaderboard_hidden, a trigger so client roles cannot write it, and `not p.leaderboard_hidden` in both mazer_leaderboard_page and mazer_leaderboard_self_rank), a rollback and live preimage under docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116, and a migration contract test.
+- WHY it changed: QA accounts (mzr-qa-1112, mzr-qa-2, cqa-a-1105, claude) were ranked beside real players; page and self ranks must exclude the same population so ranks stay consistent.
+- Status: scratch-tested on pglite (36/36); not applied to production, not yet run on PostgreSQL 17 scratch, no independent review yet.
