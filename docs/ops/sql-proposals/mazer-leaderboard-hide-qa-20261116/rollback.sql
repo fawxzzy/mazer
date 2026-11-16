@@ -45,9 +45,13 @@ as $$
   offset greatest(coalesce(p_offset, 0), 0);
 $$;
 
+-- Revoke authenticated too, then grant anon before authenticated, so the ACL array returns to the live
+-- order {postgres,anon,authenticated} (the apply file's re-grant had moved authenticated before anon).
 revoke all on function mazer.mazer_leaderboard_page(integer, integer) from public;
 revoke all on function mazer.mazer_leaderboard_page(integer, integer) from anon;
-grant execute on function mazer.mazer_leaderboard_page(integer, integer) to anon, authenticated;
+revoke all on function mazer.mazer_leaderboard_page(integer, integer) from authenticated;
+grant execute on function mazer.mazer_leaderboard_page(integer, integer) to anon;
+grant execute on function mazer.mazer_leaderboard_page(integer, integer) to authenticated;
 
 comment on function mazer.mazer_leaderboard_page is
   'Public paginated leaderboard: rank/username/level only, never private account data. Page size is hard-capped at 100 server-side regardless of what a caller requests.';

@@ -1,0 +1,193 @@
+### tested_file=supabase/migrations/20260828160000_mazer_leaderboard_hide_qa_accounts.sql sha256=0fe2aca3560f731144296ed7bb344e0733655c5d36f88028e2c139cd5c17d2fd
+### tested_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/rollback.sql sha256=81e81f8d1e90fc801047344f2c1a43c940bc58840453aea40da69d282c7f4f79
+### stub_source=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/preimage.json sha256=b1a348330a0868b3fd6137a8e3ff44dc7186177d2b6a8f9024d0ca1244b5461d (live read-only capture 2026-11-16)
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/make-stub.mjs sha256=414c14d43fda805a824d0450d3ae68d73ae39c9c6f3b67020379135f6407f3c1
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/stub-app.sql sha256=9ebe23e93795d44bbc5ebaaadcbe5dc163f6fcc5236e2ed48333359157bf4cce
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/stub-super.sql sha256=9ea5ea48f5f69754c5dfed65eca80675cf4a8d984689f077326afc399924457c
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/seed.sql sha256=81d271fc4f831c75b79db08d57d216a4c297ab77706182c9ac4ee1f9c9365594
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/check.sql sha256=ba10534d0dcc35f2ef5e342bb0ea916f00675567f29db2ffe6887eb354764e0e
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/check-rollback.sql sha256=3760c9838e86fe32d38ba79735258ba903d675cd10af686587d4a9cd7a2cfc57
+### harness_file=docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116/scratch-test/run-scratch.mjs sha256=bb24ca404f15959fe76bed4652adcad3385f9a27a97a15cbd0c1a5e201141d19
+### run_at_utc=2026-11-16T07:59:58.914Z
+
+$ scratch-pg.mjs init
+initialised postgres (PostgreSQL) 17.9 on 127.0.0.1:55442 in C:\ATLAS\tmp\scratch-pg-lbhide-20261116b (locale C; production uses en_US.UTF-8, pass --locale to match when ordering matters)
+(exit 0)
+
+$ scratch-pg.mjs build (roles + auth.users stub + LIVE-capture stub)
+built template database "stub" (auth stub + 2 extra file(s)); every pair run clones it
+(exit 0)
+
+$ runner role facts
+runner=postgres superuser=false member_of_auth_admin=false bypassrls=true
+(exit 0)
+
+==== 1. harness pair: apply, check, re-apply, rollback, catalog equality (clone of the stub, as postgres) ====
+
+$ scratch-pg.mjs pair --apply <migration> --rollback <rollback> --seed seed.sql --check check.sql --reapply --schemas mazer
+PASS  apply file runs clean as the runner role (postgres)
+PASS  apply changed the catalog (not a no-op)
+PASS  check file passes after apply
+PASS  second apply either aborts by its own guard or changes nothing - idempotent
+PASS  rollback file runs clean as the runner role (postgres)
+PASS  catalog after rollback equals the catalog before apply
+(exit 0)
+
+==== 2. verbose walk-through on a second clone (same files; shows each PASS line) ====
+
+$ create clone
+(exit 0)
+
+$ seed
+(exit 0)
+
+$ preimage: both live function md5s on the stub
+mazer_leaderboard_page 57b52e11c3aa16d5d9672e43c056b486
+mazer_leaderboard_self_rank 7f4912db0e015d565a88383e8610e86e
+(exit 0)
+
+$ preimage: public page BEFORE apply (anon, all 10 ranked)
+mzr-qa-1112:1,claude:2,MazerMaster:3,fawxzzy:4,cudding_muisc:5,cqa-a-1105:6,cuddlingmuisc:7,mzr-qa-2:8,Mazer-269110:9,ExtraPlayer:10
+(exit 0)
+
+$ APPLY migration
+psql:C:/ATLAS/tmp/worktrees/mazer-lb-hide-qa-20261116/supabase/migrations/20260828160000_mazer_leaderboard_hide_qa_accounts.sql:95: NOTICE:  trigger "mazer_protect_leaderboard_hidden_before_write" for relation "mazer.mazer_profiles" does not exist, skipping
+(exit 0)
+
+$ check.sql after apply
+
+PASS  A1 anon page = exactly the 6 visible accounts, dense ranks 1..6, ordering unchanged  [MazerMaster:1,fawxzzy:2,cudding_muisc:3,cuddlingmuisc:4,Mazer-269110:5,ExtraPlayer:6]
+PASS  A2 page excludes all 4 hidden usernames
+PASS  A3 limit/offset keep global ranks  [cudding_muisc:3,cuddlingmuisc:4]
+PASS  B1 flag set for exactly the 4 target usernames  [claude,cqa-a-1105,mzr-qa-1112,mzr-qa-2]
+PASS  B2 the 5 real-player controls are not hidden
+PASS  B3 hiding did not bump updated_at/revision
+1b5c7980-3f6f-4239-8c6f-e13bc54e169b
+PASS  C1 hidden caller self_rank = 1 row, rank null, level kept, has_username true  [1/NULL/50/true]
+91c2b51b-2915-4b5d-a666-b8552a3b9533
+PASS  C2 hidden account that would have outranked a real player has no rank
+9138bb1c-97d6-506c-8153-7b7dae8a6c60
+PASS  C3 visible caller self_rank equals page rank (MazerMaster = 1)
+PASS  C4 is_requesting_user marks only the caller
+00000000-0000-4000-8000-000000000010
+PASS  C5 last visible caller self_rank = 6 (global dense rank, same as page)
+adc7ca28-7271-5599-826f-fd7e4477b542
+PASS  D1 authenticated UPDATE ... leaderboard_hidden = true on own row is silently kept false
+1b5c7980-3f6f-4239-8c6f-e13bc54e169b
+PASS  D2 hidden authenticated user cannot unhide itself
+adc7ca28-7271-5599-826f-fd7e4477b542
+PASS  D3 ordinary own-row UPDATE by authenticated still works (trigger is flag-only)
+00000000-0000-4000-8000-000000000011
+PASS  D4 authenticated INSERT with leaderboard_hidden = true is stored false
+PASS  D5 anon has no INSERT/UPDATE on mazer_profiles at all (trigger is the second layer)
+PASS  D6 documents the live grant model: authenticated keeps table-level UPDATE, so the trigger (not a column revoke) is the enforcement
+PASS  D7 operator (postgres) can set the flag and the page reacts  [MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110]
+PASS  E1 both functions: SECURITY DEFINER, owner postgres, search_path "", body carries the filter
+PASS  E2 execute privileges as before (page: anon+authenticated, self_rank: authenticated only)
+PASS  E3 trigger function not executable by client roles
+PASS  E4 table ACL unchanged
+PASS  E5 profiles carry exactly the existing user trigger + the new protect trigger
+PASS  E6 RLS policies unchanged (4)
+PASS  E7 no trigger touched on auth.users
+(exit 0)
+
+$ RE-APPLY migration (must be refused or a no-op)
+psql:C:/ATLAS/tmp/worktrees/mazer-lb-hide-qa-20261116/supabase/migrations/20260828160000_mazer_leaderboard_hide_qa_accounts.sql:67: NOTICE:  column "leaderboard_hidden" of relation "mazer_profiles" already exists, skipping
+(exit 0)
+
+$ check.sql again after re-apply (state identical)
+
+PASS  A1 anon page = exactly the 6 visible accounts, dense ranks 1..6, ordering unchanged  [MazerMaster:1,fawxzzy:2,cudding_muisc:3,cuddlingmuisc:4,Mazer-269110:5,ExtraPlayer:6]
+PASS  A2 page excludes all 4 hidden usernames
+PASS  A3 limit/offset keep global ranks  [cudding_muisc:3,cuddlingmuisc:4]
+PASS  B1 flag set for exactly the 4 target usernames  [claude,cqa-a-1105,mzr-qa-1112,mzr-qa-2]
+PASS  B2 the 5 real-player controls are not hidden
+PASS  B3 hiding did not bump updated_at/revision
+1b5c7980-3f6f-4239-8c6f-e13bc54e169b
+PASS  C1 hidden caller self_rank = 1 row, rank null, level kept, has_username true  [1/NULL/50/true]
+91c2b51b-2915-4b5d-a666-b8552a3b9533
+PASS  C2 hidden account that would have outranked a real player has no rank
+9138bb1c-97d6-506c-8153-7b7dae8a6c60
+PASS  C3 visible caller self_rank equals page rank (MazerMaster = 1)
+PASS  C4 is_requesting_user marks only the caller
+00000000-0000-4000-8000-000000000010
+PASS  C5 last visible caller self_rank = 6 (global dense rank, same as page)
+adc7ca28-7271-5599-826f-fd7e4477b542
+PASS  D1 authenticated UPDATE ... leaderboard_hidden = true on own row is silently kept false
+1b5c7980-3f6f-4239-8c6f-e13bc54e169b
+PASS  D2 hidden authenticated user cannot unhide itself
+adc7ca28-7271-5599-826f-fd7e4477b542
+PASS  D3 ordinary own-row UPDATE by authenticated still works (trigger is flag-only)
+00000000-0000-4000-8000-000000000011
+PASS  D4 authenticated INSERT with leaderboard_hidden = true is stored false
+PASS  D5 anon has no INSERT/UPDATE on mazer_profiles at all (trigger is the second layer)
+PASS  D6 documents the live grant model: authenticated keeps table-level UPDATE, so the trigger (not a column revoke) is the enforcement
+PASS  D7 operator (postgres) can set the flag and the page reacts  [MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110]
+PASS  E1 both functions: SECURITY DEFINER, owner postgres, search_path "", body carries the filter
+PASS  E2 execute privileges as before (page: anon+authenticated, self_rank: authenticated only)
+PASS  E3 trigger function not executable by client roles
+PASS  E4 table ACL unchanged
+PASS  E5 profiles carry exactly the existing user trigger + the new protect trigger
+PASS  E6 RLS policies unchanged (4)
+PASS  E7 no trigger touched on auth.users
+(exit 0)
+
+$ hidden flags after re-apply
+claude,cqa-a-1105,mzr-qa-1112,mzr-qa-2
+(exit 0)
+
+$ ROLLBACK
+(exit 0)
+
+$ check-rollback.sql
+
+PASS  R1 after rollback all 10 accounts are ranked again, original order  [mzr-qa-1112,claude,MazerMaster,fawxzzy,cudding_muisc,cqa-a-1105,cuddlingmuisc,mzr-qa-2,Mazer-269110,ExtraPlayer]
+PASS  R2 leaderboard_hidden column is gone
+PASS  R3 protect trigger and its function are gone
+PASS  R4 both function bodies are byte-identical to the live preimage (md5 57b52e11..., 7f4912db...)
+PASS  R5 only the original user trigger remains on mazer_profiles
+(exit 0)
+
+==== 3. guard mutants on a third clone (guard must abort and leave the DB unchanged) ====
+
+$ create clone
+(exit 0)
+
+$ seed
+(exit 0)
+
+$ mutant: page body drifted (extra comment) -> apply must abort with DRIFT_PAGE
+(exit 0)
+
+$ apply on drifted page body
+psql:C:/ATLAS/tmp/worktrees/mazer-lb-hide-qa-20261116/supabase/migrations/20260828160000_mazer_leaderboard_hide_qa_accounts.sql:64: ERROR:  MAZER_LB_HIDE_PREIMAGE_DRIFT_PAGE
+CONTEXT:  PL/pgSQL function inline_code_block line 22 at RAISE
+(exit 3)
+
+$ after abort: column absent, flag trigger absent (transaction rolled back)
+0 column(s), 0 trigger(s)
+(exit 0)
+
+$ mutant: self_rank function missing -> apply must abort
+(exit 0)
+
+$ apply with self_rank missing
+psql:C:/ATLAS/tmp/worktrees/mazer-lb-hide-qa-20261116/supabase/migrations/20260828160000_mazer_leaderboard_hide_qa_accounts.sql:64: ERROR:  function "mazer.mazer_leaderboard_self_rank()" does not exist
+LINE 2:   where p.oid = 'mazer.mazer_leaderboard_self_rank()'::regpr...
+                        ^
+QUERY:  select p.prosrc               from pg_catalog.pg_proc p
+  where p.oid = 'mazer.mazer_leaderboard_self_rank()'::regprocedure
+CONTEXT:  PL/pgSQL function inline_code_block line 15 at SQL statement
+(exit 3)
+
+$ drop clone lbwalk
+(exit 0)
+
+$ drop clone lbmut
+(exit 0)
+
+$ destroy scratch cluster
+destroyed C:\ATLAS\tmp\scratch-pg-lbhide-20261116b
+(exit 0)
+
+==== RESULT: ALL STEPS PASSED (mutant/re-apply refusals are expected non-zero exits and are marked in the text) ====
