@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_e5ce522493f3",
+  "export_id": "pbe_mazer_owner_registry_325799fce66e",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:e5ce522493f34b744eae96e08a05b1173a04a32fe62793b42b5b8d311257f8af",
-  "generated_at": "2026-11-15T22:39:14.000Z",
+  "source_revision": "sha256:325799fce66e186366a9ab762ce96e7f01c9181dc35f327bac8862178c77d4f1",
+  "generated_at": "2026-11-16T04:12:35.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:244d853bfa2585590b93c38535baff9c4cbbb3072144a0782f7cdcb034b9c09b",
-      "observed_at": "2026-11-15T22:39:14.000Z"
+      "revision": "sha256:02c83900ec01e2832ba8002898d7f67111365edf679d7e8817bfae1fc3fceb81",
+      "observed_at": "2026-11-16T04:12:35.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-15T22:39:14.000Z"
+      "observed_at": "2026-11-16T04:12:35.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-15T22:39:14.000Z"
+      "observed_at": "2026-11-16T04:12:35.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-15T22:39:14.000Z"
+      "observed_at": "2026-11-16T04:12:35.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-15T22:39:14.000Z"
+      "observed_at": "2026-11-16T04:12:35.000Z"
     }
   ],
   "cards": [
@@ -4766,14 +4766,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Revisit diagonal maze paths now that movement is automatic",
-        "description": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T04:58:50.000Z",
+        "updated_at": "2026-11-16T01:47:22.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-020",
         "extensions": {
           "owner_status": "review",
@@ -4784,11 +4784,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T04:58:50.000Z"
+        "source_updated_at": "2026-11-16T01:47:22.000Z"
       },
       "content": {
-        "summary": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Written assessment of generation, navigation core, rendering and controls impact",
           "Go or no-go recommendation with the reasons",
@@ -5590,14 +5590,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Sign or reject the endless hazard product contract",
-        "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant).",
+        "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant). Board update 2026-11-16: H0: hazard product contract signed into repo (yes to all four), schedule manifest v1 and graph-contract amendments A1-A6; docs only, merged; flags stay off PR #615 merged (f8d2befe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "governance",
         "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T00:17:40.000Z",
+        "updated_at": "2026-11-16T01:06:02.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-002",
         "extensions": {
           "owner_status": "review",
@@ -5608,11 +5608,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-002",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T00:17:40.000Z"
+        "source_updated_at": "2026-11-16T01:06:02.000Z"
       },
       "content": {
-        "summary": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant).",
-        "objective": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant).",
+        "summary": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant). Board update 2026-11-16: H0: hazard product contract signed into repo (yes to all four), schedule manifest v1 and graph-contract amendments A1-A6; docs only, merged; flags stay off PR #615 merged (f8d2befe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant). Board update 2026-11-16: H0: hazard product contract signed into repo (yes to all four), schedule manifest v1 and graph-contract amendments A1-A6; docs only, merged; flags stay off PR #615 merged (f8d2befe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Owner signs or rejects the contract in writing",
           "Covered cards are re-statused from the decision",
@@ -5687,26 +5687,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-haz-004_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-HAZ-004",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add obstacles, traps and puzzles (covered by the hazard phases)",
-        "description": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed.",
+        "description": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "intake",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-HAZ-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-16T02:29:51.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-004",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5714,11 +5714,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-16T02:29:51.000Z"
       },
       "content": {
-        "summary": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed.",
-        "objective": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed.",
+        "summary": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Obstacles appear in generated levels without breaking solvability",
           "Trap behaviour is deterministic and tested",
@@ -6642,14 +6642,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Replace the maze fade in and out with a smooth build and tear-down",
-        "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
+        "description": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 616 merged: Reduce Motion shows/hides the maze instantly (no fade); menu online-counter check deflaked (10/10 local); queued for final deploy, headless only PR #616 merged (648b35d3). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T22:39:04.000Z",
+        "updated_at": "2026-11-16T00:40:50.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-020",
         "extensions": {
           "owner_status": "review",
@@ -6660,11 +6660,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MOTION-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T22:39:04.000Z"
+        "source_updated_at": "2026-11-16T00:40:50.000Z"
       },
       "content": {
-        "summary": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: Smooth nanobot-style build and tear-down of the maze (no tile fade) is live on the new build. PR #590 merged (be2fff01). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 616 merged: Reduce Motion shows/hides the maze instantly (no fade); menu online-counter check deflaked (10/10 local); queued for final deploy, headless only PR #616 merged (648b35d3). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The maze should keep building and destroying itself continuously, but the current fade in and fade out is not what the owner wanted. Design and ship a better transition: the maze builds up and tears down visibly in the game, and the menu demo uses the same motion. Board update 2026-11-15: PR 607 merged: bleed-off docks grow and retract per dock in rank order with the maze build and teardown (replaces the global dock fade); queued for the one deploy, headless only PR #607 merged (a577c91e). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: bleed-off docks drawn in sequence live in build 5g35npa39; headless only, phone check pending PR #607 merged (a577c91e). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 616 merged: Reduce Motion shows/hides the maze instantly (no fade); menu online-counter check deflaked (10/10 local); queued for final deploy, headless only PR #616 merged (648b35d3). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "No whole-maze opacity fade is used between mazes; the build and tear-down read as motion on the maze itself",
           "Works at 60 fps class pacing on a phone profile and respects reduced motion",
@@ -7732,26 +7732,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-prog-008_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PROG-008",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Decide which maze features unlock at which level and content band",
-        "description": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions.",
+        "description": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "architecture",
-        "lifecycle": "intake",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PROG-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-14T08:02:07.000Z",
+        "updated_at": "2026-11-16T04:12:35.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-008",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -7759,11 +7759,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-008",
         "source_status": "current",
-        "source_updated_at": "2026-11-14T08:02:07.000Z"
+        "source_updated_at": "2026-11-16T04:12:35.000Z"
       },
       "content": {
-        "summary": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions.",
-        "objective": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions.",
+        "summary": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Owner decides the feature unlock schedule",
           "A versioned content band manifest format is specified",
@@ -8367,7 +8367,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Grow the maze board with progression (2-5 more tiles each way)",
-        "description": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: Building slices S0 (calibration table) and S1/S2 (scale 38 growing to 40 by level, 10 px tile floor) first; camera for endless play and leaderboard policy await Zac. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -8376,7 +8376,7 @@
           "MAZER-PROG-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-15T07:53:18.000Z",
+        "updated_at": "2026-11-16T02:16:45.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-020",
         "extensions": {
           "owner_status": "review",
@@ -8387,11 +8387,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T07:53:18.000Z"
+        "source_updated_at": "2026-11-16T02:16:45.000Z"
       },
       "content": {
-        "summary": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: Building slices S0 (calibration table) and S1/S2 (scale 38 growing to 40 by level, 10 px tile floor) first; camera for endless play and leaderboard policy await Zac. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: Building slices S0 (calibration table) and S1/S2 (scale 38 growing to 40 by level, 10 px tile floor) first; camera for endless play and leaderboard policy await Zac. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Board gains 2 to 5 tiles in each direction compared with today, growing with level, with tiles staying large enough to read and touch on a 320 to 430 wide phone.",
           "The growth curve is continuous with no visible jump between levels and is covered by a test over a wide level range.",
@@ -14072,17 +14072,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make trail colours bolder and more arcade, less pastel",
-        "description": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Merged first pass: cyan is now fully neon and bloom is stronger. Violet, magenta and blue stay lighter because of the contrast floor on the trail, so a second pass is needed. Headless only. PR #588 merged (2ab307ea). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+        "description": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 613 merged: trail palette extended to the full rainbow (12 stops, warm hues back); headless captures only, phone check owed PR #613 merged (1981351c). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "completed",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T15:36:23.000Z",
+        "updated_at": "2026-11-16T01:27:14.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-051",
         "extensions": {
-          "owner_status": "completed",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -14090,11 +14090,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-051",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T15:36:23.000Z"
+        "source_updated_at": "2026-11-16T01:27:14.000Z"
       },
       "content": {
-        "summary": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Merged first pass: cyan is now fully neon and bloom is stronger. Violet, magenta and blue stay lighter because of the contrast floor on the trail, so a second pass is needed. Headless only. PR #588 merged (2ab307ea). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Merged first pass: cyan is now fully neon and bloom is stronger. Violet, magenta and blue stay lighter because of the contrast floor on the trail, so a second pass is needed. Headless only. PR #588 merged (2ab307ea). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 613 merged: trail palette extended to the full rainbow (12 stops, warm hues back); headless captures only, phone check owed PR #613 merged (1981351c). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The trail palette reads pastel. Move it to saturated, high-energy arcade colours that still read on the dark board and stay inside the shared palette modules. Board update 2026-11-15: Round 2 merged (PR 591): trail cores are now saturated neon (cyan, blue, violet, magenta); contrast is checked against the dark underlay the core is drawn on. Headless Chromium before and after viewed, CI 12 of 12. Not deployed, not checked on a real phone. PR #591 merged (f0dfa4a7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Saturated neon trail cores are live on the new build. PR #591 merged (f0dfa4a7). Deployed: production build hbvh1xpuf. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 613 merged: trail palette extended to the full rainbow (12 stops, warm hues back); headless captures only, phone check owed PR #613 merged (1981351c). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Trail colours come from the shared palette module and are visibly more saturated than before",
           "Contrast against the board stays readable on a phone-size screenshot",
@@ -14167,24 +14167,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-053_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-053",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Spiral start marker synced with the end star; polish start and end tiles",
-        "description": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds.",
+        "description": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-15T04:50:47.000Z",
+        "updated_at": "2026-11-16T01:16:25.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-053",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -14192,11 +14192,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-053",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T04:50:47.000Z"
+        "source_updated_at": "2026-11-16T01:16:25.000Z"
       },
       "content": {
-        "summary": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds.",
-        "objective": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds.",
+        "summary": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Start marker is a spiral, same size as before, spinning slowly in phase with the end star",
           "End star border uses the same shared colour as the corner diamond border",
@@ -14379,9 +14379,9 @@
   "extensions": {
     "stable_identity_count": 274,
     "exported_public_card_count": 274,
-    "exported_open_card_count": 121,
-    "exported_completed_card_count": 123,
-    "exported_deferred_card_count": 30,
+    "exported_open_card_count": 124,
+    "exported_completed_card_count": 122,
+    "exported_deferred_card_count": 28,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
     "discordos_role": "provenance-and-board-identity-only",

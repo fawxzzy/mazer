@@ -3,27 +3,27 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-15T22:39:14.000Z",
+    "registryUpdatedAt": "2026-11-16T04:12:35.000Z",
     "boardSync": {
-      "at": "2026-11-15T22:39:14.000Z",
-      "appliedEventCount": 298,
-      "lastEventId": "ddb511c686a0"
+      "at": "2026-11-16T04:12:35.000Z",
+      "appliedEventCount": 308,
+      "lastEventId": "7b089dcc332e"
     }
   },
   "counters": {
     "total": 274,
-    "open": 121,
-    "completed": 123,
-    "deferred": 30,
+    "open": 124,
+    "completed": 122,
+    "deferred": 28,
     "buckets": {
       "needs-you": 33,
-      "in-review": 79,
-      "blocked": 3,
+      "in-review": 81,
+      "blocked": 5,
       "ready": 0,
       "in-progress": 1,
-      "unclassified": 5,
-      "deferred": 30,
-      "completed": 123
+      "unclassified": 4,
+      "deferred": 28,
+      "completed": 122
     },
     "needsYou": {
       "decisions": 6,
@@ -31,7 +31,7 @@
     },
     "completedByTier": {
       "device": 0,
-      "headless": 45,
+      "headless": 44,
       "source-only": 35,
       "no-device-surface": 43,
       "unrecorded": 0
@@ -40,7 +40,7 @@
       "Zac": 1,
       "provider": 0,
       "device": 1,
-      "other-card": 1,
+      "other-card": 3,
       "unknown": 0
     }
   },
@@ -55,7 +55,7 @@
         "ask": "Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?",
         "recommendation": "Read the draft and sign it if you still want difficulty to come from hazards: it is the only lever past level 268 that keeps zoom and board size frozen.",
         "context": "The draft contract for obstacles, enemies and items is unsigned; five cards are covered by it.",
-        "prs": "#551",
+        "prs": "#551, #615",
         "verify": []
       },
       {
@@ -777,17 +777,6 @@
         "prs": "#593",
         "deployedBuild": "hbvh1xpuf",
         "updatedAt": "2026-11-15T15:36:32.000Z"
-      },
-      {
-        "id": "MAZER-VIS-051",
-        "title": "Make trail colours bolder and more arcade, less pastel",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-15",
-        "tier": "headless",
-        "prs": "#588, #591",
-        "deployedBuild": "hbvh1xpuf",
-        "updatedAt": "2026-11-15T15:36:23.000Z"
       },
       {
         "id": "MAZER-GEN-005",
@@ -2197,7 +2186,7 @@
       "title": "Replace the maze fade in and out with a smooth build and tear-down",
       "status": "review",
       "priority": "high",
-      "prs": "#590, #607",
+      "prs": "#590, #607, #616",
       "note": ""
     },
     {
@@ -2205,7 +2194,7 @@
       "title": "Grow the maze board with progression (2-5 more tiles each way)",
       "status": "review",
       "priority": "high",
-      "prs": "#589",
+      "prs": "#589, #592, #619",
       "note": ""
     },
     {
@@ -2230,6 +2219,14 @@
       "status": "review",
       "priority": "high",
       "prs": "#586, #590",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-053",
+      "title": "Spiral start marker synced with the end star; polish start and end tiles",
+      "status": "review",
+      "priority": "high",
+      "prs": "#617",
       "note": ""
     },
     {
@@ -2473,6 +2470,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-VIS-051",
+      "title": "Make trail colours bolder and more arcade, less pastel",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#588, #591, #613",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-052",
       "title": "Main menu: restore bleed-off paths that run off the screen edge",
       "status": "review",
@@ -2557,7 +2562,7 @@
       "title": "Revisit diagonal maze paths now that movement is automatic",
       "status": "review",
       "priority": "low",
-      "prs": "",
+      "prs": "#618",
       "note": ""
     },
     {
@@ -2787,6 +2792,24 @@
     ],
     "other-card": [
       {
+        "id": "MAZER-HAZ-004",
+        "title": "Add obstacles, traps and puzzles (covered by the hazard phases)",
+        "status": "review",
+        "priority": "medium",
+        "kind": "deferred-by-owner",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "derived": false
+      },
+      {
+        "id": "MAZER-PROG-008",
+        "title": "Decide which maze features unlock at which level and content band",
+        "status": "review",
+        "priority": "medium",
+        "kind": "deferred-by-owner",
+        "ask": "Waits on MAZER-HAZ-002 and MAZER-ECON-001.",
+        "derived": false
+      },
+      {
         "id": "MAZER-PROG-019",
         "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
         "status": "planning",
@@ -2861,14 +2884,6 @@
       "waitsOn": "other-card"
     },
     {
-      "id": "MAZER-HAZ-004",
-      "title": "Add obstacles, traps and puzzles (covered by the hazard phases)",
-      "status": "deferred_candidate",
-      "priority": "medium",
-      "why": "Covered by the unsigned hazard contract.",
-      "waitsOn": "other-card"
-    },
-    {
       "id": "MAZER-HAZ-005",
       "title": "Make the pursuing enemy playable (covered by the hazard phases)",
       "status": "deferred_candidate",
@@ -2883,14 +2898,6 @@
       "priority": "medium",
       "why": "The owner reports no more lag; the draft cache change cannot keep pixel parity.",
       "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-PROG-008",
-      "title": "Decide which maze features unlock at which level and content band",
-      "status": "deferred_candidate",
-      "priority": "medium",
-      "why": "Feature gating by level waits on the hazard and economy decisions.",
-      "waitsOn": "other-card"
     },
     {
       "id": "MAZER-ACCT-034",
@@ -3054,13 +3061,6 @@
     }
   ],
   "unclassified": [
-    {
-      "id": "MAZER-VIS-053",
-      "title": "Spiral start marker synced with the end star; polish start and end tiles",
-      "status": "planning",
-      "priority": "high",
-      "lane": null
-    },
     {
       "id": "MAZER-GOV-013",
       "title": "Dispatch the Board sync workflow once on GitHub and record the run",
@@ -3356,8 +3356,8 @@
       "sub": null
     },
     "MAZER-PROG-008": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "other-card"
     },
     "MAZER-PROG-009": {
       "bucket": "completed",
@@ -3400,8 +3400,8 @@
       "sub": null
     },
     "MAZER-HAZ-004": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "other-card"
     },
     "MAZER-HAZ-005": {
       "bucket": "deferred",
@@ -4140,8 +4140,8 @@
       "sub": null
     },
     "MAZER-VIS-051": {
-      "bucket": "completed",
-      "sub": "headless"
+      "bucket": "in-review",
+      "sub": null
     },
     "MAZER-VIS-052": {
       "bucket": "in-review",
@@ -4156,7 +4156,7 @@
       "sub": null
     },
     "MAZER-VIS-053": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-PROG-021": {
