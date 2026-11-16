@@ -122,6 +122,18 @@ export const createHazardStateSpace = (
     }
   }
 
+  // Flat move table (same values as graph.moveTarget, read once): the hot loops below
+  // run per state, and the graph accessor validates its arguments on every call.
+  const moveTable = new Int32Array(cells * 4).fill(-1);
+  for (let cell = 0; cell < cells; cell += 1) {
+    if (!graph.isWalkable(cell)) {
+      continue;
+    }
+    for (let d = 0; d < 4; d += 1) {
+      moveTable[cell * 4 + d] = graph.moveTarget(cell, HAZARD_MOVE_ORDER[d]!);
+    }
+  }
+
   const stateIndex = (cell: HazardCellId, tickMod: number, invulnerable: number): number => (
     ((tickMod * cells) + cell) * levels + invulnerable
   );
@@ -183,7 +195,7 @@ export const createHazardStateSpace = (
       const nextInvulnerable = invulnerable > 0 ? invulnerable - 1 : 0;
       let emittedCount = 0;
       for (let d = 0; d < 4; d += 1) {
-        const dest = graph.moveTarget(cell, HAZARD_MOVE_ORDER[d]!);
+        const dest = moveTable[cell * 4 + d]!;
         if (dest < 0) {
           continue;
         }
@@ -360,6 +372,118 @@ export const computeSolvableStates = (space: HazardStateSpace, goal: HazardCellI
     }
   }
   return solvable;
+};
+
+export interface HazardSolvableQuery {
+  /** Same answer as `computeSolvableStates(space, goal)[space.stateIndex(cell, tickMod, invulnerable)] === 1`. */
+  isSolvable(cell: HazardCellId, tickMod: number, invulnerable: number): boolean;
+}
+
+/**
+ * Solvability with the work bounded by the invulnerability-0 layer. A state with
+ * k = 0 only has k = 0 successors, so that layer is closed: it is solved once by
+ * reverse reachability over walkable cells. A state with k > 0 is solved iff it is
+ * a goal state or one of its (at most five) successors is solved; that is evaluated
+ * on demand and memoised (k drops by one per step, so the recursion depth is at
+ * most k). Callers ask about a few hundred states, so this avoids solving all k
+ * layers of the space. Answers match `computeSolvableStates` exactly (tested).
+ */
+export const createSolvableQuery = (
+  graph: HazardGraph,
+  space: HazardStateSpace,
+  goal: HazardCellId
+): HazardSolvableQuery => {
+  const levels = space.invulnerabilityLevels;
+  const period = space.period;
+  const cells = graph.cellCount;
+  const layer = period * cells;
+  // Successors of every walkable k = 0 state (at most four moves plus WAIT), as
+  // layer indices `tickMod * cells + cell`; -1 terminates a short list.
+  const successors = new Int32Array(layer * 5).fill(-1);
+  const inDegree = new Int32Array(layer + 1);
+  for (let tickMod = 0; tickMod < period; tickMod += 1) {
+    for (let cell = 0; cell < cells; cell += 1) {
+      if (cell === goal || !graph.isWalkable(cell)) {
+        continue;
+      }
+      const z = tickMod * cells + cell;
+      let slot = 0;
+      space.forEachSuccessor(space.stateIndex(cell, tickMod, 0), (next) => {
+        const target = Math.floor(next / levels);
+        successors[z * 5 + slot] = target;
+        slot += 1;
+        inDegree[target + 1] = inDegree[target + 1]! + 1;
+      });
+    }
+  }
+  for (let i = 0; i < layer; i += 1) {
+    inDegree[i + 1] = inDegree[i + 1]! + inDegree[i]!;
+  }
+  const offsets = inDegree;
+  const fill = new Int32Array(layer);
+  const predecessors = new Int32Array(offsets[layer]!);
+  for (let z = 0; z < layer; z += 1) {
+    for (let slot = 0; slot < 5; slot += 1) {
+      const target = successors[z * 5 + slot]!;
+      if (target < 0) {
+        break;
+      }
+      predecessors[offsets[target]! + fill[target]!] = z;
+      fill[target] = fill[target]! + 1;
+    }
+  }
+  const zero = new Uint8Array(layer);
+  const queue = new Int32Array(layer);
+  let head = 0;
+  let tail = 0;
+  if (Number.isInteger(goal) && goal >= 0 && goal < cells) {
+    for (let tickMod = 0; tickMod < period; tickMod += 1) {
+      const z = tickMod * cells + goal;
+      zero[z] = 1;
+      queue[tail++] = z;
+    }
+  }
+  while (head < tail) {
+    const z = queue[head++]!;
+    for (let i = offsets[z]!; i < offsets[z + 1]!; i += 1) {
+      const predecessor = predecessors[i]!;
+      if (zero[predecessor] === 0) {
+        zero[predecessor] = 1;
+        queue[tail++] = predecessor;
+      }
+    }
+  }
+
+  const memo = new Map<number, boolean>();
+  const isSolvable = (cell: HazardCellId, tickMod: number, invulnerable: number): boolean => {
+    if (cell === goal) {
+      return true;
+    }
+    if (invulnerable === 0) {
+      return zero[tickMod * cells + cell] === 1;
+    }
+    const state = space.stateIndex(cell, tickMod, invulnerable);
+    const cached = memo.get(state);
+    if (cached !== undefined) {
+      return cached;
+    }
+    // forEachSuccessor reuses scratch space and is not re-entrant: collect first.
+    const next: number[] = [];
+    space.forEachSuccessor(state, (successor) => {
+      next.push(successor);
+    });
+    let solved = false;
+    for (const successor of next) {
+      const rest = Math.floor(successor / levels);
+      if (isSolvable(rest % cells, Math.floor(rest / cells), successor % levels)) {
+        solved = true;
+        break;
+      }
+    }
+    memo.set(state, solved);
+    return solved;
+  };
+  return { isSolvable };
 };
 
 export interface WitnessReplayResult {

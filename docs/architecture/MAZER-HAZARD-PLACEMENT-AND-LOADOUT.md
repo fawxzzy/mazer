@@ -150,3 +150,24 @@ Measured on a 51x25 production maze (seed 20261105, capacity-clamped loadouts): 
 - Time: `placeLevelHazards` is well under a frame budget per level but builds large tables inside the validator; call it at level generation, not per frame.
 - Barrel/index: add `loadout` and `placement` to `src/mazer-core/hazards/index.ts` when the integrator merges the sibling lanes, and extend the source-boundary test's expected module list.
 - P6 chasers/interceptors: out of scope; they extend the validator's state space, and `maxHazardsForMaze` will need their weight.
+
+## Update 2026-11-15, slice H2 (generation overlay)
+
+The signed product contract replaces the draft schedule above for the shipped ladder. `loadout.ts` stays as draft code and is no longer the level pipeline.
+
+| Concern | Location |
+| --- | --- |
+| Manifest v1 allocator (intro 10/20/35/60, tail every 15 levels, caps 6/4/2/5, exposure stage) | `src/mazer-core/hazards/schedule.ts` |
+| Overlay: allocate, place, validate, escape slack, degrade | `src/mazer-core/hazards/overlay.ts` |
+| Legacy maze entry point (`enabled` passed in, returns null when off) | `src/legacy-runtime/legacyHazardOverlay.ts` |
+| Census (timing and invariants over the ladder) | `scripts/analysis/hazard-overlay-census.ts` |
+| Tests | `tests/core/hazards/schedule.test.ts`, `tests/core/hazards/overlay.test.ts`, `tests/reset/legacy-hazard-overlay.test.ts` |
+
+Both new core modules are now exported from `src/mazer-core/hazards/index.ts` (with `loadout` and `placement`, which were already there); the `mazer-core` barrel still does not export hazards.
+
+- **Placement changes (additive, default off):** `placeLevelHazards(..., {patrolsAvoidChokepoints: true})` keeps every patrol cell off the s-t separator cells (amendment A6) and the screen rejects a patrol on one (`patrol-on-chokepoint`). The overlay always passes `blockers: 0` (A5). Existing callers are unchanged (tested byte for byte).
+- **Tail tape:** the draft's convex prices for gates (count 4, tier 6) and patrols (count 6, tier 9); Hunters are new in H2 (count 10, tier 12) with speed divisors 3 then 2. One unit per tail step at 36 + 15j up to and including the geometry saturation level; the menu runs dry exactly at L276. Past saturation only the shard count grows (1 + floor((L - saturation) / 50)).
+- **Exposure stage:** undefined means a new player (stage = schedule); non-finite counts as 0; otherwise truncated and clamped to 0..schedule. A player behind the schedule gets the allocation of the next skipped kind's intro level, so kinds arrive one at a time in their first-encounter shape.
+- **Fairness gate:** graph-contract verdict at N = 2 (validator value; a pass implies a pass at play's N = 4), no blocker, no Sentry on a chokepoint, escape slack >= 0.9 and no fragile step among the first 10 witness steps. Escape slack forces a WAIT at every witness state; a gate closing on the waiting player ejects them to the previous distinct trail cell (A3), which must be free. A failing level drops the hazard nearest the first fragile step (ties drop the later one) until it passes; the reason is recorded and the status is `degraded`.
+- **Hunters and Shards** are allocated but not placed (`deferred`: H5 and H8).
+- **Performance work:** the hazard state space reads a flat move table, and post-contact/escape-slack queries use `createSolvableQuery` (the k = 0 layer solved once, k > 0 states on demand). Answers match `computeSolvableStates` exactly (tested on every state of 18 random scenarios). L200 overlay went from about 120 ms to about 37 ms.

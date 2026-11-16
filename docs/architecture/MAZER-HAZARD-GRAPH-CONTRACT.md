@@ -172,3 +172,7 @@ The static `blocker` is dropped from the placement menu: a blocker is a wall in 
 7. Patrol phase offsets and dwell: stays an optional integer phase, no dwell (accepted as drafted).
 8. Chaser contact when both parties are player-dependent: contact rule unchanged, extended state per the P6 handoff; A4 bounds the Hunter at 3 contacts.
 9. Combined-period bound of 720: accepted as drafted; slice H2 measures it against the generation budget.
+
+### Update 2026-11-15, slice H2
+
+A5 and A6 are enforced by the H2 overlay (`src/mazer-core/hazards/overlay.ts`): it never places a blocker, and `placeLevelHazards` gained the opt-in `patrolsAvoidChokepoints` (patrol routes avoid separator cells, screen reason `patrol-on-chokepoint`). The verdict record and the validator's N = 2 are unchanged. `createSolvableQuery` (`solvability.ts`) answers the same solvable-state question as `computeSolvableStates` without solving every invulnerability layer.
