@@ -3,26 +3,26 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-16T04:12:35.000Z",
+    "registryUpdatedAt": "2026-11-16T07:54:38.000Z",
     "boardSync": {
-      "at": "2026-11-16T04:12:35.000Z",
-      "appliedEventCount": 308,
-      "lastEventId": "7b089dcc332e"
+      "at": "2026-11-16T07:54:38.000Z",
+      "appliedEventCount": 325,
+      "lastEventId": "38e5e1a4c7df"
     }
   },
   "counters": {
-    "total": 274,
-    "open": 124,
+    "total": 277,
+    "open": 129,
     "completed": 122,
-    "deferred": 28,
+    "deferred": 26,
     "buckets": {
       "needs-you": 33,
-      "in-review": 81,
-      "blocked": 5,
+      "in-review": 84,
+      "blocked": 7,
       "ready": 0,
       "in-progress": 1,
       "unclassified": 4,
-      "deferred": 28,
+      "deferred": 26,
       "completed": 122
     },
     "needsYou": {
@@ -40,7 +40,7 @@
       "Zac": 1,
       "provider": 0,
       "device": 1,
-      "other-card": 3,
+      "other-card": 5,
       "unknown": 0
     }
   },
@@ -2178,7 +2178,7 @@
       "title": "Make generated mazes feel like a real maze",
       "status": "review",
       "priority": "high",
-      "prs": "#611",
+      "prs": "#611, #619",
       "note": ""
     },
     {
@@ -2226,7 +2226,7 @@
       "title": "Spiral start marker synced with the end star; polish start and end tiles",
       "status": "review",
       "priority": "high",
-      "prs": "#617",
+      "prs": "#617, #627",
       "note": ""
     },
     {
@@ -2275,6 +2275,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#557",
+      "note": ""
+    },
+    {
+      "id": "MAZER-FLOW-018",
+      "title": "Menu demo starts at player level; tap anywhere to play",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#626",
       "note": ""
     },
     {
@@ -2494,6 +2502,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-VIS-056",
+      "title": "Bottom corner stars clear the real display corner",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#631",
+      "note": ""
+    },
+    {
       "id": "MAZER-ACCT-020",
       "title": "Fix the four account-site usernames longer than 15 characters",
       "status": "review",
@@ -2571,6 +2587,14 @@
       "status": "review",
       "priority": "low",
       "prs": "#537, #570",
+      "note": ""
+    },
+    {
+      "id": "MAZER-HAZ-009",
+      "title": "Shards core for hazard levels",
+      "status": "review",
+      "priority": "low",
+      "prs": "#628",
       "note": ""
     },
     {
@@ -2801,6 +2825,15 @@
         "derived": false
       },
       {
+        "id": "MAZER-HAZ-005",
+        "title": "Make the pursuing enemy playable (covered by the hazard phases)",
+        "status": "review",
+        "priority": "medium",
+        "kind": "deferred-by-owner",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "derived": false
+      },
+      {
         "id": "MAZER-PROG-008",
         "title": "Decide which maze features unlock at which level and content band",
         "status": "review",
@@ -2817,6 +2850,15 @@
         "kind": "dependency",
         "ask": "Waits on MAZER-GEN-006 (review), MAZER-HAZ-002 (review).",
         "derived": true
+      },
+      {
+        "id": "MAZER-HAZ-008",
+        "title": "Plan hazard introduction and contact moments",
+        "status": "review",
+        "priority": "low",
+        "kind": "deferred-by-owner",
+        "ask": "Waits on MAZER-HAZ-002.",
+        "derived": false
       }
     ],
     "unknown": []
@@ -2878,14 +2920,6 @@
     {
       "id": "MAZER-HAZ-003",
       "title": "Phase 2: introduce obstacles and enemies one at a time",
-      "status": "deferred_candidate",
-      "priority": "medium",
-      "why": "Covered by the unsigned hazard contract.",
-      "waitsOn": "other-card"
-    },
-    {
-      "id": "MAZER-HAZ-005",
-      "title": "Make the pursuing enemy playable (covered by the hazard phases)",
       "status": "deferred_candidate",
       "priority": "medium",
       "why": "Covered by the unsigned hazard contract.",
@@ -2966,14 +3000,6 @@
     {
       "id": "MAZER-HAZ-006",
       "title": "Add usable items and the invisibility cloak (covered by the hazard phases)",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "Covered by the unsigned hazard contract.",
-      "waitsOn": "other-card"
-    },
-    {
-      "id": "MAZER-HAZ-008",
-      "title": "Plan hazard introduction and contact moments",
       "status": "deferred_candidate",
       "priority": "low",
       "why": "Covered by the unsigned hazard contract.",
@@ -3404,8 +3430,8 @@
       "sub": "other-card"
     },
     "MAZER-HAZ-005": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "other-card"
     },
     "MAZER-HAZ-006": {
       "bucket": "deferred",
@@ -3416,8 +3442,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-HAZ-008": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "other-card"
     },
     "MAZER-FLOW-001": {
       "bucket": "in-review",
@@ -4184,6 +4210,18 @@
       "sub": null
     },
     "MAZER-AUDIO-004": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-056": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-FLOW-018": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-HAZ-009": {
       "bucket": "in-review",
       "sub": null
     }
