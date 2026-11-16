@@ -23,8 +23,8 @@ import {
 } from './graphContract';
 import { stableStringify } from './serialization';
 import {
-  computeSolvableStates,
   createHazardStateSpace,
+  createSolvableQuery,
   findWitnessRoute,
   type HazardWitness
 } from './solvability';
@@ -210,7 +210,7 @@ export const validateLevelHazards = (
 
   const witness = result.witness;
   const space = createHazardStateSpace(graph, timeline, invulnerableTurns);
-  const solvable = computeSolvableStates(space, options.goal);
+  const solvable = createSolvableQuery(graph, space, options.goal);
   const failures: PostContactFailure[] = [];
   let failureCount = 0;
   let checkedStates = 0;
@@ -226,7 +226,7 @@ export const validateLevelHazards = (
       reason = 'pushback-cell-blocked';
     } else if (problem === 'contact') {
       reason = 'pushback-cell-contact';
-    } else if (solvable[space.stateIndex(pushbackCell, tickMod, invulnerableTurns)] !== 1) {
+    } else if (!solvable.isSolvable(pushbackCell, tickMod, invulnerableTurns)) {
       reason = 'no-route-after-contact';
     }
     if (reason !== null) {
