@@ -3,6 +3,8 @@ import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyG
 import {
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
   GEOMETRY_BUDGET_FILL_FIRST_LEVEL,
+  GEOMETRY_BUDGET_FILL_REFERENCE_CELLS,
+  resolveGeometryBudgetBoardFillFloor,
   resolveGeometryBudgetFillFloor,
   resolveGeometryBudgetProfileForRungs
 } from '../../src/legacy-runtime/legacyGeometryBudget';
@@ -69,6 +71,24 @@ describe('density fill floor schedule', () => {
     // 97 percent of the old mean floor at the control points (origin/main: 413 at level 50, 460 at 100).
     expect(resolveGeometryBudgetFillFloor(50)).toBe(400);
     expect(resolveGeometryBudgetFillFloor(100)).toBe(446);
+  });
+});
+
+describe('board-aware fill floor (MAZER-PROG-020 S3)', () => {
+  test('the old board keeps its floor, a bigger board scales it by cell count, never down, never below the old floor', () => {
+    expect(GEOMETRY_BUDGET_FILL_REFERENCE_CELLS).toBe(25 * 51);
+    expect(resolveGeometryBudgetBoardFillFloor(0, 1593)).toBe(0);
+    expect(resolveGeometryBudgetBoardFillFloor(400, 25 * 51)).toBe(400);
+    expect(resolveGeometryBudgetBoardFillFloor(400, 900)).toBe(400);
+    expect(resolveGeometryBudgetBoardFillFloor(400, 25 * 57)).toBe(Math.floor((400 * 1425) / 1275));
+    expect(resolveGeometryBudgetBoardFillFloor(400, 27 * 59)).toBe(Math.floor((400 * 1593) / 1275));
+    expect(resolveGeometryBudgetBoardFillFloor(400, Number.NaN)).toBe(400);
+    let previous = 0;
+    for (let cells = 1200; cells <= 1700; cells += 25) {
+      const scaled = resolveGeometryBudgetBoardFillFloor(446, cells);
+      expect(scaled).toBeGreaterThanOrEqual(Math.max(previous, 446));
+      previous = scaled;
+    }
   });
 });
 
