@@ -327,9 +327,10 @@ describe('legacy generation lifecycle', () => {
 
     expect(playerLevelOne.seed).toBe(playerLevelTwo.seed);
     expect(playerLevelTwo.generationProfile).not.toEqual(playerLevelOne.generationProfile);
-    // The board is frozen across the budget range: level 2 changes content,
-    // not size.
-    expect(playerLevelTwo.budget.scale).toBe(playerLevelOne.budget.scale);
+    // Level 2 changes content, not size: the board scale only moves by one curve step (MAZER-PROG-020 S2,
+    // 0.01 per level; it was frozen at 35, then 38).
+    expect(playerLevelTwo.budget.scale - playerLevelOne.budget.scale).toBeGreaterThanOrEqual(0);
+    expect(playerLevelTwo.budget.scale - playerLevelOne.budget.scale).toBeLessThanOrEqual(0.0101);
     expect(playerLevelTwo.generationProfile).toEqual(aiLevelTwo.generationProfile);
     expect(playerLevelOne.generationProfile).toEqual(aiLevelOne.generationProfile);
   });

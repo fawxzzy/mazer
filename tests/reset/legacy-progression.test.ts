@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { LEGACY_BOARD_BASE_SCALE } from '../../src/legacy-runtime/legacyBoardScale';
+import { LEGACY_BOARD_BASE_SCALE, resolveLegacyBoardScaleForLevel } from '../../src/legacy-runtime/legacyBoardScale';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
@@ -659,11 +659,14 @@ describe('legacy progression', () => {
       level: '1000000'
     };
 
-    // The band/label profile and the board size still ignore the ordinal.
+    // The band/label profile still ignores the ordinal.
     expect(resolveLegacyProgressionDifficultyProfile(highOrdinal))
       .toEqual(resolveLegacyProgressionDifficultyProfile(lowOrdinal));
-    expect(resolveLegacyProgressionGenerationScale(50, highOrdinal))
-      .toBe(resolveLegacyProgressionGenerationScale(50, lowOrdinal));
+    // MAZER-PROG-020 S2: the board scale is a function of the LEVEL (38 toward 40, never beyond), so it
+    // follows the level of each track and stays below 40 even at an absurd ordinal.
+    expect(resolveLegacyProgressionGenerationScale(50, lowOrdinal)).toBe(resolveLegacyBoardScaleForLevel(99));
+    expect(resolveLegacyProgressionGenerationScale(50, highOrdinal)).toBe(resolveLegacyBoardScaleForLevel(1000000));
+    expect(resolveLegacyProgressionGenerationScale(50, highOrdinal)).toBeLessThan(40);
     // DELIBERATE CHANGE (infinite-progression lane, 2026-11-06): target complexity
     // saturates at 400 (level 99), so geometry difficulty past level 99 can only
     // come from the ordinal. At the bounded top the geometry now keeps rising with
@@ -1611,10 +1614,12 @@ describe('legacy progression', () => {
     expect(advancedPalette.trailColor).toBe(0x36ff7d);
     expect(advancedPalette.trailPulseColor).toBe(0xf1faf6);
     expect(advancedPalette.trailPulseEdgeColor).toBe(0xe9fff1);
-    // Every bounded level >= 2 is a geometry-budget level on one frozen board:
-    // an advanced track no longer grows the maze past the tutorial scale.
+    // MAZER-PROG-020 S2: the board follows the level curve (38 toward 40): an advanced track is built a hair
+    // larger than level 1, never past scale 40.
+    expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBe(resolveLegacyBoardScaleForLevel(61));
     expect(resolveLegacyProgressionGenerationScale(50, advancedTrack))
-      .toBe(resolveLegacyProgressionGenerationScale(50, state.tracks.player));
+      .toBeGreaterThan(resolveLegacyProgressionGenerationScale(50, state.tracks.player));
+    expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeLessThan(40);
   });
 
   test('defines level-one mazes as small simple routes', () => {
@@ -1686,19 +1691,23 @@ describe('legacy progression', () => {
     expect(playerProfiles[0]?.difficulty.band).toBe('tutorial');
     expect(playerProfiles[1]?.difficulty.band).toBe('starter');
     expect(playerProfiles[1]).not.toEqual(playerProfiles[0]);
-    // Levels 1..30 share one frozen board: difficulty comes from maze content,
-    // not board size, so the first clear no longer grows the board.
-    expect(playerProfiles[1]?.scale).toBe(playerProfiles[0]?.scale);
+    // Difficulty comes from maze content, not board size: the first clear moves the board scale by a couple of
+    // curve steps (MAZER-PROG-020 S2, 0.01 per level; the level is the higher of the ordinal and the level the
+    // target complexity implies), not a size jump.
+    expect(playerProfiles[1]?.scale).toBe(resolveLegacyBoardScaleForLevel(resolveLegacyProgressionLevel(12)));
+    expect((playerProfiles[1]?.scale ?? 0) - (playerProfiles[0]?.scale ?? 0)).toBeLessThanOrEqual(0.0201);
     // The band labels still pair two real levels per step (diagnostics only),
     // but geometry is now the geometry budget ladder (levels 2..30): every
     // level owns a distinct profile, including the formerly tied levels 2
     // and 3.
     expect(playerProfiles[2]?.difficulty).toEqual(playerProfiles[1]?.difficulty);
-    expect(playerProfiles[2]?.scale).toBe(playerProfiles[1]?.scale);
+    expect((playerProfiles[2]?.scale ?? 0) - (playerProfiles[1]?.scale ?? 0)).toBeGreaterThanOrEqual(0);
+    expect((playerProfiles[2]?.scale ?? 0) - (playerProfiles[1]?.scale ?? 0)).toBeLessThanOrEqual(0.0201);
     expect(playerProfiles[2]?.generation).not.toEqual(playerProfiles[1]?.generation);
     expect(playerProfiles[3]?.generation).not.toEqual(playerProfiles[2]?.generation);
     expect(playerProfiles[4]?.difficulty).toEqual(playerProfiles[3]?.difficulty);
-    expect(playerProfiles[4]?.scale).toBe(playerProfiles[3]?.scale);
+    expect((playerProfiles[4]?.scale ?? 0) - (playerProfiles[3]?.scale ?? 0)).toBeGreaterThanOrEqual(0);
+    expect((playerProfiles[4]?.scale ?? 0) - (playerProfiles[3]?.scale ?? 0)).toBeLessThanOrEqual(0.0201);
     expect(playerProfiles[4]?.generation).not.toEqual(playerProfiles[3]?.generation);
     expect(aiProfiles).toEqual(playerProfiles);
   });
@@ -1926,9 +1935,9 @@ describe('legacy progression', () => {
     expect(LEGACY_PROGRESSION_MENU_MIN_TILE_PX).toBeGreaterThanOrEqual(5.3);
     expect(LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX).toBe(8);
     expect(LEGACY_PROGRESSION_PLAY_MIN_TILE_PX).toBeGreaterThanOrEqual(5.2);
-    // The board is frozen across all bounded levels >= 2, so even a maxed track
-    // generates the tutorial scale; the viewport cap is only a ceiling on it.
-    expect(unrestrictedScale).toBe(resolveLegacyProgressionGenerationScale(50, state.tracks.player));
+    // The board scale is the level curve (38 toward 40), so a maxed track generates its level's scale;
+    // the viewport cap is only a ceiling on it.
+    expect(unrestrictedScale).toBe(resolveLegacyBoardScaleForLevel(resolveLegacyProgressionLevel(LEGACY_PROGRESSION_MAX_COMPLEXITY)));
     expect(phoneScale).toBe(Math.min(unrestrictedScale, viewportCap));
     expect(narrowScale).toBe(Math.min(unrestrictedScale, narrowViewportCap));
     expect(narrowScale).toBe(unrestrictedScale);

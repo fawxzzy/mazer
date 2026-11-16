@@ -209,8 +209,11 @@ export const LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_CANDIDATES = 3;
 export const LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_MIN_TARGET = 46;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 
+// MAZER-PROG-020: the scale may be fractional (the board grows smoothly with the level), so it is
+// clamped, not rounded to a whole number; whole-number scales behave exactly as before. Rounded to
+// 1e-4 so a scale that arrives as 38.00000000000001 and 38 are one key.
 const resolveLegacyGenerationScale = (scale: number): number => (
-  clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE)
+  Math.max(LEGACY_MIN_SCALE, Math.min(LEGACY_MAX_SCALE, Math.round(scale * 10000) / 10000))
 );
 
 const resolveLegacyShortcutCountModifier = (mode: LegacyGenerationMode): number => (

@@ -1,5 +1,5 @@
 import { resolveLegacyBoardFloorScale } from './legacyBoardPlan';
-import { resolveLegacyBoardScaleForLevel } from './legacyBoardScale';
+import { LEGACY_BOARD_FLOOR_SCALE_STEP, resolveLegacyBoardScaleForLevel } from './legacyBoardScale';
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL, resolveGeometryBudgetProfile } from './legacyGeometryBudget';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
@@ -1744,7 +1744,8 @@ export const resolveLegacyProgressionScaleDetail = (
   });
   const maxScale = Math.max(25, Math.min(LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE, deviceMaxScale));
   const minScale = Math.min(25, maxScale);
-  const cappedScale = clampInteger(levelScale, minScale, maxScale);
+  // Not rounded to a whole number: the level scale is fractional (S2), so the board grows smoothly.
+  const cappedScale = Math.max(minScale, Math.min(maxScale, levelScale));
   // The 10 px tile floor, with the real layout. A no-op on every phone 320 px wide or more (the
   // board stays a function of the level); only a narrower box that cannot hold it at 10 px shrinks.
   const scale = options.viewport && isFiniteViewport(options.viewport)
@@ -1756,7 +1757,7 @@ export const resolveLegacyProgressionScaleDetail = (
       },
       cappedScale,
       options.surface === 'play' ? 'play' : 'menu',
-      1,
+      LEGACY_BOARD_FLOOR_SCALE_STEP,
       minScale
     )
     : cappedScale;
