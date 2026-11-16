@@ -2,6 +2,8 @@
 
 Status: signed product contract, docs and tests only. It records the owner decision; it enables nothing. No hazard, enemy, obstacle or item code exists or is added by this change, nothing a player sees changes, and the dormant switch `LEGACY_HAZARD_LAYER_ENABLED` stays a literal `false` (pinned by `tests/reset/legacy-hazard-handoff.test.ts` and `tests/architecture/hazard-contract-signed.test.ts`). It grants no merge, deploy, provider, database, credential or DNS authority.
 
+Amended 2026-11-15: the product contract `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md` (signed by the owner, 2026-11-15, via chat) amends this document on when hazards start (the intro schedule from level 10, not only after saturation), on the lever after the plateau (Shards) and on the world clock (real time on the player's step clock). Where they differ, the 2026-11-15 contract wins; this record and its signature stay as written.
+
 ## Signature record (MAZER-HAZ-002, MAZER-PROG-019)
 
 - Signed by: the owner (Zac), 2026-11-14.
