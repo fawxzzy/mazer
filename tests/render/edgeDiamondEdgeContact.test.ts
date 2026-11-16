@@ -12,7 +12,7 @@ import {
   type EdgeMarkerState,
   type EdgeStation
 } from '../../src/render/edgeMarkers';
-import { measureEdgeCornerOffset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
+import { measureEdgeCornerOffset, resolveEdgeCornerBottomTipInset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import { RasterContext } from './support/rasterContext';
 
@@ -105,7 +105,8 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
               // MAZER-VIS-044: a corner diamond is pinned snug in its corner, the same distance from BOTH edges at every size.
               const corner = (['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const)[station.id / 2] as 'top-left';
               const offset = measureEdgeCornerOffset(painted, corner, { width: visibleWidth, height: visibleHeight });
-              const tipInset = resolveEdgeCornerTipInset(viewport);
+              // MAZER-VIS-056: the bottom corners use their own (display-corner) inset.
+              const tipInset = station.side === 'bottom' ? resolveEdgeCornerBottomTipInset(viewport) : resolveEdgeCornerTipInset(viewport);
               expect(Math.abs(offset.horizontal - tipInset) * resolution, `${text} horizontal corner offset`).toBeLessThanOrEqual(0.5);
               expect(Math.abs(offset.vertical - tipInset) * resolution, `${text} vertical corner offset`).toBeLessThanOrEqual(0.5);
               continue;
@@ -140,7 +141,7 @@ describe('every edge diamond touches the screen edge with its outer tip and noth
             let nearEdge = 0;
             let lit = 0;
             let nearCorner = 0;
-            const cornerReachDevice = Math.ceil((resolveEdgeCornerTipInset(viewport) * resolution) + 2);
+            const cornerReachDevice = Math.ceil(((station.side === 'bottom' ? resolveEdgeCornerBottomTipInset(viewport) : resolveEdgeCornerTipInset(viewport)) * resolution) + 2);
             for (let py = 0; py < size; py += 1) {
               for (let px = 0; px < size; px += 1) {
                 if ((ctx.data[(((py * size) + px) * 4) + 3] ?? 0) === 0) continue;

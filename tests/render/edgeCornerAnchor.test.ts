@@ -4,6 +4,7 @@ import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import {
   EDGE_CORNER_ROUNDED_TIP_INSET_PX,
   measureEdgeCornerOffset,
+  resolveEdgeCornerBottomTipInset,
   resolveEdgeCornerTipInset
 } from '../../src/render/edgeCornerAnchor';
 import {
@@ -69,8 +70,10 @@ describe('corner diamonds are anchored in the 4 screen corners (MAZER-VIS-044 / 
         const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
         const offset = measureEdgeCornerOffset(painted, corner, visible);
         measured.push(`${corner}@${scale}: ${offset.horizontal.toFixed(2)} x ${offset.vertical.toFixed(2)}`);
-        expect(offset.horizontal, `${corner} ${scale} horizontal`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
-        expect(offset.vertical, `${corner} ${scale} vertical`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+        // MAZER-VIS-056: the bottom corners use their own (display-corner) inset.
+        const tipInset = corner.startsWith('bottom') ? resolveEdgeCornerBottomTipInset(viewport) : resolveEdgeCornerTipInset(viewport);
+        expect(offset.horizontal, `${corner} ${scale} horizontal`).toBeCloseTo(tipInset, 9);
+        expect(offset.vertical, `${corner} ${scale} vertical`).toBeCloseTo(tipInset, 9);
       }
     });
     expect(measured).toHaveLength(12);
@@ -99,9 +102,13 @@ describe('corner diamonds are anchored in the 4 screen corners (MAZER-VIS-044 / 
     const viewport = { width: 390, height: 844 };
     const [tl, , tr, , br, , bl] = resolveEdgeStations(viewport) as ReadonlyArray<{ x: number; y: number }>;
     expect(tr!.x).toBeCloseTo(viewport.width - tl!.x, 9);
-    expect(bl!.y).toBeCloseTo(viewport.height - tl!.y, 9);
-    expect(br!.x).toBeCloseTo(tr!.x, 9);
+    expect(br!.x).toBeCloseTo(viewport.width - bl!.x, 9);
     expect(br!.y).toBeCloseTo(bl!.y, 9);
+    // MAZER-VIS-056: the bottom pair sits further in along its diagonals by the difference of the two tip insets (4 px here).
+    const shift = resolveEdgeCornerBottomTipInset(viewport) - resolveEdgeCornerTipInset(viewport);
+    expect(shift).toBe(4);
+    expect(bl!.y).toBeCloseTo(viewport.height - tl!.y - shift, 9);
+    expect(bl!.x).toBeCloseTo(tl!.x + shift, 9);
     expect(resolveOrbitingEdgeStations(viewport, Math.PI * 2)).toEqual(resolveEdgeStations(viewport));
   });
 });
