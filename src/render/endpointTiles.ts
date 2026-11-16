@@ -5,7 +5,7 @@
  * endpoint colour) with a dark disc badge and a lit ring on top. On the live board the pad read as a visible
  * square / rounded-square box behind the star and the play marker, and the owner asked for it gone.
  *
- * Now there is no box. The star and the play arrow sit directly on the board tile (the baked Chip fill is the only
+ * Now there is no box. The star and the spiral sit directly on the board tile (the baked Chip fill is the only
  * thing behind them), centred on the device-snapped tile. What keeps them legible without a backdrop is a thin
  * dark KEYLINE traced around the glyph itself (the board void colour, 1+ device px): the goal red (#FF405D) is only
  * about 1.8:1 against the mid-tone chip, but red on the keyline is far above 3:1, and the outline hugs the shape, so
@@ -13,17 +13,17 @@
  * for one consistent look.
  *
  *  - Goal: a goal-red star, up to 0.70 of the half-tile (smaller where the fit below needs it).
- *  - Start: a gold play triangle that POINTS THE WAY THE PLAYER WILL FIRST MOVE (`direction`, resolved from the maze
- *    by startDirection.ts; right when there is no board, e.g. the Guide icon), so it reads as the player emerging
- *    from it.
+ *  - Start (MAZER-VIS-053): a gold two-arm SPIRAL of the old triangle's footprint, turning slowly in phase with the star
+ *    (endpointSpiral.ts). It replaced the play triangle, so it no longer points anywhere: `direction` (startDirection.ts)
+ *    is still carried by the tile geometry but nothing draws it.
  *
  * CENTRING AND FIT (2026-11-10, owner: "the star isn't centred in its tile, same with the start arrow, and its size
  * should not make it bleed over the tile edges"). The VISIBLE glyph is the fill plus its dark keyline. Both glyphs are
  * centred OPTICALLY, by the centroid of what is painted, on the tile's painted-interior centre (the chip fill, inside the
  * lit rim, which is inset on the closed sides only; see endpointOpticalCentre.ts): the STAR by its circumcentre
- * (MAZER-VIS-034) and the play TRIANGLE by the centroid of the triangle dilated by its stroke and keyline (MAZER-VIS-036;
- * a bounding-box-centred triangle left its mass a sixth of its length behind the centre). The glyph is scaled down, if
- * needed, so that the farthest point of the
+ * (MAZER-VIS-034) and the start SPIRAL by its spin axis (two arms half a turn apart are 2-fold symmetric, so the axis IS
+ * the centroid of what is painted, at every angle; MAZER-VIS-053; it replaced the play triangle, MAZER-VIS-036). The glyph
+ * is scaled down, if needed, so that the farthest point of the
  * keyline stays an inset inside the tile's FILL (the area inside the lit rim: the closest of its four edges to the
  * cell centre) with at least 0.5 device px to spare: the keyline never reaches the rim or the tile edge, at any tile
  * size or DPR. Where the one-device-pixel keyline would take too much of that room it is thinned so the glyph keeps
@@ -33,8 +33,9 @@
  * No css-px floor: on a dense board the glyph is as small as the tile, and the goal is found through the beacon
  * (goalBeacon.ts), which has its own css-px sizing.
  */
-import { DEFAULT_START_DIRECTION, type StartDirection } from './startDirection';
-import { dilatedTriangleCentroid, resolveEndpointCentre, STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE } from './endpointOpticalCentre';
+import { type StartDirection } from './startDirection';
+import { resolveEndpointCentre, STAR_CIRCUMCENTRE_BELOW_BOX_CENTRE } from './endpointOpticalCentre';
+import { START_SPIRAL } from './endpointSpiral';
 import {
   BOARD_TILE_GEOMETRY,
   snapLineWidth
@@ -56,7 +57,7 @@ export interface EndpointTileRect {
   fillRadii: EndpointRadii;
   /** Concave corners (both neighbours open, diagonal wall). Carried with the tile geometry; the marker ignores it. */
   concave?: { tl: boolean; tr: boolean; br: boolean; bl: boolean };
-  /** Start only: the direction of the first step of the solution path (BoardTileLayer sets it). Default: right. */
+  /** Start only: the direction of the first step of the solution path (BoardTileLayer sets it). Carried, not drawn since VIS-053. */
   direction?: StartDirection;
 }
 
@@ -68,18 +69,22 @@ export interface EndpointGlyphFrame {
   radius: number;
   /** Keyline width: the dark outline traced around the glyph, snapped to whole device pixels, never below one. */
   keyline: number;
+  /**
+   * Goal only (MAZER-VIS-053): width of the star's BORDER in the shared border colour, between the red fill and the
+   * (then thin, one device pixel) dark keyline. 0 for the start spiral, which has the full keyline and no border.
+   */
+  border: number;
 }
 
-export interface EndpointPlay {
-  ax: number;
-  ay: number;
-  bx: number;
-  by: number;
+export interface EndpointSpiral {
+  /** The spin axis: the tile's optical centre (board-local css px). */
   cx: number;
   cy: number;
-  /** Round-join stroke width of the gold fill's own edge. */
+  /** Radius of an arm's centre line at its outer end, and where it starts. */
+  outer: number;
+  inner: number;
+  /** Round-cap stroke width of the gold arm (the dark keyline adds `frame.keyline` on each side). */
   stroke: number;
-  direction: StartDirection;
 }
 
 export interface EndpointTileSpec {
@@ -87,22 +92,9 @@ export interface EndpointTileSpec {
   frame: EndpointGlyphFrame;
   /** Goal only: star radii. */
   star: { outer: number; inner: number } | null;
-  /** Start only: the play triangle (board-local vertices) pointing along `direction`. */
-  play: EndpointPlay | null;
+  /** Start only: the spiral (axis, radii, stroke). */
+  spiral: EndpointSpiral | null;
 }
-
-/**
- * The triangle in glyph space (u along the direction of travel, v across it) mapped to board-local x/y:
- * right = (u, v), down = (-v, u), left = (-u, -v), up = (v, -u). A rotation, so the triangle stays the same shape.
- */
-const rotate = (direction: StartDirection, u: number, v: number): readonly [number, number] => {
-  switch (direction) {
-    case 'right': return [u, v];
-    case 'down': return [-v, u];
-    case 'left': return [-u, -v];
-    case 'up': return [v, -u];
-  }
-};
 
 /** Share of the half-tile kept clear between the keyline's farthest point and the rim. */
 const FIT_INSET_OF_RADIUS = 0.07;
@@ -136,52 +128,43 @@ export const resolveEndpointTile = (
   const room = Math.max(0, fillRoom(tile, cx, cy) - Math.max(radius * FIT_INSET_OF_RADIUS, 0.5 / devicePixelRatio));
   let keyline = snapLineWidth(radius * k.keylineOfRadius, devicePixelRatio);
   if (kind === 'goal') {
-    // Thin the keyline when it would take more than a fifth of the room (tiny tiles), then fit the star.
-    keyline = Math.min(keyline, room / 5);
-    const outer = Math.max(0, Math.min(radius * k.goalStarOuterOfRadius, (room - keyline) / STAR_FAR_VERTEX));
+    // Thin the keyline when it would take more than a fifth of the room (tiny tiles). MAZER-VIS-053: that edge is split into
+    // the star's BORDER (the shared border colour, the edge diamonds' colour) and a dark keyline one device pixel wide
+    // outside it. The border takes what the old keyline had beyond that one device pixel and is at least one device pixel.
+    // The fit counts both, so the star never reaches the rim.
+    const edge = Math.min(keyline, room / 5);
+    keyline = Math.min(edge, 1 / devicePixelRatio);
+    const fit = (edgeBorder: number): number => Math.max(0, Math.min(radius * k.goalStarOuterOfRadius, (room - keyline - edgeBorder) / STAR_FAR_VERTEX));
+    let border = Math.max(edge - keyline, Math.min(1 / devicePixelRatio, room / 5));
+    let outer = fit(border);
+    // On a tile at the physical floor (a handful of device pixels) the border would leave the red under two device pixels
+    // across: drop the border there so the star stays a readable red star (the keyline still carries it).
+    if (outer * devicePixelRatio < 2) {
+      border = 0;
+      outer = fit(0);
+    }
     // The star's circumcentre (its centre of mass) goes on the tile's painted-interior centre (endpointOpticalCentre.ts).
     const at = resolveEndpointCentre(tile);
     return {
       kind,
-      frame: { cx: at.x, cy: at.y, radius, keyline },
+      frame: { cx: at.x, cy: at.y, radius, keyline, border },
       star: { outer, inner: outer * (k.goalStarInnerOfRadius / k.goalStarOuterOfRadius) },
-      play: null
+      spiral: null
     };
   }
-  const direction = tile.direction ?? DEFAULT_START_DIRECTION;
   keyline = Math.min(keyline, room / 4);
-  const stroke = Math.min(snapLineWidth(radius * k.startPlayStrokeOfRadius, devicePixelRatio), room / 3);
-  // The triangle in glyph space (u along travel, v across it), nominal size scaled by the fit. It is placed so the
-  // centroid of its PAINTED pixels (the triangle dilated by half the gold stroke plus the keyline) is on the tile's
-  // painted-interior centre, the same target as the goal star (endpointOpticalCentre.ts, MAZER-VIS-036). It used to
-  // be placed by its bounding box, which left the visible mass a sixth of its length behind the centre.
-  const nominalHalfHeight = radius * k.startPlayHalfHeightOfRadius;
-  const nominalLength = radius * k.startPlayLengthOfRadius;
-  // Its farthest vertex from the cell centre as the fit has always measured it (a base corner of the box-centred
-  // triangle): kept as the bound, so the size, and the keyline's clearance from the rim, are what they were.
-  const farVertex = Math.hypot(nominalLength / 2, nominalHalfHeight);
-  const fit = Math.max(0, Math.min(1, (room - (stroke / 2) - keyline) / farVertex));
-  const halfHeight = nominalHalfHeight * fit;
-  const length = nominalLength * fit;
-  const painted = dilatedTriangleCentroid([0, -halfHeight], [0, halfHeight], [length, 0], (stroke / 2) + keyline);
+  const stroke = Math.min(snapLineWidth(radius * k.startSpiralStrokeOfRadius, devicePixelRatio), room / 3);
+  // The arm's centre line reaches at most `outer`; its painted edge (half the gold stroke, then the keyline) must stay inside
+  // the room, so the outer radius is the nominal one (the circle round the old triangle) or what the room allows.
+  const outer = Math.max(0, Math.min(radius * k.startSpiralOuterOfRadius, room - (stroke / 2) - keyline));
+  // The spin axis is the tile's painted-interior centre, the same target as the goal star. Two arms half a turn apart are
+  // 2-fold symmetric, so the painted mass is centred on that axis at every angle: the spin cannot wobble.
   const at = resolveEndpointCentre(tile);
-  const [ax, ay] = rotate(direction, -painted.x, -halfHeight);
-  const [bx, by] = rotate(direction, -painted.x, halfHeight);
-  const [px, py] = rotate(direction, length - painted.x, 0);
   return {
     kind,
-    frame: { cx: at.x, cy: at.y, radius, keyline },
+    frame: { cx: at.x, cy: at.y, radius, keyline, border: 0 },
     star: null,
-    play: {
-      ax: at.x + ax,
-      ay: at.y + ay,
-      bx: at.x + bx,
-      by: at.y + by,
-      cx: at.x + px,
-      cy: at.y + py,
-      stroke,
-      direction
-    }
+    spiral: { cx: at.x, cy: at.y, outer, inner: outer * START_SPIRAL.innerShare, stroke }
   };
 };
 
