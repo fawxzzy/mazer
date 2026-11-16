@@ -11,7 +11,18 @@
  * - Unsupported platforms and any throwing audio call are silent no-ops: movement must never fail over a chirp.
  */
 
-export type LegacySoundEffectKind = 'step' | 'wallBump' | 'goal' | 'toggleOn';
+export type LegacySoundEffectKind =
+  | 'step'
+  | 'wallBump'
+  | 'goal'
+  | 'toggleOn'
+  // Hazard moments (slice H6; named events in legacyHazardAudioEvents.ts). Softer than every older kind.
+  | 'hazardIntro'
+  | 'hazardTier'
+  | 'hazardGateClosing'
+  | 'hazardContact'
+  | 'hazardBurnout'
+  | 'shardCollected';
 
 interface LegacySoundTone {
   /** Start offset from now, seconds. */
@@ -33,7 +44,30 @@ export const LEGACY_SOUND_EFFECT_TONES: Readonly<Record<LegacySoundEffectKind, r
     { at: 0.09, durationSec: 0.09, frequencyHz: 659.25, gain: 0.05 },
     { at: 0.18, durationSec: 0.16, frequencyHz: 783.99, gain: 0.05 }
   ]),
-  toggleOn: Object.freeze([{ at: 0, durationSec: 0.08, frequencyHz: 660, gain: 0.04 }])
+  toggleOn: Object.freeze([{ at: 0, durationSec: 0.08, frequencyHz: 660, gain: 0.04 }]),
+  // Slice H6 hazard moments: every tone is at most 0.03 peak gain (below the goal chime and the wall bump) and soft-attacked.
+  // A new kind: two rising pentatonic notes, the step tick's family.
+  hazardIntro: Object.freeze([
+    { at: 0, durationSec: 0.1, frequencyHz: 392, gain: 0.026, attackSec: 0.02 },
+    { at: 0.1, durationSec: 0.14, frequencyHz: 523.25, gain: 0.026, attackSec: 0.02 }
+  ]),
+  // A tier pip: one short high tick.
+  hazardTier: Object.freeze([{ at: 0, durationSec: 0.07, frequencyHz: 659.25, gain: 0.02, attackSec: 0.012 }]),
+  // A gate about to close: a very soft low tick (it can repeat each beat, so it is the quietest).
+  hazardGateClosing: Object.freeze([{ at: 0, durationSec: 0.05, frequencyHz: 246.94, gain: 0.012, attackSec: 0.012 }]),
+  // A contact: a soft falling pair, lower than the wall bump's gain.
+  hazardContact: Object.freeze([
+    { at: 0, durationSec: 0.07, frequencyHz: 220, gain: 0.03, attackSec: 0.01 },
+    { at: 0.07, durationSec: 0.09, frequencyHz: 174.61, gain: 0.024, attackSec: 0.01 }
+  ]),
+  // A Hunter gives up: three soft falling notes.
+  hazardBurnout: Object.freeze([
+    { at: 0, durationSec: 0.08, frequencyHz: 392, gain: 0.022, attackSec: 0.015 },
+    { at: 0.08, durationSec: 0.08, frequencyHz: 329.63, gain: 0.02, attackSec: 0.015 },
+    { at: 0.16, durationSec: 0.12, frequencyHz: 261.63, gain: 0.018, attackSec: 0.015 }
+  ]),
+  // A shard: one bright, short, quiet note.
+  shardCollected: Object.freeze([{ at: 0, durationSec: 0.12, frequencyHz: 783.99, gain: 0.024, attackSec: 0.012 }])
 });
 
 /**
@@ -49,7 +83,13 @@ export const LEGACY_SOUND_EFFECT_MIN_GAP_MS: Readonly<Record<LegacySoundEffectKi
   step: 120,
   wallBump: 140,
   goal: 0,
-  toggleOn: 0
+  toggleOn: 0,
+  hazardIntro: 400,
+  hazardTier: 400,
+  hazardGateClosing: 200,
+  hazardContact: 250,
+  hazardBurnout: 400,
+  shardCollected: 120
 });
 
 export interface LegacyAudioParamLike {
