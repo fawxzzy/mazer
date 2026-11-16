@@ -136,7 +136,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Top/bottom border openings paired across the board so the player can wrap vertically.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Horizontal wrap pairing forced by a single-feeder, vertical-only wrap profile.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
   { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Perimeter feeder spokes: single-tile border openings carved inward from each side.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
-  { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Opposite-border pairing pass that mirrors existing border openings onto the far side.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' }
+  { file: 'src/legacy-runtime/legacyMazeFeatureRegistry.ts', literal: 'Opposite-border pairing pass that mirrors existing border openings onto the far side.', kind: 'technical', route: 'developer-facing feature registry description; never rendered to players' },
+  { file: 'src/legacy-runtime/legacyHazardGateController.ts', literal: 'Pulse Gate: the magenta fence opens and closes. Wait for it to open, then go.', kind: 'raw-static', route: 'HAZ-004 H3 one-time Pulse Gate intro line (hazard lab flag only); H6 (HAZ-008) moves it into the skippable intro card' }
 ];
 
 /**

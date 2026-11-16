@@ -31,6 +31,20 @@ import {
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot
 } from './legacyMaze';
+import { resolveLegacyHazardOverlay, type LegacyHazardOverlayResult } from './legacyHazardOverlay';
+
+/**
+ * Slice H3: the hazard overlay job that rides along with a maze build. The scene resolves the
+ * hazard layer switch on the main thread and sends the RESULT here (`enabled: true`): a Web Worker
+ * cannot read the page query string or localStorage (the GEN-020 trap, legacyMazeWorkerClient.ts).
+ * Absent (the default build) means no overlay is computed and the job, its key and its response
+ * are byte-identical to the pre-H3 ones.
+ */
+export interface LegacyMazeGenerationHazardJob {
+  readonly enabled: true;
+  readonly level: number;
+  readonly exposureStage?: number;
+}
 
 export interface LegacyMazeGenerationJobInput {
   readonly aspectRatio: number;
@@ -39,11 +53,12 @@ export interface LegacyMazeGenerationJobInput {
   readonly scale: number;
   readonly seed: number;
   readonly selection: LegacyGenerationSelectionOptions;
+  readonly hazard?: LegacyMazeGenerationHazardJob;
 }
 
 export type LegacyMazeGenerationJobRequest = { readonly id: number; readonly input: LegacyMazeGenerationJobInput };
 export type LegacyMazeGenerationJobResponse =
-  | { readonly id: number; readonly maze: LegacyMazeSnapshot }
+  | { readonly id: number; readonly maze: LegacyMazeSnapshot; readonly hazardOverlay?: LegacyHazardOverlayResult | null }
   | { readonly id: number; readonly error: string };
 
 export const runLegacyMazeGenerationJob = (input: LegacyMazeGenerationJobInput): LegacyMazeSnapshot => (
@@ -57,6 +72,65 @@ export const runLegacyMazeGenerationJob = (input: LegacyMazeGenerationJobInput):
   )
 );
 
+/**
+ * What the worker posts back: the maze, plus the hazard overlay only when the job asked for one
+ * (so the flag-off response is exactly `{ id, maze }` as before).
+ */
+export const runLegacyMazeGenerationJobResponse = (
+  id: number,
+  input: LegacyMazeGenerationJobInput
+): LegacyMazeGenerationJobResponse => {
+  const maze = runLegacyMazeGenerationJob(input);
+  if (input.hazard?.enabled !== true) {
+    return { id, maze };
+  }
+  return {
+    id,
+    maze,
+    hazardOverlay: resolveLegacyHazardOverlay(maze, {
+      enabled: true,
+      level: input.hazard.level,
+      exposureStage: input.hazard.exposureStage
+    })
+  };
+};
+
+interface ParkedHazardOverlay {
+  readonly level: number;
+  readonly exposureStage: number | undefined;
+  readonly overlay: LegacyHazardOverlayResult | null;
+}
+
+// Worker-built overlays travel next to the maze, never inside it: the snapshot stays hazard-free
+// (tests/reset/legacy-hazard-handoff.test.ts). Keyed by the maze object, so a maze that is dropped
+// takes its overlay with it.
+const parkedHazardOverlays = new WeakMap<LegacyMazeSnapshot, ParkedHazardOverlay>();
+
+export const parkLegacyMazeHazardOverlay = (
+  maze: LegacyMazeSnapshot,
+  hazard: LegacyMazeGenerationHazardJob,
+  overlay: LegacyHazardOverlayResult | null
+): void => {
+  parkedHazardOverlays.set(maze, { level: hazard.level, exposureStage: hazard.exposureStage, overlay });
+};
+
+/**
+ * The overlay the worker built for exactly this maze, level and exposure stage (taken once), or
+ * undefined when there is none and the caller must compute it on the main thread.
+ */
+export const takeLegacyMazeHazardOverlay = (
+  maze: LegacyMazeSnapshot,
+  level: number,
+  exposureStage?: number
+): LegacyHazardOverlayResult | null | undefined => {
+  const parked = parkedHazardOverlays.get(maze);
+  if (parked === undefined) {
+    return undefined;
+  }
+  parkedHazardOverlays.delete(maze);
+  return parked.level === level && parked.exposureStage === exposureStage ? parked.overlay : undefined;
+};
+
 export const createLegacyMazeGenerationJobInput = (input: {
   aspectRatio?: number;
   mode: LegacyGenerationMode;
@@ -64,13 +138,15 @@ export const createLegacyMazeGenerationJobInput = (input: {
   scale: number;
   seed: number;
   selection?: LegacyGenerationSelectionOptions;
+  hazard?: LegacyMazeGenerationHazardJob;
 }): LegacyMazeGenerationJobInput => ({
   aspectRatio: input.aspectRatio ?? 1,
   mode: input.mode,
   profile: normalizeLegacyMazeGenerationProfile(input.profile),
   scale: input.scale,
   seed: input.seed,
-  selection: input.selection ?? {}
+  selection: input.selection ?? {},
+  ...(input.hazard ? { hazard: input.hazard } : {})
 });
 
 /**
@@ -79,7 +155,8 @@ export const createLegacyMazeGenerationJobInput = (input: {
  */
 export const createLegacyMazeGenerationJobInputFromRequest = (
   request: LegacyGenerationRequest,
-  scale: number
+  scale: number,
+  hazard?: LegacyMazeGenerationHazardJob
 ): LegacyMazeGenerationJobInput => createLegacyMazeGenerationJobInput({
   aspectRatio: request.aspectRatio,
   mode: request.mode,
@@ -90,7 +167,8 @@ export const createLegacyMazeGenerationJobInputFromRequest = (
     candidateCount: request.selectionCandidateCount,
     targetComplexity: request.targetComplexity,
     tolerance: request.selectionTolerance
-  }
+  },
+  hazard
 });
 
 /** Everything that decides the maze EXCEPT the seed (so a seed can be chosen early and compared late). */
@@ -100,7 +178,9 @@ export const resolveLegacyMazeGenerationJobKey = (input: LegacyMazeGenerationJob
     mode: input.mode,
     profile: input.profile,
     scale: input.scale,
-    selection: input.selection
+    selection: input.selection,
+    // Only present with the hazard layer on, so the default-build key is unchanged.
+    ...(input.hazard ? { hazard: input.hazard } : {})
   })
 );
 
@@ -275,6 +355,9 @@ export class LegacyMazeWorkerHost {
     if ('maze' in response) {
       build.maze = response.maze;
       build.status = 'ready';
+      if (build.input.hazard && response.hazardOverlay !== undefined) {
+        parkLegacyMazeHazardOverlay(response.maze, build.input.hazard, response.hazardOverlay);
+      }
     } else {
       build.status = 'failed';
     }

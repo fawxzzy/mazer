@@ -117,6 +117,21 @@ export interface MazeCycleTelemetryReceipt {
   controlMode: LegacyControlMode;
   averageFrameMs: number;
   completedAt: string;
+  /**
+   * Slice H3, hazard layer on only (absent otherwise, so default-build receipts are unchanged):
+   * the hazard schedule version, overlay digest and exposure stage of the level that was played.
+   * Client-only fields in the receipt jsonb; no server column reads them.
+   */
+  hazardScheduleVersion?: number;
+  hazardDigest?: string;
+  exposureStage?: number;
+}
+
+/** The hazard overlay stamp a play completion carries with the hazard layer on (slice H3). */
+export interface MazeCycleHazardReceiptFields {
+  readonly hazardScheduleVersion: number;
+  readonly hazardDigest: string;
+  readonly exposureStage: number;
 }
 
 export interface MazeCycleTelemetryHistory {
@@ -138,6 +153,8 @@ export interface MazeCycleTelemetryRecordInput {
   surface: MazeCycleTelemetrySurface;
   backtracks?: number;
   wrongTurns?: number;
+  /** Slice H3: present only for a play completion with the hazard layer on. */
+  hazard?: MazeCycleHazardReceiptFields | null;
 }
 
 export type MazeCycleTelemetryDiagnosticReceipt = Omit<MazeCycleTelemetryReceipt, 'playerPath'> & {
@@ -442,6 +459,22 @@ export const createEmptyMazeCycleTelemetryHistory = (): MazeCycleTelemetryHistor
   receipts: []
 });
 
+// All three hazard fields or none (slice H3); a malformed stamp is dropped, never half-kept.
+export const resolveMazeCycleHazardReceiptFields = (value: unknown): Partial<MazeCycleHazardReceiptFields> => {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const { hazardScheduleVersion, hazardDigest, exposureStage } = value;
+  if (
+    typeof hazardScheduleVersion !== 'number' || !Number.isInteger(hazardScheduleVersion) || hazardScheduleVersion < 1
+    || typeof hazardDigest !== 'string' || hazardDigest.length === 0 || hazardDigest.length > 128
+    || typeof exposureStage !== 'number' || !Number.isInteger(exposureStage) || exposureStage < 0
+  ) {
+    return {};
+  }
+  return { hazardScheduleVersion, hazardDigest, exposureStage };
+};
+
 const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
   if (!isRecord(value)) {
     return null;
@@ -489,7 +522,8 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
     resetUsed: value.resetUsed === true,
     controlMode,
     averageFrameMs: normalizeNonNegativeNumber(value.averageFrameMs),
-    completedAt: value.completedAt
+    completedAt: value.completedAt,
+    ...resolveMazeCycleHazardReceiptFields(value)
   };
 };
 
@@ -660,7 +694,8 @@ export const createMazeCycleTelemetryReceipt = (
     resetUsed: input.resetUsed,
     controlMode: input.controlMode,
     averageFrameMs,
-    completedAt
+    completedAt,
+    ...resolveMazeCycleHazardReceiptFields(input.hazard)
   };
 };
 

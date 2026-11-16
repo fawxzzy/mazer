@@ -7,11 +7,12 @@
 //
 // The caller passes `enabled` from the hazard layer switch. This module does not
 // read the switch itself: a Web Worker cannot read the page query string or
-// localStorage (the GEN-020 staircase trap, legacyMazeWorkerClient.ts), so when
-// slice H3 runs the overlay inside the maze worker the resolved boolean travels
-// in the job message.
+// localStorage (the GEN-020 staircase trap, legacyMazeWorkerClient.ts), so the
+// maze worker receives the resolved boolean in the job message.
 //
-// Not imported by any scene or runtime module yet (slice H3 wires it).
+// Slice H3 wiring: the maze worker job (legacyMazeGenerationJob.ts) runs it after
+// generation when the job carries `hazard`, and the Pulse Gate controller
+// (legacyHazardGateController.ts) runs it on the main thread as the fallback.
 import {
   computeHazardOverlay,
   type HazardOverlayResult
@@ -19,6 +20,8 @@ import {
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from './legacyGeometryBudget';
 import { createLegacyMazeHazardGraph } from './legacyHazardGraphAdapter';
 import type { LegacyMazeSnapshot } from './legacyMaze';
+
+export type LegacyHazardOverlayResult = HazardOverlayResult;
 
 export type LegacyHazardOverlaySource = Pick<LegacyMazeSnapshot, 'grid' | 'start' | 'goal' | 'seed'>;
 
