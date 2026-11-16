@@ -244,3 +244,7 @@ Order rationale:
 ## Update 2026-11-15, slice H1
 
 The dormant literal switch was replaced by `resolveHazardLayerEnabled()` (`src/legacy-runtime/legacyHazardLayerFlag.ts`): build constant `HAZARD_LAYER_BUILD_DEFAULT` (false) plus the lab switch `?lab=hazards` (remembered in localStorage, `?lab=off` clears it, a "LAB" chip shows while it is on). The lab level jump `?lab=hazards&level=N` runs through the Level Preview sandbox and never submits progress. With the layer on, H1 runs only the world clock over an empty hazard schedule; nothing is drawn and generation is byte-identical (golden hash corpus run with the flag off and on). Everything else in this contract is unchanged.
+
+## Update 2026-11-15, slice H2
+
+The generation overlay is built as specified in the H2 row, behind the hazard layer switch and not yet called by any scene or worker: `computeHazardOverlay` (`src/mazer-core/hazards/overlay.ts`), the manifest v1 allocator (`schedule.ts`) and the legacy entry point `resolveLegacyHazardOverlay` (`src/legacy-runtime/legacyHazardOverlay.ts`). Measured overlay time and the decisions taken are in `docs/architecture/MAZER-HAZARD-PLACEMENT-AND-LOADOUT.md` (Update, slice H2) and `docs/playbook-notes/2026-11-15-mazer-h2-hazard-overlay.md`. `resolveLegacyHazardHandoff` is unchanged; it is retired when H3 wires the overlay. Nothing else in this contract changes.
