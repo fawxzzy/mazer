@@ -491,6 +491,10 @@ import {
   checkLegacyUsernameAvailable,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
+  createLegacyRevokedSessionSnapshot,
+  dropRevokedLegacyAuthSession,
+  isLegacyRuntimeDiagnosticsAuthFixtureSnapshot,
+  probeLegacyAuthSessionWithProvider,
   readLegacyAccountUsername,
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentityState,
@@ -505,6 +509,10 @@ import {
   MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS,
   runMazerHostSignOutInBrowser
 } from '../legacy-runtime/legacyHostSignOut';
+import {
+  installLegacyAuthRecheckInBrowser,
+  type LegacyAuthRecheckBrowserBinding
+} from '../legacy-runtime/legacyAuthRecheck';
 import { LEGACY_AUTH_FAILURE_CODES } from '../legacy-runtime/legacyAuthFailureCodes';
 import { resolveLegacyAuthFeedbackExpiresAtMs } from '../legacy-runtime/legacyAuthFeedbackLifetime';
 import {
@@ -1798,6 +1806,8 @@ export class MenuScene extends Phaser.Scene {
   // Top of the message toast while the editor is open: just under the card, so it never covers Save/Cancel.
   private leaderboardUsernameEditorToastTop: number | null = null;
   private authUnsubscribe: (() => void) | null = null;
+  // Provider recheck on boot and on resume (legacyAuthRecheck.ts); null for fixtures, previews and after shutdown.
+  private authRecheck: LegacyAuthRecheckBrowserBinding | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
   private maze!: LegacyMazeSnapshot;
@@ -2645,6 +2655,8 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
+      this.authRecheck?.dispose();
+      this.authRecheck = null;
       this.presence.stop();
       this.destroyAccountUsernameNativeInput();
       this.detachRuntimeDiagnostics();
@@ -6909,6 +6921,8 @@ export class MenuScene extends Phaser.Scene {
       this.revokeLegacyGuestPlayGrant();
     }
     this.mode = 'menu';
+    // A provider recheck that came due during the run runs now (never mid-run).
+    this.authRecheck?.notifySafePoint();
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
     this.overlay = 'none';
@@ -14462,6 +14476,28 @@ export class MenuScene extends Phaser.Scene {
 
     const snapshot = await readLegacyAuthSessionSnapshot();
     this.applyLegacyAuthSnapshot(snapshot);
+    this.installLegacyAuthRecheck();
+  }
+
+  // "Sign out everywhere" on the account portal: ask the provider at boot and on resume (legacyAuthRecheck.ts).
+  private installLegacyAuthRecheck(): void {
+    if (this.sys.settings.status >= Phaser.Scenes.SHUTDOWN || this.authRecheck !== null) {
+      return;
+    }
+    this.authRecheck = installLegacyAuthRecheckInBrowser<LegacyAuthSessionSnapshot>({
+      drop: dropRevokedLegacyAuthSession,
+      isAuthenticated: () => this.authSnapshot.status === 'authenticated'
+        && !isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(this.authSnapshot),
+      isSafePoint: () => this.mode === 'menu',
+      onSignedOut: (snapshot) => {
+        if (this.sys.settings.status < Phaser.Scenes.SHUTDOWN) {
+          this.applyLegacyAuthSnapshot(snapshot);
+        }
+      },
+      probe: probeLegacyAuthSessionWithProvider,
+      signedOutSnapshot: () => createLegacyRevokedSessionSnapshot()
+    });
+    this.authRecheck?.request('boot');
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {
