@@ -124,19 +124,20 @@ describe('guide copy only names things that exist', () => {
     expect(MENU_SCENE).not.toContain('createOverlayClosePill');
   });
 
-  test('Start row: Chip draws the start end marker (a play arrow straight on the tile, pointing the way you set off) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
+  test('Start row: Chip draws the start end marker (a gold spiral that turns slowly in step with the end star, MAZER-VIS-053) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
-    expect(row('start').text).toMatch(/arrow on the first tile points the way you set off/);
+    expect(row('start').text).toMatch(/spiral on the first tile is where you set off/);
     expect(row('start').text).not.toMatch(/ring|tile pad|tinted/i);
     expect(row('start').text).not.toMatch(/bracket/i);
     expect(row('start').icon.chipDraw?.marker).toBe('start');
     expect(row('start').icon.boardDraw).toEqual({ module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' });
     expect(boardTileBake.drawBoardMarkers).toBeTypeOf('function');
-    // The start end marker is drawn by drawBoardMarkers' start branch: a play triangle on the tile, rotated to the first step.
-    expect(read('src/render/boardTileBake.ts')).toMatch(/spec\.play/);
-    expect(read('src/render/endpointTiles.ts')).toMatch(/startPlayHalfHeightOfRadius/);
-    expect(read('src/render/endpointTiles.ts')).toMatch(/direction/);
-    expect(read('src/render/boardTileBake.ts')).not.toMatch(/startArm/);
+    // The start end marker is drawn by drawBoardMarkers' start branch: a two-arm spiral, turned by the same clock as the star.
+    expect(read('src/render/boardTileBake.ts')).toMatch(/spec.spiral/);
+    expect(read('src/render/boardTileBake.ts')).toMatch(/resolveStartSpiralArm/);
+    expect(read('src/render/endpointTiles.ts')).toMatch(/startSpiralOuterOfRadius/);
+    expect(read('src/render/endpointSpiral.ts')).toMatch(/GOAL_STAR_SPIN/);
+    expect(read('src/render/boardTileBake.ts')).not.toMatch(/spec.play|startArm/);
   });
 
   test('You: the player is a rounded green block in the Chip tile corner proportion, inside a ring of the same shape', () => {

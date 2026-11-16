@@ -12,8 +12,9 @@ import {
 } from '../../src/render/startDirection';
 
 /**
- * The start tile's play arrow points the way the player will first move, so it reads as the player emerging from it.
- * Derived from the maze: the first step of the real (wrap-aware) solution path, which for a start with one open side is
+ * The start tile's first-step direction. The start marker used to be a play arrow pointing along it; MAZER-VIS-053 replaced the
+ * arrow with a spiral that points nowhere, so the direction is still resolved and carried on the tile (and tested here) but
+ * no longer changes a pixel. Derived from the maze: the first step of the real (wrap-aware) solution path, which for a start with one open side is
  * that open side. Level 1 is the corridor: portrait = down, landscape = right.
  */
 const CORRIDOR_PROFILE: Partial<LegacyMazeGenerationProfile> = { layout: 'corridor' };
@@ -107,36 +108,23 @@ describe('Level 1 corridor: the arrow points the way the player walks', () => {
   });
 });
 
-describe('the marker geometry follows the direction', () => {
+describe('the start marker no longer depends on the direction (MAZER-VIS-053: a spiral points nowhere)', () => {
   const tile = { left: 100, top: 100, width: 40, height: 40, radii: [8, 8, 8, 8] as const, fill: { left: 101, top: 101, width: 38, height: 38 }, fillRadii: [7, 7, 7, 7] as const };
 
-  test.each(START_DIRECTIONS)('%s: the apex is on the %s side of the centre and the flat side is behind it', (direction) => {
+  test.each(START_DIRECTIONS)('%s: the same spiral, centred on the tile, and no triangle', (direction) => {
     const spec = resolveEndpointTile('start', { ...tile, direction }, 3);
-    const play = spec.play!;
-    expect(play.direction).toBe(direction);
-    const cx = 120; const cy = 120;
-    const along = (x: number, y: number): number => ({ right: x - cx, left: cx - x, down: y - cy, up: cy - y })[direction];
-    const across = (x: number, y: number): number => ({ right: y - cy, left: cy - y, down: cx - x, up: x - cx })[direction];
-    // apex ahead of the centre, the two base corners behind it and level with each other
-    expect(along(play.cx, play.cy)).toBeGreaterThan(0);
-    expect(along(play.ax, play.ay)).toBeLessThan(0);
-    expect(along(play.bx, play.by)).toBeCloseTo(along(play.ax, play.ay), 9);
-    expect(across(play.cx, play.cy)).toBeCloseTo(0, 9);
-    expect(across(play.ax, play.ay) + across(play.bx, play.by)).toBeCloseTo(0, 9);
-    // the same triangle in every direction: a pure rotation (side lengths are equal)
-    const right = resolveEndpointTile('start', { ...tile, direction: 'right' }, 3).play!;
-    const side = (p: typeof play): number[] => [
-      Math.hypot(p.ax - p.bx, p.ay - p.by), Math.hypot(p.bx - p.cx, p.by - p.cy), Math.hypot(p.cx - p.ax, p.cy - p.ay)
-    ];
-    side(play).forEach((len, i) => expect(len).toBeCloseTo(side(right)[i]!, 9));
+    expect(spec.spiral).not.toBeNull();
+    expect(spec.star).toBeNull();
+    expect(spec.spiral).toEqual(resolveEndpointTile('start', tile, 3).spiral);
+    expect(spec.spiral!.cx).toBeCloseTo(120, 0);
+    expect(spec.spiral!.cy).toBeCloseTo(120, 0);
+    expect('play' in spec).toBe(false);
   });
 
-  test('no direction given: the arrow points right (the Guide icon and the Trace-free standalone cell)', () => {
-    expect(resolveEndpointTile('start', tile, 3).play!.direction).toBe('right');
-  });
-
-  test('the goal ignores the direction', () => {
-    expect(resolveEndpointTile('goal', { ...tile, direction: 'down' }, 3).play).toBeNull();
+  test('the goal has a star and no spiral, whatever the direction', () => {
+    const goal = resolveEndpointTile('goal', { ...tile, direction: 'down' }, 3);
+    expect(goal.spiral).toBeNull();
+    expect(goal.star).not.toBeNull();
   });
 });
 
