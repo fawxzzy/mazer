@@ -35,3 +35,33 @@ describe('isFrontDoorTapAnywhereStart', () => {
     expect(isFrontDoorTapAnywhereStart({ x: -1, y: 5 }, [], viewport)).toBe(false);
   });
 });
+
+import { shouldFrontDoorTapAnywhereStartRun, type FrontDoorTapAnywhereContext } from '../../src/legacy-runtime/legacyFrontDoorHitZone';
+
+describe('shouldFrontDoorTapAnywhereStartRun gating', () => {
+  const ok: FrontDoorTapAnywhereContext = {
+    hasStartButton: true,
+    levelPreviewActive: false,
+    mode: 'menu',
+    objectsUnderPointer: 0,
+    otherButtonBounds: [{ left: 330, top: 10, width: 44, height: 44 }],
+    overlay: 'none',
+    playAccess: true,
+    point: { x: 100, y: 600 },
+    viewport: { width: 390, height: 844 }
+  };
+  it('starts on an empty-space tap', () => {
+    expect(shouldFrontDoorTapAnywhereStartRun(ok)).toBe(true);
+  });
+  it.each([
+    ['overlay open', { overlay: 'options' }],
+    ['level preview', { levelPreviewActive: true }],
+    ['no play access', { playAccess: false }],
+    ['play mode', { mode: 'play' }],
+    ['object under pointer', { objectsUnderPointer: 1 }],
+    ['no start button', { hasStartButton: false }],
+    ['inside another button margin', { point: { x: 320, y: 70 } }]
+  ])('does not start: %s', (_name, override) => {
+    expect(shouldFrontDoorTapAnywhereStartRun({ ...ok, ...override })).toBe(false);
+  });
+});

@@ -56,3 +56,26 @@ export const isFrontDoorTapAnywhereStart = (
     && point.y <= rect.top + rect.height + margin
   ));
 };
+
+export interface FrontDoorTapAnywhereContext {
+  hasStartButton: boolean;
+  levelPreviewActive: boolean;
+  mode: string;
+  objectsUnderPointer: number;
+  otherButtonBounds: ReadonlyArray<{ left: number; top: number; width: number; height: number }>;
+  overlay: string;
+  playAccess: boolean;
+  point: { x: number; y: number };
+  viewport: { height: number; width: number };
+}
+
+/** Full gate for the tap-anywhere start (MenuScene.handleFrontDoorTapAnywhere delegates here). */
+export const shouldFrontDoorTapAnywhereStartRun = (ctx: FrontDoorTapAnywhereContext): boolean => (
+  ctx.mode === 'menu'
+  && ctx.overlay === 'none'
+  && ctx.objectsUnderPointer <= 0
+  && !ctx.levelPreviewActive
+  && ctx.playAccess
+  && ctx.hasStartButton
+  && isFrontDoorTapAnywhereStart(ctx.point, ctx.otherButtonBounds, ctx.viewport)
+);

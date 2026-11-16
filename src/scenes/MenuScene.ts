@@ -320,7 +320,7 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { LEGACY_HEADER_ICON_GLYPH_SCALE, resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
-import { isFrontDoorTapAnywhereStart, resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
+import { resolveLegacyFrontDoorHitZone, shouldFrontDoorTapAnywhereStartRun } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
   resolveLegacyTapRecoveryTarget,
   shouldRecoverLegacyTapAfterUiRebuild
@@ -4915,22 +4915,18 @@ export class MenuScene extends Phaser.Scene {
 
   // Tap anywhere on the front door starts a run, except within a margin of any other UI button.
   private handleFrontDoorTapAnywhere(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean {
-    if (
-      this.mode !== 'menu'
-      || this.overlay !== 'none'
-      || objectsUnderPointer > 0
-      || this.levelPreviewLevel !== null
-      || !this.hasLegacyPlayAccess()
-    ) {
-      return false;
-    }
     const start = this.uiButtons.find((button) => button.semanticAction === 'Start');
-    if (!start) {
-      return false;
-    }
-    const point = this.resolveLegacyInputPointerPoint(pointer);
-    const others = this.uiButtons.filter((button) => button !== start).map((button) => button.bounds);
-    if (!isFrontDoorTapAnywhereStart(point, others, this.layout)) {
+    if (!shouldFrontDoorTapAnywhereStartRun({
+      hasStartButton: start !== undefined,
+      levelPreviewActive: this.levelPreviewLevel !== null,
+      mode: this.mode,
+      objectsUnderPointer,
+      otherButtonBounds: this.uiButtons.filter((button) => button !== start).map((button) => button.bounds),
+      overlay: this.overlay,
+      playAccess: this.mode === 'menu' && this.hasLegacyPlayAccess(),
+      point: this.resolveLegacyInputPointerPoint(pointer),
+      viewport: this.layout
+    })) {
       return false;
     }
     this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
@@ -14693,7 +14689,7 @@ export class MenuScene extends Phaser.Scene {
     this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
 
     if (result.progressionState) {
-      this.progressionState = result.progressionState;
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(result.progressionState);
     }
     if (result.remoteSyncResult) {
       this.publishLegacyRemoteSyncResult(result.remoteSyncResult);
@@ -14739,10 +14735,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (bootstrapped.progressionState) {
-      this.progressionState = writeLegacyProgressionState(
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(writeLegacyProgressionState(
         this.resolveLegacyProgressionStorage(),
         bootstrapped.progressionState
-      );
+      ));
     }
     if (bootstrapped.settings) {
       this.settings = bootstrapped.settings;
