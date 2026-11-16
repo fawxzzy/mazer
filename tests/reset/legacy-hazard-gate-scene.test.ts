@@ -72,6 +72,7 @@ const createScene = (options: { layerOn?: boolean } = {}) => {
     resolveLegacyPlayerVisualMoveDurationMs: () => 0,
     appendLegacyPlayCyclePoint: () => undefined,
     recordMazeCycleCompletion: count('completion'),
+    noteHazardMomentsLevelCleared: () => undefined,
     armLegacyPlayerTransferEnergy: () => undefined,
     precomputeLegacyDeconstructResetMaze: () => undefined,
     schedulePlayResetReturn: count('resetReturn'),
@@ -267,5 +268,15 @@ describe('H1 review follow-ups', () => {
     expect(scene.playHeldTouchRepeatDueAtMs).toBeNull();
     expect(scene.playHeldTouchMoves).toEqual([]);
     expect(repeats).toBe(0);
+  });
+  test('play builds use the H6 onboarding exposure stage (cards and maze agree); menu and flag off do not', () => {
+    const { scene } = createScene();
+    const asked: unknown[] = [];
+    Object.assign(scene, { resolveHazardOnboarding: () => ({ exposureStageFor: (level: unknown) => { asked.push(level); return 2; } }) });
+    expect(call(scene, 'resolveLegacyHazardExposureStage', 'play', 12)).toBe(2);
+    expect(call(scene, 'resolveLegacyHazardExposureStage', 'menu', 12)).toBeUndefined();
+    expect(asked).toEqual([12]);
+    const off = createScene({ layerOn: false }).scene;
+    expect(call(off, 'resolveLegacyHazardJob', 'play')).toBeUndefined();
   });
 });

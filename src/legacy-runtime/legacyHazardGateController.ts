@@ -27,9 +27,6 @@ import { resolveLegacyNavigationTarget, type LegacyMazeSnapshot, type LegacyPoin
 /** More than the readability cap (6 gates per board); extra gates are ignored, never overflow. */
 export const LEGACY_HAZARD_GATE_CAPACITY = 16;
 
-/** One line, player-facing. H6 owns the full skippable intro card (HAZ-008); H3 shows this once. */
-export const LEGACY_PULSE_GATE_INTRO_COPY = 'Pulse Gate: the magenta fence opens and closes. Wait for it to open, then go.';
-
 /** Move order shared with the hazard graph (HAZARD_MOVE_ORDER: up, left, down, right). */
 const STEP_DELTAS: readonly (readonly [number, number])[] = [[0, -1], [-1, 0], [0, 1], [1, 0]];
 
@@ -51,8 +48,6 @@ export interface LegacyHazardGateInstallOptions {
 
 export interface LegacyHazardGateInstallResult {
   readonly gateCount: number;
-  /** Player-facing intro line to show now, or null. */
-  readonly introCopy: string | null;
   readonly overlaySource: LegacyHazardGateOverlaySource;
 }
 
@@ -72,7 +67,6 @@ export interface LegacyHazardGateDiagnostics {
   readonly firstEncounter: string | null;
   readonly gateCount: number;
   readonly gates: readonly { readonly x: number; readonly y: number; readonly period: number; readonly openFrom: number; readonly openFor: number }[];
-  readonly introShown: boolean;
   readonly level: number | null;
   readonly mode: LegacyHazardGateMode | null;
   readonly overlaySource: LegacyHazardGateOverlaySource;
@@ -126,7 +120,6 @@ export class LegacyHazardGateController {
   private overlay: LegacyHazardOverlayResult | null = null;
   private source: LegacyHazardGateOverlaySource = 'none';
   private receipt: LegacyHazardReceiptFields | null = null;
-  private introShown = false;
   private blocks = 0;
   private ejectCount = 0;
   private installVersion = 0;
@@ -162,7 +155,7 @@ export class LegacyHazardGateController {
     return this.height;
   }
 
-  /** Back to an empty board (no gates, no demo, no receipt fields). Keeps the intro-shown latch. */
+  /** Back to an empty board (no gates, no demo, no receipt fields). */
   clear(): void {
     this.installVersion += 1;
     this.count = 0;
@@ -183,7 +176,7 @@ export class LegacyHazardGateController {
   install(maze: LegacyMazeSnapshot, options: LegacyHazardGateInstallOptions): LegacyHazardGateInstallResult {
     this.clear();
     if (options.mode === 'menu' && (maze.source === 'menu-snapshot' || !hasLegacyPlayerMetPulseGates(options.playerLevel))) {
-      return { gateCount: 0, introCopy: null, overlaySource: 'none' };
+      return { gateCount: 0, overlaySource: 'none' };
     }
     const overlay = options.workerOverlay !== undefined
       ? options.workerOverlay
@@ -191,7 +184,7 @@ export class LegacyHazardGateController {
     this.source = overlay === null ? 'none' : (options.workerOverlay !== undefined ? 'worker' : 'main-thread');
     this.currentMode = options.mode;
     if (overlay === null) {
-      return { gateCount: 0, introCopy: null, overlaySource: this.source };
+      return { gateCount: 0, overlaySource: this.source };
     }
     this.overlay = overlay;
     if (options.mode === 'play') {
@@ -203,7 +196,7 @@ export class LegacyHazardGateController {
     }
     const witness = overlay.verdict?.witness ?? null;
     if (options.mode === 'menu' && witness === null) {
-      return { gateCount: 0, introCopy: null, overlaySource: this.source };
+      return { gateCount: 0, overlaySource: this.source };
     }
     this.loadGates(maze, overlay);
     if (options.mode === 'menu' && this.count > 0 && witness !== null) {
@@ -211,12 +204,8 @@ export class LegacyHazardGateController {
     } else if (options.mode === 'menu') {
       this.count = 0;
     }
-    let introCopy: string | null = null;
-    if (options.mode === 'play' && this.count > 0 && overlay.allocation.firstEncounter === 'pulseGate' && !this.introShown) {
-      this.introShown = true;
-      introCopy = LEGACY_PULSE_GATE_INTRO_COPY;
-    }
-    return { gateCount: this.count, introCopy, overlaySource: this.source };
+    // The first-encounter intro card belongs to H6 onboarding (legacyHazardOnboarding.ts), not to this controller.
+    return { gateCount: this.count, overlaySource: this.source };
   }
 
   private loadGates(maze: LegacyMazeSnapshot, overlay: LegacyHazardOverlayResult): void {
@@ -398,7 +387,6 @@ export class LegacyHazardGateController {
       firstEncounter: this.overlay?.allocation.firstEncounter ?? null,
       gateCount: this.count,
       gates,
-      introShown: this.introShown,
       level: this.overlay?.level ?? null,
       mode: this.currentMode,
       overlaySource: this.source,

@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import {
-  LEGACY_PULSE_GATE_INTRO_COPY,
   createLegacyHazardGateController,
   hasLegacyPlayerMetPulseGates,
   parseLegacyHazardLevel,
@@ -122,22 +121,16 @@ describe('Pulse Gate controller (slice H3)', () => {
     expect(controller.ejects).toBe(3);
   });
 
-  test('receipt fields exist in play only, and the intro line shows once per controller', () => {
+  test('receipt fields exist in play only', () => {
     const { maze, overlay, level } = findGateFixture();
     const controller = createLegacyHazardGateController();
-    const first = controller.install(maze, { mode: 'play', level, playerLevel: level });
+    controller.install(maze, { mode: 'play', level, playerLevel: level });
     expect(controller.receiptFields()).toEqual({
       hazardScheduleVersion: overlay.scheduleVersion,
       hazardDigest: overlay.digest,
       exposureStage: overlay.exposureStage
     });
     expect(controller.receiptFields()).toBe(controller.receiptFields());
-    if (overlay.allocation.firstEncounter === 'pulseGate') {
-      expect(first.introCopy).toBe(LEGACY_PULSE_GATE_INTRO_COPY);
-    } else {
-      expect(first.introCopy).toBeNull();
-    }
-    expect(controller.install(maze, { mode: 'play', level, playerLevel: level }).introCopy).toBeNull();
     controller.install(maze, { mode: 'menu', level, playerLevel: 50 });
     expect(controller.receiptFields()).toBeNull();
     controller.clear();
@@ -151,7 +144,7 @@ describe('Pulse Gate controller (slice H3)', () => {
     const controller = createLegacyHazardGateController();
     expect(controller.install(maze, { mode: 'play', level, playerLevel: level, workerOverlay: overlay }).overlaySource).toBe('worker');
     expect(controller.gateCount).toBe(gateSpecs(overlay.specs).length);
-    expect(controller.install(maze, { mode: 'play', level, playerLevel: level, workerOverlay: null })).toEqual({ gateCount: 0, introCopy: null, overlaySource: 'none' });
+    expect(controller.install(maze, { mode: 'play', level, playerLevel: level, workerOverlay: null })).toEqual({ gateCount: 0, overlaySource: 'none' });
     expect(controller.receiptFields()).toBeNull();
     const low = controller.install(maze, { mode: 'play', level: 3, playerLevel: 3 });
     expect(low.gateCount).toBe(0);
@@ -166,7 +159,6 @@ describe('Pulse Gate controller (slice H3)', () => {
     expect(controller.install({ ...maze, source: 'menu-snapshot' } as typeof maze, { mode: 'menu', level, playerLevel: 50 }).gateCount).toBe(0);
     const result = controller.install(maze, { mode: 'menu', level, playerLevel: 50 });
     expect(result.gateCount).toBeGreaterThan(0);
-    expect(result.introCopy).toBeNull();
     expect(controller.demoReplayActive).toBe(true);
     expect(controller.demoLength).toBe(witness.cells.length);
     expect(controller.demoTick).toBe(witness.startTick);

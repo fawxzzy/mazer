@@ -7325,7 +7325,14 @@ export class MenuScene extends Phaser.Scene {
     if (!this.hazardGates) {
       return undefined;
     }
-    return { enabled: true, level: parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, mode).level) };
+    const level = parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, mode).level);
+    const exposureStage = this.resolveLegacyHazardExposureStage(mode, level);
+    return exposureStage === undefined ? { enabled: true, level } : { enabled: true, level, exposureStage };
+  }
+
+  // Play builds use the H6 onboarding stage so the intro cards and the maze agree; the menu demo keeps the default.
+  private resolveLegacyHazardExposureStage(mode: LegacyGenerationMode, level: number): number | undefined {
+    return mode === 'play' ? this.resolveHazardOnboarding()?.exposureStageFor(level) : undefined;
   }
 
   // A new maze is live: load its Pulse Gates (the worker's overlay when it built one, else computed here).
@@ -7335,21 +7342,14 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     const level = parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, this.mode).level);
-    const result = gates.install(this.maze, {
+    const exposureStage = this.resolveLegacyHazardExposureStage(this.mode, level);
+    gates.install(this.maze, {
       mode: this.mode === 'play' ? 'play' : 'menu',
       level,
+      exposureStage,
       playerLevel: parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, 'play').level),
-      workerOverlay: takeLegacyMazeHazardOverlay(this.maze, level)
+      workerOverlay: takeLegacyMazeHazardOverlay(this.maze, level, exposureStage)
     });
-    if (result.introCopy !== null) {
-      this.pushLegacyPlayerMessage(createLegacyPlayerMessage({
-        copy: result.introCopy,
-        durationMs: 5200,
-        id: 'pulse-gate-intro',
-        source: 'progression',
-        tone: 'info'
-      }));
-    }
   }
 
   private createLegacyHazardGateCanvas(): void {
