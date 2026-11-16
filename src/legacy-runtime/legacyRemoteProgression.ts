@@ -50,6 +50,7 @@ import {
   MAZE_CYCLE_TELEMETRY_STORAGE_KEY,
   MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT,
   readMazeCycleTelemetryHistory,
+  resolveMazeCycleHazardReceiptFields,
   scoreMazeCycleAiDecisionSummary,
   type MazeCycleTelemetryReceipt
 } from './mazeCycleTelemetry';
@@ -780,7 +781,9 @@ export const hydrateLegacyRemoteAccountState = async (
   };
 };
 
-const createRemoteCycleReceiptPayload = (
+// Exported for the slice H3 receipt test. The hazard stamp rides in the receipt jsonb only when the
+// local receipt has it (hazard layer on); no server column or RPC parameter reads it.
+export const createRemoteCycleReceiptPayload = (
   receipt: MazeCycleTelemetryReceipt
 ): Record<string, unknown> => {
   const previewStart = Math.max(0, receipt.playerPath.length - MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT);
@@ -812,7 +815,8 @@ const createRemoteCycleReceiptPayload = (
     shortestViablePathLength: receipt.shortestViablePathLength,
     start: receipt.start,
     surface: receipt.surface,
-    wrongTurns: receipt.wrongTurns
+    wrongTurns: receipt.wrongTurns,
+    ...resolveMazeCycleHazardReceiptFields(receipt)
   };
 };
 

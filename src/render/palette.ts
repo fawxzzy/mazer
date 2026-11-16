@@ -845,3 +845,6 @@ export const MIDNIGHT_RAINBOW_STOPS = [
   0xf28d4c,
   0x23b4ad
 ] as const;
+
+/** HAZ-004 slice H3: Pulse Gate identity magenta (src/render/hazardGateLayer.ts). Floor contrast comes from its keyline. */
+export const HAZARD_GATE_MAGENTA = 0xff4fd8;
