@@ -74,3 +74,7 @@ play to running. Timed mode remains disabled. Future enemy, projectile, item,
 duration, and collision handlers remain unintegrated. Those integrations must
 be incremental and preserve existing movement, completion, progression, and
 telemetry behavior.
+
+## Amendment pointer (2026-11-15)
+
+The signed hazard product contract (`docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md`, section 2.1) makes the world clock real time on the player's step clock: one tick per `repeatIntervalMs`, started by the first input of the level and stopped on pause, overlay, `visibilitychange` and blur with no catch-up. That enters through the `timed-mode-tick` capability above in slice H1 of its roadmap; until then timed mode stays disabled, the phase table above stays exact, and no deferred phase is wired.

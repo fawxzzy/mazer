@@ -74,7 +74,7 @@ describe('trail contrast against the real Chip floor (chip fill, lit rim, gap)',
   });
 
   test('every iridescent resting hue (stops and every in-between colour) clears 4.5:1 against its underlay on every floor', () => {
-    expect(IRIDESCENT_TRAIL_CORE_STOPS.length).toBe(6);
+    expect(IRIDESCENT_TRAIL_CORE_STOPS.length).toBe(12);
     for (const sample of restingSamples()) {
       for (const [name, floor] of floors) {
         expect(trailCoreContrast(sample, floor, 1), `0x${sample.toString(16)} on ${name}`).toBeGreaterThanOrEqual(4.5);
@@ -193,9 +193,15 @@ describe('goal end marker (Chip): a star on the tile, at every size', () => {
   test('same artwork on every size: only the scale changes (colours and order of the calls are the same)', () => {
     const shape = (calls: Recorded[]): string => calls.map((c) => c.op).join(',');
     const fills = (calls: Recorded[]): unknown[] => calls.filter((c) => c.op === 'fillStyle').map((c) => c.args[0]);
-    expect(shape(drawGoal(6.45))).toBe(shape(drawGoal(40)));
-    expect(fills(drawGoal(6.45))).toEqual(fills(drawGoal(40)));
-    expect(fills(drawGoal(6.45))).toContain(boardMaterial.goal);
+    // From a usable tile size up the artwork is one call sequence (keyline, shared-colour border, red star).
+    expect(shape(drawGoal(14.72))).toBe(shape(drawGoal(40)));
+    expect(fills(drawGoal(14.72))).toEqual(fills(drawGoal(40)));
+    // At the physical floor (a 6 css px tile at DPR 2) the border layer is dropped so the star stays a readable red star
+    // (MAZER-VIS-053): the keyline and the red are the same and in the same order, only the middle layer is missing.
+    const tiny = fills(drawGoal(6.45));
+    expect(tiny).toEqual(fills(drawGoal(40)).filter((color) => color === boardMaterial.void || color === boardMaterial.goal));
+    expect(tiny).toContain(boardMaterial.goal);
+    expect(fills(drawGoal(40))).toContain(boardMaterial.goal);
   });
 
   test('the Trace style (the alternate) keeps its css-px floors, as before', () => {

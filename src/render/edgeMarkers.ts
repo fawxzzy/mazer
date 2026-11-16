@@ -71,7 +71,7 @@
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
 import { resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
-import { PLAYER_COLOR, resolveTrailPaletteBorderColor } from './trailPalette';
+import { PLAYER_COLOR, resolveSharedBorderColor, resolveTrailPaletteBorderColor } from './trailPalette';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
   EDGE_BEAM_FLIGHT_MS,
@@ -594,10 +594,11 @@ const clampUnit = (value: number): number => (
 
 export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyArray<EdgeMarkerState> => {
   const idleAlpha = resolveEdgeMarkerIdleAlpha(input.timeMs, input.reducedMotion);
-  const borderColor = resolveTrailPaletteBorderColor(
-    Number.isFinite(input.trailHeadDistanceTiles) ? (input.trailHeadDistanceTiles ?? 0) : 0,
-    Number.isFinite(input.trailTimeMs) ? (input.trailTimeMs ?? input.timeMs) : input.timeMs,
-    input.reducedMotion || input.trailAnimated === false
+  // The shared border colour (trailPalette.ts): the end star's border calls the same function (MAZER-VIS-053).
+  const borderColor = resolveSharedBorderColor(
+    { distanceTiles: input.trailHeadDistanceTiles, timeMs: input.trailTimeMs, animated: input.trailAnimated },
+    input.timeMs,
+    input.reducedMotion
   );
   const flashProgress = !input.reducedMotion && input.flash
     ? Math.max(0, Math.min(1, (input.timeMs - input.flash.startedAtMs) / EDGE_MARKER_FLASH_MS))

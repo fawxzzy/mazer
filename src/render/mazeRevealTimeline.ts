@@ -40,7 +40,7 @@
  * The strict 0/1 `bleedProgress` switch of `introTimeline.ts` is NOT changed: it still drives the edge-path
  * logic (trail, bleed glow); only the baked board's own extent (cells and docks) follows the timeline here.
  *
- * Reduced motion: no front at all (`resolveMazeRevealFrame` returns null); the 200 ms crossfade of
+ * Reduced motion: no front at all (`resolveMazeRevealFrame` returns null); the former 200 ms crossfade of
  * `introTimeline.ts` is the whole effect. `introTimeline.ts` already computed its `boardAlpha` but nothing applied it:
  * the board used to cut in / out in one frame at that setting, so `resolveReducedBoardFade` now gives the board layer
  * that crossfade (one Image alpha, no recompose).
@@ -50,8 +50,6 @@
 import {
   INTRO_BUILD_START_MS,
   INTRO_LASER_MS,
-  INTRO_REDUCED_MOTION_MS,
-  OUTRO_REDUCED_MOTION_MS,
   OUTRO_TILES_START_MS,
   resolveIntroRevealEndMs,
   resolveIntroRevealMs,
@@ -237,23 +235,13 @@ export const resolveMazeRevealFrame = (
 };
 
 /**
- * Reduced motion only: the alpha of the whole board layer during the 200 ms crossfade (build: 0 to 1, deconstruct:
- * 1 to 0), or null when there is no crossfade (full motion, or it has finished and the hard state applies).
+ * Reduced motion (MOTION-020): the board has NO crossfade. Reduced motion never changes colour and stops movement,
+ * so the maze appears on the first build frame and disappears on the first tear-down frame (the hard tile state
+ * from the intro timeline). Always null; kept so the driver and scene call sites stay a single path.
  */
 export const resolveReducedBoardFade = (
-  direction: MazeRevealDirection,
-  elapsedMs: number,
-  tileCount: number,
-  reducedMotion: boolean
-): number | null => {
-  if (!reducedMotion || normalizeCount(tileCount) <= 0) {
-    return null;
-  }
-  const elapsed = normalizeElapsed(elapsedMs);
-  const length = direction === 'build' ? INTRO_REDUCED_MOTION_MS : OUTRO_REDUCED_MOTION_MS;
-  if (elapsed >= length) {
-    return null;
-  }
-  const progress = clamp01(elapsed / length);
-  return direction === 'build' ? progress : 1 - progress;
-};
+  _direction: MazeRevealDirection,
+  _elapsedMs: number,
+  _tileCount: number,
+  _reducedMotion: boolean
+): number | null => null;

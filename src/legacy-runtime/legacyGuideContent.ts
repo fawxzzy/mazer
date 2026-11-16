@@ -119,7 +119,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'start',
-    text: 'An arrow on the first tile points the way you set off.'
+    text: 'The spiral on the first tile is where you set off.'
   },
   {
     heading: 'You',

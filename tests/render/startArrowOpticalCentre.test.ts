@@ -13,13 +13,14 @@ import {
 import { boardMaterial } from '../../src/render/boardTileStyle';
 import { dilatedTriangleCentroid, resolveEndpointCentre, tileCentre } from '../../src/render/endpointOpticalCentre';
 import { resolveEndpointTile } from '../../src/render/endpointTiles';
-import type { StartDirection } from '../../src/render/startDirection';
+import { START_SPIRAL } from '../../src/render/endpointSpiral';
 import { RasterContext, type Rgba } from './support/rasterContext';
 
 /**
- * MAZER-VIS-036: the START arrow's optical centre (the centroid of its painted pixels, glyph and keyline together) sits
- * on the tile's painted-interior centre, within 0.5 device px, on every tile shape and in every direction the arrow can
- * point (an open side), at DPR 1 / 2 / 2.625 / 3 and the live tile sizes. Same method as endpointOpticalCentre.test.ts
+ * MAZER-VIS-036 (start arrow) and MAZER-VIS-053 (it became a spiral; the file keeps its name): the START marker's optical
+ * centre (the centroid of its painted pixels, glyph and keyline together) sits on the tile's painted-interior centre,
+ * within 0.5 device px, on every tile shape and at every angle the spiral turns through, at DPR 1 / 2 / 2.625 / 3 and
+ * the live tile sizes. Same method as endpointOpticalCentre.test.ts
  * (the real bake + marker draw rasterised to pixels). These fail on the previous bounding-box centring, which left the
  * painted centroid 2 to 6 device px BEHIND the tile centre (a triangle's centroid is a sixth of its length behind its
  * bounding-box centre) and ignored the rim-inset asymmetry of corner and junction tiles.
@@ -41,7 +42,8 @@ const STRIPES = gridOf(['.#####.', '.#####.', '.#####.', '.#####.', '.#####.', '
 
 const TILE_SIZES = [9.95, 14.72, 15.6, 16.66, 25.44];
 const DPRS = [1, 2, 2.625, 3];
-const DIRECTIONS: readonly StartDirection[] = ['up', 'right', 'down', 'left'];
+/** Angles (radians) the spiral is rasterised at: rest, an odd one, a quarter turn, and most of a half turn. */
+const ROTATIONS: readonly number[] = [0, 0.7, Math.PI / 2, 2.9];
 
 const rgbOf = (color: number): Rgba => [(color >> 16) & 255, (color >> 8) & 255, color & 255, 255];
 const CHIP = rgbOf(boardMaterial.chip);
@@ -66,9 +68,8 @@ const shapes = (cells: boolean[][]): Map<string, BoardCell> => {
 const tileOf = (cells: boolean[][], cell: BoardCell, size = 14.72, dpr = 3): ChipTileGeometry => (
   computeChipTileAt(inputFor(cells, size, dpr, cell), cell)!
 );
-const OPEN_KEY = { up: 'u', down: 'd', left: 'l', right: 'r' } as const;
-/** Every direction the arrow can really point on this tile: toward an open side. */
-const openDirections = (t: ChipTileGeometry): StartDirection[] => DIRECTIONS.filter((d) => t.open[OPEN_KEY[d]]);
+/** The angles the spiral is checked at on this tile (the spiral points nowhere, so every tile shape gets every angle). */
+const openDirections = (_t: ChipTileGeometry): readonly number[] => ROTATIONS;
 const rimOf = (t: ChipTileGeometry): number => Math.max(
   t.fill.left - t.left,
   t.left + t.width - (t.fill.left + t.fill.width),
@@ -87,7 +88,7 @@ interface Measured {
 }
 
 const memo = new Map<string, Measured>();
-const measure = (cells: boolean[][], tileSize: number, dpr: number, cell: BoardCell, direction: StartDirection): Measured => {
+const measure = (cells: boolean[][], tileSize: number, dpr: number, cell: BoardCell, direction: number): Measured => {
   const key = `${cells.map((r) => r.map((c) => (c ? 1 : 0)).join('')).join('/')}|${tileSize}|${dpr}|${cell.x},${cell.y}|${direction}`;
   const hit = memo.get(key);
   if (hit) return hit;
@@ -96,13 +97,13 @@ const measure = (cells: boolean[][], tileSize: number, dpr: number, cell: BoardC
   const surface = new RasterContext(layout.pixelWidth, layout.pixelHeight);
   bakeBoardTiles(input, () => ({ canvas: surface, ctx: surface as unknown as TileBakeContext2D }));
   const base = surface.clone();
-  const tile = { ...computeChipTileAt(input, cell)!, direction };
+  const tile = computeChipTileAt(input, cell)!;
   const marked = base.clone();
   marked.paintStrokes = true;
   marked.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawBoardMarkers(marked, {
     style: 'chip', tileSize, devicePixelRatio: dpr, originX: layout.originX, originY: layout.originY,
-    start: cell, startTile: tile
+    start: cell, startTile: tile, startSpiralRotation: direction
   });
   let n = 0;
   let sx = 0;
@@ -191,25 +192,34 @@ describe('dilatedTriangleCentroid: the painted glyph centroid (pure)', () => {
   });
 });
 
-describe('the start arrow geometry (pure)', () => {
+describe('the start spiral geometry (pure)', () => {
   const straight = (): ChipTileGeometry => tileOf(MAZE, [...shapes(MAZE)].find(([k]) => k.startsWith('straight|lr'))![1]);
 
-  test('size and shape are unchanged: the same triangle as before, only placed differently', () => {
-    // 14.72 css px at DPR 3 (the live phone board): base and length pinned to what origin/main drew on this tile
-    const play = resolveEndpointTile('start', { ...straight(), direction: 'right' }, 3).play!;
-    expect(Math.hypot(play.bx - play.ax, play.by - play.ay)).toBeCloseTo(PINNED_BASE, 6);
-    expect(play.cx - play.ax).toBeCloseTo(PINNED_LENGTH, 6);
-    expect(play.stroke).toBeCloseTo(PINNED_STROKE, 6);
+  test('size: the spiral stays within the circle that circumscribes the old play triangle and shares the footprint of the star', () => {
+    // 14.72 css px at DPR 3 (the live phone board): the old triangle had half height 0.5 and length 0.95 of the half-tile
+    const t = straight();
+    const resolved = resolveEndpointTile('start', t, 3);
+    const spiral = resolved.spiral!;
+    const { radius } = resolved.frame;
+    // at most the circle that circumscribes the old play triangle (0.95 long, 0.5 half-height), less if the lit room is tighter
+    expect(spiral.outer).toBeLessThanOrEqual((Math.hypot(0.95 / 2, 0.5) * radius) + 1e-9);
+    expect(spiral.outer).toBeGreaterThan(radius * 0.4);
+    expect(spiral.inner).toBeCloseTo(spiral.outer * START_SPIRAL.innerShare, 9);
+    // the two end glyphs share one footprint: the star's tip radius is within a fifth of the spiral's outer radius
+    const star = resolveEndpointTile('goal', t, 3).star!;
+    expect(Math.abs(spiral.outer - star.outer) / star.outer).toBeLessThan(0.2);
+    expect(resolveEndpointTile('start', t, 3).play).toBeUndefined();
   });
 
-  test('the arrow leans its apex forward: the base sits nearer the target than the apex (a triangle is heavy at its base)', () => {
+  test('the spin axis is the shared optical centre (the star\'s target), and the first-step direction changes nothing', () => {
     const t = straight();
-    const centre = tileCentre(t);
-    const play = resolveEndpointTile('start', { ...t, direction: 'right' }, 3).play!;
-    expect(play.cx - centre.x).toBeGreaterThan(centre.x - play.ax);
-    // and the frame is the target, not the old bounding-box centre
-    const frame = resolveEndpointTile('start', { ...t, direction: 'right' }, 3).frame;
-    expect(frame.cx).toBeCloseTo(resolveEndpointCentre(t).x, 9);
+    const target = resolveEndpointCentre(t);
+    const spiral = resolveEndpointTile('start', t, 3).spiral!;
+    expect(spiral.cx).toBeCloseTo(target.x, 9);
+    expect(spiral.cy).toBeCloseTo(target.y, 9);
+    for (const direction of ['up', 'right', 'down', 'left'] as const) {
+      expect(resolveEndpointTile('start', { ...t, direction }, 3)).toEqual(resolveEndpointTile('start', t, 3));
+    }
   });
 });
 
@@ -221,9 +231,9 @@ const PLACEMENTS: Array<[string, boolean[][]]> = [
 ];
 
 describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as const)))(
-  'start arrow optical centre, raster: tile %f css px at DPR %f',
+  'start spiral optical centre, raster: tile %f css px at DPR %f',
   (tileSize, dpr) => {
-    test.each(PLACEMENTS)('%s: the painted arrow centroid is within 0.5 device px of the interior centre, in every direction', (_name, cells) => {
+    test.each(PLACEMENTS)('%s: the painted spiral centroid is within 0.5 device px of the interior centre, at every angle', (_name, cells) => {
       for (const [key, cell] of shapes(cells)) {
         const open = openDirections(tileOf(cells, cell, tileSize, dpr));
         expect(open.length, key).toBeGreaterThan(0);
@@ -254,7 +264,7 @@ describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as cons
       }
     });
 
-    test('the arrow and its keyline stay on the chip fill: nothing painted on the rim, the void or off the tile', () => {
+    test('the spiral and its keyline stay on the chip fill: nothing painted on the rim, the void or off the tile', () => {
       for (const cells of [MAZE, RING, BARS, STRIPES]) {
         for (const [key, cell] of shapes(cells)) {
           for (const direction of openDirections(tileOf(cells, cell, tileSize, dpr))) {
@@ -279,8 +289,3 @@ describe('the pure target shared with the star', () => {
     }
   });
 });
-
-// Pinned from origin/main (566259c5) for the straight tile at 14.72 css px, DPR 3, direction right.
-const PINNED_BASE = 5.780662150526126;
-const PINNED_LENGTH = 5.4916290429998185;
-const PINNED_STROKE = 1;
