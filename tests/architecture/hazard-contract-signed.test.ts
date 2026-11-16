@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
-import { LEGACY_HAZARD_LAYER_ENABLED, resolveLegacyHazardHandoff } from '../../src/legacy-runtime/legacyHazardHandoff';
+import { resolveLegacyHazardHandoff } from '../../src/legacy-runtime/legacyHazardHandoff';
+import { HAZARD_LAYER_BUILD_DEFAULT, resolveHazardLayerEnabled } from '../../src/legacy-runtime/legacyHazardLayerFlag';
 
 const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n');
 const CONTRACT = 'docs/research/MAZER_HAZARD_CONTRACT_PHASE1_2026-11-14.md';
@@ -31,7 +32,8 @@ describe('MAZER-HAZ-002 hazard contract phase 1 is signed and still enables noth
   });
 
   test('signing enables nothing: the layer is off and level 1 and the plateau edge owe no hazard', () => {
-    expect(LEGACY_HAZARD_LAYER_ENABLED).toBe(false);
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+    expect(resolveHazardLayerEnabled()).toBe(false);
     for (const level of [1, 2, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
       expect(resolveLegacyHazardHandoff(level)).toMatchObject({ hazardBudgetLevels: 0, hazardsActive: false, obstacles: [], enemies: [] });
     }

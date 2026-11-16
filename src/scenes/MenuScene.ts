@@ -175,6 +175,7 @@ import {
 } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
+import { bootHazardLab, describeHazardLabClock, type HazardLabBoot } from '../legacy-runtime/legacyHazardLabBoot';
 import { subscribeServiceWorkerCacheWarning } from '../boot/serviceWorkerCacheWarning';
 import {
   WorldTurnHost,
@@ -1843,6 +1844,8 @@ export class MenuScene extends Phaser.Scene {
   private legacyWorldTurnMove: { deltaX: number; deltaY: number } | null = null;
   private legacyWorldTurnCommandSequence = 0;
   private legacyWorldTurnHost = this.createLegacyWorldTurnHost();
+  // Hazard layer lab (slice H1): null runtime unless the layer flag is on; flag off does nothing here.
+  private hazardLab: HazardLabBoot | null = null;
   private readonly playKeyboardRepeatGate = new HumanInputRepeatGate();
   private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
@@ -2361,6 +2364,7 @@ export class MenuScene extends Phaser.Scene {
   public create(): void {
     markMazerBootStatus('menu-scene-create');
     const runtimeSearch = typeof window === 'undefined' ? '' : window.location.search;
+    this.hazardLab = bootHazardLab(runtimeSearch);
     this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);
     const initialSeed = resolveInitialLegacyRuntimeSeed(runtimeSearch, {
       previousSeed: this.mazeSeed
@@ -2647,6 +2651,7 @@ export class MenuScene extends Phaser.Scene {
       this.destroyAccountUsernameNativeInput();
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
+      this.hazardLab?.runtime?.dispose();
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.detachLegacyQaDiagnosticsSurface();
@@ -3303,6 +3308,7 @@ export class MenuScene extends Phaser.Scene {
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
+    this.updateHazardWorldClock(time);
     this.uiTransitionGhost?.update(time, delta);
     if (this.overlay === 'auth') {
       // Auth owns the full screen. The level announcer sits above the normal
@@ -3783,6 +3789,7 @@ export class MenuScene extends Phaser.Scene {
           state: worldTurnDiagnostics.state,
           timedModeEnabled: worldTurnDiagnostics.timedModeEnabled
         },
+        ...(this.hazardLab?.runtime ? { worldClock: describeHazardLabClock(this.hazardLab) } : {}),
         inputBuffer: {
           directionalIntent: this.playDirectionalIntent.getDiagnostics(),
           held: {
@@ -4844,6 +4851,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     event.preventDefault();
+    this.hazardLab?.runtime?.noteInput(this.time.now);
     const action = resolveHumanKeyboardAction(event, this.time.now);
     if (
       action === null
@@ -4891,6 +4899,7 @@ export class MenuScene extends Phaser.Scene {
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
     // A tap skips a still-running Play intro.
     this.skipLegacyIntroIfBuilding(this.time.now);
+    this.hazardLab?.runtime?.noteInput(this.time.now);
     const point = this.resolveLegacyInputPointerPoint(pointer);
     if (this.handleLegacyPlayTouchControl(point.x, point.y, pointer.id)) {
       this.playPointerStart = null;
@@ -7114,7 +7123,22 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  // Hazard layer lab (slice H1): one clock frame. No-op unless the flag is on. Active only in play with
+  // no overlay or lifecycle hold; blur and hidden stop the clock inside the runtime itself.
+  private updateHazardWorldClock(time: number): void {
+    const runtime = this.hazardLab?.runtime;
+    if (!runtime) {
+      return;
+    }
+    const playActive = this.mode === 'play'
+      && this.overlay === 'none'
+      && this.playCompletedAtMs === null
+      && !this.isLegacyPlayLifecycleInputLocked();
+    runtime.frame(time, playActive, this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs);
+  }
+
   private resetLegacyWorldTurnHost(): void {
+    this.hazardLab?.runtime?.resetLevel();
     this.legacyWorldTurnMove = null;
     this.legacyWorldTurnCommandSequence = 0;
     this.legacyWorldTurnHost = this.createLegacyWorldTurnHost();
@@ -7131,6 +7155,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
+    this.hazardLab?.runtime?.noteInput(this.time.now);
     this.legacyWorldTurnCommandSequence += 1;
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const diagnostics = this.legacyWorldTurnHost.getDiagnostics();
@@ -10772,15 +10797,20 @@ export class MenuScene extends Phaser.Scene {
   // (unused in play). The level is read from the live player track, so it
   // follows goal-to-goal advances as well as jumps.
   private drawLegacyLevelPreviewBadge(): void {
-    if (this.levelPreviewLevel === null) {
+    // Hazard lab (slice H1): a quiet "LAB" chip in the same slot while the layer is on via the lab switch.
+    const labChip = this.hazardLab?.chipText ?? null;
+    if (this.levelPreviewLevel === null && labChip === null) {
       return;
     }
+    const previewText = this.levelPreviewLevel === null
+      ? null
+      : formatLegacyLevelPreviewBadge(this.progressionState.tracks.player.level);
     this.footerText
-      .setText(formatLegacyLevelPreviewBadge(this.progressionState.tracks.player.level))
+      .setText(labChip !== null && previewText !== null ? `${labChip}  ${previewText}` : (labChip ?? previewText ?? ''))
       .setPosition(this.layout.width / 2, this.layout.footerY - 22)
       .setFontSize(12)
-      .setColor('#72e0bf')
-      .setAlpha(0.6);
+      .setColor(labChip !== null ? '#ffc857' : '#72e0bf')
+      .setAlpha(labChip !== null ? 0.8 : 0.6);
   }
 
   // Level Preview only. The sandbox progression is replaced outright (never

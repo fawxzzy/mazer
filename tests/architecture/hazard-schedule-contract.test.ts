@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { LEGACY_HAZARD_LAYER_ENABLED } from '../../src/legacy-runtime/legacyHazardHandoff';
+import { HAZARD_LAYER_BUILD_DEFAULT, resolveHazardLayerEnabled } from '../../src/legacy-runtime/legacyHazardLayerFlag';
 
 const read = (path: string): string => readFileSync(join(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n');
 const readJson = (path: string): any => JSON.parse(read(path));
@@ -127,8 +127,9 @@ describe('MAZER-HAZ-002 hazard schedule manifest v1 (slice H0)', () => {
   });
 
   test('signing the contract wires nothing: the dormant switch stays off', () => {
-    expect(LEGACY_HAZARD_LAYER_ENABLED).toBe(false);
-    expect(manifest.flag.buildDefaultEnabled).toBe(false);
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+    expect(resolveHazardLayerEnabled()).toBe(false);
+    expect(manifest.flag.buildDefaultEnabled).toBe(HAZARD_LAYER_BUILD_DEFAULT);
     expect(manifest.status).toBe('signed-not-wired');
   });
 });
