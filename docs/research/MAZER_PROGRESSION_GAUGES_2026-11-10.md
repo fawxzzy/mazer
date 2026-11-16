@@ -495,3 +495,7 @@ Changed: levels 2-11 are guaranteed single route (accidental loops broken); loop
 ## Limits
 
 Six seeds per level and board (3600 mazes per build); the walkers are models; the human-like gauge is not calibrated against real players; the dump script is tree-specific and was copied into a main checkout for the baseline.
+
+## Hazard gauges (slice H7, 2026-11-15)
+
+`progression-gauges.ts` also has `hazards` (hazardDelay, escape slack, bot contacts and clean rate over the shipped ladder with the real H2 overlay, plus the product contract 2.5 band assertions) and `runway` (where the hazard menu runs dry). Run `npx vite-node --script scripts/analysis/progression-gauges.ts hazards --assert` (or `--assert=integrity`) and `... runway`; there is no npm script because package.json is frozen for lanes. Results and the runway numbers: `docs/playbook-notes/2026-11-15-mazer-h7-hazard-gauges.md`.
