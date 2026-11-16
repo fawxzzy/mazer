@@ -37,6 +37,8 @@ const fakeElement = (hidden = false): FakeElement => {
 /** Runs the inline script against a fake page and returns its handles. */
 const runFallbackScript = (bootStatus?: unknown) => {
   const splash = fakeElement();
+  const splashIcon = Object.assign(fakeElement(), { src: 'data:image/webp;base64,AAAA' });
+  const fallbackIcon = Object.assign(fakeElement(true), { src: '' });
   const removed: FakeElement[] = [];
   splash.parentNode = { removeChild: (node) => { removed.push(node); } };
   const fallback = fakeElement(true);
@@ -44,6 +46,8 @@ const runFallbackScript = (bootStatus?: unknown) => {
   const elements: Record<string, FakeElement> = {
     'mazer-boot-splash': splash,
     'mazer-boot-fallback': fallback,
+    'mazer-boot-splash-icon': splashIcon,
+    'mazer-boot-fallback-icon': fallbackIcon,
     'mazer-boot-fallback-retry': retry
   };
   const windowListeners = new Map<string, Listener>();
@@ -63,7 +67,7 @@ const runFallbackScript = (bootStatus?: unknown) => {
   };
   const reload = vi.fn();
   new Function('window', 'document', 'location', fallbackScript)(fakeWindow, fakeDocument, { reload });
-  return { fallback, removed, retry, reload, splash, windowListeners, documentListeners };
+  return { fallback, fallbackIcon, removed, retry, reload, splash, windowListeners, documentListeners };
 };
 
 describe('index.html static fallback when the game bundle never runs', () => {
@@ -76,6 +80,24 @@ describe('index.html static fallback when the game bundle never runs', () => {
     expect(fallbackMarkup).toContain(`>${AUTH_SURFACE_LABELS.tryAgain}</button>`);
     // The id selector sets display, so [hidden] needs its own rule or the fallback would always show.
     expect(html).toContain('#mazer-boot-fallback[hidden] { display: none; }');
+  });
+
+  test('the splash carries the MAZER kicker (same word and style as the canvas screens) above the icon', () => {
+    const splashMarkup = /<div id="mazer-boot-splash"[\s\S]*?<p id="mazer-boot-splash-text"/.exec(html)?.[0] ?? '';
+    expect(splashMarkup).toContain(`>${AUTH_SURFACE_LABELS.kicker}</p>`);
+    expect(splashMarkup).toContain('class="mazer-boot-splash-kicker"');
+    expect(html).toContain('bottom: calc(100% + 22px)');
+    expect(html).toContain('letter-spacing: 0.34em; color: #6be8e1;');
+  });
+
+  test('the fallback shows the same app icon the splash holds, at the boot-error screen size (76 px)', () => {
+    expect(fallbackMarkup).toContain('id="mazer-boot-fallback-icon"');
+    expect(fallbackMarkup).toContain('width="76" height="76"');
+    const page = runFallbackScript();
+    expect(page.fallbackIcon.hidden).toBe(true);
+    page.documentListeners.get('DOMContentLoaded')?.();
+    expect(page.fallbackIcon.src).toBe('data:image/webp;base64,AAAA');
+    expect(page.fallbackIcon.hidden).toBe(false);
   });
 
   test('the script sits after the splash and the fallback markup and before the game bundle', () => {
