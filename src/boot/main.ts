@@ -105,7 +105,12 @@ const registerProductionServiceWorker = (): void => {
         watchServiceWorkerInstallFailure(registration, () => reportServiceWorkerCacheWarning('service worker install failed'));
         return registration;
       }
-      : null
+      : null,
+    resumeUpdate: {
+      isVisible: () => document.visibilityState === 'visible',
+      addVisibilityListener: (listener) => document.addEventListener('visibilitychange', listener),
+      now: () => Date.now()
+    }
   }, (message) => {
     markMazerBootStatus('service-worker-error', message);
     if (shouldWarnAboutServiceWorkerError(navigator.onLine)) {

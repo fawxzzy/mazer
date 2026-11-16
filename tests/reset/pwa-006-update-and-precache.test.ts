@@ -1,7 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { installMazerServiceWorkerControllerReload } from '../../src/boot/serviceWorkerLifecycle';
+import {
+  installMazerProductionServiceWorker,
+  installMazerServiceWorkerControllerReload,
+  MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS
+} from '../../src/boot/serviceWorkerLifecycle';
 
 // MAZER-PWA-006: deferred update (reload only when hidden and idle) and the trimmed precache.
 const setup = (controlledAtBoot = true) => {
@@ -102,5 +106,70 @@ describe('app icon out of the precache (MAZER-PERF-011)', () => {
   test('the file is still served from public/ and the manifest still points at it', () => {
     expect(readFileSync(resolve(__dirname, '../../public/manifest.webmanifest'), 'utf8')).toContain('/icons/mazer-app-icon.png?v=');
     expect(readFileSync(resolve(__dirname, '../../public/icons/mazer-app-icon.png')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('update check on resume (stale home-screen build)', () => {
+  const setupResume = async () => {
+    const state = { visible: true, now: 1_000_000 };
+    const listeners: Array<() => void> = [];
+    const update = vi.fn(async () => undefined);
+    const onError = vi.fn();
+    installMazerProductionServiceWorker({
+      hostname: 'mazer.fawxzzy.com',
+      readyState: 'complete',
+      addLoadListener: vi.fn(),
+      register: vi.fn(async () => ({ update })),
+      resumeUpdate: {
+        isVisible: () => state.visible,
+        addVisibilityListener: (listener) => listeners.push(listener),
+        now: () => state.now
+      }
+    }, onError);
+    await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+    const resume = async (): Promise<void> => {
+      state.visible = false;
+      listeners.forEach((listener) => listener());
+      state.visible = true;
+      listeners.forEach((listener) => listener());
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+    return { listeners, onError, resume, state, update };
+  };
+
+  test('re-checks for a new build when the app returns to the foreground', async () => {
+    const { listeners, resume, state, update } = await setupResume();
+    expect(listeners).toHaveLength(1);
+    state.now += MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS;
+    await resume();
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  });
+
+  test('throttles quick app switches and never checks on hide', async () => {
+    const { resume, state, update } = await setupResume();
+    state.now += MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS - 1;
+    await resume();
+    expect(update).toHaveBeenCalledOnce();
+    state.now += 1;
+    state.visible = false;
+    await resume();
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  });
+
+  test('a failed resume check is silent (no cache warning)', async () => {
+    const { onError, resume, state, update } = await setupResume();
+    update.mockRejectedValueOnce(new Error('offline'));
+    state.now += MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS;
+    await resume();
+    await vi.waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    await Promise.resolve();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  test('main.ts wires the resume check to visibilitychange', () => {
+    const main = readFileSync(resolve(__dirname, '../../src/boot/main.ts'), 'utf8');
+    expect(main).toContain('resumeUpdate: {');
+    expect(main).toContain("document.visibilityState === 'visible'");
   });
 });
