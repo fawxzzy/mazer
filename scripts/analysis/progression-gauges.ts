@@ -12,8 +12,21 @@
 //   # 2. analyse one or two gauged dumps
 //   npx vite-node --script scripts/analysis/progression-gauges.ts \
 //     analyze --after=<gauges.json> [--before=<gauges.json>] --out=<report.json>
+//
+// Hazard gauges (slice H7, product contract 2.5). These generate the shipped ladder mazes themselves,
+// run the real H2 overlay on each, and re-measure what it shipped with lib/hazardGauges.ts (shares no
+// code with the allocator, placement or H2 verdict):
+//   # 3. band assertions over L10..300 on both ladder boards (L1-9 are sampled for the no-hazard check);
+//   #    --assert exits 1 on any failure, --assert=integrity only on the integrity set (curve = report)
+//   npx vite-node --script scripts/analysis/progression-gauges.ts \
+//     hazards --assert [--from=1] [--to=300] [--seeds=2] [--step=1] [--out=<report.json>]
+//   # 4. runway: where the hazard menu runs dry, measured past the geometry saturation level
+//   npx vite-node --script scripts/analysis/progression-gauges.ts \
+//     runway [--from=200] [--to=480] [--step=10] [--seeds=4] [--out=<report.json>]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { BOT_HORIZON, BOT_MYOPIC_HORIZON, BOT_TIERS } from './lib/hazardGauges';
+import { evaluateHazardBands, hazardMenuTape, runHazardGaugeCorpus, shippedFreeze, type HazardGaugeRow } from './lib/hazardGaugeCorpus';
 import { computeMazeGauges, type MazeGauges } from './lib/mazeGauges';
 import type { DumpedMaze } from './progression-maze-dump';
 
@@ -363,5 +376,94 @@ const analyze = (): void => {
   console.log(`\nreport -> ${outPath}`);
 };
 
-const command = process.argv.find((value) => value === 'compute' || value === 'analyze');
-if (command === 'compute') { compute(); } else if (command === 'analyze') { analyze(); } else { console.error('usage: compute|analyze'); process.exitCode = 1; }
+// ---------------------------------------------------------------------------
+// Hazard gauges (slice H7).
+// ---------------------------------------------------------------------------
+export const HAZARD_GAUGES: readonly { readonly key: string; readonly label: string; readonly question: string; readonly direction: 1 | -1 }[] = [
+  { key: 'hazardDelay', label: 'Hazard delay', question: 'Contact-free witness ticks minus the static shortest route: the ticks hazards cost a solver who knows the map and the timing', direction: 1 },
+  { key: 'escapeSlack', label: 'Escape slack', question: 'Share of witness ticks where one forced wait still leaves the level finishable (lower = less forgiving)', direction: -1 },
+  { key: 'contacts.exact', label: 'Exact-bot contacts', question: 'Contacts of a bot replaying the fastest contact-free route (must be 0)', direction: 1 },
+  { key: 'contacts.horizon', label: `Horizon-bot contacts (${BOT_HORIZON} ticks)`, question: `Contacts of a bot that sees hazard timing ${BOT_HORIZON} ticks ahead and every Sentry rail`, direction: 1 },
+  { key: 'contacts.myopic', label: `Myopic-bot contacts (${BOT_MYOPIC_HORIZON} tick)`, question: 'Contacts of a bot that sees one tick ahead and learns a Sentry rail only when hit', direction: 1 },
+  { key: 'cleanRate', label: 'Clean rate', question: 'Share of runs a bot clears with no contact inside the tick cap', direction: -1 }
+];
+
+const hazards = (): void => {
+  const from = Number(arg('from', '1'));
+  const to = Number(arg('to', '300'));
+  const seeds = Number(arg('seeds', '2'));
+  const step = Number(arg('step', '1'));
+  const outPath = arg('out');
+  // --assert fails on any assertion; --assert=integrity fails only on the integrity set (the overlay
+  // ships what H2 claims), leaving the contract-curve assertions as a report.
+  const assertMode = process.argv.includes('--assert') ? 'all' : arg('assert') === 'integrity' ? 'integrity' : 'off';
+  const started = Date.now();
+  const rows: HazardGaugeRow[] = runHazardGaugeCorpus({
+    from, to, step, seeds,
+    onRow: (row) => { if (row.level % 50 === 0 && row.seedIndex === 0) { console.error(`  ${row.board} L${row.level} (${((Date.now() - started) / 1000).toFixed(0)}s)`); } }
+  });
+  const report = evaluateHazardBands(rows, { bandFrom: Math.max(from, 10), bandTo: to });
+  const pct = (value: number): string => `${(value * 100).toFixed(0)}%`.padStart(5);
+  console.log(`\n== hazard bands: L${from}-${to}, step ${step}, ${seeds} seed(s), ${rows.length} mazes, ${((Date.now() - started) / 1000).toFixed(1)}s ==`);
+  console.log(['board'.padEnd(8), 'band'.padEnd(10), 'units'.padStart(5), 'delay'.padStart(6), 'slack'.padStart(6), ...BOT_TIERS.flatMap((tier) => [`${tier}.c`.padStart(10), 'clean'.padStart(5)])].join(' '));
+  for (const band of report.bands) {
+    console.log([
+      band.board.padEnd(8), band.band.padEnd(10), band.placedUnits.toFixed(1).padStart(5), band.hazardDelay.toFixed(1).padStart(6),
+      (band.escapeSlackMin === null ? '-' : band.escapeSlackMin.toFixed(3)).padStart(6),
+      ...BOT_TIERS.flatMap((tier) => [band.contacts[tier].toFixed(2).padStart(10), pct(band.cleanRate[tier])])
+    ].join(' '));
+  }
+  console.log('spearman (band index vs band mean delay):', Object.entries(report.spearmanByBoard).map(([board, rho]) => `${board} ${rho.toFixed(3)}`).join(' | '));
+  for (const result of report.assertions) { console.log(`${result.pass ? 'PASS' : 'FAIL'}  [${result.kind}] ${result.name}: ${result.detail}`); }
+  if (outPath) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify({ from, to, seeds, step, ...report, rows }));
+    console.log(`report -> ${outPath}`);
+  }
+  const gating = report.assertions.filter((result) => assertMode === 'all' || (assertMode === 'integrity' && result.kind === 'integrity'));
+  if (gating.some((result) => !result.pass)) { process.exitCode = 1; }
+};
+
+const runway = (): void => {
+  const from = Number(arg('from', '200'));
+  const to = Number(arg('to', '480'));
+  const step = Number(arg('step', '10'));
+  const seeds = Number(arg('seeds', '4'));
+  const outPath = arg('out');
+  const menu = hazardMenuTape();
+  const freeze = shippedFreeze();
+  console.log('== hazard menu tape (no saturation freeze) ==');
+  console.log(menu.tape.map((entry) => `L${entry.level} ${entry.unit}`).join(', '));
+  console.log(`last unit L${menu.lastUnitLevel} (last placed gate/Sentry unit L${menu.lastPlacedUnitLevel}); menu empty at L${menu.dryLevel}`);
+  console.log(`shipped allocator freezes at L${freeze.saturationLevel}: ${freeze.frozenKey}, ${freeze.unitsBoughtBySaturation} tail units bought`);
+  // Measured: the real overlay with the freeze lifted, so the allocator keeps buying until the menu is empty.
+  const rows = runHazardGaugeCorpus({ from, to, step, seeds, saturationLevel: 10_000 });
+  const levels: { level: number; allocated: number; placed: number; degraded: number; delay: number; delayMin: number; delayMax: number; horizonContacts: number }[] = [];
+  for (let level = from; level <= to; level += step) {
+    const at = rows.filter((row) => row.level === level);
+    const delays = at.map((row) => row.gauges.hazardDelay ?? 0);
+    levels.push({
+      level,
+      allocated: mean(at.map((row) => row.allocatedGates + row.allocatedSentries)),
+      placed: mean(at.map((row) => row.placedGates + row.placedSentries)),
+      degraded: at.filter((row) => row.status !== 'full').length / Math.max(1, at.length),
+      delay: mean(delays),
+      delayMin: Math.min(...delays),
+      delayMax: Math.max(...delays),
+      horizonContacts: mean(at.map((row) => row.gauges.bots.horizon.contacts))
+    });
+  }
+  console.log(`\n== measured with the freeze lifted: L${from}-${to} step ${step}, ${seeds} seed(s) x both boards ==`);
+  console.log(['level'.padStart(5), 'alloc'.padStart(6), 'placed'.padStart(6), 'degr'.padStart(5), 'delay'.padStart(6), 'min'.padStart(4), 'max'.padStart(4), 'hzC'.padStart(5)].join(' '));
+  for (const entry of levels) {
+    console.log([String(entry.level).padStart(5), entry.allocated.toFixed(1).padStart(6), entry.placed.toFixed(1).padStart(6), `${(entry.degraded * 100).toFixed(0)}%`.padStart(5), entry.delay.toFixed(1).padStart(6), String(entry.delayMin).padStart(4), String(entry.delayMax).padStart(4), entry.horizonContacts.toFixed(2).padStart(5)].join(' '));
+  }
+  if (outPath) {
+    mkdirSync(dirname(outPath), { recursive: true });
+    writeFileSync(outPath, JSON.stringify({ menu, freeze, levels }));
+    console.log(`report -> ${outPath}`);
+  }
+};
+
+const command = process.argv.find((value) => value === 'compute' || value === 'analyze' || value === 'hazards' || value === 'runway');
+if (command === 'compute') { compute(); } else if (command === 'analyze') { analyze(); } else if (command === 'hazards') { hazards(); } else if (command === 'runway') { runway(); } else { console.error('usage: compute|analyze|hazards|runway'); process.exitCode = 1; }
