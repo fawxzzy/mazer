@@ -767,7 +767,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": {
         "ask": "Waits on MAZER-HAZ-002 and MAZER-ECON-001.",
@@ -885,11 +885,16 @@
             "repo": "fawxzzy/mazer",
             "number": 620,
             "mergedSha": "c1f79c15487a0617b75744b73867d468b6908cc2"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 629,
+            "mergedSha": "e5031c136eb27722ac0ca5adfc600715aafae956"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": {
         "kind": "deferred-by-owner",
@@ -903,7 +908,23 @@
       "filesHint": []
     },
     "MAZER-HAZ-005": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 624,
+            "mergedSha": "494326f6"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 630,
+            "mergedSha": "68b3591c91e1e8bb13c505f7577ff786c7a464e0"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+      },
       "blocker": {
         "kind": "deferred-by-owner",
         "summary": "Covered by the unsigned hazard contract.",
@@ -950,7 +971,18 @@
       ]
     },
     "MAZER-HAZ-008": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 625,
+            "mergedSha": "9e81a96da3833efcaeae5a63a7fc44736e6ec296"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+      },
       "blocker": {
         "kind": "deferred-by-owner",
         "summary": "Covered by the unsigned hazard contract.",
@@ -4256,7 +4288,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4270,11 +4302,16 @@
             "repo": "fawxzzy/mazer",
             "number": 617,
             "mergedSha": "f5365258"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 627,
+            "mergedSha": "fe4cc750b8e81b243b5da44c1eef9b71f1173573"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4314,7 +4351,7 @@
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4328,11 +4365,16 @@
             "repo": "fawxzzy/mazer",
             "number": 611,
             "mergedSha": "8e2a75f1"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 619,
+            "mergedSha": "9af930a9280bf6a80c0e2ea331c4198489f402ff"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "5g35npa39"
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],
@@ -4405,6 +4447,60 @@
         "headless": true,
         "deviceChecked": false,
         "deployedBuild": "5g35npa39"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-056": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 631,
+            "mergedSha": "8253accd37643fdb3b6d2cb4cb6c11a0b5e21dcd"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-FLOW-018": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 626,
+            "mergedSha": "b05244ad"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-HAZ-009": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 628,
+            "mergedSha": "d55da749"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "fawxzzy-mazer-pakov2avo"
       },
       "blocker": null,
       "verify": [],

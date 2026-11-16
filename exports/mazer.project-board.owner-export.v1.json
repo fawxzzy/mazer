@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_325799fce66e",
+  "export_id": "pbe_mazer_owner_registry_9cc1291d5b7b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:325799fce66e186366a9ab762ce96e7f01c9181dc35f327bac8862178c77d4f1",
-  "generated_at": "2026-11-16T04:12:35.000Z",
+  "source_revision": "sha256:9cc1291d5b7b741b5d0d00485a1536b2d99630d7bc461a920939c73adc106454",
+  "generated_at": "2026-11-16T07:54:38.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:02c83900ec01e2832ba8002898d7f67111365edf679d7e8817bfae1fc3fceb81",
-      "observed_at": "2026-11-16T04:12:35.000Z"
+      "revision": "sha256:08e7cfcdba547298248e97cc20616b97da00e3780c93bb10fb9beda87b87c97f",
+      "observed_at": "2026-11-16T07:54:38.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-16T04:12:35.000Z"
+      "observed_at": "2026-11-16T07:54:38.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-16T04:12:35.000Z"
+      "observed_at": "2026-11-16T07:54:38.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-16T04:12:35.000Z"
+      "observed_at": "2026-11-16T07:54:38.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-16T04:12:35.000Z"
+      "observed_at": "2026-11-16T07:54:38.000Z"
     }
   ],
   "cards": [
@@ -4442,6 +4442,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-flow-018_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-FLOW-018",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Menu demo starts at player level; tap anywhere to play",
+        "description": "The AI menu demo should begin at the player's current level and climb from there, and a tap almost anywhere on the menu starts a run except near other UI buttons.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-16T07:54:38.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-018",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-018",
+        "source_status": "current",
+        "source_updated_at": "2026-11-16T07:54:38.000Z"
+      },
+      "content": {
+        "summary": "The AI menu demo should begin at the player's current level and climb from there, and a tap almost anywhere on the menu starts a run except near other UI buttons.",
+        "objective": "The AI menu demo should begin at the player's current level and climb from there, and a tap almost anywhere on the menu starts a run except near other UI buttons.",
+        "acceptance_criteria": [
+          "Menu demo starts at the saved player level on app load then climbs",
+          "Tap outside the button safe zones starts a run; taps near buttons do not",
+          "No change to the run itself or level generation"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-gen-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -4766,14 +4817,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Revisit diagonal maze paths now that movement is automatic",
-        "description": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 deployed in build fawxzzy-mazer-pakov2avo: staircase pass stays default-off (?staircase=1 plus QA gate); headless only, owner look pending PR #618 merged (06920efe). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-16T01:47:22.000Z",
+        "updated_at": "2026-11-16T07:53:38.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-020",
         "extensions": {
           "owner_status": "review",
@@ -4784,11 +4835,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T01:47:22.000Z"
+        "source_updated_at": "2026-11-16T07:53:38.000Z"
       },
       "content": {
-        "summary": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 deployed in build fawxzzy-mazer-pakov2avo: staircase pass stays default-off (?staircase=1 plus QA gate); headless only, owner look pending PR #618 merged (06920efe). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Auto-move means not every turn is a player decision, so diagonal paths may now be viable. Assess generation, navigation, rendering and guide impact and recommend go or no-go with a prototype if go. Board update 2026-11-15: Assessment done (read-only, report on file): true diagonal corridors would touch the generator, edge-wrap, tile drawing, guide and about 40 tests, and collide with the held hazard and controls work, so no-go for now. Recommended instead: a flagged staircase prototype, off by default. Needs Zac to say whether he meant diagonal dragging or diagonal corridors drawn. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 merged: flagged default-off staircase pathway pass, reachable only with ?staircase=1 plus QA gate (runtimeDiagnostics or previewLevel); flag-off byte-identical; independent review PASS; headless only, auto-move feel on turn-heavy mazes not device-checked PR #618 merged (06920efe). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 618 deployed in build fawxzzy-mazer-pakov2avo: staircase pass stays default-off (?staircase=1 plus QA gate); headless only, owner look pending PR #618 merged (06920efe). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Written assessment of generation, navigation core, rendering and controls impact",
           "Go or no-go recommendation with the reasons",
@@ -4817,7 +4868,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make generated mazes feel like a real maze",
-        "description": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
+        "description": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 619 deployed in build fawxzzy-mazer-pakov2avo: GEN-021 span-aware goal-pick route floor live; headless/census only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -4827,7 +4878,7 @@
           "MAZER-PROG-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-15T22:39:14.000Z",
+        "updated_at": "2026-11-16T07:53:48.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-021",
         "extensions": {
           "owner_status": "review",
@@ -4838,11 +4889,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-021",
         "source_status": "current",
-        "source_updated_at": "2026-11-15T22:39:14.000Z"
+        "source_updated_at": "2026-11-16T07:53:48.000Z"
       },
       "content": {
-        "summary": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: Audit done (report and contact sheets on file): levels 10 to 100 read as a comb or circuit board, not a real maze (straight spines, blank areas, short local routes, straight wrap corridors); levels 200 and up look like real mazes. Cause: fill and felt targets are fixed cell counts tuned on the old board. Prototype (not shipped) fixes fill and blank areas. Plan: board-aware targets with the board-size slices, then longer start-to-goal routes and turning branches. Generation time on bigger boards must be measured with the repo harness before shipping. Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 619 deployed in build fawxzzy-mazer-pakov2avo: GEN-021 span-aware goal-pick route floor live; headless/census only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Use the existing generator features together so mazes read as real mazes: long winding routes, many believable dead ends, branching, deception and a clear start-to-finish journey, growing with level. Board update 2026-11-15: PR 611 merged: journey-planned generation (start/goal span mean 0.72 vs 0.35, route 2.7x vs 2.1x linear, decisions on route 7-22), golden 598/600 regenerated, independent review PASS; per-maze route floor and per-level 2.5x not met (follow-up); headless/census only PR #611 merged (8e2a75f1). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: journey-planned generation live in build 5g35npa39; headless/census only, phone check pending PR #611 merged (8e2a75f1). Deployed: production build 5g35npa39. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 619 deployed in build fawxzzy-mazer-pakov2avo: GEN-021 span-aware goal-pick route floor live; headless/census only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Contact sheets of generated mazes at levels 1, 10, 30, 60, 100, 200 and 400 on the new board are reviewed and the parts that do not feel like a real maze are named.",
           "A tuning plan combines the existing generator features to fix them, with measured gauges (route length, dead-end depth, branching, decision points) before and after.",
@@ -5694,7 +5745,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Add obstacles, traps and puzzles (covered by the hazard phases)",
-        "description": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 629 merged: H3 Pulse Gate behind lab flag, CI 12/12, independent review PASS + delta PASS, headless only, not device-checked PR #629 merged (e5031c13). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 620 (H1 flag/clock) and 629 (H3 Pulse Gate) deployed in build fawxzzy-mazer-pakov2avo behind ?lab=hazards, default OFF; headless only, device and flag gate open PR #629 merged (e5031c13). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
@@ -5703,7 +5754,7 @@
           "MAZER-HAZ-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-16T02:29:51.000Z",
+        "updated_at": "2026-11-16T07:53:52.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-004",
         "extensions": {
           "owner_status": "review",
@@ -5714,11 +5765,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T02:29:51.000Z"
+        "source_updated_at": "2026-11-16T07:53:52.000Z"
       },
       "content": {
-        "summary": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 629 merged: H3 Pulse Gate behind lab flag, CI 12/12, independent review PASS + delta PASS, headless only, not device-checked PR #629 merged (e5031c13). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 620 (H1 flag/clock) and 629 (H3 Pulse Gate) deployed in build fawxzzy-mazer-pakov2avo behind ?lab=hazards, default OFF; headless only, device and flag gate open PR #629 merged (e5031c13). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The board card for an obstacle, trap and puzzle environment contract is covered by the obstacle phase of the hazard contract. The trap library on main is not live. Deferred until the hazard contract is signed. Board update 2026-11-16: Roadmap H1 merged (PR 620): hazard layer flag (build constant false + ?lab=hazards lab switch) and idle-until-input world clock over an empty schedule; default build unchanged, flag-off byte-identical, independent review PASS; follow-ups: release-to-stop unit test + MenuScene wiring test, per-frame speed-profile allocation when flag on; headless only PR #620 merged (c1f79c15). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 629 merged: H3 Pulse Gate behind lab flag, CI 12/12, independent review PASS + delta PASS, headless only, not device-checked PR #629 merged (e5031c13). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 620 (H1 flag/clock) and 629 (H3 Pulse Gate) deployed in build fawxzzy-mazer-pakov2avo behind ?lab=hazards, default OFF; headless only, device and flag gate open PR #629 merged (e5031c13). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Obstacles appear in generated levels without breaking solvability",
           "Trap behaviour is deterministic and tested",
@@ -5740,26 +5791,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-haz-005_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-HAZ-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make the pursuing enemy playable (covered by the hazard phases)",
-        "description": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract.",
+        "description": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract. Board update 2026-11-16: PR 624 merged: H4 pure contact/rewind/Sentry core, unwired, flag off, CI 12/12 on 3e9adbc4, headless only, not device-checked PR #624 merged (494326f6). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: H5 Hunter pure core merged (#630), flag off, not wired; joint verdict meets 40 ms only at L35 PR #630 merged (9c34c8ff). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 624 (H4 contact core) and 630 (H5 hunter core) deployed in build fawxzzy-mazer-pakov2avo; pure cores unwired, flag off, headless only PR #630 merged (68b3591c). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "intake",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-HAZ-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-05T00:00:00.000Z",
+        "updated_at": "2026-11-16T07:54:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-005",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5767,11 +5818,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-05T00:00:00.000Z"
+        "source_updated_at": "2026-11-16T07:54:00.000Z"
       },
       "content": {
-        "summary": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract.",
-        "objective": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract.",
+        "summary": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract. Board update 2026-11-16: PR 624 merged: H4 pure contact/rewind/Sentry core, unwired, flag off, CI 12/12 on 3e9adbc4, headless only, not device-checked PR #624 merged (494326f6). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: H5 Hunter pure core merged (#630), flag off, not wired; joint verdict meets 40 ms only at L35 PR #630 merged (9c34c8ff). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 624 (H4 contact core) and 630 (H5 hunter core) deployed in build fawxzzy-mazer-pakov2avo; pure cores unwired, flag off, headless only PR #630 merged (68b3591c). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The board card for an enemy that pursues the player is now handled by hazard phases rather than as a standalone card. A graph-based enemy agent exists in the core library but no scene imports it, so it is a design reference, not a playable feature. Deferred to the hazard contract. Board update 2026-11-16: PR 624 merged: H4 pure contact/rewind/Sentry core, unwired, flag off, CI 12/12 on 3e9adbc4, headless only, not device-checked PR #624 merged (494326f6). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: H5 Hunter pure core merged (#630), flag off, not wired; joint verdict meets 40 ms only at L35 PR #630 merged (9c34c8ff). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 624 (H4 contact core) and 630 (H5 hunter core) deployed in build fawxzzy-mazer-pakov2avo; pure cores unwired, flag off, headless only PR #630 merged (68b3591c). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "An enemy appears and pursues in a real run",
           "The enemy obeys the turn contract and solvability checks",
@@ -5897,26 +5948,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-haz-008_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-HAZ-008",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Plan hazard introduction and contact moments",
-        "description": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract.",
+        "description": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract. Board update 2026-11-16: PR 625 merged: H6 hazard onboarding (flag OFF), CI 12/12, post-merge independent review PASS (2 P2s to close in #629), headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 625 (H6 onboarding) deployed in build fawxzzy-mazer-pakov2avo behind hazard flag OFF; headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "intake",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-HAZ-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-06T00:00:00.000Z",
+        "updated_at": "2026-11-16T07:54:04.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-008",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5924,15 +5975,66 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-008",
         "source_status": "current",
-        "source_updated_at": "2026-11-06T00:00:00.000Z"
+        "source_updated_at": "2026-11-16T07:54:04.000Z"
       },
       "content": {
-        "summary": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract.",
-        "objective": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract.",
+        "summary": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract. Board update 2026-11-16: PR 625 merged: H6 hazard onboarding (flag OFF), CI 12/12, post-merge independent review PASS (2 P2s to close in #629), headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 625 (H6 onboarding) deployed in build fawxzzy-mazer-pakov2avo behind hazard flag OFF; headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "When hazards land, each new type needs a skippable pre-level card and telegraph, and contact needs a one-time message, a flash and a pushback with brief invulnerability. This is phase 2 and depends on the unsigned hazard contract. Board update 2026-11-16: PR 625 merged: H6 hazard onboarding (flag OFF), CI 12/12, post-merge independent review PASS (2 P2s to close in #629), headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 625 (H6 onboarding) deployed in build fawxzzy-mazer-pakov2avo behind hazard flag OFF; headless only, not device-checked PR #625 merged (9e81a96d). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Each hazard type is introduced safely before it can block",
           "Contact never ends a run",
           "Accessibility checks: shape not color only, reduced motion form"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-haz-009_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-HAZ-009",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Shards core for hazard levels",
+        "description": "Pure solver, locked-star and tail-route target module for the Shards hazard, unwired and behind the hazard lab flag.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-16T07:54:38.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-009",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-HAZ-009",
+        "source_status": "current",
+        "source_updated_at": "2026-11-16T07:54:38.000Z"
+      },
+      "content": {
+        "summary": "Pure solver, locked-star and tail-route target module for the Shards hazard, unwired and behind the hazard lab flag.",
+        "objective": "Pure solver, locked-star and tail-route target module for the Shards hazard, unwired and behind the hazard lab flag.",
+        "acceptance_criteria": [
+          "Shard solver proves every generated level solvable",
+          "Locked star and tail route target are deterministic",
+          "Module is not called by play while the hazard flag is off"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7739,7 +7841,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Decide which maze features unlock at which level and content band",
-        "description": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 621 (H2 overlay, not called) and 622 (H7 gauges, scripts) deployed in build fawxzzy-mazer-pakov2avo; flag off, headless only PR #622 merged (de17b7e0). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "architecture",
         "lifecycle": "review",
         "priority": "medium",
@@ -7748,7 +7850,7 @@
           "MAZER-PROG-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-16T04:12:35.000Z",
+        "updated_at": "2026-11-16T07:53:56.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-008",
         "extensions": {
           "owner_status": "review",
@@ -7759,11 +7861,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-008",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T04:12:35.000Z"
+        "source_updated_at": "2026-11-16T07:53:56.000Z"
       },
       "content": {
-        "summary": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-14: Deferred 2026-11-14: feature unlocks by level wait on the hazard and economy decisions. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 621 (H2 overlay, not called) and 622 (H7 gauges, scripts) deployed in build fawxzzy-mazer-pakov2avo; flag off, headless only PR #622 merged (de17b7e0). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Two board cards cover feature gating by level and a versioned manifest of content bands. Nothing is implemented; both depend on the ladder and budget decision and on the economy draft. Awaiting an owner decision. Board update 2026-11-16: Roadmap H2 merged (PR 621): hazard generation overlay (manifest v1 allocator + fairness validators) behind the hazard switch, default off, not yet called; overlay 12.55 ms median / 57.74 ms worst over L10..300 (node, PC; phone unmeasured); flag-off byte-identical; headless only PR #621 merged (ad1864b5). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: Roadmap H7 merged (PR 622): hazard gauges and runway report, analysis scripts and docs only. Finding: the contract 2.5 delay curve FAILS on H2 placement (Spearman phone -0.399, desktop -0.070; delay flat after the first Sentry); the hazard menu is spent at L276 and empty at L291, about 130 levels before the geometry ceiling; integrity checks pass on 1200 mazes; headless only PR #622 merged (de17b7e0). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 621 (H2 overlay, not called) and 622 (H7 gauges, scripts) deployed in build fawxzzy-mazer-pakov2avo; flag off, headless only PR #622 merged (de17b7e0). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Owner decides the feature unlock schedule",
           "A versioned content band manifest format is specified",
@@ -8367,7 +8469,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Grow the maze board with progression (2-5 more tiles each way)",
-        "description": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 592 (S2) and 619 (S3) deployed in build fawxzzy-mazer-pakov2avo: board grows 38 toward 40 with board-aware fill; headless only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
@@ -8376,7 +8478,7 @@
           "MAZER-PROG-021"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-16T02:16:45.000Z",
+        "updated_at": "2026-11-16T07:53:44.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-020",
         "extensions": {
           "owner_status": "review",
@@ -8387,11 +8489,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-020",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T02:16:45.000Z"
+        "source_updated_at": "2026-11-16T07:53:44.000Z"
       },
       "content": {
-        "summary": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-15: S0 and S1 merged (PR 589): board scale 38 on every level and a 10 px tile floor, calibration table included. S2 (scale grows slowly from 38 toward 40, never reaching it) is PR 592, being rebased onto main. Headless Chromium and WebKit screenshots at levels 1 to 300; not deployed, not checked on a real phone. Ladder tables still tuned for the old scale until S3. PR #589 merged (e757c9e7). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 592 (S2) and 619 (S3) deployed in build fawxzzy-mazer-pakov2avo: board grows 38 toward 40 with board-aware fill; headless only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Tiles get slightly smaller so a few more fit across and down, and the board grows as levels get harder, giving room for longer and more complex mazes. Board update 2026-11-16: S2 PR 592 merged (board grows 38 toward 40, 10 px tile floor holds 300..430 incl. 350x568 menu demo fix, golden regenerated, independent review PASS); S3 PR 619 pending retarget; ladder felt-ceiling retune not done; headless only PR #592 merged (f0940534). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: S3 PR 619 merged: board-aware density fill floor and GEN-021 span-aware goal-pick route floor, independent review PASS, golden regenerated; felt-ceiling retune (930 baked at scale 35 vs ~1100 capacity at 38) still open; headless only PR #619 merged (9af930a9). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 592 (S2) and 619 (S3) deployed in build fawxzzy-mazer-pakov2avo: board grows 38 toward 40 with board-aware fill; headless only, phone check pending PR #619 merged (9af930a9). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Board gains 2 to 5 tiles in each direction compared with today, growing with level, with tiles staying large enough to read and touch on a 320 to 430 wide phone.",
           "The growth curve is continuous with no visible jump between levels and is covered by a test over a wide level range.",
@@ -14174,14 +14276,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Spiral start marker synced with the end star; polish start and end tiles",
-        "description": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "description": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 627 merged: PWA update check on app resume (likely stale phone build for spiral/rainbow); headless only, not device-checked PR #627 merged (fe4cc750). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 617 spiral start and 627 PWA update-on-resume deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #627 merged (fe4cc750). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-16T01:16:25.000Z",
+        "updated_at": "2026-11-16T07:54:08.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-053",
         "extensions": {
           "owner_status": "review",
@@ -14192,11 +14294,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-053",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T01:16:25.000Z"
+        "source_updated_at": "2026-11-16T07:54:08.000Z"
       },
       "content": {
-        "summary": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 627 merged: PWA update check on app resume (likely stale phone build for spiral/rainbow); headless only, not device-checked PR #627 merged (fe4cc750). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 617 spiral start and 627 PWA update-on-resume deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #627 merged (fe4cc750). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Replace the start triangle with a spiral of the same size that spins slowly in phase with the end star. Touch up the look of the start and end tiles, and give the end star the same border colour as the corner diamonds. Board update 2026-11-16: PR 617 merged: start marker is a gold two-arm spiral turning in phase with the end star; star border uses the shared edge-marker colour; headless captures only, phone check owed PR #617 merged (f5365258). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 627 merged: PWA update check on app resume (likely stale phone build for spiral/rainbow); headless only, not device-checked PR #627 merged (fe4cc750). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-16: PR 617 spiral start and 627 PWA update-on-resume deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #627 merged (fe4cc750). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Start marker is a spiral, same size as before, spinning slowly in phase with the end star",
           "End star border uses the same shared colour as the corner diamond border",
@@ -14322,6 +14424,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-056_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-056",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Bottom corner stars clear the real display corner",
+        "description": "On 375x812-class home-screen phones the bottom corner stars were fully hidden (canvas 762 tall fell outside the size band) and on others 3-5px clipped by continuous iPhone corners. Place them from measured geometry. Board update 2026-11-16: PR 631 corner stars deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #631 merged (8253accd). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-16T07:54:13.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-056",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-056",
+        "source_status": "current",
+        "source_updated_at": "2026-11-16T07:54:13.000Z"
+      },
+      "content": {
+        "summary": "On 375x812-class home-screen phones the bottom corner stars were fully hidden (canvas 762 tall fell outside the size band) and on others 3-5px clipped by continuous iPhone corners. Place them from measured geometry. Board update 2026-11-16: PR 631 corner stars deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #631 merged (8253accd). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "objective": "On 375x812-class home-screen phones the bottom corner stars were fully hidden (canvas 762 tall fell outside the size band) and on others 3-5px clipped by continuous iPhone corners. Place them from measured geometry. Board update 2026-11-16: PR 631 corner stars deployed in build fawxzzy-mazer-pakov2avo; headless only, phone check owed PR #631 merged (8253accd). Deployed: production build fawxzzy-mazer-pakov2avo. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Bottom stars fully visible at rest and while orbiting on all measured phone sizes",
+          "Desktop and square-corner phones unchanged",
+          "Regression test fails if any star pixel lies outside the visible corner"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -14377,11 +14530,11 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 274,
-    "exported_public_card_count": 274,
-    "exported_open_card_count": 124,
+    "stable_identity_count": 277,
+    "exported_public_card_count": 277,
+    "exported_open_card_count": 129,
     "exported_completed_card_count": 122,
-    "exported_deferred_card_count": 28,
+    "exported_deferred_card_count": 26,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
     "discordos_role": "provenance-and-board-identity-only",
