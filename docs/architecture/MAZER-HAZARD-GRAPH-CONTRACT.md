@@ -140,7 +140,7 @@ Signed by Zac, 2026-11-15, via chat ("yes to all four"). Source of the decisions
 
 - Contact definition is unchanged (occupancy at the arrival tick, plus a head-on swap, also across a wrap).
 - On contact the player snaps back to the last junction on their own trail. The trail retracts over about 250 ms with the clock held, then the player has N = 4 contact-free ticks (the marker blinks at 2 Hz). Obstacles still block during invulnerability.
-- Runtime safety: from the rewind cell the client runs the A* witness. If there is no witness it steps back to the previous trail junction, and finally to the validated start.
+- Runtime safety: from the rewind cell the client runs the A* witness. If there is no witness it steps back to the previous trail junction, and finally to the validated start. (H4 core builds this check as an exact per-level distance table instead of a per-contact A*, with the same answer, and adds a start rescue so a rewind never strands the player: `docs/playbook-notes/2026-11-15-mazer-h4-contact-core.md`.)
 - The validator keeps checking post-contact states at N = 2. More invulnerability is never worse, so a level that passes at N = 2 also passes at N = 4. The validator's own pushback model (witness-route junction) is a proof device; the trail rewind is what play does, and the runtime A* check closes the gap between them.
 - A mistake costs time and distance only: no lives, no level fail, no restart, no progress loss. The clear card adds "CLEAN" for a level cleared with no contact.
 - Trail consumers: the rewind retracts the trail cell by cell (it replaces the "pushback appends the pushback placement" rule in Consumer rules), so the trail still cannot teleport silently.
