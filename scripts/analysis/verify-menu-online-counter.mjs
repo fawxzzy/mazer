@@ -116,6 +116,49 @@ const measureStable = async (page, slot, floor) => {
   throw new Error(`slot ink never stabilised in ${STABLE_TIMEOUT_MS} ms: ${JSON.stringify(series)}`);
 };
 
+// MAZER-QA-010 (root cause): the menu demo loops build -> settled -> deconstruct -> build every few seconds, and the
+// slot sits under the maze backdrop. A measurement series that straddles that cycle reads different backdrop ink
+// ("ink remains in the slot after the count is released (74 vs 0)", "control delta must be exactly 0, got 4"); it
+// is NOT the presence grace window (releasing the count resets the display to hidden immediately). Wait on the real
+// condition: a page-side watcher records whether the lifecycle left 'settled' since it was armed, and a whole
+// measurement series is accepted only when the scene was settled for all of it, otherwise it is re-run.
+const armSettledWatch = (page) => page.evaluate(() => {
+  const scene = window.__MAZER_GAME__.scene.getScene('MenuScene');
+  const phaseOf = () => JSON.parse(document.documentElement.getAttribute('data-mazer-visual-diagnostics'))?.runtime?.generation?.drawStage?.lifecyclePhase;
+  window.__mazerSettledWatch = { left: false, backdropEpoch: scene.menuDemoCycleStartedAtMs };
+  const watch = window.__mazerSettledWatch;
+  const tick = () => {
+    if (phaseOf() !== 'settled' || scene.menuDemoCycleStartedAtMs !== watch.backdropEpoch) { watch.left = true; }
+    if (window.__mazerSettledWatch === watch) { requestAnimationFrame(tick); }
+  };
+  tick();
+});
+const waitSettled = (page) => page.waitForFunction(() => JSON.parse(document.documentElement.getAttribute('data-mazer-visual-diagnostics'))?.runtime?.generation?.drawStage?.lifecyclePhase === 'settled', null, { timeout: 30_000 });
+const stayedSettled = (page) => page.evaluate(() => window.__mazerSettledWatch.left === false);
+const MAX_SERIES_ATTEMPTS = 8;
+const measureSeries = async (page, slot, floor) => {
+  for (let attempt = 1; attempt <= MAX_SERIES_ATTEMPTS; attempt += 1) {
+    await waitSettled(page);
+    await settle(page, 300);
+    await armSettledWatch(page);
+    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
+    await settle(page, 300);
+    const hiddenA = await measureStable(page, slot, floor);
+    await settle(page, 300);
+    const hiddenB = await measureStable(page, slot, floor);
+    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(7));
+    await settle(page, 700);
+    const shown = await measureStable(page, slot, floor);
+    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
+    await settle(page, 700);
+    const hiddenAfter = await measureStable(page, slot, floor);
+    if (await stayedSettled(page)) {
+      return { hiddenA, hiddenB, shown, hiddenAfter };
+    }
+  }
+  throw new Error(`the menu demo backdrop never held still for a whole measurement series in ${MAX_SERIES_ATTEMPTS} attempts`);
+};
+
 const settle = (page, ms = 1700) => page.evaluate((wait) => new Promise((done) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(done)), wait)), ms);
 
 const main = async () => {
@@ -138,7 +181,7 @@ const main = async () => {
         await context.route('**/*', (route) => new URL(route.request().url()).origin === new URL(preview.baseUrl).origin
           ? route.continue() : route.abort());
         const page = await context.newPage();
-        await page.goto(`${preview.baseUrl}/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'networkidle' });
+        await page.goto(`${preview.baseUrl}/?content=core-only&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749`, { waitUntil: 'load', timeout: 60_000 });
         await waitForAuthenticatedFixtureReady(page);
         await page.waitForFunction(() => {
           const v = JSON.parse(document.documentElement.getAttribute('data-mazer-visual-diagnostics'));
@@ -159,16 +202,7 @@ const main = async () => {
         assert(centre(header.leaderboard) < centre(header.account), `${name}: icon order is not leaderboard-first`);
 
         const slot = { left: header.leaderboard.right, right: header.title.left, top: 0, bottom: Math.max(header.leaderboard.bottom, 64) };
-        // Released: nothing in the slot.
-        await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
-        await settle(page);
-        const hiddenA = await measureStable(page, slot, INK_FLOOR);
-        await settle(page, 300);
-        const hiddenB = await measureStable(page, slot, INK_FLOOR);
-        // Counted: painted in the slot.
-        await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(7));
-        await settle(page);
-        const shown = await measureStable(page, slot, INK_FLOOR);
+        const { hiddenA, hiddenB, shown, hiddenAfter } = await measureSeries(page, slot, INK_FLOOR);
         const delta = shown.ink - hiddenA.ink;
         assert(delta >= MIN_COUNTER_DELTA_PIXELS, `${name}: the counter is not painted (ink ${shown.ink} shown vs ${hiddenA.ink} released, need delta >= ${MIN_COUNTER_DELTA_PIXELS})`);
         assert(shown.bounds, `${name}: no counter ink bounds`);
@@ -178,10 +212,7 @@ const main = async () => {
         for (const control of [header.leaderboard, header.account, header.settings]) {
           assert(!overlaps(shown.bounds, control), `${name}: counter overlaps a header control`);
         }
-        // Unknown again: the slot is empty after the grace window (no "0", no dash).
-        await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
-        await settle(page);
-        const hiddenAfter = await measureStable(page, slot, INK_FLOOR);
+        // Unknown again: the slot is empty again (no "0", no dash); measured inside the same settled series.
         assert(hiddenAfter.ink <= hiddenA.ink + 5, `${name}: ink remains in the slot after the count is released (${hiddenAfter.ink} vs ${hiddenA.ink})`);
         // Negative control: released vs released is exactly 0 ink difference, and fails the paint assertion.
         const controlDelta = hiddenB.ink - hiddenA.ink;

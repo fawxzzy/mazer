@@ -258,34 +258,31 @@ describe('maze build / tear-down timeline: frames', () => {
   });
 });
 
-describe('reduced motion: the 200 ms crossfade is the whole effect', () => {
-  test('the board layer fades 0 to 1 on the build and 1 to 0 on the deconstruct over the shipped crossfade length, linearly, no front', () => {
-    expect(INTRO_REDUCED_MOTION_MS).toBe(MOTION_DURATION_MS.base);
-    expect(resolveReducedBoardFade('build', 0, 373, true)).toBe(0);
-    expect(resolveReducedBoardFade('build', INTRO_REDUCED_MOTION_MS / 2, 373, true)).toBeCloseTo(0.5, 6);
-    expect(resolveReducedBoardFade('build', INTRO_REDUCED_MOTION_MS, 373, true)).toBeNull();
-    expect(resolveReducedBoardFade('deconstruct', 0, 373, true)).toBe(1);
-    expect(resolveReducedBoardFade('deconstruct', OUTRO_REDUCED_MOTION_MS / 4, 373, true)).toBeCloseTo(0.75, 6);
-    expect(resolveReducedBoardFade('deconstruct', OUTRO_REDUCED_MOTION_MS, 373, true)).toBeNull();
+describe('reduced motion: the maze appears and disappears instantly (MOTION-020)', () => {
+  test('there is no board fade at any time: no alpha ramp, no front', () => {
+    for (const ms of [0, 1, 50, INTRO_REDUCED_MOTION_MS / 2, INTRO_REDUCED_MOTION_MS, 1000]) {
+      expect(resolveReducedBoardFade('build', ms, 373, true)).toBeNull();
+      expect(resolveReducedBoardFade('deconstruct', ms, 373, true)).toBeNull();
+      expect(resolveMazeRevealFrame('build', ms, 373, true)).toBeNull();
+      expect(resolveMazeRevealFrame('deconstruct', ms, 373, true)).toBeNull();
+    }
+    expect(OUTRO_REDUCED_MOTION_MS).toBe(INTRO_REDUCED_MOTION_MS);
   });
 
   test('full motion has no board fade (the growing front is used instead)', () => {
     expect(resolveReducedBoardFade('build', 50, 373, false)).toBeNull();
     expect(resolveReducedBoardFade('deconstruct', 50, 373, false)).toBeNull();
-    expect(resolveReducedBoardFade('build', 50, 0, true)).toBeNull();
   });
 
-  test('the driver shows the full board at the crossfade alpha, then hands back to the hard state', () => {
+  test('the driver keeps the board at alpha 1 and never crossfades while reduced', () => {
     const driver = new MazeRevealDriver();
     const base = { phase: 'deconstructing', introStartedAtMs: null, deconstructStartedAtMs: 1000, tileCount: 373, reducedMotion: true } as const;
-    expect(driver.update({ ...base, time: 1100 })).toBe(true);
-    expect(driver.current).toBeNull();
-    expect(driver.crossfading).toBe(true);
-    expect(driver.boardAlpha).toBeCloseTo(0.5, 6);
-    expect(driver.resolveBoardReveal(new Int32Array(4), 2, 2)).toBeNull();
-    expect(driver.update({ ...base, time: 1200 })).toBe(true);
-    expect(driver.crossfading).toBe(false);
-    expect(driver.boardAlpha).toBe(1);
+    for (const time of [1000, 1050, 1100, 1199, 1200]) {
+      driver.update({ ...base, time });
+      expect(driver.current).toBeNull();
+      expect(driver.crossfading).toBe(false);
+      expect(driver.boardAlpha).toBe(1);
+    }
   });
 });
 
