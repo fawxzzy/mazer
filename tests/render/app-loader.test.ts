@@ -4,6 +4,8 @@ import {
   LOADER_FADE_OUT_MS,
   LOADER_ICON_MAX_PX,
   LOADER_ICON_MIN_PX,
+  LOADER_KICKER_GAP_PX,
+  LOADER_KICKER_HEIGHT_PX,
   LOADER_MIN_HOLD_MS,
   LOADER_PULSE_PERIOD_MS,
   LOADER_RING_GROWTH,
@@ -208,6 +210,14 @@ describe('layout and HTML splash hand-off', () => {
     expect(layout.centreX).toBe(195);
     expect(layout.centreY).toBe(422);
     expect(layout.labelCentreY).toBeGreaterThan(layout.centreY + (layout.iconSizePx / 2));
+  });
+
+  test('the MAZER kicker sits a fixed gap above the icon, mirroring the label below it', () => {
+    for (const [width, height] of [[390, 844], [375, 667], [1280, 720], [320, 568]]) {
+      const layout = resolveLoaderLayout(width, height);
+      const iconTop = layout.centreY - (layout.iconSizePx / 2);
+      expect(layout.kickerCentreY + (LOADER_KICKER_HEIGHT_PX / 2) + LOADER_KICKER_GAP_PX).toBe(iconTop);
+    }
   });
 
   test('the HTML splash exit: leave at once if the loader never showed, else wait out the rest of the hold', () => {

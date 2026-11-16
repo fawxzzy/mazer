@@ -594,7 +594,7 @@ import {
   resolveLegacyAuthLoadingCopy,
   shouldToastLegacyAuthFeedback
 } from '../legacy-runtime/legacyAccountStatusState';
-import { LOADER_RING_REDUCED_ALPHA, LOADER_RING_REDUCED_SCALE } from '../render/appLoader';
+import { LOADER_KICKER_FONT_PX, LOADER_RING_REDUCED_ALPHA, LOADER_RING_REDUCED_SCALE } from '../render/appLoader';
 import { MAZER_LOADER_ICON_TEXTURE_KEY, MAZER_LOADER_RING_TEXTURE_KEY } from '../render/appLoaderOverlay';
 import {
   hasLegacyStoredAuthSession,
@@ -1766,6 +1766,8 @@ export class MenuScene extends Phaser.Scene {
   private readonly uiEntrance = new UiEntranceDriver();
   private playerMessageToastTexts: Phaser.GameObjects.Text[] = [];
   private authGateLoadingText!: Phaser.GameObjects.Text;
+  /** The MAZER kicker above the loader icon (the HTML splash shows the same word in the same place). */
+  private authGateLoadingKicker!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
   // MAZER-VIS-039: the one app loader (icon, ring, fade in/out) behind the `Signing you in…` cover (src/render/appLoader.ts).
   private appLoader: AppLoaderOverlay | null = null;
@@ -2546,6 +2548,13 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '15px',
       color: LEGACY_ACCOUNT_STATUS_COLORS.loaderLabel
+    })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
+    this.authGateLoadingKicker = this.applyLegacyUiTextCrispness(this.add.text(0, 0, LEGACY_ACCOUNT_STATUS_COPY.kicker, {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${LOADER_KICKER_FONT_PX}px`,
+      fontStyle: '500',
+      letterSpacing: Math.round(LOADER_KICKER_FONT_PX * 0.34),
+      color: LEGACY_ACCOUNT_STATUS_COLORS.kicker
     })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
     this.appLoader = new AppLoaderOverlay(this, LEGACY_AUTH_GATE_LOADING_DEPTH);
 
@@ -15559,6 +15568,7 @@ export class MenuScene extends Phaser.Scene {
       }
       // The input shield is gone at once; the label leaves with the cover's fade.
       this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);
+      this.syncAuthGateLoadingKicker(loaderAlpha, this.layout.width);
       return;
     }
 
@@ -15583,6 +15593,19 @@ export class MenuScene extends Phaser.Scene {
       Math.round(loaderLayout?.labelCentreY ?? height / 2)
     );
     this.authGateLoadingText.setAlpha(loaderAlpha).setVisible(loaderAlpha > 0);
+    this.syncAuthGateLoadingKicker(loaderAlpha, width);
+  }
+
+  /** Keeps the loader's MAZER kicker above the icon, fading with the cover and the label. */
+  private syncAuthGateLoadingKicker(loaderAlpha: number, fallbackWidth: number): void {
+    const loaderLayout = this.appLoader?.currentLayout;
+    this.authGateLoadingKicker
+      .setPosition(
+        Math.round(loaderLayout?.centreX ?? fallbackWidth / 2),
+        Math.round(loaderLayout?.kickerCentreY ?? this.layout.height / 2)
+      )
+      .setAlpha(loaderAlpha)
+      .setVisible(loaderAlpha > 0);
   }
 
   private resolveLegacyPlayTouchControlDiagnostics(): MenuSceneVisualDiagnostics['touchControls'] {
