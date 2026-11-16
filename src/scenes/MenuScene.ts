@@ -26,6 +26,8 @@ import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
+import { resolveStartSpiralRotation } from '../render/endpointSpiral';
+import { resolveSharedBorderColor } from '../render/trailPalette';
 import {
   resolveBleedGlowColor,
   resolveBleedGlowEnvelope,
@@ -490,6 +492,10 @@ import {
   checkLegacyUsernameAvailable,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
+  createLegacyRevokedSessionSnapshot,
+  dropRevokedLegacyAuthSession,
+  isLegacyRuntimeDiagnosticsAuthFixtureSnapshot,
+  probeLegacyAuthSessionWithProvider,
   readLegacyAccountUsername,
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentityState,
@@ -504,6 +510,10 @@ import {
   MAZER_HOST_SIGN_OUT_NAVIGATION_TIMEOUT_MS,
   runMazerHostSignOutInBrowser
 } from '../legacy-runtime/legacyHostSignOut';
+import {
+  installLegacyAuthRecheckInBrowser,
+  type LegacyAuthRecheckBrowserBinding
+} from '../legacy-runtime/legacyAuthRecheck';
 import { LEGACY_AUTH_FAILURE_CODES } from '../legacy-runtime/legacyAuthFailureCodes';
 import { resolveLegacyAuthFeedbackExpiresAtMs } from '../legacy-runtime/legacyAuthFeedbackLifetime';
 import {
@@ -1797,6 +1807,8 @@ export class MenuScene extends Phaser.Scene {
   // Top of the message toast while the editor is open: just under the card, so it never covers Save/Cancel.
   private leaderboardUsernameEditorToastTop: number | null = null;
   private authUnsubscribe: (() => void) | null = null;
+  // Provider recheck on boot and on resume (legacyAuthRecheck.ts); null for fixtures, previews and after shutdown.
+  private authRecheck: LegacyAuthRecheckBrowserBinding | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
   private maze!: LegacyMazeSnapshot;
@@ -2647,6 +2659,8 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
+      this.authRecheck?.dispose();
+      this.authRecheck = null;
       this.presence.stop();
       this.destroyAccountUsernameNativeInput();
       this.detachRuntimeDiagnostics();
@@ -6916,6 +6930,8 @@ export class MenuScene extends Phaser.Scene {
       this.revokeLegacyGuestPlayGrant();
     }
     this.mode = 'menu';
+    // A provider recheck that came due during the run runs now (never mid-run).
+    this.authRecheck?.notifySafePoint();
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
     this.overlay = 'none';
@@ -10384,7 +10400,11 @@ export class MenuScene extends Phaser.Scene {
       phase,
       reducedMotion: this.prefersLegacyReducedMotion(),
       // The slow spin (goalStarSpin.ts): from the shared scene clock; 0 (tip up, static) under Reduce Motion.
-      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0
+      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      // MAZER-VIS-053: the start spiral turns on the SAME clock and period as the star (in phase), and the star's border is
+      // the shared border colour of the edge diamonds (same function, same trail head, same reduced-motion rule).
+      startSpiralRotation: kind === 'start' ? resolveStartSpiralRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      endpointBorderColor: resolveSharedBorderColor(this.trailPaletteHead, time ?? 0, this.prefersLegacyReducedMotion())
     };
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
     // any more); Trace: its own marker artwork. Both go through the same call.
@@ -14486,6 +14506,28 @@ export class MenuScene extends Phaser.Scene {
 
     const snapshot = await readLegacyAuthSessionSnapshot();
     this.applyLegacyAuthSnapshot(snapshot);
+    this.installLegacyAuthRecheck();
+  }
+
+  // "Sign out everywhere" on the account portal: ask the provider at boot and on resume (legacyAuthRecheck.ts).
+  private installLegacyAuthRecheck(): void {
+    if (this.sys.settings.status >= Phaser.Scenes.SHUTDOWN || this.authRecheck !== null) {
+      return;
+    }
+    this.authRecheck = installLegacyAuthRecheckInBrowser<LegacyAuthSessionSnapshot>({
+      drop: dropRevokedLegacyAuthSession,
+      isAuthenticated: () => this.authSnapshot.status === 'authenticated'
+        && !isLegacyRuntimeDiagnosticsAuthFixtureSnapshot(this.authSnapshot),
+      isSafePoint: () => this.mode === 'menu',
+      onSignedOut: (snapshot) => {
+        if (this.sys.settings.status < Phaser.Scenes.SHUTDOWN) {
+          this.applyLegacyAuthSnapshot(snapshot);
+        }
+      },
+      probe: probeLegacyAuthSessionWithProvider,
+      signedOutSnapshot: () => createLegacyRevokedSessionSnapshot()
+    });
+    this.authRecheck?.request('boot');
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {

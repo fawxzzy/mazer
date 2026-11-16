@@ -36,6 +36,11 @@ import {
   type EndpointTileSpec
 } from './endpointTiles';
 import { shouldDrawEndpointMarker } from './endpointMarkerLayering';
+import { resolveStartSpiralArm, START_SPIRAL } from './endpointSpiral';
+import { resolveSharedBorderColor } from './trailPalette';
+
+/** The goal star's border when the caller has no live trail colour (the Guide icon): the static trail palette at its start. */
+const STATIC_ENDPOINT_BORDER_COLOR = resolveSharedBorderColor(null, 0, true);
 
 /**
  * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone.
@@ -1017,6 +1022,18 @@ export interface BoardMarkerInput {
    */
   goalStarRotation?: number;
   /**
+   * Chip style (MAZER-VIS-053): the start spiral's clockwise rotation in radians (endpointSpiral.ts, the star's angle
+   * un-reduced, so the two turn in phase), about its centre. Default 0: what the Guide icon and every static frame draw.
+   * Ignored under reducedMotion.
+   */
+  startSpiralRotation?: number;
+  /**
+   * Chip style (MAZER-VIS-053): the goal star's BORDER colour, 0xRRGGBB. The scene passes the shared border colour
+   * (trailPalette.ts `resolveSharedBorderColor`, the colour of the edge diamonds' border). Default: the static trail
+   * palette at the trail's start, which is what a diamond with no live trail shows (the Guide icon).
+   */
+  endpointBorderColor?: number;
+  /**
    * Chip style: the start / goal cell's own chip geometry in BOARD-LOCAL css px (`computeChipTileAt`, from the
    * same bake layout), so the end marker is centred on the baked tile's device-snapped cell. `startTile.direction` is
    * the way the start arrow points. Omit for a standalone cell (Guide icons): an isolated chip, arrow pointing right.
@@ -1114,7 +1131,7 @@ const drawTraceGoalMarker = (
 };
 
 /**
- * The end marker: the glyph (goal star / start play arrow) directly on the baked tile, no pad, no disc, no ring. A
+ * The end marker: the glyph (goal star / start spiral) directly on the baked tile, no pad, no disc, no ring. A
  * dark keyline is traced around the glyph (board void colour, round joins) and the glyph is filled over it, so it
  * stays legible on the mid-tone chip without any backdrop shape.
  */
@@ -1124,47 +1141,66 @@ const drawEndpointGlyph = (
   spec: EndpointTileSpec,
   ox: number,
   oy: number,
-  starRotation = 0
+  starRotation = 0,
+  spiralRotation = 0,
+  borderColor = STATIC_ENDPOINT_BORDER_COLOR
 ): void => {
   const m = style.material;
   const { frame } = spec;
   const cx = ox + frame.cx;
   const cy = oy + frame.cy;
   if (spec.star) {
-    // keyline: the star's outline, stroked wide in the void colour (half of it falls inside, under the fill).
-    // The star is turned about (cx, cy), its circumcentre (goalStarSpin.ts), so the centring never moves.
+    // Three layers, outermost first, each the star's outline stroked wide (half of every stroke falls inside, under the layers
+    // above it): a thin dark keyline, then the BORDER in the SHARED border colour (the edge diamonds' border, MAZER-VIS-053),
+    // then the red fill. The border colour alone is not enough: at some hues it is the red's own brightness, and 1.7:1 on
+    // the chip at the dimmest, so the keyline outside it keeps the glyph's edge crisp. The star is turned about (cx, cy), its
+    // circumcentre (goalStarSpin.ts), so the centring never moves.
     starPath(painter, cx, cy, spec.star.outer, spec.star.inner, starRotation);
     painter.fillStyle(cssRgb(m.void));
     painter.strokeStyle(cssRgb(m.void));
-    painter.lineWidth(frame.keyline * 2);
+    painter.lineWidth((frame.keyline + frame.border) * 2);
     painter.fill();
     painter.stroke();
+    if (frame.border > 0) {
+      painter.fillStyle(cssRgb(borderColor));
+      painter.strokeStyle(cssRgb(borderColor));
+      painter.lineWidth(frame.border * 2);
+      painter.fill();
+      painter.stroke();
+    }
     starPath(painter, cx, cy, spec.star.outer, spec.star.inner, starRotation);
     painter.fillStyle(cssRgb(m.goal));
     painter.fill();
     return;
   }
-  if (spec.play) {
-    const { play } = spec;
-    const trace = (): void => {
+  if (spec.spiral) {
+    // The start spiral (MAZER-VIS-053): two interleaved arms about the tile's optical centre, each stroked wide in the void
+    // colour (the keyline) and then in gold, round caps and joins. Turned about its axis by `spiralRotation`.
+    const { spiral } = spec;
+    const arm = (index: number): void => {
+      const points = resolveStartSpiralArm(
+        { cx: ox + spiral.cx, cy: oy + spiral.cy, outer: spiral.outer, inner: spiral.inner },
+        index,
+        spiralRotation
+      );
       painter.begin();
-      painter.move(ox + play.ax, oy + play.ay);
-      painter.line(ox + play.bx, oy + play.by);
-      painter.line(ox + play.cx, oy + play.cy);
-      painter.close();
+      painter.move(points[0] as number, points[1] as number);
+      for (let i = 2; i < points.length; i += 2) {
+        painter.line(points[i] as number, points[i + 1] as number);
+      }
     };
-    trace();
-    painter.fillStyle(cssRgb(m.void));
     painter.strokeStyle(cssRgb(m.void));
-    painter.lineWidth(play.stroke + (frame.keyline * 2));
-    painter.fill();
-    painter.stroke();
-    trace();
-    painter.fillStyle(cssRgb(m.start));
+    painter.lineWidth(spiral.stroke + (frame.keyline * 2));
+    for (let index = 0; index < START_SPIRAL.arms; index += 1) {
+      arm(index);
+      painter.stroke();
+    }
     painter.strokeStyle(cssRgb(m.start));
-    painter.lineWidth(play.stroke);
-    painter.fill();
-    painter.stroke();
+    painter.lineWidth(spiral.stroke);
+    for (let index = 0; index < START_SPIRAL.arms; index += 1) {
+      arm(index);
+      painter.stroke();
+    }
   }
 };
 
@@ -1233,7 +1269,7 @@ const standaloneEndpointRect = (
  * Draws start, goal and player for the chosen style onto `ctx`. Only the markers present in the
  * input are drawn. Start is skipped while the player stands on it. Order: start, goal, player.
  *
- * Chip style: start and goal are END MARKERS (see endpointTiles.ts): a star / a play arrow centred directly on
+ * Chip style: start and goal are END MARKERS (see endpointTiles.ts): a star / a spiral centred directly on
  * the baked tile (no box behind them), placed from `startTile` / `goalTile` (the baked tile's geometry). The start
  * arrow points along `startTile.direction`. Trace style: the alternate marker artwork, unchanged.
  */
@@ -1257,7 +1293,9 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
     const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
     drawEndpointGlyph(
       painter, style, resolveEndpointTile(kind, rect, scale), ox, oy,
-      kind === 'goal' && !input.reducedMotion ? (input.goalStarRotation ?? 0) : 0
+      kind === 'goal' && !input.reducedMotion ? (input.goalStarRotation ?? 0) : 0,
+      kind === 'start' && !input.reducedMotion ? (input.startSpiralRotation ?? 0) : 0,
+      input.endpointBorderColor
     );
   };
   if (input.start && shouldDrawEndpointMarker('start', onStart)) {

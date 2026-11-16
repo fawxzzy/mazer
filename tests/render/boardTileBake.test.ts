@@ -22,7 +22,7 @@ import {
   cssRgba,
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
-import type { StartDirection } from '../../src/render/startDirection';
+import { resolveSharedBorderColor } from '../../src/render/trailPalette';
 import {
   braidedMazeGrid,
   contrast,
@@ -431,29 +431,37 @@ describe('markers', () => {
     ]);
   });
 
-  test('chip goal: a keyline then a star in the danger colour, directly on the tile (no pad, no disc, no ring)', () => {
+  test('chip goal: a keyline, a border in the shared border colour, then a star in the danger colour, directly on the tile (no pad, no disc, no ring)', () => {
     const { rec } = draw({ start: undefined, player: undefined });
     expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
       `set fillStyle=${cssRgb(boardMaterial.void)}`,
+      `set fillStyle=${cssRgb(resolveSharedBorderColor(null, 0, true))}`,
       `set fillStyle=${cssRgb(boardMaterial.goal)}`
     ]);
     expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.void)}`);
     // the keyline is the star's own outline: no circle (disc / ring) and no rounded-rect pad is drawn
     expect(rec.count('arc(')).toBe(0);
     expect(rec.count('arcTo(')).toBe(0);
-    expect(rec.count('stroke(')).toBe(1);
+    // the keyline and the border are the star's two outline strokes
+    expect(rec.count('stroke(')).toBe(2);
   });
 
-  test('chip start: a keyline then a gold play arrow, directly on the tile (no pad, no disc, no ring)', () => {
+  test('the goal star border is the colour it is given (the scene passes the live shared border colour)', () => {
+    const { rec } = draw({ start: undefined, player: undefined, endpointBorderColor: 0x123456 });
+    expect(rec.log).toContain(`set strokeStyle=${cssRgb(0x123456)}`);
+    expect(rec.log).toContain(`set fillStyle=${cssRgb(0x123456)}`);
+  });
+
+  test('chip start: a keyline then a gold two-arm spiral, directly on the tile (no pad, no disc, no ring)', () => {
     const { rec } = draw({ goal: undefined, player: undefined });
-    expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
-      `set fillStyle=${cssRgb(boardMaterial.void)}`,
-      `set fillStyle=${cssRgb(boardMaterial.start)}`
+    expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([]);
+    expect(rec.log.filter((e) => e.startsWith('set strokeStyle='))).toEqual([
+      `set strokeStyle=${cssRgb(boardMaterial.void)}`,
+      `set strokeStyle=${cssRgb(boardMaterial.start)}`
     ]);
-    expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.void)}`);
-    expect(rec.log).toContain(`set strokeStyle=${cssRgb(boardMaterial.start)}`);
-    // the keyline stroke and the gold arrow's own round-join outline are the only strokes; nothing is circular
-    expect(rec.count('stroke(')).toBe(2);
+    // each of the two arms is stroked in the keyline colour, then in gold; nothing is circular and nothing is filled
+    expect(rec.count('stroke(')).toBe(4);
+    expect(rec.count('fill(')).toBe(0);
     expect(rec.count('arc(')).toBe(0);
     expect(rec.count('arcTo(')).toBe(0);
   });
@@ -483,28 +491,34 @@ describe('markers', () => {
     }
   });
 
-  test('the start arrow follows the direction on the start tile (and points right with none)', () => {
+  test('the start spiral is turned by startSpiralRotation, ignores the first-step direction, and stays centred on the tile', () => {
     const input = inputFor(corridorGrid(), { tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 } });
     const tile = computeChipTileAt(input, { x: 12, y: 0 })!;
-    const apexOf = (direction?: StartDirection): [number, number] => {
+    const pointsOf = (rotation: number, direction?: 'up' | 'down' | 'left' | 'right'): number[][] => {
       const rec = createRecordingContext();
       drawBoardMarkers(rec.ctx, {
-        style: 'chip', tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 }, startTile: direction ? { ...tile, direction } : tile
+        style: 'chip', tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 }, startTile: direction ? { ...tile, direction } : tile,
+        startSpiralRotation: rotation
       });
-      const pts = rec.log
+      return rec.log
         .filter((e) => e.startsWith('moveTo(') || e.startsWith('lineTo('))
-        .map((e) => e.slice(e.indexOf('(') + 1, -1).split(',').map(Number) as [number, number]);
-      return pts[2]!;
+        .map((e) => e.slice(e.indexOf('(') + 1, -1).split(',').map(Number));
     };
+    const rest = pointsOf(0);
+    expect(rest.length).toBeGreaterThan(40);
+    expect(pointsOf(0, 'up')).toEqual(rest);
+    expect(pointsOf(0, 'left')).toEqual(rest);
+    expect(pointsOf(0.8)).not.toEqual(rest);
+    // two arms half a turn apart: the mean of all points is the spin axis at every angle
     const cx = tile.left + (tile.width / 2);
     const cy = tile.top + (tile.height / 2);
-    const right = apexOf('right');
-    expect(apexOf()).toEqual(right);
-    expect(right[0]).toBeGreaterThan(cx);
-    expect(right[1]).toBeCloseTo(cy, 6);
-    expect(apexOf('left')[0]).toBeLessThan(cx);
-    expect(apexOf('down')[1]).toBeGreaterThan(cy);
-    expect(apexOf('up')[1]).toBeLessThan(cy);
+    for (const rotation of [0, 0.8, 2.1]) {
+      const pts = pointsOf(rotation);
+      const mx = pts.reduce((sum, p) => sum + p[0]!, 0) / pts.length;
+      const my = pts.reduce((sum, p) => sum + p[1]!, 0) / pts.length;
+      expect(Math.abs(mx - cx)).toBeLessThan(1);
+      expect(Math.abs(my - cy)).toBeLessThan(1);
+    }
   });
 
   test('trace keeps its own start and goal artwork (and still honours the css-px floors)', () => {
@@ -545,8 +559,8 @@ describe('markers', () => {
       // The goal red is only ~1.8:1 on the bare chip (no backdrop any more); the star's dark keyline carries it.
       ['goal keyline', boardMaterial.void, chip],
       ['goal star on keyline', boardMaterial.goal, boardMaterial.void],
-      ['start arrow keyline', boardMaterial.void, chip],
-      ['start arrow on keyline', boardMaterial.start, boardMaterial.void]
+      ['start spiral keyline', boardMaterial.void, chip],
+      ['start spiral on keyline', boardMaterial.start, boardMaterial.void]
     ];
     console.info(`BOARD_TILE_CONTRAST ${rows.map(([n, f, b]) => `${n}: ${contrast(f, b).toFixed(2)}`).join(' | ')}`);
     for (const [name, fg, bg] of rows) {

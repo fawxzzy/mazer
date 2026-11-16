@@ -4,7 +4,12 @@
 // candidate grid, real layout, refined aspect ratio, final grid, final layout.
 // Calibration scripts and the tile-floor test read this instead of copying the
 // layout math, so they cannot drift from the shipped layout.
-import { LEGACY_BOARD_MIN_TILE_PX, resolveLegacyBoardDimensions } from './legacyBoardScale';
+import {
+  LEGACY_BOARD_BASE_SCALE,
+  LEGACY_BOARD_MAX_SCALE,
+  LEGACY_BOARD_MIN_TILE_PX,
+  resolveLegacyBoardDimensions
+} from './legacyBoardScale';
 import { normalizeGridDimension } from './legacyMaze';
 import {
   resolveLegacyMenuBoardAspectRatio,
@@ -57,11 +62,46 @@ export const planLegacyBoard = (
   return { scale, aspectRatio, width: dims.width, height: dims.height, tileSize: layout.tileSize };
 };
 
-// The tile floor, enforced with the real layout. Returns the largest scale <= `desiredScale`
-// (stepping down by `step`) whose board draws tiles of at least LEGACY_BOARD_MIN_TILE_PX on this
-// viewport. On every phone 320 px wide or more at the scales the ladder uses it returns
-// `desiredScale` unchanged, so the board stays a function of the level; it only bites on a
-// narrower box that physically cannot hold the board at 10 px. Never goes below `minScale`.
+// The tile floor, enforced with the real layout. Returns `desiredScale`, or the largest scale below it
+// that still draws tiles of at least LEGACY_BOARD_MIN_TILE_PX on this viewport. The limit is a property
+// of the DEVICE (a ceiling), found by walking a fixed lattice (`step` apart, anchored at the base scale)
+// up from the base scale until the first scale that cannot hold 10 px, or down from it when even the
+// base scale cannot. The result is min(desired, ceiling), so it never falls as the level (and the desired
+// scale) rises and never depends on which level asked first. A box that holds 10 px up to the top of the
+// curve (every phone 360 px wide or more) always gets `desiredScale` back untouched. Never below `minScale`.
+const floorCeilingCache = new Map<string, number>();
+
+const resolveFloorCeiling = (
+  viewport: LegacyBoardPlanViewport,
+  surface: LegacyMenuLayoutSurface,
+  step: number,
+  minScale: number
+): number => {
+  const key = [
+    viewport.width, viewport.height, viewport.safeArea?.top ?? 0, viewport.safeArea?.bottom ?? 0,
+    viewport.safeArea?.left ?? 0, viewport.safeArea?.right ?? 0, viewport.browserMobileParity ? 1 : 0, surface, step, minScale
+  ].join(':');
+  const cached = floorCeilingCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const fits = (scale: number): boolean => planLegacyBoard(viewport, scale, surface).tileSize >= LEGACY_BOARD_MIN_TILE_PX;
+  const at = (index: number): number => Math.round((LEGACY_BOARD_BASE_SCALE + (index * step)) * 10000) / 10000;
+  let ceiling: number;
+  if (fits(LEGACY_BOARD_BASE_SCALE)) {
+    let index = 0;
+    while (at(index + 1) <= LEGACY_BOARD_MAX_SCALE && fits(at(index + 1))) { index += 1; }
+    ceiling = at(index + 1) <= LEGACY_BOARD_MAX_SCALE ? at(index) : Number.POSITIVE_INFINITY;
+  } else {
+    let index = 0;
+    while (at(index) > minScale && !fits(at(index))) { index -= 1; }
+    ceiling = Math.max(minScale, at(index));
+  }
+  if (floorCeilingCache.size >= 256) { floorCeilingCache.clear(); }
+  floorCeilingCache.set(key, ceiling);
+  return ceiling;
+};
+
 export const resolveLegacyBoardFloorScale = (
   viewport: LegacyBoardPlanViewport,
   desiredScale: number,
@@ -69,9 +109,20 @@ export const resolveLegacyBoardFloorScale = (
   step: number,
   minScale = 25
 ): number => {
-  let scale = desiredScale;
-  while (scale > minScale && planLegacyBoard(viewport, scale, surface).tileSize < LEGACY_BOARD_MIN_TILE_PX) {
-    scale = Math.max(minScale, Math.round((scale - step) * 10000) / 10000);
+  const ceiling = resolveFloorCeiling(viewport, surface, step, minScale);
+  if (desiredScale >= ceiling) {
+    return Math.max(minScale, ceiling);
   }
-  return scale;
+  if (!Number.isFinite(ceiling)) {
+    return Math.max(minScale, desiredScale);
+  }
+  // Below a finite ceiling the desired scale is not guaranteed to hold 10 px: whether a tile fits is not smooth in the
+  // scale (an odd-grid rounding can flip it between two lattice points, a 350x568 menu-demo at levels 214-219 drew
+  // 9.87 px). So it is snapped DOWN onto the same fixed lattice the ceiling is found on and walked down to the first
+  // lattice scale that fits. That is monotone in the desired scale (the largest fitting lattice point at or below it),
+  // never above the ceiling, and does not depend on which level asked first.
+  let index = Math.floor(((desiredScale - LEGACY_BOARD_BASE_SCALE) / step) + 1e-9);
+  const scaleAt = (i: number): number => Math.round((LEGACY_BOARD_BASE_SCALE + (i * step)) * 10000) / 10000;
+  while (scaleAt(index) > minScale && planLegacyBoard(viewport, scaleAt(index), surface).tileSize < LEGACY_BOARD_MIN_TILE_PX) { index -= 1; }
+  return Math.max(minScale, scaleAt(index));
 };

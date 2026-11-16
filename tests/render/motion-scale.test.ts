@@ -52,7 +52,7 @@ describe('motion scale', () => {
   it('migrated constants equal their old literals', () => {
     expect([INTRO_DIGIT_IN_MS, INTRO_LASER_MS, INTRO_BEAM_STAGGER_MS, INTRO_REDUCED_MOTION_MS]).toEqual([200, 400, 60, 200]);
     expect([OUTRO_LASER_MS, OUTRO_DIGIT_IN_MS, OUTRO_HANDOFF_MS, OUTRO_REDUCED_MOTION_MS]).toEqual([400, 300, 300, 200]);
-    expect([EDGE_MARKER_FLASH_MS, EDGE_MARKER_IDLE_PERIOD_MS, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS]).toEqual([120, 3600, 3600]);
+    expect([EDGE_MARKER_FLASH_MS, EDGE_MARKER_IDLE_PERIOD_MS, IRIDESCENT_TRAIL_SWEEP_PERIOD_MS]).toEqual([120, 3600, 10800]);
     expect(LEGACY_PLAYER_TRANSFER_SWIRL_PERIOD_MS).toBe(1200);
     expect(TELEPORT_TRANSFER_EXTRACTION_REDUCED_MOTION_CROSSFADE_MS).toBe(200);
     // One crossfade length, shared by intro, outro and teleport.

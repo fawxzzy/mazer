@@ -33,6 +33,7 @@ import {
 import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
 import { forceRemoveOneTileStubs } from './legacyMazeStubs';
 import { applyOneTileStubRule } from './legacyMazeStubPass';
+import { applyStaircasePass, readLegacyStaircaseFlagFromLocation } from './legacyMazeStaircase';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
@@ -164,6 +165,9 @@ export interface LegacyGenerationSelectionOptions {
   wrapRungs?: number;
   targetComplexity?: number | null;
   tolerance?: number;
+  // MAZER-GEN-020 (flagged prototype, QA only): true re-lays corridors as staircases after the build (legacyMazeStaircase.ts).
+  // Undefined reads the page's ?staircase=1; absent and off leave every maze byte-identical.
+  staircase?: boolean;
 }
 
 export interface LegacyGenerationSelectionReview {
@@ -205,8 +209,11 @@ export const LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_CANDIDATES = 3;
 export const LEGACY_GENERATION_SELECTION_PRESSURE_RETRY_MIN_TARGET = 46;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 
+// MAZER-PROG-020: the scale may be fractional (the board grows smoothly with the level), so it is
+// clamped, not rounded to a whole number; whole-number scales behave exactly as before. Rounded to
+// 1e-4 so a scale that arrives as 38.00000000000001 and 38 are one key.
 const resolveLegacyGenerationScale = (scale: number): number => (
-  clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE)
+  Math.max(LEGACY_MIN_SCALE, Math.min(LEGACY_MAX_SCALE, Math.round(scale * 10000) / 10000))
 );
 
 const resolveLegacyShortcutCountModifier = (mode: LegacyGenerationMode): number => (
@@ -996,7 +1003,9 @@ const generateLegacyRuntimeMazeForMode = (
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale, profile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const gate = resolveLegacyGenerationTickGateContract();
-  const { maze, profile: builtProfile, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
+  const selected = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
+  const { profile: builtProfile, review } = selected;
+  const maze = (selectionOptions.staircase ?? readLegacyStaircaseFlagFromLocation()) ? applyStaircasePass(selected.maze) : selected.maze;
 
   return {
     ...maze,
