@@ -9,14 +9,15 @@ import {
 
 export const LEGACY_MAZE_WORKER_DISABLE_PARAM = 'mazeWorker';
 
-const createDefaultMazeWorker = (): LegacyMazeWorkerLike | null => {
+export const createDefaultMazeWorker = (): LegacyMazeWorkerLike | null => {
   if (typeof Worker === 'undefined') {
     return null;
   }
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).get(LEGACY_MAZE_WORKER_DISABLE_PARAM) === 'off') {
     return null;
   }
-  // MAZER-GEN-020: the staircase QA flag lives in the page's query string, which a worker cannot read: stay on the main thread.
+  // MAZER-GEN-020: the (QA-gated) staircase flag lives in the page's query string, which a worker cannot read, so
+  // flag-on generation runs on the main thread. Plain URLs keep the worker.
   if (readLegacyStaircaseFlagFromLocation()) {
     return null;
   }

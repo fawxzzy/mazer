@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createDefaultMazeWorker } from '../../src/legacy-runtime/legacyMazeWorkerClient';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { analyzeMazeDifficulty } from '../../src/legacy-runtime/legacyMazeDifficultyMetrics';
 import { measureFelt } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
@@ -47,19 +48,66 @@ const openings = (maze: { width: number; height: number; grid: ReadonlyArray<Rea
 describe('staircase pathways: the flag', () => {
   test('parses 1/on/true/yes and nothing else', () => {
     expect(LEGACY_STAIRCASE_PARAM).toBe('staircase');
-    for (const on of ['?staircase=1', 'staircase=on', '?a=1&staircase=TRUE', '?staircase=yes']) {
+    for (const on of ['?staircase=1&previewLevel=5', 'staircase=on&runtimeDiagnostics=1', '?a=1&staircase=TRUE&runtimeDiagnostics=true', '?staircase=yes&previewLevel=20']) {
       expect(resolveLegacyStaircaseFlag(on), on).toBe(true);
     }
     for (const off of ['', '?', '?staircase=0', '?staircase=', '?staircase=2', '?staircases=1', '?x=staircase']) {
       expect(resolveLegacyStaircaseFlag(off), off).toBe(false);
     }
-    expect(resolveLegacyStaircaseFlag(new URLSearchParams('staircase=1'))).toBe(true);
+    expect(resolveLegacyStaircaseFlag(new URLSearchParams('staircase=1&previewLevel=5'))).toBe(true);
     expect(resolveLegacyStaircaseFlag(null)).toBe(false);
     expect(resolveLegacyStaircaseFlag(undefined)).toBe(false);
   });
 
+  test('the flag only counts with the QA gate (runtimeDiagnostics or previewLevel)', () => {
+    for (const ungated of ['?staircase=1', 'staircase=on', '?staircase=1&runtimeDiagnostics=0', '?staircase=1&runtimeDiagnostics=', '?staircase=1&previewLevel=0', '?staircase=1&previewLevel=abc', '?runtimeDiagnostics=1', '?previewLevel=5']) {
+      expect(resolveLegacyStaircaseFlag(ungated), ungated).toBe(false);
+    }
+  });
+
   test('is off when there is no page query (node, worker)', () => {
     expect(readLegacyStaircaseFlagFromLocation()).toBe(false);
+  });
+
+  describe('page location and worker host', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    test('readLegacyStaircaseFlagFromLocation is true only when the URL is gated', () => {
+      const cases: Array<[string, boolean]> = [
+        ['?staircase=1', false],
+        ['', false],
+        ['?previewLevel=5', false],
+        ['?staircase=1&previewLevel=5', true],
+        ['?staircase=1&runtimeDiagnostics=1', true],
+        ['?staircase=0&previewLevel=5', false]
+      ];
+      for (const [search, expected] of cases) {
+        vi.stubGlobal('location', { search });
+        expect(readLegacyStaircaseFlagFromLocation(), search).toBe(expected);
+      }
+    });
+
+    test('createDefaultMazeWorker returns null for the gated flag and a Worker otherwise', () => {
+      const created: string[] = [];
+      class FakeWorker {
+        constructor(url: unknown, options: unknown) {
+          created.push(String(url) + JSON.stringify(options));
+        }
+      }
+      vi.stubGlobal('Worker', FakeWorker);
+      vi.stubGlobal('location', { search: '?staircase=1&previewLevel=5' });
+      expect(createDefaultMazeWorker()).toBeNull();
+      expect(created).toHaveLength(0);
+      for (const search of ['', '?staircase=1', '?previewLevel=5']) {
+        vi.stubGlobal('location', { search });
+        expect(createDefaultMazeWorker(), search).toBeInstanceOf(FakeWorker);
+      }
+      expect(created).toHaveLength(3);
+      vi.stubGlobal('location', { search: '?mazeWorker=off' });
+      expect(createDefaultMazeWorker()).toBeNull();
+    });
   });
 
   test('absent and false leave the maze byte-identical, on adds only staircaseStats and geometry', () => {

@@ -29,6 +29,7 @@
 // Pure, deterministic (seeded by the maze seed, row-major chain order), integer only, no clock.
 import type { LegacyMazeSnapshot } from './legacyMaze';
 import { measureFelt } from './legacyMazeFeltDifficulty';
+import { isLegacyLevelPreviewRoute } from './legacyLevelPreview';
 
 export const LEGACY_STAIRCASE_PARAM = 'staircase';
 
@@ -59,12 +60,20 @@ export interface LegacyStaircaseStats {
 
 type StaircaseMaze = Pick<LegacyMazeSnapshot, 'width' | 'height' | 'grid' | 'start' | 'goal' | 'solutionPath' | 'seed'>;
 
+// The QA gate: `?staircase=1` only counts together with the QA diagnostics flag (`runtimeDiagnostics=1|true`, the same
+// gate the QA fixtures use) or the level-preview route (`previewLevel=N`). A plain production URL, with or without
+// `staircase=1`, can therefore never alter a real player's maze.
+const isQaGated = (params: URLSearchParams): boolean => {
+  const diagnostics = params.get('runtimeDiagnostics')?.trim().toLowerCase();
+  return diagnostics === '1' || diagnostics === 'true' || isLegacyLevelPreviewRoute(params);
+};
+
 export const resolveLegacyStaircaseFlag = (search?: string | URLSearchParams | null): boolean => {
   const params = search instanceof URLSearchParams
     ? search
     : new URLSearchParams(typeof search === 'string' ? (search.startsWith('?') ? search.slice(1) : search) : '');
   const raw = params.get(LEGACY_STAIRCASE_PARAM);
-  return raw !== null && /^(1|on|true|yes)$/i.test(raw.trim());
+  return raw !== null && /^(1|on|true|yes)$/i.test(raw.trim()) && isQaGated(params);
 };
 
 // The page's own query string, when there is a page (not in node, not in a worker: the worker host stays off
