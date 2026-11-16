@@ -2118,7 +2118,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     // Wiring lane (2026-11-06): the Guide is a sheet (legacyGuideSheetPlan.ts + legacyGuideContent.ts) with
     // wrapped 14 px copy and an icon per row; the old dropdown's 8-11 px legend and its start/exit rows are gone.
-    expect(menuSceneSource).toContain('const model = buildLegacyGuideSheetModel(context, { hasKeyboard: this.resolveLegacyGuideHasKeyboard() });');
+    // Slice H6 adds the met hazard kinds (always [] while the hazard layer is off, so the rows are unchanged).
+    expect(menuSceneSource).toContain('const model = buildLegacyGuideSheetModel(context, {\r\n      hasKeyboard: this.resolveLegacyGuideHasKeyboard(),');
+    expect(menuSceneSource).toContain('hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? []');
     expect(menuSceneSource).toContain('let plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(Number.MAX_SAFE_INTEGER) });');
     expect(menuSceneSource).toContain('model.closeLabel,');
     expect(menuSceneSource).toContain('private closeLegacyGuideSheet(): void {');
@@ -2560,7 +2562,8 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',
-    'publishVisualDiagnostics', 'publishRuntimeDiagnostics', 'tickLegacyPresence', 'updateHazardWorldClock'
+    'publishVisualDiagnostics', 'publishRuntimeDiagnostics', 'tickLegacyPresence', 'updateHazardWorldClock',
+    'updateHazardMoments'
   ];
   for (const name of noops) scene[name] = vi.fn();
   const demo = vi.fn();

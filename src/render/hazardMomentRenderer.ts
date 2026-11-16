@@ -9,6 +9,8 @@
  * and fades out over its last 300 ms (instantly under reduced motion).
  */
 import Phaser from 'phaser';
+import { designTokens } from '../theme/tokens';
+import { cyberArcadeMaterial } from './cyberArcadeMaterial';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent, type GuideHazardGlyph } from './guideHazardGlyph';
 
 export interface HazardMomentCardContent {
@@ -132,9 +134,9 @@ export class HazardMomentView {
       fontSize: `${size}px`,
       color
     })).setOrigin(0, 0).setDepth(options.depth + 1).setVisible(false);
-    this.heading = text(sizes.headingSize, '#ffffff');
-    this.body = text(sizes.textSize, '#c9d6e8');
-    this.pipText = text(sizes.textSize, '#ffffff');
+    this.heading = text(sizes.headingSize, designTokens.color['text.primary']);
+    this.body = text(sizes.textSize, designTokens.color['text.muted']);
+    this.pipText = text(sizes.textSize, designTokens.color['text.primary']);
   }
 
   /** Queues a card. The text is set here, so the card is drawn on the very next visible frame. */
@@ -196,7 +198,7 @@ export class HazardMomentView {
     g.clear().setVisible(true);
     if (this.card) {
       const accent = resolveGuideHazardAccent(this.card.content.glyph);
-      g.fillStyle(0x070b14, 0.9 * cardAlpha);
+      g.fillStyle(cyberArcadeMaterial.substrate.panel, 0.9 * cardAlpha);
       g.fillRoundedRect(frame.cardLeft, frame.cardTop, frame.cardWidth, cardHeight, sizes.radius);
       g.lineStyle(2, accent, 0.9 * cardAlpha);
       g.strokeRoundedRect(frame.cardLeft, frame.cardTop, frame.cardWidth, cardHeight, sizes.radius);
@@ -222,7 +224,7 @@ export class HazardMomentView {
       const dotsWidth = dots * dotGap;
       const pillWidth = Math.round(10 + dotsWidth + 6 + this.pipText.width + 12);
       const pillLeft = Math.round((input.viewWidth - pillWidth) / 2);
-      g.fillStyle(0x070b14, 0.88 * pipAlpha);
+      g.fillStyle(cyberArcadeMaterial.substrate.panel, 0.88 * pipAlpha);
       g.fillRoundedRect(pillLeft, frame.pipTop, pillWidth, pipHeight, Math.floor(pipHeight / 2));
       g.lineStyle(1.5, accent, 0.85 * pipAlpha);
       g.strokeRoundedRect(pillLeft, frame.pipTop, pillWidth, pipHeight, Math.floor(pipHeight / 2));

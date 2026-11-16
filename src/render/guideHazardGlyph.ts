@@ -83,7 +83,7 @@ export const drawGuideHazardGlyph = (
         { x: centerX - 2.5 * unit, y: centerY + 7 * unit },
         { x: centerX - 4.5 * unit, y: centerY - 2 * unit }
       ], true);
-      graphics.fillStyle(0xffffff, 0.35);
+      graphics.fillStyle(cyberArcadeMaterial.shine.core, 0.35);
       graphics.fillPoints([
         { x: centerX, y: centerY - 8 * unit },
         { x: centerX + 1.5 * unit, y: centerY - 2 * unit },
