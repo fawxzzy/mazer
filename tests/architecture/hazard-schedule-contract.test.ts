@@ -101,9 +101,9 @@ describe('MAZER-HAZ-002 hazard schedule manifest v1 (slice H0)', () => {
     const record = doc.split('\n## 1.')[0];
     expect(record).toContain('SIGNED 2026-11-15');
     expect(record).toContain('Zac (owner), 2026-11-15, via chat');
-    expect(record).toContain('"YES to all four contract calls"');
+    expect(record).toContain('"yes to all four"');
     expect(manifest.contract.signedBy).toBe('Zac, 2026-11-15, via chat');
-    expect(manifest.contract.signedWords).toBe('YES to all four contract calls');
+    expect(manifest.contract.signedWords).toBe('yes to all four');
     for (const phrase of ['Pulse Gate', 'Sentry', 'Hunter', 'Shard', 'last junction on their own trail', '**4 ticks**', 'third contact with the same Hunter']) {
       expect(doc).toContain(phrase);
     }

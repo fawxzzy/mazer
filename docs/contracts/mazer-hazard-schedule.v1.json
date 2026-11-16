@@ -7,7 +7,7 @@
     "doc": "docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md",
     "graphContract": "docs/architecture/MAZER-HAZARD-GRAPH-CONTRACT.md",
     "signedBy": "Zac, 2026-11-15, via chat",
-    "signedWords": "YES to all four contract calls"
+    "signedWords": "yes to all four"
   },
   "flag": {
     "buildDefaultEnabled": false,

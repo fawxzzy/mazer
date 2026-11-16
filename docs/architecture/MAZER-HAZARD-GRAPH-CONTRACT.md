@@ -117,7 +117,7 @@ No `Math.random`, `Date.now`, or clock in `src/mazer-core/hazards` (source-bound
 
 ## Signed amendments (2026-11-15)
 
-Signed by Zac, 2026-11-15, via chat ("YES to all four contract calls"). Source of the decisions: `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md` sections 2.1 to 2.5. Schedule and caps are machine-readable in `docs/contracts/mazer-hazard-schedule.v1.json`.
+Signed by Zac, 2026-11-15, via chat ("yes to all four"). Source of the decisions: `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md` sections 2.1 to 2.5. Schedule and caps are machine-readable in `docs/contracts/mazer-hazard-schedule.v1.json`.
 
 | # | Amendment | Replaces | Code that follows |
 | --- | --- | --- | --- |

@@ -5,7 +5,7 @@ Status: signed product contract (Reopening Gate), docs, manifest and tests only.
 ## Signature record (MAZER-HAZ-002, MAZER-HAZ-003)
 
 - Signed by: Zac (owner), 2026-11-15, via chat.
-- Words: "YES to all four contract calls" (relayed verbatim in the coordinator brief for slice H0; the owner's own chat message is the source).
+- Words: "yes to all four" (recorded from the owner's chat reply on 2026-11-15 to the list of four calls: sign the contract, 10/20/35/60 schedule, rewind-only penalty, shards as the forever axis).
 - The four calls signed:
   1. (a) This contract is signed as written (Reopening Gate). Signing also names "Mazer features" for the ATLAS freeze list.
   2. (b) Intro schedule: Pulse Gate at level 10, Sentry at level 20, Hunter at level 35, Shard at level 60. The draft's unlocks at 6/11/16 with spacing 5 are rejected.
