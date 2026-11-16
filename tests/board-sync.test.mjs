@@ -84,6 +84,16 @@ test("completed requires a merged PR AND a deployed build; no-runtime work may u
   assert.deepEqual(completedProblems("X", { prs: [], headless: true, deviceChecked: false }).length, 2);
 });
 
+test("a completed card keeps checkedOn through the evidence merge when a real device was checked", () => {
+  const reg = registry([card("MAZER-A-001", "review")]);
+  const device = { ...shipped, deviceChecked: true, checkedOn: "Owner phone, build build-1234" };
+  const ok = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { status: "completed", evidence: device })]);
+  assert.deepEqual(ok.errors, []);
+  assert.match(ok.registry.workItems[0].description, /Checked on a real device: Owner phone, build build-1234./);
+  const missing = fold(reg, [base("2026-11-13T00:00:00Z", "MAZER-A-001", { status: "completed", evidence: { ...shipped, deviceChecked: true } })]);
+  assert.match(missing.errors.join(), /checkedOn/);
+});
+
 test("review with a merged PR but no build says merged-not-deployed; the text cannot claim more than the evidence", () => {
   const r = fold(registry([card("MAZER-A-001")]), [base("2026-11-13T00:00:00Z", "MAZER-A-001", { status: "review", evidence: { prs: [{ repo: M, number: 7, mergedSha: "abcdef12" }], headless: true, deviceChecked: false } })]);
   assert.deepEqual(r.errors, []);

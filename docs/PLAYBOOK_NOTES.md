@@ -437,6 +437,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: QA accounts (mzr-qa-1112, mzr-qa-2, cqa-a-1105, claude) were ranked beside real players; page and self ranks must exclude the same population so ranks stay consistent.
 - Status: scratch-tested on pglite (36/36); not applied to production, not yet run on PostgreSQL 17 scratch, no independent review yet.
 
+## 2026-11-16 Board fold keeps checkedOn through the evidence merge
+- WHAT changed: `mergeEvidence` (scripts/board/board-events.mjs) now carries `evidence.checkedOn` into the stored card evidence and clears it when the device check is withdrawn; tests/board-sync.test.mjs covers a completed card with a real-device check and the still-refused missing label.
+- WHY it changed: the merge dropped `checkedOn`, so every `completed` event with `deviceChecked: true` failed `completedProblems` and refused the whole fold.
+- Status: headless (board-sync tests 39/39, plan dry run accepts the pending events); board tooling only, nothing player-visible.
 ## 2026-11-16 MAZER kicker on boot splash and canvas loader; icon on static fallback
 - WHAT changed: index.html boot splash now shows the MAZER kicker above the icon and the static "Could not load" fallback shows the app icon (copied from the splash image); appLoader.ts adds LOADER_KICKER_* and LoaderLayout.kickerCentreY; MenuScene draws the same kicker on the canvas loader cover; legacyAccountStatusState.ts shifts kickerCentreY with the loader on short screens; tests pin the offset and the markup.
 - WHY it changed: the gallery cross-check found the HTML splash lacked the kicker the canvas screens have, and the fallback lacked the icon the boot-error screen has. The kicker sits at one offset in splash and canvas so the crossfade stays identical.

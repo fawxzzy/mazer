@@ -206,6 +206,9 @@ function mergeEvidence(current, incoming) {
   if (incoming.deployedBuild !== undefined) out.deployedBuild = incoming.deployedBuild;
   if (incoming.headless !== undefined) out.headless = incoming.headless;
   if (incoming.deviceChecked !== undefined) out.deviceChecked = incoming.deviceChecked;
+  // checkedOn must survive the merge, or a completed card with a real-device check can never pass completedProblems.
+  if (incoming.checkedOn !== undefined) out.checkedOn = incoming.checkedOn;
+  else if (incoming.deviceChecked !== undefined && incoming.deviceChecked !== true) delete out.checkedOn;
   return out;
 }
 
