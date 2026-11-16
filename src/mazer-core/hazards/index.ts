@@ -4,6 +4,7 @@
 export * from './chaserEngine';
 export * from './chaserSolvability';
 export * from './chaserValidation';
+export * from './exposure';
 export * from './graphContract';
 export * from './loadout';
 export * from './overlay';
