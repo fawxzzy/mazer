@@ -436,3 +436,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added migration 20260828160000_mazer_leaderboard_hide_qa_accounts.sql (mazer_profiles.leaderboard_hidden, a trigger so client roles cannot write it, and `not p.leaderboard_hidden` in both mazer_leaderboard_page and mazer_leaderboard_self_rank), a rollback and live preimage under docs/ops/sql-proposals/mazer-leaderboard-hide-qa-20261116, and a migration contract test.
 - WHY it changed: QA accounts (mzr-qa-1112, mzr-qa-2, cqa-a-1105, claude) were ranked beside real players; page and self ranks must exclude the same population so ranks stay consistent.
 - Status: scratch-tested on pglite (36/36); not applied to production, not yet run on PostgreSQL 17 scratch, no independent review yet.
+
+## 2026-11-16 MAZER kicker on boot splash and canvas loader; icon on static fallback
+- WHAT changed: index.html boot splash now shows the MAZER kicker above the icon and the static "Could not load" fallback shows the app icon (copied from the splash image); appLoader.ts adds LOADER_KICKER_* and LoaderLayout.kickerCentreY; MenuScene draws the same kicker on the canvas loader cover; legacyAccountStatusState.ts shifts kickerCentreY with the loader on short screens; tests pin the offset and the markup.
+- WHY it changed: the gallery cross-check found the HTML splash lacked the kicker the canvas screens have, and the fallback lacked the icon the boot-error screen has. The kicker sits at one offset in splash and canvas so the crossfade stays identical.
+- Status: headless (typecheck, unit tests, Chromium 390x844 splash DOM and screenshot); canvas loader kicker and real phone not checked.

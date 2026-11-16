@@ -65,6 +65,10 @@ export const resolveLoaderIconSizePx = (viewportWidth: number, viewportHeight: n
 /** The label sits this far under the icon (CSS `top: calc(100% + 22px)` in index.html) and is ~16 px tall. */
 export const LOADER_LABEL_GAP_PX = 22;
 export const LOADER_LABEL_HEIGHT_PX = 16;
+/** The MAZER kicker sits the same distance ABOVE the icon (CSS `bottom: calc(100% + 22px)`, 16 px line, 13 px type). */
+export const LOADER_KICKER_GAP_PX = 22;
+export const LOADER_KICKER_HEIGHT_PX = 16;
+export const LOADER_KICKER_FONT_PX = 13;
 
 export interface LoaderLayout {
   readonly centreX: number;
@@ -72,6 +76,8 @@ export interface LoaderLayout {
   readonly iconSizePx: number;
   /** Vertical centre of the label line. */
   readonly labelCentreY: number;
+  /** Vertical centre of the MAZER kicker line above the icon (same place as the HTML splash's kicker). */
+  readonly kickerCentreY: number;
 }
 
 /** Where the loader sits for a viewport: dead centre, the same place the HTML splash puts it. */
@@ -83,7 +89,8 @@ export const resolveLoaderLayout = (viewportWidth: number, viewportHeight: numbe
     centreX,
     centreY,
     iconSizePx,
-    labelCentreY: centreY + (iconSizePx / 2) + LOADER_LABEL_GAP_PX + (LOADER_LABEL_HEIGHT_PX / 2)
+    labelCentreY: centreY + (iconSizePx / 2) + LOADER_LABEL_GAP_PX + (LOADER_LABEL_HEIGHT_PX / 2),
+    kickerCentreY: centreY - (iconSizePx / 2) - LOADER_KICKER_GAP_PX - (LOADER_KICKER_HEIGHT_PX / 2)
   };
 };
 

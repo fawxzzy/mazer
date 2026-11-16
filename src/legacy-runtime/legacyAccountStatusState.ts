@@ -323,7 +323,8 @@ export const resolveLegacyAccountStatusLayout = (
     : {
       ...baseLoader,
       centreY: baseLoader.centreY - overflow,
-      labelCentreY: baseLoader.labelCentreY - overflow
+      labelCentreY: baseLoader.labelCentreY - overflow,
+      kickerCentreY: baseLoader.kickerCentreY - overflow
     };
   const iconTop = Math.round(loader.centreY - (iconSize / 2));
   const titleTop = iconTop + iconSize + iconToTitle;
