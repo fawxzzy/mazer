@@ -1,0 +1,189 @@
+{
+  "captured_at_utc": "2026-11-16",
+  "source": "read-only sb-query.ps1 against project bxtcuhkotumitoqtrcej, schema mazer",
+  "functions": [
+    {
+      "name": "mazer_leaderboard_page",
+      "args": "p_limit integer, p_offset integer",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": "{\"search_path=\\\"\\\"\"}",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres}",
+      "md5_prosrc": "57b52e11c3aa16d5d9672e43c056b486",
+      "prosrc_len": 646,
+      "prosrc_cr_count": 0,
+      "functiondef": "CREATE OR REPLACE FUNCTION mazer.mazer_leaderboard_page(p_limit integer DEFAULT 25, p_offset integer DEFAULT 0)\n RETURNS TABLE(rank text, username text, player_level text, is_requesting_user boolean)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with ranked as (\n    select\n      p.username,\n      s.player_level,\n      s.user_id,\n      row_number() over (\n        order by s.player_level desc, s.level_reached_at asc nulls last, s.user_id asc\n      ) as rank_value\n    from mazer.mazer_progression_states s\n    join mazer.mazer_profiles p on p.user_id = s.user_id\n    where p.username is not null\n  )\n  select\n    ranked.rank_value::text,\n    ranked.username,\n    ranked.player_level::text,\n    ranked.user_id = auth.uid() as is_requesting_user\n  from ranked\n  order by ranked.rank_value\n  limit least(greatest(coalesce(p_limit, 25), 1), 100)\n  offset greatest(coalesce(p_offset, 0), 0);\n$function$\n"
+    },
+    {
+      "name": "mazer_leaderboard_self_rank",
+      "args": "",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": "{\"search_path=\\\"\\\"\"}",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres}",
+      "md5_prosrc": "7f4912db0e015d565a88383e8610e86e",
+      "prosrc_len": 1197,
+      "prosrc_cr_count": 0,
+      "functiondef": "CREATE OR REPLACE FUNCTION mazer.mazer_leaderboard_self_rank()\n RETURNS TABLE(rank text, player_level text, has_username boolean)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  -- Ranked over the exact same population mazer_leaderboard_page counts\n  -- (only rows with a username) -- an earlier version of this query ranked\n  -- over every progression row via a bare left join, so a caller's number\n  -- here could disagree with where they actually sit on the public page\n  -- (counting no-username accounts against them that the page itself never\n  -- shows). base is the caller's own row; ranked only ever matches it when\n  -- they have a username, leaving rank null otherwise.\n  with ranked as (\n    select\n      s.user_id,\n      row_number() over (\n        order by s.player_level desc, s.level_reached_at asc nulls last, s.user_id asc\n      ) as rank_value\n    from mazer.mazer_progression_states s\n    join mazer.mazer_profiles p on p.user_id = s.user_id\n    where p.username is not null\n  ),\n  base as (\n    select s.user_id, s.player_level, p.username is not null as has_username\n    from mazer.mazer_progression_states s\n    left join mazer.mazer_profiles p on p.user_id = s.user_id\n    where s.user_id = auth.uid()\n  )\n  select ranked.rank_value::text, base.player_level::text, base.has_username\n  from base\n  left join ranked on ranked.user_id = base.user_id;\n$function$\n"
+    }
+  ],
+  "profiles_table": {
+    "columns": [
+      {
+        "c": "user_id",
+        "t": "uuid",
+        "n": "NO",
+        "d": null
+      },
+      {
+        "c": "display_name",
+        "t": "text",
+        "n": "YES",
+        "d": null
+      },
+      {
+        "c": "selected_control_mode",
+        "t": "text",
+        "n": "NO",
+        "d": "'stick'::text"
+      },
+      {
+        "c": "settings",
+        "t": "jsonb",
+        "n": "NO",
+        "d": "'{}'::jsonb"
+      },
+      {
+        "c": "created_at",
+        "t": "timestamp with time zone",
+        "n": "NO",
+        "d": "now()"
+      },
+      {
+        "c": "updated_at",
+        "t": "timestamp with time zone",
+        "n": "NO",
+        "d": "now()"
+      },
+      {
+        "c": "revision",
+        "t": "bigint",
+        "n": "NO",
+        "d": "0"
+      },
+      {
+        "c": "username",
+        "t": "text",
+        "n": "NO",
+        "d": null
+      },
+      {
+        "c": "username_origin",
+        "t": "text",
+        "n": "NO",
+        "d": null
+      }
+    ],
+    "table_acl": "{postgres=arwdDxtm/postgres,authenticated=arw/postgres}",
+    "column_acl": [
+      {
+        "c": "username",
+        "acl": "{supabase_auth_admin=r/postgres}"
+      }
+    ],
+    "policies": [
+      {
+        "n": "Mazer Auth hook can inspect usernames",
+        "cmd": "SELECT",
+        "roles": "{supabase_auth_admin}",
+        "q": "true",
+        "wc": null
+      },
+      {
+        "n": "mazer_profiles_owner_insert_r001",
+        "cmd": "INSERT",
+        "roles": "{authenticated}",
+        "q": null,
+        "wc": "(( SELECT auth.uid() AS uid) = user_id)"
+      },
+      {
+        "n": "mazer_profiles_owner_select_r001",
+        "cmd": "SELECT",
+        "roles": "{authenticated}",
+        "q": "(( SELECT auth.uid() AS uid) = user_id)",
+        "wc": null
+      },
+      {
+        "n": "mazer_profiles_owner_update_r001",
+        "cmd": "UPDATE",
+        "roles": "{authenticated}",
+        "q": "(( SELECT auth.uid() AS uid) = user_id)",
+        "wc": "(( SELECT auth.uid() AS uid) = user_id)"
+      }
+    ],
+    "triggers": [
+      "mazer_enforce_username_origin_before_update"
+    ],
+    "counts": {
+      "profiles": 135,
+      "named": 135
+    }
+  },
+  "target_and_control_rows": [
+    {
+      "user_id": "9138bb1c-97d6-506c-8153-7b7dae8a6c60",
+      "username": "MazerMaster",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": false
+    },
+    {
+      "user_id": "4a180a92-b3cc-4117-97b5-3e7b3778079b",
+      "username": "Mazer-269110",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": false
+    },
+    {
+      "user_id": "adc7ca28-7271-5599-826f-fd7e4477b542",
+      "username": "fawxzzy",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": false
+    },
+    {
+      "user_id": "4d149c7d-04ff-4a19-bd81-8d3b173b994d",
+      "username": "cuddlingmuisc",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": false
+    },
+    {
+      "user_id": "cf491de3-7e3e-4162-8e4a-c2c0c9468e14",
+      "username": "mzr-qa-2",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": true
+    },
+    {
+      "user_id": "007630ec-e9ed-44ae-b688-33b954cbf85c",
+      "username": "cudding_muisc",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": false
+    },
+    {
+      "user_id": "f810c8e8-068c-4e63-9d8e-bc64636fb1a2",
+      "username": "cqa-a-1105",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": true
+    },
+    {
+      "user_id": "1b5c7980-3f6f-4239-8c6f-e13bc54e169b",
+      "username": "mzr-qa-1112",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": true
+    },
+    {
+      "user_id": "91c2b51b-2915-4b5d-a666-b8552a3b9533",
+      "username": "claude",
+      "leaderboard_hidden_before": "column absent (implicit false)",
+      "target_hidden_after_apply": true
+    }
+  ],
+  "drift": "none: live prosrc md5 equals md5 of the bodies in 20260824170159_mazer_master_runtime_contracts.sql (LF, 0 CR)"
+}
