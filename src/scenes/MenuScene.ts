@@ -331,7 +331,7 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { LEGACY_HEADER_ICON_GLYPH_SCALE, resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
-import { resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
+import { resolveLegacyFrontDoorHitZone, shouldFrontDoorTapAnywhereStartRun } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
   resolveLegacyTapRecoveryTarget,
   shouldRecoverLegacyTapAfterUiRebuild
@@ -486,7 +486,7 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
-import { resolveLegacyGenerationTrack } from '../legacy-runtime/legacyMenuDemoTrack';
+import { resolveLegacyGenerationTrack, seedLegacyMenuDemoTrackFromPlayer } from '../legacy-runtime/legacyMenuDemoTrack';
 import {
   LegacyMazePrefetchSlot,
   createLegacyMazeGenerationJobInput,
@@ -4311,6 +4311,9 @@ export class MenuScene extends Phaser.Scene {
       if (this.handleOverlayScrollPointerDown(pointer)) {
         return;
       }
+      if (this.handleFrontDoorTapAnywhere(pointer, currentlyOver.length)) {
+        return;
+      }
       this.handleLegacyPlayPointerDown(pointer);
     });
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
@@ -4922,6 +4925,26 @@ export class MenuScene extends Phaser.Scene {
     if (wasHeld) {
       this.boardDynamicDirty = true;
     }
+    return true;
+  }
+
+  // Tap anywhere on the front door starts a run, except within a margin of any other UI button.
+  private handleFrontDoorTapAnywhere(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean {
+    const start = this.uiButtons.find((button) => button.semanticAction === 'Start');
+    if (!shouldFrontDoorTapAnywhereStartRun({
+      hasStartButton: start !== undefined,
+      levelPreviewActive: this.levelPreviewLevel !== null,
+      mode: this.mode,
+      objectsUnderPointer,
+      otherButtonBounds: this.uiButtons.filter((button) => button !== start).map((button) => button.bounds),
+      overlay: this.overlay,
+      playAccess: this.mode === 'menu' && this.hasLegacyPlayAccess(),
+      point: this.resolveLegacyInputPointerPoint(pointer),
+      viewport: this.layout
+    })) {
+      return false;
+    }
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
     return true;
   }
 
@@ -14804,7 +14827,7 @@ export class MenuScene extends Phaser.Scene {
     this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
 
     if (result.progressionState) {
-      this.progressionState = result.progressionState;
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(result.progressionState);
     }
     if (result.remoteSyncResult) {
       this.publishLegacyRemoteSyncResult(result.remoteSyncResult);
@@ -14832,7 +14855,10 @@ export class MenuScene extends Phaser.Scene {
       this.progressionState = createLegacyLevelPreviewProgressionState(this.levelPreviewLevel);
       return;
     }
-    this.progressionState = readLegacyProgressionState(this.resolveLegacyProgressionStorage());
+    // The menu demo starts on the player's current level, then climbs.
+    this.progressionState = seedLegacyMenuDemoTrackFromPlayer(
+      readLegacyProgressionState(this.resolveLegacyProgressionStorage())
+    );
   }
 
   private applyBootstrappedLegacyAccountState(): void {
@@ -14847,10 +14873,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (bootstrapped.progressionState) {
-      this.progressionState = writeLegacyProgressionState(
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(writeLegacyProgressionState(
         this.resolveLegacyProgressionStorage(),
         bootstrapped.progressionState
-      );
+      ));
     }
     if (bootstrapped.settings) {
       this.settings = bootstrapped.settings;

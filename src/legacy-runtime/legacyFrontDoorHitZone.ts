@@ -33,3 +33,49 @@ export const resolveLegacyFrontDoorHitZone = (
 export const isPointInLegacyFrontDoorHitZone = (zone: LegacyHitRect, x: number, y: number): boolean => (
   x >= zone.left && x <= zone.right && y >= zone.top && y <= zone.bottom
 );
+
+/**
+ * Tap-anywhere start: on the front door a tap almost anywhere starts a run, except within
+ * this margin of any other UI button (settings, leaderboard, ...).
+ */
+export const FRONT_DOOR_TAP_ANYWHERE_EXCLUSION_MARGIN_PX = 28;
+
+export const isFrontDoorTapAnywhereStart = (
+  point: { x: number; y: number },
+  otherButtonBounds: ReadonlyArray<{ left: number; top: number; width: number; height: number }>,
+  viewport: { height: number; width: number },
+  margin: number = FRONT_DOOR_TAP_ANYWHERE_EXCLUSION_MARGIN_PX
+): boolean => {
+  if (point.x < 0 || point.y < 0 || point.x > viewport.width || point.y > viewport.height) {
+    return false;
+  }
+  return !otherButtonBounds.some((rect) => (
+    point.x >= rect.left - margin
+    && point.x <= rect.left + rect.width + margin
+    && point.y >= rect.top - margin
+    && point.y <= rect.top + rect.height + margin
+  ));
+};
+
+export interface FrontDoorTapAnywhereContext {
+  hasStartButton: boolean;
+  levelPreviewActive: boolean;
+  mode: string;
+  objectsUnderPointer: number;
+  otherButtonBounds: ReadonlyArray<{ left: number; top: number; width: number; height: number }>;
+  overlay: string;
+  playAccess: boolean;
+  point: { x: number; y: number };
+  viewport: { height: number; width: number };
+}
+
+/** Full gate for the tap-anywhere start (MenuScene.handleFrontDoorTapAnywhere delegates here). */
+export const shouldFrontDoorTapAnywhereStartRun = (ctx: FrontDoorTapAnywhereContext): boolean => (
+  ctx.mode === 'menu'
+  && ctx.overlay === 'none'
+  && ctx.objectsUnderPointer <= 0
+  && !ctx.levelPreviewActive
+  && ctx.playAccess
+  && ctx.hasStartButton
+  && isFrontDoorTapAnywhereStart(ctx.point, ctx.otherButtonBounds, ctx.viewport)
+);
