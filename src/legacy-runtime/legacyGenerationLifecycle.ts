@@ -20,6 +20,7 @@ import {
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetBoardFillFloor,
   resolveGeometryBudgetFillFloor,
   resolveGeometryBudgetFringeCells,
   resolveGeometryBudgetLoopPlan,
@@ -706,7 +707,7 @@ const selectLegacyGeometryBudgetMaze = (
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor, reverseFloor }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor: resolveGeometryBudgetBoardFillFloor(fillFloor, base.width * base.height), reverseFloor }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that

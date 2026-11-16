@@ -1571,10 +1571,16 @@ const reinforceLegacyRouteQuality = (
   };
 };
 
-const resolveFarthestReachableFloor = (
+// `minDistance` is the old behaviour (the goal must beat the route it replaces). `requiredDistance` is the
+// route floor in edges (minimumSolutionPathLength - 1): when the farthest tile reaches it, the span-aware pick
+// may only choose a tile at or past it, so a goal under the floor can never win just because it is far on
+// the board (MAZER-GEN-021 review finding). When even the farthest tile is short of the floor the floor
+// cannot be met and the pick keeps the old rule.
+export const resolveFarthestReachableFloor = (
   grid: boolean[][],
   start: LegacyPoint,
-  minDistance = 0
+  minDistance = 0,
+  requiredDistance = 0
 ): { distance: number; point: LegacyPoint } => {
   let farthest = { distance: 0, point: clonePoint(start) };
   const reachable = resolveReachableFloorDistances(grid, start);
@@ -1585,7 +1591,8 @@ const resolveFarthestReachableFloor = (
     }
   }
 
-  const picked = pickLegacySpanAwareGoal(reachable.values(), start, farthest, minDistance);
+  const floorDistance = farthest.distance >= requiredDistance ? Math.max(minDistance, requiredDistance) : minDistance;
+  const picked = pickLegacySpanAwareGoal(reachable.values(), start, farthest, floorDistance);
   return {
     distance: picked.distance,
     point: clonePoint(picked.point)
@@ -1608,7 +1615,7 @@ const resolveLegacyFinalRouteState = (
   let solutionPath = buildShortestPath(grid, start, resolvedGoal);
 
   if (solutionPath.length < minimumSolutionPathLength) {
-    const farthest = resolveFarthestReachableFloor(grid, start, solutionPath.length);
+    const farthest = resolveFarthestReachableFloor(grid, start, solutionPath.length, minimumSolutionPathLength - 1);
     if (farthest.distance + 1 > solutionPath.length) {
       resolvedGoal = farthest.point;
       solutionPath = buildShortestPath(grid, start, resolvedGoal);

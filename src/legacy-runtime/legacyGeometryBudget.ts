@@ -491,6 +491,20 @@ export const resolveGeometryBudgetFillFloor = (level: number): number => {
   return Math.floor((value * GEOMETRY_BUDGET_FILL_PERCENT) / 100);
 };
 
+// MAZER-PROG-020 S3: the fill floors above are absolute floor-cell counts measured on the frozen 25x51 board (1275
+// cells). The board now grows with the level (25x57 at level 1, toward 27x59), so the same count would leave more
+// of the board blank (audit: fill 24.5 percent at 25x57 and 22 at 27x59 against 29 on the old board at level 30).
+// The floor therefore scales with the board's cell count, never down (a smaller board keeps the old floor). The
+// fill only ever carves branches the explorer does not pay for (felt steps exactly unchanged), so this moves the
+// look, not the felt ladder. The fill stays bounded by FILL_MAX_EVALS, so the cost is bounded too.
+export const GEOMETRY_BUDGET_FILL_REFERENCE_CELLS = 25 * 51;
+export const resolveGeometryBudgetBoardFillFloor = (fillFloor: number, boardCells: number): number => {
+  if (!(fillFloor > 0) || !Number.isFinite(boardCells) || boardCells <= GEOMETRY_BUDGET_FILL_REFERENCE_CELLS) {
+    return Math.max(0, Math.trunc(Number.isFinite(fillFloor) ? fillFloor : 0));
+  }
+  return Math.floor((fillFloor * boardCells) / GEOMETRY_BUDGET_FILL_REFERENCE_CELLS);
+};
+
 // Longest deceptive branch the tuner carves in one move at level N: depth rises
 // with the level (8 cells at level 2 up to 40).
 export const resolveGeometryBudgetMaxBranch = (level: number): number => (
