@@ -71,7 +71,13 @@ export const IRIDESCENT_TRAIL_CORE_STOPS = Object.freeze([
   0x5c96ff, // laser blue
   0x8678ff, // electric indigo
   0xb85cff, // neon violet
-  0xdc46f0 // hot magenta
+  0xdc46f0, // hot magenta
+  0xf04ccc, // neon pink
+  0xff4f9a, // rose
+  0xff6a64, // coral
+  0xff8a2f, // neon orange
+  0xffa830, // amber
+  0xe4ee3c // lemon yellow
 ] as const);
 
 /** The same hues, deep and saturated: the bloom colour. Sampled with the same phase as the core. */
@@ -81,7 +87,13 @@ export const IRIDESCENT_TRAIL_GLOW_STOPS = Object.freeze([
   0x2f66e0,
   0x4a3cd8,
   0x7a1fd8,
-  0xb01cb8
+  0xb01cb8,
+  0xc0189e,
+  0xcc1c72,
+  0xcc3a3c,
+  0xcc5a10,
+  0xcc7a14,
+  0xa8b818
 ] as const);
 
 // Navigation Core v1's own ENERGY palette (read directly out of the frozen
@@ -104,9 +116,9 @@ export const NAVIGATION_CORE_TRAIL_ENERGY_STOPS = [
 ] as const;
 
 /** One full sweep (stop 0 out to the last stop and back) spans this many tiles of trail. */
-export const IRIDESCENT_TRAIL_TILES_PER_SWEEP = 8;
+export const IRIDESCENT_TRAIL_TILES_PER_SWEEP = 16;
 /** ...and one full sweep drifts past a fixed point on the trail in this many ms. */
-export const IRIDESCENT_TRAIL_SWEEP_PERIOD_MS = MOTION_LOOP_MS.drift;
+export const IRIDESCENT_TRAIL_SWEEP_PERIOD_MS = MOTION_LOOP_MS.drift * 3;
 
 /** Slow swell: crest-to-crest length in tiles, and the time one crest takes to travel one wavelength. */
 export const TRAIL_PULSE_WAVELENGTH_TILES = 8;

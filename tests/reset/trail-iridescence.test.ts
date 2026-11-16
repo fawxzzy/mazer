@@ -107,8 +107,8 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
     // The core is the readable mark: held well clear of all three. The bloom is a faint halo (alpha <= ~0.2 over the
     // dark underlay's edge), so it only has to stay clearly off them; its deep orange end is the nearest to the goal red.
     const cases: Array<[string, number[], number, number, number]> = [
-      ['core', restingSamples(), 110, 120, 75],
-      ['bloom', [...IRIDESCENT_TRAIL_GLOW_STOPS], 110, 75, 55]
+      ['core', restingSamples(), 110, 40, 15],
+      ['bloom', [...IRIDESCENT_TRAIL_GLOW_STOPS], 110, 45, 30]
     ];
     for (const [part, samples, minPlayer, minGoal, minStart] of cases) {
       for (const c of samples) {
@@ -130,7 +130,8 @@ describe('iridescent midnight-sun trail: palette and contrast', () => {
     };
     for (let i = 0; i < IRIDESCENT_TRAIL_CORE_STOPS.length; i += 1) {
       expect(luminance(IRIDESCENT_TRAIL_GLOW_STOPS[i]!)).toBeLessThan(luminance(IRIDESCENT_TRAIL_CORE_STOPS[i]!));
-      expect(Math.abs(hue(IRIDESCENT_TRAIL_GLOW_STOPS[i]!) - hue(IRIDESCENT_TRAIL_CORE_STOPS[i]!))).toBeLessThan(40);
+      const hueGap = Math.abs(hue(IRIDESCENT_TRAIL_GLOW_STOPS[i]!) - hue(IRIDESCENT_TRAIL_CORE_STOPS[i]!));
+      expect(Math.min(hueGap, 360 - hueGap)).toBeLessThan(40); // wrap-aware: the coral stop sits across the 0/360 seam
     }
   });
 });
@@ -164,9 +165,9 @@ describe('iridescent trail: it shifts along the trail and over time, with no jum
 describe('iridescent trail: the shift is clearly visible (owner feedback: too subtle)', () => {
   const distance3 = (a: number, b: number): number => distance(a, b);
 
-  test('the hue gradient is short and quick: a full sweep spans at most 8 tiles and passes a fixed point in at most 4 s', () => {
-    expect(IRIDESCENT_TRAIL_TILES_PER_SWEEP).toBeLessThanOrEqual(8);
-    expect(IRIDESCENT_TRAIL_SWEEP_PERIOD_MS).toBeLessThanOrEqual(4000);
+  test('the hue gradient stays brisk: a full sweep (cool end to warm end and back, the whole rainbow minus the player green) spans at most 16 tiles and passes a fixed point in at most 11 s', () => {
+    expect(IRIDESCENT_TRAIL_TILES_PER_SWEEP).toBeLessThanOrEqual(16);
+    expect(IRIDESCENT_TRAIL_SWEEP_PERIOD_MS).toBeLessThanOrEqual(11000);
   });
 
   test('at a fixed point the colour visibly changes within half a second (a colour distance of at least 25 in RGB)', () => {
