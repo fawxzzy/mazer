@@ -106,7 +106,21 @@ export interface MazerServiceWorkerLifecycleRuntime {
   readyState: DocumentReadyState;
   addLoadListener: (listener: () => void) => void;
   register: ((scriptUrl: string) => Promise<MazerServiceWorkerRegistration>) | null;
+  /**
+   * Update check on resume. A home-screen app is usually resumed from memory, not relaunched, so the one
+   * `registration.update()` at boot can be the only check for days and the phone keeps an old build. When present,
+   * each return to the foreground re-checks, at most once per MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS. The new worker
+   * then claims the page and the deferred reload (MAZER-PWA-006) applies it at the next idle hide.
+   */
+  resumeUpdate?: {
+    isVisible: () => boolean;
+    addVisibilityListener: (listener: () => void) => void;
+    now: () => number;
+  };
 }
+
+/** Minimum gap between resume-triggered update checks (one small no-cache fetch of the worker script). */
+export const MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS = 60_000;
 
 const isLocalhostHostname = (hostname: string): boolean =>
   ['localhost', '127.0.0.1', '::1'].includes(hostname);
@@ -127,6 +141,21 @@ export const installMazerProductionServiceWorker = (
     registrationStarted = true;
 
     void runtime.register?.('/app-sw.js')
+      .then((registration) => {
+        const resume = runtime.resumeUpdate;
+        if (resume) {
+          let lastCheck = resume.now();
+          resume.addVisibilityListener(() => {
+            if (!resume.isVisible() || resume.now() - lastCheck < MAZER_SW_RESUME_UPDATE_MIN_INTERVAL_MS) {
+              return;
+            }
+            lastCheck = resume.now();
+            // A failed resume check (offline, flaky network) is not the cache warning: the next resume retries.
+            void Promise.resolve().then(() => registration.update()).catch(() => undefined);
+          });
+        }
+        return registration;
+      })
       .then((registration) => registration.update())
       .catch((error: unknown) => {
         onError(error instanceof Error ? error.message : String(error));
