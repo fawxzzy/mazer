@@ -138,6 +138,17 @@ import {
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
+import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
+import { HazardMomentView } from '../render/hazardMomentRenderer';
+import {
+  HAZARD_EXPOSURE_STORAGE_KEY,
+  HAZARD_INTRO_CARD_SHOW_MS,
+  HAZARD_TIER_PIP_SHOW_MS,
+  createHazardOnboarding,
+  type HazardOnboarding
+} from '../legacy-runtime/legacyHazardOnboarding';
+import { resolveHazardAudioSound } from '../legacy-runtime/legacyHazardAudioEvents';
+import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../legacy-runtime/legacyGeometryBudget';
 import {
   createLegacySoundEffects,
   installLegacyAudioUnlock,
@@ -327,7 +338,7 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { LEGACY_HEADER_ICON_GLYPH_SCALE, resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
-import { resolveLegacyFrontDoorHitZone } from '../legacy-runtime/legacyFrontDoorHitZone';
+import { resolveLegacyFrontDoorHitZone, shouldFrontDoorTapAnywhereStartRun } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
   resolveLegacyTapRecoveryTarget,
   shouldRecoverLegacyTapAfterUiRebuild
@@ -482,7 +493,7 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
-import { resolveLegacyGenerationTrack } from '../legacy-runtime/legacyMenuDemoTrack';
+import { resolveLegacyGenerationTrack, seedLegacyMenuDemoTrackFromPlayer } from '../legacy-runtime/legacyMenuDemoTrack';
 import {
   LegacyMazePrefetchSlot,
   createLegacyMazeGenerationJobInput,
@@ -1373,6 +1384,8 @@ const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
 // Player message toast: above the auth gate so errors raised on it stay readable.
 const LEGACY_PLAYER_MESSAGE_TOAST_DEPTH = LEGACY_AUTH_GATE_LOADING_DEPTH + 10;
+// Slice H6 intro card / tier pip: above the board, below every sheet and toast (and hidden while any overlay is open).
+const LEGACY_HAZARD_MOMENT_DEPTH = 40;
 const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
@@ -3351,6 +3364,7 @@ export class MenuScene extends Phaser.Scene {
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
     this.updateHazardWorldClock(time);
+    this.updateHazardMoments(time);
     this.uiTransitionGhost?.update(time, delta);
     if (this.overlay === 'auth') {
       // Auth owns the full screen. The level announcer sits above the normal
@@ -3835,6 +3849,7 @@ export class MenuScene extends Phaser.Scene {
           timedModeEnabled: worldTurnDiagnostics.timedModeEnabled
         },
         ...this.resolveLegacyHazardLabDiagnostics(),
+        ...(this.hazardMomentDiagnostics ? { moments: { ...this.hazardMomentDiagnostics } } : {}),
         inputBuffer: {
           directionalIntent: this.playDirectionalIntent.getDiagnostics(),
           held: {
@@ -4325,6 +4340,9 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       if (this.handleOverlayScrollPointerDown(pointer)) {
+        return;
+      }
+      if (this.handleFrontDoorTapAnywhere(pointer, currentlyOver.length)) {
         return;
       }
       this.handleLegacyPlayPointerDown(pointer);
@@ -4938,6 +4956,26 @@ export class MenuScene extends Phaser.Scene {
     if (wasHeld) {
       this.boardDynamicDirty = true;
     }
+    return true;
+  }
+
+  // Tap anywhere on the front door starts a run, except within a margin of any other UI button.
+  private handleFrontDoorTapAnywhere(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean {
+    const start = this.uiButtons.find((button) => button.semanticAction === 'Start');
+    if (!shouldFrontDoorTapAnywhereStartRun({
+      hasStartButton: start !== undefined,
+      levelPreviewActive: this.levelPreviewLevel !== null,
+      mode: this.mode,
+      objectsUnderPointer,
+      otherButtonBounds: this.uiButtons.filter((button) => button !== start).map((button) => button.bounds),
+      overlay: this.overlay,
+      playAccess: this.mode === 'menu' && this.hasLegacyPlayAccess(),
+      point: this.resolveLegacyInputPointerPoint(pointer),
+      viewport: this.layout
+    })) {
+      return false;
+    }
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
     return true;
   }
 
@@ -5864,6 +5902,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.resetLegacyWorldTurnHost();
     this.installLegacyHazardGateLayer();
+    this.startHazardMomentsLevel();
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
     this.activeInputField = null;
@@ -7455,6 +7494,9 @@ export class MenuScene extends Phaser.Scene {
           nowMs: this.time.now,
           startedAtMs: this.playStartedAtMs
         }));
+      }
+      if (firstGoalArrival) {
+        this.noteHazardMomentsLevelCleared();
       }
       this.recordMazeCycleCompletion('play');
       this.armLegacyPlayerTransferEnergy(this.time.now);
@@ -10776,6 +10818,111 @@ export class MenuScene extends Phaser.Scene {
 
   // Single shared entry point for vibration (src/legacy-runtime/legacyHaptics.ts). Honours Settings > Haptics and
   // reduced motion, and is a no-op where navigator.vibrate is missing (iOS Safari, most desktops).
+  // Hazard onboarding and moments (slice H6: intro cards, tier pips, Guide rows, audio events). Everything here is
+  // inert while the layer flag is off: resolveHazardOnboarding() returns null, so no storage is read, no view is
+  // built and nothing is drawn. Decisions live in legacyHazardOnboarding.ts; this only asks and draws.
+  private hazardOnboarding: HazardOnboarding | null = null;
+  private hazardOnboardingFor: HazardLabBoot | null = null;
+  private hazardMomentView: HazardMomentView | null = null;
+  private hazardMomentCardAnchor: { x: number; y: number } | null = null;
+  private hazardMomentDiagnostics: { cardKind: string | null; cardShowMs: number | null; pipLevel: number | null } | null = null;
+
+  private resolveHazardOnboarding(): HazardOnboarding | null {
+    if (this.hazardOnboardingFor !== this.hazardLab) {
+      this.hazardOnboardingFor = this.hazardLab;
+      this.hazardOnboarding = createHazardOnboarding({
+        enabled: this.hazardLab?.state.enabled === true,
+        resolveStorage: () => createLegacyAuthScopedStorage(
+          this.resolveBrowserLocalStorage(),
+          HAZARD_EXPOSURE_STORAGE_KEY,
+          this.authSnapshot
+        ),
+        saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL
+      });
+    }
+    return this.hazardOnboarding;
+  }
+
+  private resolveHazardMomentView(): HazardMomentView {
+    if (this.hazardMomentView === null) {
+      this.hazardMomentView = new HazardMomentView(this, {
+        crisp: (text) => this.applyLegacyUiTextCrispness(text),
+        depth: LEGACY_HAZARD_MOMENT_DEPTH,
+        fontFamily: LEGACY_UI_FONT_FAMILY
+      });
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        this.hazardMomentView = null;
+      });
+    }
+    return this.hazardMomentView;
+  }
+
+  private startHazardMomentsLevel(): void {
+    this.hazardMomentView?.clear();
+    this.hazardMomentCardAnchor = null;
+    const onboarding = this.mode === 'play' ? this.resolveHazardOnboarding() : null;
+    if (onboarding === null) {
+      return;
+    }
+    // Built once per scene while the layer is on (never while off), so a card costs only its model and two setText calls.
+    const view = this.resolveHazardMomentView();
+    const startedAt = performance.now();
+    const moments = onboarding.levelStart(this.progressionState.tracks.player.level);
+    if (moments.introCard !== null) {
+      view.showCard(moments.introCard, HAZARD_INTRO_CARD_SHOW_MS);
+    }
+    const cardShowMs = moments.introCard === null ? null : Math.round((performance.now() - startedAt) * 1000) / 1000;
+    if (moments.introCard !== null) {
+      this.hazardMomentCardAnchor = copyPoint(this.player);
+      this.playLegacySoundEffect(resolveHazardAudioSound('hazard.intro'));
+    }
+    if (moments.tierPip !== null) {
+      view.showPip(moments.tierPip, HAZARD_TIER_PIP_SHOW_MS);
+      if (moments.introCard === null) {
+        this.playLegacySoundEffect(resolveHazardAudioSound('hazard.tier'));
+      }
+    }
+    this.hazardMomentDiagnostics = {
+      cardKind: moments.introCard?.kind ?? null,
+      cardShowMs,
+      pipLevel: moments.tierPip?.level ?? null
+    };
+  }
+
+  private noteHazardMomentsLevelCleared(): void {
+    this.hazardMomentView?.dismissCard();
+    this.resolveHazardOnboarding()?.levelCleared(this.progressionState.tracks.player.level);
+  }
+
+  private updateHazardMoments(time: number): void {
+    const view = this.hazardMomentView;
+    if (view === null) {
+      return;
+    }
+    const anchor = this.hazardMomentCardAnchor;
+    if (anchor !== null && (this.player.x !== anchor.x || this.player.y !== anchor.y)) {
+      // The first step dismisses the card (it is skippable and never blocks input).
+      view.dismissCard();
+      this.hazardMomentCardAnchor = null;
+    }
+    const frame = this.resolveLegacyMazeRenderFrame(
+      this.layout.boardLeft,
+      this.layout.boardTop,
+      this.layout.boardWidth,
+      this.layout.boardHeight
+    );
+    view.frame({
+      footerY: this.layout.footerY,
+      nowMs: time,
+      playerY: frame.boardTop + ((this.player.y + 0.5) * frame.tileSize),
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      safeTop: readMazerViewportGeometry().safeArea.top,
+      viewHeight: this.layout.height,
+      viewWidth: this.layout.width,
+      visible: this.mode === 'play' && this.overlay === 'none' && !this.isLegacyPlayLifecycleInputLocked()
+    });
+  }
+
   private readonly legacySoundEffects = createLegacySoundEffects();
 
   // Sound effects (src/legacy-runtime/legacySoundEffects.ts): gated by Settings > Sound effects, default on (MAZER-AUDIO-004).
@@ -12012,7 +12159,11 @@ export class MenuScene extends Phaser.Scene {
   // buildLegacyGuideSheetPlan. Icons call the board's own draw functions where
   // the content module says they are shared (goal star, perimeter diamond).
   private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void {
-    const model = buildLegacyGuideSheetModel(context, { hasKeyboard: this.resolveLegacyGuideHasKeyboard() });
+    const model = buildLegacyGuideSheetModel(context, {
+      hasKeyboard: this.resolveLegacyGuideHasKeyboard(),
+      // Slice H6: met + live hazard kinds while the layer is on; [] (the unchanged sheet) while off.
+      hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? []
+    });
     const sizes = LEGACY_GUIDE_SHEET_SIZES;
     const safeArea = readMazerViewportGeometry().safeArea;
     const measure = (itemWidth: number): number[] => {
@@ -12057,6 +12208,10 @@ export class MenuScene extends Phaser.Scene {
         case 'level-numeral': return playerPalette.playerCoreColor;
         case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
         case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
+        case 'hazard-gate':
+        case 'hazard-sentry':
+        case 'hazard-hunter':
+        case 'hazard-shard': return resolveGuideHazardAccent(glyph);
       }
     };
     // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
@@ -12261,6 +12416,12 @@ export class MenuScene extends Phaser.Scene {
       }
       case 'sound-speaker':
         drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);
+        return;
+      case 'hazard-gate':
+      case 'hazard-sentry':
+      case 'hazard-hunter':
+      case 'hazard-shard':
+        drawGuideHazardGlyph(graphics, icon.glyph, centerX, centerY, badgeRadius * 0.9, accentColor);
         return;
     }
   }
@@ -14883,7 +15044,7 @@ export class MenuScene extends Phaser.Scene {
     this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
 
     if (result.progressionState) {
-      this.progressionState = result.progressionState;
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(result.progressionState);
     }
     if (result.remoteSyncResult) {
       this.publishLegacyRemoteSyncResult(result.remoteSyncResult);
@@ -14911,7 +15072,10 @@ export class MenuScene extends Phaser.Scene {
       this.progressionState = createLegacyLevelPreviewProgressionState(this.levelPreviewLevel);
       return;
     }
-    this.progressionState = readLegacyProgressionState(this.resolveLegacyProgressionStorage());
+    // The menu demo starts on the player's current level, then climbs.
+    this.progressionState = seedLegacyMenuDemoTrackFromPlayer(
+      readLegacyProgressionState(this.resolveLegacyProgressionStorage())
+    );
   }
 
   private applyBootstrappedLegacyAccountState(): void {
@@ -14926,10 +15090,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (bootstrapped.progressionState) {
-      this.progressionState = writeLegacyProgressionState(
+      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(writeLegacyProgressionState(
         this.resolveLegacyProgressionStorage(),
         bootstrapped.progressionState
-      );
+      ));
     }
     if (bootstrapped.settings) {
       this.settings = bootstrapped.settings;
