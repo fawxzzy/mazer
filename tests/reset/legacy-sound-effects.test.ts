@@ -125,6 +125,31 @@ describe('createLegacySoundEffects', () => {
     expect(LEGACY_SOUND_EFFECT_MIN_GAP_MS.goal).toBe(0);
   });
 
+  test('slice H6 hazard sounds are gentle: at most 0.03 peak gain, a soft attack, short, and throttled', () => {
+    const hazardKinds = ['hazardIntro', 'hazardTier', 'hazardGateClosing', 'hazardContact', 'hazardBurnout', 'shardCollected'] as const;
+    for (const kind of hazardKinds) {
+      const tones = LEGACY_SOUND_EFFECT_TONES[kind];
+      expect(tones.length, kind).toBeGreaterThan(0);
+      for (const tone of tones) {
+        expect(tone.gain, kind).toBeLessThanOrEqual(0.03);
+        expect(tone.attackSec ?? 0, kind).toBeGreaterThanOrEqual(0.01);
+        expect(tone.durationSec, kind).toBeLessThanOrEqual(0.15);
+      }
+      expect(LEGACY_SOUND_EFFECT_MIN_GAP_MS[kind], kind).toBeGreaterThanOrEqual(120);
+    }
+  });
+
+  test('hazard sounds obey the sound setting like every other effect (no context while off)', () => {
+    const fake = makeFakeContext();
+    const factory = vi.fn(() => fake.context);
+    const effects = createLegacySoundEffects(factory);
+    expect(effects.play('hazardIntro', false, 0)).toBe(false);
+    expect(effects.play('hazardContact', false, 0)).toBe(false);
+    expect(factory).not.toHaveBeenCalled();
+    expect(effects.play('hazardIntro', true, 1000)).toBe(true);
+    expect(fake.oscillators.length).toBe(LEGACY_SOUND_EFFECT_TONES.hazardIntro.length);
+  });
+
   test('unlock creates and resumes the context inside a gesture, never while off', () => {
     const fake = makeFakeContext('suspended');
     const factory = vi.fn(() => fake.context);
