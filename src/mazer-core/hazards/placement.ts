@@ -92,6 +92,13 @@ export interface PlaceLevelHazardsOptions {
   readonly invulnerableTurns?: number;
   /** Overrides `maxHazardsForMaze`. */
   readonly capacity?: number;
+  /**
+   * Graph-contract amendment A6 (signed product contract 2.4): a patrol (Sentry)
+   * never covers a mandatory (separator) cell. Patrol segments touching one are
+   * skipped and the screen rejects any placement that hosts one. Default false
+   * keeps the draft behaviour.
+   */
+  readonly patrolsAvoidChokepoints?: boolean;
 }
 
 export interface KindCounts {
@@ -259,6 +266,7 @@ export type PlacementRejection =
   | 'first-encounter-not-alone'
   | 'first-encounter-no-detour'
   | 'first-encounter-wait-too-long'
+  | 'patrol-on-chokepoint'
   | 'validator-failed';
 
 export interface ScreenHazardPlacementOptions {
@@ -268,6 +276,8 @@ export interface ScreenHazardPlacementOptions {
   readonly capacity?: number;
   /** When set, the first-encounter rule is enforced for this kind. */
   readonly firstEncounterKind?: PlacementKind | null;
+  /** Amendment A6: reject a patrol on a mandatory cell (gates may sit on one). */
+  readonly rejectPatrolChokepoints?: boolean;
 }
 
 export interface PlacementScreen {
@@ -335,6 +345,10 @@ export const screenHazardPlacement = (
     goal,
     invulnerableTurns: options.invulnerableTurns
   });
+  if (options.rejectPatrolChokepoints === true
+    && verdict.chokepoints.hostedHazards.some((host) => host.kind === 'patrol')) {
+    reasons.push('patrol-on-chokepoint');
+  }
   if (!verdict.pass) {
     reasons.push('validator-failed');
   }
@@ -356,6 +370,8 @@ interface BuildContext {
   readonly gateTier: number;
   readonly patrolTier: number;
   readonly firstKind: PlacementKind | null;
+  /** Cells no patrol route may cover (amendment A6), or null when unrestricted. */
+  readonly patrolForbidden: Uint8Array | null;
 }
 
 interface BuildState {
@@ -539,6 +555,8 @@ const placePatrols = (
     const usable = segments
       .map((segment, segmentIndex) => ({ segment, segmentIndex }))
       .filter(({ segment }) => segment.every((cell) => isFree(context, state, cell, first)))
+      .filter(({ segment }) => context.patrolForbidden === null
+        || segment.every((cell) => context.patrolForbidden![cell] !== 1))
       .filter(({ segment }) => {
         // Safe pocket: some segment cell has an off-segment, hazard-free neighbour to dodge into.
         const inside = new Set(segment);
@@ -726,6 +744,14 @@ export const placeLevelHazards = (
   }
 
   const guarded = protectedCells(graph, start, goal);
+  const avoidChokepoints = options.patrolsAvoidChokepoints === true;
+  let patrolForbidden: Uint8Array | null = null;
+  if (avoidChokepoints && target.patrols > 0) {
+    patrolForbidden = new Uint8Array(graph.cellCount);
+    for (const cell of findSeparatorCells(graph, start, goal)) {
+      patrolForbidden[cell] = 1;
+    }
+  }
   let attempts = 0;
   let firstBuilt: Built | null = null;
   const finish = (sequence: readonly HazardSpec[], screen: PlacementScreen, firstIndex: number): HazardPlacementResult => {
@@ -752,7 +778,8 @@ export const placeLevelHazards = (
     goal,
     invulnerableTurns,
     capacity,
-    firstEncounterKind: kind
+    firstEncounterKind: kind,
+    rejectPatrolChokepoints: avoidChokepoints
   });
 
   for (let salt = 0; salt < MAX_PLACEMENT_ATTEMPTS; salt += 1) {
@@ -766,7 +793,8 @@ export const placeLevelHazards = (
       target,
       gateTier: loadout.gateTier ?? 0,
       patrolTier: loadout.patrolTier ?? 0,
-      firstKind: activeFirst
+      firstKind: activeFirst,
+      patrolForbidden
     });
     firstBuilt ??= built;
     if (built.sequence.length === 0) {
