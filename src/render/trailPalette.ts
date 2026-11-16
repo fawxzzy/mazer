@@ -253,6 +253,29 @@ export const resolveTrailPaletteBorderColor = (
   motionStopped: boolean
 ): number => sampleIridescentTrail(headDistanceTiles, timeMs, motionStopped, { core: 0, glow: 0, wave: 0, sheen: 0 }).core;
 
+/** The trail head the scene records on every trail draw (MenuScene `trailPaletteHead`); null when there is no trail (menu). */
+export interface TrailPaletteHeadSample {
+  readonly distanceTiles?: number;
+  readonly timeMs?: number;
+  readonly animated?: boolean;
+}
+
+/**
+ * THE shared border colour (MAZER-VIS-053): the colour of the edge markers' border AND of the end star's border. Both call
+ * this one function with the same inputs, so the star and the corner diamonds can never show two different colours.
+ * `timeMs` is the scene clock (used when the trail has no clock of its own, e.g. the menu); `head` is the trail head sample
+ * (null = no trail: distance 0). Reduced motion and an un-animated trail (Trail Shine off) stop the sheen and swell.
+ */
+export const resolveSharedBorderColor = (
+  head: TrailPaletteHeadSample | null | undefined,
+  timeMs: number,
+  reducedMotion: boolean
+): number => resolveTrailPaletteBorderColor(
+  Number.isFinite(head?.distanceTiles) ? (head?.distanceTiles ?? 0) : 0,
+  Number.isFinite(head?.timeMs) ? (head?.timeMs ?? timeMs) : timeMs,
+  reducedMotion || head?.animated === false
+);
+
 // MAZER-UI-031 slice 2: legacy iridescent material colours (moved verbatim from legacyIridescentMaterial.ts).
 export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS_VALUE = [
   0x8b2fe0,

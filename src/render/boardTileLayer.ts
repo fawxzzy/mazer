@@ -484,7 +484,7 @@ const createDocumentSurface = (pixelWidth: number, pixelHeight: number): TileBak
 
 /** The start and goal cells' chip geometry, board-local css px (null when absent or not a floor cell). */
 export interface BoardTileEndpoints {
-  /** The start tile, plus the direction its play arrow points: the first step of the solution path (startDirection.ts). */
+  /** The start tile, plus the first step direction (the start marker is a spiral now and points nowhere, so it is carried but not drawn): the first step of the solution path (startDirection.ts). */
   start: (ChipTileGeometry & { direction: StartDirection }) | null;
   goal: ChipTileGeometry | null;
 }
