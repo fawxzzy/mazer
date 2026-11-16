@@ -32,7 +32,11 @@ export type LegacyGuideGlyph =
   | 'edge-marker'
   | 'level-numeral'
   | 'online-count'
-  | 'sound-speaker';
+  | 'sound-speaker'
+  | 'hazard-gate'
+  | 'hazard-sentry'
+  | 'hazard-hunter'
+  | 'hazard-shard';
 
 export type LegacyGuideIconStatus = 'shared-with-board' | 'guide-local' | 'todo-wiring';
 
@@ -63,7 +67,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online' | 'sound';
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online' | 'sound' | LegacyGuideHazardRowId;
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -222,6 +226,74 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
 ]);
 
 /**
+ * The hazard kinds, spelled locally so the Guide data stays free of the hazard core (the source boundary
+ * test pins which legacy files may import it). tests/reset/legacy-hazard-onboarding.test.ts pins this list
+ * to the signed schedule's units, in order.
+ */
+export type LegacyGuideHazardKind = 'pulseGate' | 'sentry' | 'hunter' | 'shard';
+
+export type LegacyGuideHazardRowId = 'hazard-gate' | 'hazard-sentry' | 'hazard-hunter' | 'hazard-shard';
+
+/** A Guide row for one hazard kind (slice H6). Its heading and text are also the kind's intro card. */
+export interface LegacyGuideHazardRow extends LegacyGuideRow {
+  id: LegacyGuideHazardRowId;
+  kind: LegacyGuideHazardKind;
+}
+
+const hazardGlyphIcon = (glyph: LegacyGuideGlyph, reasonId: string): LegacyGuideIconSpec => ({
+  badge: 'circle',
+  boardDraw: null,
+  chipDraw: null,
+  glyph,
+  lane: null,
+  reasonId,
+  status: 'guide-local'
+});
+
+/**
+ * Hazard rows (slice H6), in schedule order. NEVER part of LEGACY_GUIDE_ROWS: the sheet shows a
+ * hazard row only while the hazard layer is on (build flag or `?lab=hazards`) AND the player has
+ * met that kind AND the kind is live in play (legacyHazardOnboarding.ts decides which), so the
+ * flag-off Guide is unchanged. The same heading and text are the kind's one-line intro card, so
+ * the card and the Guide cannot disagree. Each claim is pinned to the signed schedule manifest by
+ * tests/reset/legacy-hazard-onboarding.test.ts.
+ */
+export const LEGACY_GUIDE_HAZARD_ROWS: readonly LegacyGuideHazardRow[] = Object.freeze([
+  {
+    heading: 'Pulse Gate',
+    icon: hazardGlyphIcon('hazard-gate', 'hazard-gate-glyph-guide-local-until-board-layer'),
+    id: 'hazard-gate',
+    kind: 'pulseGate',
+    text: 'Gates open and shut on a beat. Wait for the gap, then go through.'
+  },
+  {
+    heading: 'Sentry',
+    icon: hazardGlyphIcon('hazard-sentry', 'hazard-sentry-glyph-guide-local-until-board-layer'),
+    id: 'hazard-sentry',
+    kind: 'sentry',
+    text: 'Sentries pace a short route. A touch sends you back to your last junction.'
+  },
+  {
+    heading: 'Hunter',
+    icon: hazardGlyphIcon('hazard-hunter', 'hazard-hunter-glyph-guide-local-until-board-layer'),
+    id: 'hazard-hunter',
+    kind: 'hunter',
+    text: 'A Hunter chases you, slower than you move. It gives up after three catches.'
+  },
+  {
+    heading: 'Shard',
+    icon: hazardGlyphIcon('hazard-shard', 'hazard-shard-glyph-guide-local-until-board-layer'),
+    id: 'hazard-shard',
+    kind: 'shard',
+    text: 'Collect the shard first. The star stays locked until you do.'
+  }
+]);
+
+export const resolveLegacyGuideHazardRow = (kind: LegacyGuideHazardKind): LegacyGuideHazardRow => (
+  LEGACY_GUIDE_HAZARD_ROWS.find((row) => row.kind === kind)!
+);
+
+/**
  * Rows deliberately NOT shown yet. Each names what must land first; the
  * drift test pins that none of them is in LEGACY_GUIDE_ROWS. (The Start row
  * left this list when Chip landed: the start marker is now on the board.)
@@ -277,14 +349,22 @@ export interface LegacyGuideSheetModel {
   closeLabel: typeof LEGACY_GUIDE_CLOSE_LABEL;
 }
 
-/** Same rows for both contexts: only the sheet the Guide returns to differs (the caller's overlay stack). */
+/**
+ * Same rows for both contexts: only the sheet the Guide returns to differs (the caller's overlay stack).
+ * `hazardKinds` (slice H6) appends the hazard rows for those kinds, in schedule order; empty or omitted
+ * (the hazard layer off) returns LEGACY_GUIDE_ROWS itself, so the flag-off sheet is unchanged.
+ */
 export const buildLegacyGuideSheetModel = (
   context: LegacyGuideContext,
-  options: { hasKeyboard?: boolean } = {}
-): LegacyGuideSheetModel => ({
-  closeLabel: LEGACY_GUIDE_CLOSE_LABEL,
-  context,
-  keyboardLine: options.hasKeyboard === true ? buildLegacyGuideKeyboardLine() : null,
-  rows: LEGACY_GUIDE_ROWS,
-  title: LEGACY_GUIDE_TITLE
-});
+  options: { hasKeyboard?: boolean; hazardKinds?: readonly LegacyGuideHazardKind[] } = {}
+): LegacyGuideSheetModel => {
+  const hazardKinds = options.hazardKinds ?? [];
+  const hazardRows = LEGACY_GUIDE_HAZARD_ROWS.filter((row) => hazardKinds.includes(row.kind));
+  return {
+    closeLabel: LEGACY_GUIDE_CLOSE_LABEL,
+    context,
+    keyboardLine: options.hasKeyboard === true ? buildLegacyGuideKeyboardLine() : null,
+    rows: hazardRows.length === 0 ? LEGACY_GUIDE_ROWS : [...LEGACY_GUIDE_ROWS, ...hazardRows],
+    title: LEGACY_GUIDE_TITLE
+  };
+};

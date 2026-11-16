@@ -426,3 +426,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: the roadmap asks the contract to be signed into the repo before any hazard code (H1+) lands, so each later slice cites a fixed, tested source. Owner answered yes to the four contract calls.
 - Rule: no code under `src/` changed; the validator defaults and `LEGACY_HAZARD_LAYER_ENABLED = false` stay as they were until slices H1-H5 land.
 - Status: headless (tests, decision-registry check); nothing checked on a real phone (nothing player-visible changed).
+
+## 2026-11-16 Menu demo starts at the player's level; tap anywhere starts a run
+- WHAT changed: `seedLegacyMenuDemoTrackFromPlayer` (legacyMenuDemoTrack.ts) lifts a lower ai-runner track to the player's level when progression loads, so the main-menu demo starts on the player's level and then climbs. `isFrontDoorTapAnywhereStart` (legacyFrontDoorHitZone.ts) plus `MenuScene.handleFrontDoorTapAnywhere` make a tap almost anywhere on the front door start a run, except within 28 px of any other UI button (settings cog, leaderboard) or when an overlay, level preview or sign-in gate is active.
+- WHY it changed: the demo restarted at a fixed low level and only the small label was tappable. Play access gating and the Start hit zone are unchanged.
+- Status: headless (typecheck, unit tests); nothing checked in a browser or on a real phone.

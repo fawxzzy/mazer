@@ -5,6 +5,7 @@ import { MAZER_ACCESSIBILITY_SHORTCUTS } from '../../src/boot/accessibilitySurfa
 import { resolveHumanKeyboardActionKind } from '../../src/input-human/keyboard';
 import {
   LEGACY_GUIDE_CLOSE_LABEL,
+  LEGACY_GUIDE_HAZARD_ROWS,
   LEGACY_GUIDE_KEY_BINDINGS,
   LEGACY_GUIDE_PENDING_ROWS,
   LEGACY_GUIDE_ROWS,
@@ -314,7 +315,7 @@ describe('guide icons are tied to the draw functions the board uses', () => {
   });
 
   test('status bookkeeping is honest: todo rows name a lane and why, shared rows name a board draw, guide-local rows say so', () => {
-    for (const r of LEGACY_GUIDE_ROWS) {
+    for (const r of [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS]) {
       expect(r.icon.reasonId, r.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
       if (r.icon.status === 'todo-wiring') {
         expect(r.icon.lane, r.id).not.toBeNull();
@@ -346,7 +347,8 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('every glyph the data names has a draw case in the scene, and nothing else is drawn', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const drawn = [...icon.matchAll(/case '([a-z-]+)':/g)].map((m) => m[1]).sort();
-    const declared = LEGACY_GUIDE_ROWS.map((r) => r.icon.glyph).sort();
+    // Slice H6: the hazard rows (shown only while the hazard layer is on) are drawn by the same method.
+    const declared = [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph).sort();
     expect(drawn).toEqual(declared);
   });
 
@@ -383,7 +385,7 @@ describe('the scene paints exactly what the guide data declares', () => {
 
   test('the scene holds no guide copy of its own: rows come from the data, headings and text both', () => {
     const guide = method('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
-    for (const r of LEGACY_GUIDE_ROWS) {
+    for (const r of [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS]) {
       expect(MENU_SCENE, r.id).not.toContain(r.text);
       expect(guide).not.toContain(`'${r.heading}'`);
     }
