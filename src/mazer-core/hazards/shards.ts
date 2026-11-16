@@ -7,13 +7,13 @@
  *
  * Pieces:
  * - `resolveShardRoutePlan`: how many shards a level gets (the allocator's
- *   `shards`) and the route-target window. From saturation on the target is
+ *   `shards`) and the route-target band. From saturation on the target is
  *   strict: `SHARD_ROUTE_BASE + SHARD_ROUTE_STEP * (level - saturation)` ticks,
- *   window `[target, target + SHARD_ROUTE_WINDOW]`. STEP 2 / WINDOW 1 keeps
+ *   band `[target, target + SHARD_ROUTE_BAND]`. STEP 2 / BAND 1 keeps
  *   every realized route strictly above the previous level's (`R + 2 > R + 1`)
  *   even though a plain grid fixes the parity of a static tour.
  * - `placeShards`: deterministic shard cells whose static tour
- *   start -> shard 1 -> ... -> shard k -> star lands in a window.
+ *   start -> shard 1 -> ... -> shard k -> star lands in a band.
  * - `computeShardLayer`: placement + the shard verdict + the phone forgiveness
  *   gate, retried on the seeded stream; `failed` tells the caller to try the
  *   next base (the contract's reject-and-try-next-base loop).
@@ -49,8 +49,8 @@ export const SHARD_SEED_STREAM = 0x53485244;
 export const SHARD_ROUTE_BASE = 160;
 /** Ticks added per level from saturation on (manifest `forever.minRiseTicksPerLevel` is 1; 2 survives grid parity). */
 export const SHARD_ROUTE_STEP = 2;
-/** Accepted overshoot above the target. Must stay below SHARD_ROUTE_STEP so consecutive windows never overlap. */
-export const SHARD_ROUTE_WINDOW = 1;
+/** Accepted overshoot above the target. Must stay below SHARD_ROUTE_STEP so consecutive bands never overlap. */
+export const SHARD_ROUTE_BAND = 1;
 /** Placement + verdict attempts per base before `failed`. */
 export const SHARD_LAYER_ATTEMPTS = 12;
 /** Near-best candidates the seeded pick chooses among for a non-final shard. */
@@ -67,7 +67,7 @@ export interface ShardRoutePlan {
   readonly saturationLevel: number;
   /** Shards on this level (equals `allocateHazardUnits(level).shards`). */
   readonly count: number;
-  /** True from saturation on: the window is the strict per-level route target. */
+  /** True from saturation on: the band is the strict per-level route target. */
   readonly strict: boolean;
   /** Strict target in witness ticks, or null before saturation. */
   readonly target: number | null;
@@ -88,16 +88,16 @@ export const resolveShardRoutePlan = (
 };
 
 /**
- * Window for the route in ticks. Strict levels: `[target, target + WINDOW]`.
+ * Band for the route in ticks. Strict levels: `[target, target + SHARD_ROUTE_BAND]`.
  * Before saturation the single shard is a modest detour: `[d + 2, d + max(4, ceil(d / 2))]`
  * with `d` the static start -> star distance (a preference, not a ladder rung).
  */
-export const resolveShardRouteWindow = (
+export const resolveShardRouteBand = (
   plan: ShardRoutePlan,
   startGoalDistance: number
 ): { readonly min: number; readonly max: number } => (
   plan.target !== null
-    ? { min: plan.target, max: plan.target + SHARD_ROUTE_WINDOW }
+    ? { min: plan.target, max: plan.target + SHARD_ROUTE_BAND }
     : { min: startGoalDistance + 2, max: startGoalDistance + Math.max(4, Math.ceil(startGoalDistance / 2)) }
 );
 
@@ -166,7 +166,7 @@ export const resolveShardEligibleCells = (
   return cells;
 };
 
-export type ShardPlacementFailure = 'no-eligible-cells' | 'too-few-cells' | 'route-too-long-for-target' | 'window-missed';
+export type ShardPlacementFailure = 'no-eligible-cells' | 'too-few-cells' | 'route-too-long-for-target' | 'band-missed';
 
 export type ShardPlacementResult =
   | {
@@ -174,10 +174,10 @@ export type ShardPlacementResult =
     readonly shards: readonly HazardCellId[];
     /** Static tour (no waits). */
     readonly tour: number;
-    /** Route length the window was checked against: `finalTicks` when given, else the static tour. */
+    /** Route length the band was checked against: `finalTicks` when given, else the static tour. */
     readonly route: number;
-    /** False only for a non-strict placement that took the closest route outside the window. */
-    readonly inWindow: boolean;
+    /** False only for a non-strict placement that took the closest route outside the band. */
+    readonly inBand: boolean;
   }
   | { readonly placed: false; readonly reason: ShardPlacementFailure; readonly closestRoute: number | null };
 
@@ -185,7 +185,7 @@ export interface PlaceShardsOptions {
   readonly start: HazardCellId;
   readonly goal: HazardCellId;
   readonly count: number;
-  /** Route window (ticks), inclusive. */
+  /** Route band (ticks), inclusive. */
   readonly min: number;
   readonly max: number;
   readonly seed: number;
@@ -198,7 +198,7 @@ export interface PlaceShardsOptions {
   readonly finalTicks?: (prefix: readonly HazardCellId[]) => Int32Array;
   /** Ticks the earlier legs are expected to lose to waits; the prefix aims this much shorter. Default 0. */
   readonly expectedWaits?: number;
-  /** Strict (default): no cell in the window fails. Non-strict: take the closest route instead. */
+  /** Strict (default): no cell in the band fails. Non-strict: take the closest route instead. */
   readonly strict?: boolean;
 }
 
@@ -206,14 +206,14 @@ export interface PlaceShardsOptions {
  * Greedy seeded placement. Earlier shards: leg j aims at `remaining / remainingLegs`
  * steps from the previous shard and the seeded pick chooses among the
  * `SHARD_PICK_POOL` best-scoring cells. The last shard is chosen (seeded) among
- * the cells whose route closes inside the window. Because shards count only in
+ * the cells whose route closes inside the band. Because shards count only in
  * order, the route through a last shard x is exactly "earliest states on x with
  * the earlier shards collected" plus "fastest x -> star", so `finalTicks` is exact.
  */
 export const placeShards = (graph: HazardGraph, options: PlaceShardsOptions): ShardPlacementResult => {
   const { start, goal, count, min, max, seed } = options;
   if (!Number.isInteger(count) || count < 1) throw new RangeError('count must be a positive integer');
-  if (!Number.isInteger(min) || !Number.isInteger(max) || max < min) throw new RangeError('window must be integers with min <= max');
+  if (!Number.isInteger(min) || !Number.isInteger(max) || max < min) throw new RangeError('band must be integers with min <= max');
   const eligible = resolveShardEligibleCells(graph, options.specs ?? [], start, goal);
   if (eligible.length === 0) return { placed: false, reason: 'no-eligible-cells', closestRoute: null };
   if (eligible.length < count) return { placed: false, reason: 'too-few-cells', closestRoute: null };
@@ -248,9 +248,9 @@ export const placeShards = (graph: HazardGraph, options: PlaceShardsOptions): Sh
   const routeOf = (cell: HazardCellId): number => (routes === null ? spent + fromDistance[cell]! + toGoal[cell]! : routes[cell]!);
   const free = eligible.filter((cell) => !used.has(cell) && routeOf(cell) >= 0);
   const closing = free.filter((cell) => routeOf(cell) >= min && routeOf(cell) <= max);
-  const finish = (cell: HazardCellId, inWindow: boolean): ShardPlacementResult => {
+  const finish = (cell: HazardCellId, inBand: boolean): ShardPlacementResult => {
     shards.push(cell);
-    return { placed: true, shards, tour: spent + fromDistance[cell]! + toGoal[cell]!, route: routeOf(cell), inWindow };
+    return { placed: true, shards, tour: spent + fromDistance[cell]! + toGoal[cell]!, route: routeOf(cell), inBand };
   };
   if (closing.length > 0) return finish(closing[mix32(seed, count - 1) % closing.length]!, true);
   let closest: HazardCellId | null = null;
@@ -263,11 +263,11 @@ export const placeShards = (graph: HazardGraph, options: PlaceShardsOptions): Sh
       closest = cell;
     }
   }
-  if (closest === null) return { placed: false, reason: 'window-missed', closestRoute: null };
+  if (closest === null) return { placed: false, reason: 'band-missed', closestRoute: null };
   if (options.strict === false) return finish(closest, false);
   return {
     placed: false,
-    reason: routeOf(closest) > max ? 'route-too-long-for-target' : 'window-missed',
+    reason: routeOf(closest) > max ? 'route-too-long-for-target' : 'band-missed',
     closestRoute: routeOf(closest)
   };
 };
@@ -275,7 +275,7 @@ export const placeShards = (graph: HazardGraph, options: PlaceShardsOptions): Sh
 export type ShardLayerStatus =
   /** No shard on this level (before the Shard intro). */
   | 'none'
-  /** Shards placed; the verdict and the forgiveness gate passed; strict levels landed in the window. */
+  /** Shards placed; the verdict and the forgiveness gate passed; strict levels landed in the band. */
   | 'placed'
   /** No attempt passed: try the next base (strict levels) or ship without shards (before saturation). */
   | 'failed';
@@ -286,7 +286,7 @@ export type ShardLayerReasonCode =
   | 'sentry-on-leg'
   | 'escape-slack-low'
   | 'fragile-early-step'
-  | 'witness-outside-window';
+  | 'witness-outside-band';
 
 export interface ShardLayerResult {
   readonly contract: typeof SHARD_LAYER_CONTRACT;
@@ -294,8 +294,8 @@ export interface ShardLayerResult {
   readonly status: ShardLayerStatus;
   readonly plan: ShardRoutePlan;
   readonly seed: number;
-  /** Witness-tick window the route had to land in. */
-  readonly window: { readonly min: number; readonly max: number } | null;
+  /** Witness-tick band the route had to land in. */
+  readonly band: { readonly min: number; readonly max: number } | null;
   readonly shards: readonly HazardCellId[];
   /** Static tour of the shipped shards (no waits). */
   readonly tour: number | null;
@@ -340,9 +340,9 @@ export const resolveShardSeed = (mazeSeed: number, level: number): number => mix
 
 /**
  * Placement + verdict + forgiveness gate for one base maze. On strict levels the
- * witness ticks (waits included) must land in the window; when a witness
+ * witness ticks (waits included) must land in the band; when a witness
  * carries `w` waits, the next attempt aims the static tour `w` lower. Before
- * saturation the window only steers placement.
+ * saturation the band only steers placement.
  */
 export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayerOptions): ShardLayerResult => {
   const { start, goal, level, specs } = options;
@@ -362,16 +362,16 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
     digest: ''
   };
   if (plan.count === 0) {
-    return { ...empty, status: 'none', window: null, attempts: 0, rejections: [] };
+    return { ...empty, status: 'none', band: null, attempts: 0, rejections: [] };
   }
-  const window = resolveShardRouteWindow(plan, shardFloorDistances(graph, start)[goal]!);
+  const band = resolveShardRouteBand(plan, shardFloorDistances(graph, start)[goal]!);
   const rejections: ShardLayerReasonCode[] = [];
   let timeline: HazardTimeline;
   try {
     timeline = createHazardTimeline(graph, specs);
   } catch (error) {
     if (!(error instanceof HazardSpecError)) throw error;
-    return { ...empty, status: 'failed', window, attempts: 1, rejections: ['verdict-failed'] };
+    return { ...empty, status: 'failed', band, attempts: 1, rejections: ['verdict-failed'] };
   }
   const finalTicks = (prefix: readonly HazardCellId[]): Int32Array => (
     measureFinalShardTicks(graph, timeline, { start, goal, prefix, maxProductStates: options.maxProductStates })
@@ -384,8 +384,8 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       start,
       goal,
       count: plan.count,
-      min: window.min,
-      max: window.max,
+      min: band.min,
+      max: band.max,
       seed: mix32(seed, attempt),
       specs,
       finalTicks,
@@ -397,7 +397,7 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       if (placement.reason === 'no-eligible-cells' || placement.reason === 'too-few-cells') break;
       // Waits the prefix lost on this attempt; aim the next prefix that much shorter.
       if (placement.reason === 'route-too-long-for-target' && placement.closestRoute !== null) {
-        expectedWaits += Math.max(1, placement.closestRoute - window.max);
+        expectedWaits += Math.max(1, placement.closestRoute - band.max);
       }
       continue;
     }
@@ -412,9 +412,9 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       continue;
     }
     const ticks = verdict.witness.ticks;
-    if (plan.strict && (ticks < window.min || ticks > window.max)) {
+    if (plan.strict && (ticks < band.min || ticks > band.max)) {
       // Cannot happen when finalTicks is exact; kept as the guard the ladder relies on.
-      rejections.push('witness-outside-window');
+      rejections.push('witness-outside-band');
       continue;
     }
     const slack = verdict.escapeSlack;
@@ -429,7 +429,7 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
     return {
       ...empty,
       status: 'placed',
-      window,
+      band,
       shards: placement.shards,
       tour: placement.tour,
       routeTicks: ticks,
@@ -440,5 +440,5 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       digest: computeShardDigest({ level, seed, shards: placement.shards })
     };
   }
-  return { ...empty, status: 'failed', window, attempts: rejections.length, rejections };
+  return { ...empty, status: 'failed', band, attempts: rejections.length, rejections };
 };

@@ -3,13 +3,13 @@
 //   npx vite-node --script scripts/analysis/shard-runway.ts -- [--assert] [--to=2000] [--stride=50] [--run=6]
 //     [--saturation=<level>] [--boards=phone,desktop] [--out=<file.json>]
 //
-// 1. Schedule (every level, saturation..to): the shard route target rises strictly, consecutive windows never overlap
-//    (target(L + 1) > target(L) + SHARD_ROUTE_WINDOW), the shard count equals the allocator and never drops.
+// 1. Schedule (every level, saturation..to): the shard route target rises strictly, consecutive bands never overlap
+//    (target(L + 1) > target(L) + SHARD_ROUTE_BAND), the shard count equals the allocator and never drops.
 // 2. Realized routes (sampled levels: saturation, a run of `--run` consecutive levels, every `--stride`, both edges of
 //    each 50-level shard block, `--to`): the shipped maze per board, the H2 overlay on it, then `computeShardLayer`.
 //    A failed base is retried with the next seed (emulating the contract's reject-and-try-next-base loop); the bases
 //    needed must stay within GEOMETRY_BUDGET_BASE_CANDIDATES. The witness ticks of each shipped route must land in its
-//    window and rise strictly from one sampled level to the next on the same board.
+//    band and rise strictly from one sampled level to the next on the same board.
 // 3. Cost: the shard verdict (`validateShardRoute`, timed again on the shipped shards) median must be at most
 //    2x the H5 budget (2 x 40 ms). Placement (layer) time is reported, not gated.
 //
@@ -27,7 +27,7 @@ import { createLegacyMazeHazardGraph } from '../../src/legacy-runtime/legacyHaza
 import { resolveLegacyHazardOverlay } from '../../src/legacy-runtime/legacyHazardOverlay';
 import {
   HAZARD_SHARD_GROWTH_LEVELS,
-  SHARD_ROUTE_WINDOW,
+  SHARD_ROUTE_BAND,
   allocateHazardUnits,
   computeShardLayer,
   resolveShardRoutePlan,
@@ -53,7 +53,7 @@ export interface ShardRunwayRow {
   readonly status: 'placed' | 'failed';
   readonly routeTicks: number | null;
   readonly tour: number | null;
-  readonly inWindow: boolean;
+  readonly inBand: boolean;
   readonly escapeSlack: number | null;
   readonly productStates: number | null;
   readonly verdictMs: number | null;
@@ -67,7 +67,7 @@ export const checkShardSchedule = (saturationLevel: number, to: number): string[
     const plan = resolveShardRoutePlan(level, { saturationLevel });
     const shards = allocateHazardUnits(level, { saturationLevel }).shards;
     if (plan.target === null || previous.target === null) failures.push(`L${level}: no target`);
-    else if (plan.target <= previous.target + SHARD_ROUTE_WINDOW) failures.push(`L${level}: target ${plan.target} overlaps L${level - 1} window`);
+    else if (plan.target <= previous.target + SHARD_ROUTE_BAND) failures.push(`L${level}: target ${plan.target} overlaps L${level - 1} band`);
     if (plan.count !== shards) failures.push(`L${level}: count ${plan.count} != allocator ${shards}`);
     if (plan.count < previous.count) failures.push(`L${level}: shard count dropped`);
     previous = plan;
@@ -120,7 +120,7 @@ export const runShardRunwayLevel = (level: number, board: (typeof LADDER_BOARDS)
       status: 'placed',
       routeTicks: ticks,
       tour: layer.tour,
-      inWindow: ticks !== null && layer.window !== null && ticks >= layer.window.min && ticks <= layer.window.max && ticks === layer.routeTicks,
+      inBand: ticks !== null && layer.band !== null && ticks >= layer.band.min && ticks <= layer.band.max && ticks === layer.routeTicks,
       escapeSlack: layer.escapeSlack?.ratio ?? null,
       productStates: verdict.productStates,
       verdictMs,
@@ -136,7 +136,7 @@ export const runShardRunwayLevel = (level: number, board: (typeof LADDER_BOARDS)
     status: 'failed',
     routeTicks: null,
     tour: null,
-    inWindow: false,
+    inBand: false,
     escapeSlack: null,
     productStates: null,
     verdictMs: null,
@@ -175,7 +175,7 @@ const main = (): void => {
       console.log(`L${level} ${board.name}: k ${row.shards} target ${row.target} -> ${row.status} ticks ${String(row.routeTicks)} `
         + `bases ${row.basesTried} slack ${String(row.escapeSlack)} verdict ${row.verdictMs?.toFixed(1) ?? '-'} ms layer ${row.layerMs.toFixed(0)} ms`);
       if (row.status !== 'placed') failures.push(`L${level} ${board.name}: no base out of ${GEOMETRY_BUDGET_BASE_CANDIDATES} placed shards`);
-      else if (!row.inWindow) failures.push(`L${level} ${board.name}: route ${String(row.routeTicks)} outside its window`);
+      else if (!row.inBand) failures.push(`L${level} ${board.name}: route ${String(row.routeTicks)} outside its band`);
       if (previous?.routeTicks != null && row.routeTicks !== null && row.routeTicks <= previous.routeTicks) {
         failures.push(`L${level} ${board.name}: route ${row.routeTicks} does not exceed L${previous.level} (${previous.routeTicks})`);
       }

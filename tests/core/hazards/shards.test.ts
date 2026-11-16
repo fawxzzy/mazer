@@ -8,7 +8,7 @@ import {
   HAZARD_SHARD_GROWTH_LEVELS,
   SHARD_ROUTE_BASE,
   SHARD_ROUTE_STEP,
-  SHARD_ROUTE_WINDOW,
+  SHARD_ROUTE_BAND,
   advanceShardProgress,
   allocateHazardUnits,
   createHazardTimeline,
@@ -22,7 +22,7 @@ import {
   resolveShardEligibleCells,
   resolveShardRoutePlan,
   resolveShardRouteTarget,
-  resolveShardRouteWindow,
+  resolveShardRouteBand,
   shuttlePeriod,
   validateShardRoute,
   verifyShardWitness,
@@ -260,7 +260,7 @@ describe('placement', () => {
   const { graph, start, goal } = createLegacyMazeHazardGraph(maze);
   const base = measureShardTour(graph, start, goal, []);
 
-  test('deterministic, lands the static tour in the window, avoids start and goal', () => {
+  test('deterministic, lands the static tour in the band, avoids start and goal', () => {
     const options = { start, goal, count: 3, min: base + 40, max: base + 41, seed: 99 };
     const first = placeShards(graph, options);
     const again = placeShards(graph, options);
@@ -277,11 +277,11 @@ describe('placement', () => {
     expect(other.placed).toBe(true);
   });
 
-  test('an unreachable window fails strictly and degrades to the closest route when not strict', () => {
+  test('an unreachable band fails strictly and degrades to the closest route when not strict', () => {
     const strict = placeShards(graph, { start, goal, count: 1, min: 10_000, max: 10_001, seed: 1 });
-    expect(strict).toMatchObject({ placed: false, reason: 'window-missed' });
+    expect(strict).toMatchObject({ placed: false, reason: 'band-missed' });
     const loose = placeShards(graph, { start, goal, count: 1, min: 10_000, max: 10_001, seed: 1, strict: false });
-    expect(loose).toMatchObject({ placed: true, inWindow: false });
+    expect(loose).toMatchObject({ placed: true, inBand: false });
   });
 });
 
@@ -299,19 +299,19 @@ describe('tail route-target schedule', () => {
     expect(resolveShardRoutePlan(59, { saturationLevel: 288 }).count).toBe(0);
   });
 
-  test('strict per-level rise with disjoint windows from saturation to L2000', () => {
-    expect(SHARD_ROUTE_WINDOW).toBeLessThan(SHARD_ROUTE_STEP);
+  test('strict per-level rise with disjoint bands from saturation to L2000', () => {
+    expect(SHARD_ROUTE_BAND).toBeLessThan(SHARD_ROUTE_STEP);
     for (const saturationLevel of [288, 368, 420]) {
       expect(resolveShardRouteTarget(saturationLevel, saturationLevel)).toBe(SHARD_ROUTE_BASE);
       let previousMax = -1;
       let previousCount = 0;
       for (let level = saturationLevel; level <= 2000; level += 1) {
         const plan = resolveShardRoutePlan(level, { saturationLevel });
-        const window = resolveShardRouteWindow(plan, 0);
-        expect(window.min).toBeGreaterThan(previousMax);
-        expect(window.min).toBeGreaterThanOrEqual(previousMax + 1);
+        const band = resolveShardRouteBand(plan, 0);
+        expect(band.min).toBeGreaterThan(previousMax);
+        expect(band.min).toBeGreaterThanOrEqual(previousMax + 1);
         expect(plan.count).toBeGreaterThanOrEqual(previousCount);
-        previousMax = window.max;
+        previousMax = band.max;
         previousCount = plan.count;
       }
       const tail = resolveShardRoutePlan(2000, { saturationLevel });
