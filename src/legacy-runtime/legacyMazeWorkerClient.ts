@@ -1,6 +1,7 @@
 // MAZER-PERF-008: the one place that constructs the maze generation Worker.
 // An absent Worker (node, tests, very old browsers) or `?mazeWorker=off` (kill switch, and
 // the A/B switch for measuring) means no background build is offered.
+import { readLegacyStaircaseFlagFromLocation } from './legacyMazeStaircase';
 import {
   LegacyMazeWorkerHost,
   type LegacyMazeWorkerLike
@@ -13,6 +14,10 @@ const createDefaultMazeWorker = (): LegacyMazeWorkerLike | null => {
     return null;
   }
   if (typeof location !== 'undefined' && new URLSearchParams(location.search).get(LEGACY_MAZE_WORKER_DISABLE_PARAM) === 'off') {
+    return null;
+  }
+  // MAZER-GEN-020: the staircase QA flag lives in the page's query string, which a worker cannot read: stay on the main thread.
+  if (readLegacyStaircaseFlagFromLocation()) {
     return null;
   }
   return new Worker(
