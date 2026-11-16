@@ -15,7 +15,7 @@ Owner: "I hate the current fade in / fade out ... I think we can do better." Sec
 - The "thin white 1px line before the fill" (VIS-050 leftover) was the pale rim of the first low-alpha cells showing before their dark fill (a chip is rim plus fill; low alpha shows the rim first). No cell is drawn at partial alpha any more, so rim and fill arrive together. Opacity is not used by the board reveal at all.
 - Wrap docks slide out of the board edge over `MAZE_DOCK_FADE_MS` (200 ms, easeOutCubic) instead of fading.
 - Cost: one clip plus one `drawImage` per recompose (was up to 16 draws). The bake is unchanged, so `BOARD_TILE_BAKE_VERSION` stays v3. Timing is unchanged: windows, input unlock, beams, totals and the strict 0/1 edge-path switch.
-- Reduce Motion: unchanged, the 200 ms board crossfade is the whole effect (`resolveMazeRevealFrame` returns null).
+- Reduce Motion (MOTION-020): the maze appears and disappears instantly, no fade and no movement (`resolveMazeRevealFrame` and `resolveReducedBoardFade` both return null).
 - No separate leading-edge glint: a bright 1px tip is exactly the "thin white line" the owner rejected, and the crisp sliced edge of a whole chip already reads as the front.
 - Evidence: `scripts/analysis/capture-maze-motion-filmstrip.mjs` (filmstrips and native-pixel zoom crops at fixed times, Chromium 390x844 DPR3 and WebKit iPhone 15 Pro). Headless only; nothing was checked on a real phone. The gap between tear-down end and the next build (digit interstitial) is lifecycle timing, outside this change.
 
@@ -42,7 +42,7 @@ One closed-form timeline for the whole maze (`src/render/mazeRevealTimeline.ts`,
 - Wall sockets and the rim glow ride the corridor they belong to: a wall's alpha is the largest alpha among the floor cells around it (the old "grow the clip by one tile").
 - Wrap docks (and the border cells that own one) fade over `MAZE_DOCK_FADE_MS` (200 ms): in after the build end, out ending exactly at the 400 ms edge-path switch. The strict 0/1 switch itself is unchanged (trail, bleed glow and dock logic still key off it).
 - Start / goal markers fade in over the beam flight (400 ms) through the existing alpha argument only (`0.9 * markerDeconstructAlpha * markerRevealAlpha`); their drawing is untouched.
-- Reduce Motion: no front, no dock fade (`resolveMazeRevealFrame` returns null); the shipped 200 ms crossfade is the whole effect.
+- Reduce Motion: no front, no dock fade, no board crossfade (MOTION-020: instant appear / disappear; reduced motion never changes colour and stops movement).
 
 ## 3. How it is drawn without a per-frame redraw of the board art
 
@@ -78,3 +78,5 @@ Cost (real clock, no recorder, JS cost of scene update + Phaser render per frame
 - Real phone: nothing here was checked on a device (headless only).
 - No scale ramp of the tiles (alpha only); the front glow is not added (the soft ramp already reads as a wavefront and every extra pass costs render time).
 - The level digit, the trail, the player and the diamonds are untouched.
+
+MOTION-020 update: the 200 ms reduced-motion board crossfade described above was removed; at that setting the board is drawn at alpha 1 from the first build frame and hidden from the first tear-down frame. Non-reduced behaviour is unchanged.
