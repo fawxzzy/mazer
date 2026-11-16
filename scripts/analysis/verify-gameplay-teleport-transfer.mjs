@@ -123,6 +123,11 @@ const STATION_SIDE = ['top', 'top', 'top', 'right', 'bottom', 'bottom', 'bottom'
 // MAZER-VIS-054: a tall portrait phone (375 <= width < 500, height >= 780) slides each CORNER diamond's outer tip 16 css px in from both edges
 // (rounded display corners hide the corner itself). Mirrors src/render/edgeCornerAnchor.ts `resolveEdgeCornerTipInset`; every other viewport is 0.
 const cornerTipInset = (width, height) => (width >= 375 && width < 500 && height >= 780 ? 16 : 0);
+// MAZER-VIS-056: the two BOTTOM corner diamonds (ids 4, 6) clear a continuous R66 display corner instead: 20 css px when the page reports a
+// bottom safe area or falls in the same size band (headless Chromium reports no safe area, so here: the band). Mirrors
+// src/render/edgeCornerAnchor.ts `resolveEdgeCornerBottomTipInset`; an acceptance number, not imported.
+const bottomCornerTipInset = (width, height) => (width >= 375 && width < 500 && height >= 780 ? 20 : 0);
+const stationCornerTipInset = (id, width, height) => (id === 4 || id === 6 ? bottomCornerTipInset(width, height) : cornerTipInset(width, height));
 const ALL_STATION_IDS = [0, 1, 2, 3, 4, 5, 6, 7];
 // A diamond counts as lit when its stroke alpha is above the idle breathing maximum (0.6).
 const LIT_ALPHA_FLOOR = 0.62;
@@ -508,7 +513,7 @@ const analyzeEdgeContact = (frames) => {
           : side === 'left' ? tip.x - paint
             : frame.visible.w - (tip.x + paint);
       // Corner diamonds (even ids) rest cornerTipInset in from the edge on a rounded-display phone, not on it (MAZER-VIS-054).
-      const gap = id % 2 === 0 ? rawGap - cornerTipInset(frame.visible.w, frame.visible.h) : rawGap;
+      const gap = id % 2 === 0 ? rawGap - stationCornerTipInset(id, frame.visible.w, frame.visible.h) : rawGap;
       checked += 1;
       if (gap < worstPast) { worstPast = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
       if (gap > worstShort) { worstShort = gap; worst = { id, gap, age: frame.introAge ?? frame.outroAge }; }
@@ -1043,13 +1048,13 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   const probe = await h.page.evaluate(() => window.__mazerQa.edgePixelProbe());
   const probeViewport = await h.page.evaluate(() => window.__mazerQa.viewport());
   // Corner footprints may sit the VIS-054 tip inset (device px) in from the edge on a rounded-display phone.
-  const cornerSlack = cornerTipInset(probeViewport.width, probeViewport.height) * (probe.w / probeViewport.width);
+  const cornerSlackFor = (id) => stationCornerTipInset(id, probeViewport.width, probeViewport.height) * (probe.w / probeViewport.width);
   const footprint = (id) => probe.boxes.find((b) => b.id === id);
   const touches = (id) => {
     const box = footprint(id)?.box;
     if (!box) { return false; }
     const side = STATION_SIDE[id];
-    const slack = id % 2 === 0 ? cornerSlack : 0;
+    const slack = id % 2 === 0 ? cornerSlackFor(id) : 0;
     return side === 'top' ? box.minY <= 2 + slack : side === 'bottom' ? box.maxY >= probe.h - 3 - slack : side === 'left' ? box.minX <= 2 : box.maxX >= probe.w - 3;
   };
   check(`${label}: real canvas pixels (layer shown vs hidden on the same frame): each diamond's footprint reaches the last three device rows/columns (MAZER-VIS-055: the star's needle tip antialiases one row fainter than the old kite) of its edge (${probe.w}x${probe.h} px)`, ALL_STATION_IDS.every(touches), JSON.stringify(probe.boxes));
@@ -1057,6 +1062,7 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   const inCorner = (id) => {
     const box = footprint(id)?.box;
     if (!box) { return false; }
+    const cornerSlack = cornerSlackFor(id);
     const horizontal = id === 0 || id === 6 ? box.minX <= 1 + cornerSlack : box.maxX >= probe.w - 2 - cornerSlack;
     const vertical = id === 0 || id === 2 ? box.minY <= 1 + cornerSlack : box.maxY >= probe.h - 2 - cornerSlack;
     return horizontal && vertical;

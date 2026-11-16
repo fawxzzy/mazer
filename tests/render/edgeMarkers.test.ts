@@ -1,4 +1,4 @@
-import { resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
+import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
@@ -12,6 +12,7 @@ import {
   resolveEdgeMarkerOutline,
   EDGE_MARKER_MAX_EXTENT_PX,
   EDGE_MARKER_TIP_PAINT_PX,
+  resolveEdgeBottomCornerInset,
   resolveEdgeCornerInset,
   resolveEdgeMarkerPaintedPolygon,
   EDGE_MIDPOINT_STATION_ID,
@@ -132,9 +133,10 @@ describe('edge marker stations', () => {
         right: viewport.width - bounds.right
       };
       if (station.isCorner) {
-        // MAZER-VIS-044: the same distance from BOTH edges of the screen corner it sits in.
-        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
-        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+        // MAZER-VIS-044: the same distance from BOTH edges of the screen corner it sits in (MAZER-VIS-056: bottom corners use their own inset).
+        const tipInset = station.side === 'bottom' ? resolveEdgeCornerBottomTipInset(viewport) : resolveEdgeCornerTipInset(viewport);
+        expect(Math.min(gaps.top, gaps.bottom), `station ${station.id} vertical corner gap`).toBeCloseTo(tipInset, 9);
+        expect(Math.min(gaps.left, gaps.right), `station ${station.id} horizontal corner gap`).toBeCloseTo(tipInset, 9);
       } else {
         expect(gaps[station.side], `station ${station.id} gap to ${station.side}`).toBeCloseTo(0, 9);
       }
@@ -207,8 +209,16 @@ describe('edge marker stations', () => {
     const stations = resolveEdgeStations({ width: 390, height: 844 });
     expect(stations[0]?.x).toBeCloseTo(inset, 9);
     expect(stations[0]?.y).toBeCloseTo(inset, 9);
-    expect(stations[4]?.x).toBeCloseTo(390 - inset, 9);
-    expect(stations[4]?.y).toBeCloseTo(844 - inset, 9);
+    // MAZER-VIS-056: the BOTTOM corners clear a continuous R66 display corner: tip 20 px in from both edges (top stays 16).
+    const bottomInset = resolveEdgeBottomCornerInset({ width: 390, height: 844 });
+    expect(bottomInset).toBeCloseTo(20 + ((EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX) * Math.SQRT1_2), 9);
+    expect(stations[4]?.x).toBeCloseTo(390 - bottomInset, 9);
+    expect(stations[4]?.y).toBeCloseTo(844 - bottomInset, 9);
+    expect(stations[6]?.x).toBeCloseTo(bottomInset, 9);
+    expect(stations[6]?.y).toBeCloseTo(844 - bottomInset, 9);
+    // Square-cornered views keep every corner ON the corner (VIS-044), bottom included.
+    expect(resolveEdgeBottomCornerInset({ width: 1280, height: 720 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
+    expect(resolveEdgeBottomCornerInset({ width: 375, height: 667 })).toBeCloseTo(resolveEdgeCornerInset(), 9);
     expect(stations[1]?.x).toBeCloseTo(195, 9);
     expect(stations[2]?.x).toBeCloseTo(390 - inset, 9);
     const extent = EDGE_MARKER_HALF_HEIGHT + EDGE_MARKER_TIP_PAINT_PX;
@@ -237,10 +247,14 @@ describe('edge marker stations', () => {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, surface, { menuActionMode: 'authenticated' });
       const stations = resolveEdgeStations({ width: layout.width, height: layout.height });
       const at = (id: number) => stations[id] as { x: number; y: number };
-      // Vertical mirror: top row (0,1,2) <-> bottom row (6,5,4) share x and mirror y.
-      for (const [topId, bottomId] of [[0, 6], [1, 5], [2, 4]] as const) {
-        expect(at(topId).x, `x ${topId}/${bottomId}`).toBeCloseTo(at(bottomId).x, 9);
-        expect(at(topId).y + at(bottomId).y, `y ${topId}/${bottomId}`).toBeCloseTo(layout.height, 9);
+      // Vertical mirror: top row (0,1,2) <-> bottom row (6,5,4) share x and mirror y. MAZER-VIS-056: on a rounded display the bottom
+      // corners sit `bottomShift` further in along their diagonal (0 on square-cornered views, so there the mirror is exact).
+      const bottomShift = resolveEdgeBottomCornerInset({ width: layout.width, height: layout.height }) - resolveEdgeCornerInset({ width: layout.width, height: layout.height });
+      expect(bottomShift).toBeGreaterThanOrEqual(0);
+      for (const [topId, bottomId, shiftX] of [[0, 6, 1], [1, 5, 0], [2, 4, -1]] as const) {
+        const shift = topId === 1 ? 0 : bottomShift;
+        expect(at(topId).x + (shiftX * shift), `x ${topId}/${bottomId}`).toBeCloseTo(at(bottomId).x, 9);
+        expect(at(topId).y + at(bottomId).y + shift, `y ${topId}/${bottomId}`).toBeCloseTo(layout.height, 9);
       }
       // Horizontal mirror: left (7) <-> right (3) share y and mirror x; both exactly mid-height.
       expect(at(7).y).toBeCloseTo(at(3).y, 9);
@@ -257,18 +271,20 @@ describe('edge marker stations', () => {
     }
   });
 
-  test('the scene feeds the stations the viewport ONLY: no safe area, no header-control avoidance', () => {
+  test('the scene feeds the stations the viewport plus the bottom safe area as a rounding SIGNAL only: no safe-area offset, no header-control avoidance', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const start = source.indexOf('private resolveLegacyEdgeStations()');
     const body = source.slice(start, source.indexOf('\n  }', start));
-    // The viewport size plus the canvas resolution (which only decides where the backing store ends): MAZER-VIS-043.
-    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height }, resolveMazerCanvasResolution());');
-    expect(body).not.toContain('safeArea');
+    // The viewport size plus the canvas resolution (which only decides where the backing store ends): MAZER-VIS-043. MAZER-VIS-056:
+    // the bottom safe area tells edgeCornerAnchor.ts the bottom corners are rounded display corners; it never offsets a station.
+    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height, safeAreaBottom: readMazerViewportGeometry().safeArea.bottom }, resolveMazerCanvasResolution());');
+    expect(body).not.toMatch(/safeArea\.(top|left|right)/);
     expect(body).not.toContain('resolveHeaderControlRects');
     const markers = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
     expect(markers).not.toContain('clearStationOfControls');
     expect(markers).not.toContain('resolveHeaderControlRects');
-    expect(markers).not.toContain('safeArea');
+    // Only the declared field: edgeMarkers.ts never reads or subtracts a safe area itself (edgeCornerAnchor.ts interprets it).
+    expect(markers).not.toMatch(/safeArea(?!Bottom\?: number;)/);
   });
 
 
@@ -986,12 +1002,13 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
         expect(maxX, label).toBeLessThanOrEqual(viewport.width + 1e-9);
         expect(maxY, label).toBeLessThanOrEqual(viewport.height + 1e-9);
         const cornerLift = resolveEdgeCornerInset(viewport) - resolveEdgeStationNormalExtent(0);
+        const bottomCornerLift = resolveEdgeBottomCornerInset(viewport) - resolveEdgeStationNormalExtent(0);
         if (station.side === 'top') {
           expect(minY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
           if (Math.abs(minY) < 1e-9) flushSamples += 1;
         }
         if (station.side === 'bottom') {
-          expect(viewport.height - maxY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
+          expect(viewport.height - maxY, label).toBeLessThanOrEqual(bottomCornerLift + 1e-9);
           if (Math.abs(viewport.height - maxY) < 1e-9) flushSamples += 1;
         }
       }

@@ -4,6 +4,7 @@ import { EDGE_DIAMOND_REST_SCALE } from '../../src/render/edgeBeamTimeline';
 import {
   EDGE_CORNER_ROUNDED_TIP_INSET_PX,
   measureEdgeCornerOffset,
+  resolveEdgeCornerBottomTipInset,
   resolveEdgeCornerTipInset
 } from '../../src/render/edgeCornerAnchor';
 import {
@@ -69,8 +70,10 @@ describe('corner diamonds are anchored in the 4 screen corners (MAZER-VIS-044 / 
         const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
         const offset = measureEdgeCornerOffset(painted, corner, visible);
         measured.push(`${corner}@${scale}: ${offset.horizontal.toFixed(2)} x ${offset.vertical.toFixed(2)}`);
-        expect(offset.horizontal, `${corner} ${scale} horizontal`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
-        expect(offset.vertical, `${corner} ${scale} vertical`).toBeCloseTo(resolveEdgeCornerTipInset(viewport), 9);
+        // MAZER-VIS-056: the bottom corners use their own (display-corner) inset.
+        const tipInset = corner.startsWith('bottom') ? resolveEdgeCornerBottomTipInset(viewport) : resolveEdgeCornerTipInset(viewport);
+        expect(offset.horizontal, `${corner} ${scale} horizontal`).toBeCloseTo(tipInset, 9);
+        expect(offset.vertical, `${corner} ${scale} vertical`).toBeCloseTo(tipInset, 9);
       }
     });
     expect(measured).toHaveLength(12);

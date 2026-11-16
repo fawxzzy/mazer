@@ -70,7 +70,7 @@
  * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
-import { resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
+import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
 import { PLAYER_COLOR, resolveSharedBorderColor, resolveTrailPaletteBorderColor } from './trailPalette';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
@@ -96,6 +96,8 @@ export type EdgeStationId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export interface EdgeViewport {
   readonly width: number;
   readonly height: number;
+  /** env(safe-area-inset-bottom), css px (viewportGeometry.ts). > 0: the bottom corners are rounded display corners (MAZER-VIS-056). */
+  readonly safeAreaBottom?: number;
 }
 
 export interface EdgeStation {
@@ -223,6 +225,14 @@ export const resolveEdgeCornerInset = (viewport?: EdgeViewport): number => (
 );
 
 /**
+ * MAZER-VIS-056: the same distance for the two BOTTOM corner stars (ids 4 and 6): their painted outer tip sits
+ * resolveEdgeCornerBottomTipInset(viewport) from both edges (0, or 20 px when the bottom corners are rounded display corners).
+ */
+export const resolveEdgeBottomCornerInset = (viewport?: EdgeViewport): number => (
+  resolveEdgeCornerBottomTipInset(viewport) + resolveEdgeKiteOutwardReach(INWARD_ANGLE[0], 'left')
+);
+
+/**
  * The extent of a canvas axis that is actually painted, in world (css) px: the backing store is `round(css * dpr)` device px and the
  * context is scaled by `dpr`, so the last visible world coordinate is `round(css * dpr) / dpr`. Equal to `css` at dpr 1 (integer sizes).
  */
@@ -245,15 +255,20 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
   const right = Math.max(left, width - inset);
   const top = inset;
   const bottom = Math.max(top, height - inset);
+  // MAZER-VIS-056: the bottom corners have their own inset (rounded display corners); the midpoints keep the shared rectangle.
+  const bottomInset = resolveEdgeBottomCornerInset(viewport);
   return STATION_IDS.map((id) => {
     const along = resolveEdgeStationPosition(id, left, right, top, bottom);
     const side = STATION_SIDE[id];
     const extent = resolveEdgeStationNormalExtent(id);
     const isCorner = id % 2 === 0;
+    const isBottomCorner = isCorner && side === 'bottom';
     const cornerMaxScale = isCorner ? resolveEdgeCornerMaxScale(viewport.width) : 1;
     // Corners sit ON the inset rectangle's corners (snug on the diagonal); midpoints are flush with their edge.
-    const x = isCorner ? along.x : side === 'left' ? extent : side === 'right' ? width - extent : along.x;
-    const y = isCorner ? along.y : side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
+    const cornerX = isBottomCorner ? (along.x < width / 2 ? bottomInset : Math.max(bottomInset, width - bottomInset)) : along.x;
+    const cornerY = isBottomCorner ? Math.max(top, height - bottomInset) : along.y;
+    const x = isCorner ? cornerX : side === 'left' ? extent : side === 'right' ? width - extent : along.x;
+    const y = isCorner ? cornerY : side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
     return {
       id,
       x,
@@ -287,7 +302,8 @@ const wrapStep = (value: number): number => ((value % EDGE_STATION_COUNT) + EDGE
  *
  * Between stations the diamond moves along the perimeter coordinate s (station
  * units, 2 per side, clockwise from the top-left corner): along the side it
- * interpolates linearly between the rest corner centres, and its angle is
+ * interpolates between the rest corner centres through the rest midpoint
+ * (linear when both corners are the same distance from it), and its angle is
  * (s + 1) pi / 4 -- the rest orientation at every station, so the kite swings
  * smoothly through the corners. Top/bottom: outer tip flush with the screen
  * edge. Left/right: the centre eases from the corner inset to the flush offset
@@ -312,28 +328,35 @@ export const resolveOrbitingEdgeStation = (
   const u = (s - (2 * sideIndex)) / 2;
   const angle = ((s + 1) * Math.PI) / 4;
   const reach = resolveEdgeKiteOutwardReach(angle, side);
-  const inset = resolveEdgeCornerInset(viewport);
-  const left = inset;
-  const right = Math.max(left, viewport.width - inset);
+  // The four corners come from the REST layout (MAZER-VIS-056: the bottom corners may sit further in than the top ones), so the
+  // path always runs through exactly where the corner stars rest.
+  const topLeft = restStations[0] as EdgeStation;
+  const topRight = restStations[2] as EdgeStation;
+  const bottomRight = restStations[4] as EdgeStation;
+  const bottomLeft = restStations[6] as EdgeStation;
   const cornerReach = resolveEdgeStationNormalExtent(0);
-  const topCornerY = inset;
-  const bottomCornerY = viewport.height - inset;
   // 0 at the side midpoint, 1 at its corners (squared: the kite stays flush for most of the side).
   const cornerBlend = ((2 * u) - 1) ** 2;
+  // Along the side: from the start corner to the end corner, bent smoothly (4u(1 - u) is 1 at the midpoint, 0 at both corners) so
+  // u = 1/2 lands exactly on the rest MIDPOINT even when the two corners are not the same distance from it (VIS-056 bottom inset).
+  const midBend = 4 * u * (1 - u);
+  const along = (from: number, to: number, mid: number): number => from + ((to - from) * u) + ((mid - ((from + to) / 2)) * midBend);
   let x: number;
   let y: number;
   if (side === 'top') {
-    x = left + ((right - left) * u);
-    y = reach + ((inset - cornerReach) * cornerBlend);
+    x = along(topLeft.x, topRight.x, (restStations[1] as EdgeStation).x);
+    y = reach + ((topLeft.y - cornerReach) * cornerBlend);
   } else if (side === 'right') {
-    x = viewport.width - (reach + (((viewport.width - right) - cornerReach) * cornerBlend));
-    y = topCornerY + ((bottomCornerY - topCornerY) * u);
+    const cornerGap = ((viewport.width - topRight.x) * (1 - u)) + ((viewport.width - bottomRight.x) * u);
+    x = viewport.width - (reach + ((cornerGap - cornerReach) * cornerBlend));
+    y = along(topRight.y, bottomRight.y, (restStations[3] as EdgeStation).y);
   } else if (side === 'bottom') {
-    x = right + ((left - right) * u);
-    y = viewport.height - (reach + ((inset - cornerReach) * cornerBlend));
+    x = along(bottomRight.x, bottomLeft.x, (restStations[5] as EdgeStation).x);
+    y = viewport.height - (reach + (((viewport.height - bottomRight.y) - cornerReach) * cornerBlend));
   } else {
-    x = reach + ((left - cornerReach) * cornerBlend);
-    y = bottomCornerY + ((topCornerY - bottomCornerY) * u);
+    const cornerGap = (bottomLeft.x * (1 - u)) + (topLeft.x * u);
+    x = reach + ((cornerGap - cornerReach) * cornerBlend);
+    y = along(bottomLeft.y, topLeft.y, (restStations[7] as EdgeStation).y);
   }
   return { id, x, y, inwardAngle: angle, side, isCorner: false };
 };
