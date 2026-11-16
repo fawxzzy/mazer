@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "mazer-hazard-schedule",
+  "version": 1,
+  "status": "signed-not-wired",
+  "contract": {
+    "doc": "docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md",
+    "graphContract": "docs/architecture/MAZER-HAZARD-GRAPH-CONTRACT.md",
+    "signedBy": "Zac, 2026-11-15, via chat",
+    "signedWords": "YES to all four contract calls"
+  },
+  "flag": {
+    "buildDefaultEnabled": false,
+    "labSwitch": "?lab=hazards",
+    "note": "Slice H1 replaces the dormant literal LEGACY_HAZARD_LAYER_ENABLED with resolveHazardLayerEnabled(); slice H9 flips the build default after the owner's phone sign-off. This manifest enables nothing."
+  },
+  "clock": {
+    "tickSource": "repeatIntervalMs",
+    "startsOn": "first-input",
+    "stopsOn": ["pause", "overlay", "visibilitychange", "blur"],
+    "catchUp": false
+  },
+  "contact": {
+    "consequence": "rewind-to-last-trail-junction",
+    "rewindMs": 250,
+    "invulnerableTicksPlay": 4,
+    "invulnerableTicksValidator": 2,
+    "runtimeFallback": ["witness-a-star", "previous-trail-junction", "validated-start"],
+    "gateCloseOnPlayer": "eject-one-cell-back-no-contact",
+    "hunterBurnoutContacts": 3,
+    "penalty": "time-and-distance-only"
+  },
+  "kinds": {
+    "pulseGate": { "class": "obstacle", "graphKind": "timedGate", "firstEncounterTier": 0 },
+    "sentry": { "class": "enemy", "graphKind": "patrol", "firstEncounterRouteCells": 3 },
+    "hunter": { "class": "enemy", "engine": "chaserEngine", "speedDivisorAtIntro": 3, "speedDivisorFloor": 2 },
+    "shard": { "class": "objective", "locksStar": true }
+  },
+  "intro": [
+    {
+      "level": 10,
+      "unit": "pulseGate",
+      "firstEncounter": { "gates": 1, "openFraction": "3/4", "maxWaitTicks": 1, "clearStepsAround": 2 }
+    },
+    {
+      "level": 20,
+      "unit": "sentry",
+      "firstEncounter": { "sentries": 1, "routeCells": 3, "safePocket": true, "gatesKeptAway": true }
+    },
+    {
+      "level": 35,
+      "unit": "hunter",
+      "firstEncounter": { "hunters": 1, "speedDivisor": 3, "denMinRouteFraction": 0.6, "outOfSightOfStart": true }
+    },
+    {
+      "level": 60,
+      "unit": "shard",
+      "firstEncounter": { "shards": 1, "starLockedUntilCollected": true }
+    }
+  ],
+  "tail": {
+    "fromLevel": 36,
+    "untilLevel": "geometry-saturation",
+    "everyLevels": 15,
+    "unitsPerStep": 1,
+    "pricedBy": "loadout.ts convex-price tape",
+    "blockersRemoved": true
+  },
+  "caps": {
+    "gates": 6,
+    "sentries": 4,
+    "hunters": 2,
+    "enemiesTotal": 5,
+    "shards": "tail-rule"
+  },
+  "fairness": {
+    "escapeSlackRatioMin": 0.9,
+    "noFragileStepInFirstWitnessSteps": 10,
+    "unknownVerdictCountsAsFail": true,
+    "neverShipUnsolvable": true
+  },
+  "exposure": {
+    "stages": { "min": 0, "max": 4 },
+    "rule": "a skipped kind is introduced one per level, in schedule order, using its first-encounter shape",
+    "newPlayerStageEqualsSchedule": true
+  },
+  "forever": {
+    "axis": "shard-route-target",
+    "fromLevel": "geometry-saturation",
+    "minRiseTicksPerLevel": 1,
+    "shardCountGrowsEveryLevels": 50
+  },
+  "rejected": {
+    "draftUnlockLevels": [6, 11, 16],
+    "staticBlocker": "dropped from the menu",
+    "items": "no items in this roadmap (HAZ-006 rejected for now)",
+    "dormantKinds": ["interceptor", "wall-follower"]
+  }
+}

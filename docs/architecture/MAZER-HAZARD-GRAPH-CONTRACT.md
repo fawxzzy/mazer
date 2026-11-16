@@ -2,7 +2,7 @@
 
 ## Status
 
-DRAFT (packet P3). The owner authorized local source work on the draft hazard contract defaults; that contract is still unsigned. Nothing here is wired into `MenuScene`, any scene, or the `src/mazer-core` barrel. The code is dormant, pure, and test-proven only. Every item tagged **[DEFAULT, pending owner]** is a recommendation, not a decision. Nothing here authorizes rendering a hazard, changing generation output, or changing progression.
+SIGNED 2026-11-15 (Zac, via chat), as amended below; see `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md` for the product contract this graph contract serves. The 2026-11-15 amendments are collected in "Signed amendments (2026-11-15)" at the end of this file; where the body text below says otherwise, the amendment section wins. The amendments change the contract text only: the code in `src/mazer-core/hazards` is unchanged by slice H0, and the validator defaults stay as written until the slices named in the amendment table land. Nothing is wired into `MenuScene`, any scene, or the `src/mazer-core` barrel, and nothing here authorizes rendering a hazard, changing generation output, or changing progression before its slice. Items tagged **[DEFAULT, pending owner]** below are settled by the signed amendments or accepted as the default, as the "Open decisions: status after signing" list says.
 
 Supersedes nothing. Builds on `docs/architecture/MAZER-WORLD-TURN-CONTRACT.md` (phase order), `docs/architecture/MAZER-EDGE-WRAP-TOPOLOGY-CONTRACT.md` (the playable wrap-aware graph), and the reopening gate in `docs/research/MAZER_PRESSURE_MECHANICS_PREP.md` (collision semantics, fairness and escape proof, lifecycle timing, diagnostics). Items (`docs/INTEGRATION_SCOPE.md`: trap, enemy, item, puzzle channels stay dormant advisory scoring) are out of scope and are not modeled.
 
@@ -114,3 +114,61 @@ No `Math.random`, `Date.now`, or clock in `src/mazer-core/hazards` (source-bound
 - P4 (obstacles): construct `BlockerSpec` / `TimedGateSpec`, gate level acceptance on `validateLevelHazards`, persist witness and verdict.
 - P5 (patroller): `PatrolSpec` plus `HazardTimeline.enemyCellsAt`; wire the enemy and collision phases through the contact definition; decide telegraph form.
 - P6 (chaser/interceptor): extend the state space with enemy state; keep `forEachSuccessor` as the single transition definition and keep the contact rule.
+
+## Signed amendments (2026-11-15)
+
+Signed by Zac, 2026-11-15, via chat ("YES to all four contract calls"). Source of the decisions: `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md` sections 2.1 to 2.5. Schedule and caps are machine-readable in `docs/contracts/mazer-hazard-schedule.v1.json`.
+
+| # | Amendment | Replaces | Code that follows |
+| --- | --- | --- | --- |
+| A1 | Tick rule: real-time world clock | "The world advances only on player actions" (Tick semantics) | H1 |
+| A2 | Contact consequence: rewind to the last junction on the player's own trail, then N = 4 invulnerable ticks in play | Pushback model "nearest junction strictly behind on the witness route" and the "N = 2 default" (Contact, Level verdicts) | H4 |
+| A3 | Eject rule: a gate closing on the player ejects one cell back along the trail, no contact, no invulnerability | "waiting in a gate cell that is about to close on the player" being merely illegal (Tick semantics) | H3 |
+| A4 | Hunter burnout: the third contact with the same Hunter in one level removes it | Open decision 8 and the unbounded Hunter contact count | H5 |
+| A5 | Blocker removal: the static `blocker` is dropped from the placement menu; the intro schedule and caps replace the draft counts | `BlockerSpec` as a placeable kind (Hazard classes) | H2 |
+| A6 | Chokepoints: Sentries (patrols) are never placed on chokepoints, gates may be | Open decision 5 | H2 |
+
+### A1. Tick rule: real-time world clock
+
+- One world tick lasts one player repeat interval (`repeatIntervalMs`, about 140 ms today). Each tick the player either steps one cell or waits. Waiting covers a released finger, a bump into a wall, a closed gate and an untaken turn. Enemies move on their own tick fractions (a Hunter at `speedDivisor` 3 moves once per 3 ticks, never below a divisor of 2).
+- The clock starts on the player's first input of the level. It stops on pause, on the overlay, on `visibilitychange` and on blur, and restarts on the next input with no catch-up. Nobody is hit while reading the board.
+- The three-phase order of a tick (player movement, enemy movement, collisions) and the arrival-tick evaluation of obstacles are unchanged. What changes is what advances the tick: elapsed play time on the player's step clock, not a player action alone. A rejected move no longer holds the world still: the clock keeps running, so that tick is a WAIT.
+- The validator is not affected. In both models every tick offers the same choice (move or WAIT), so `findWitnessRoute` and `chaserSolvability` stay exact as written.
+- Cosmetic clocks stay on render time and never read hazard state as truth. Pause, resume and focus loss still never advance the tick.
+
+### A2. Contact consequence: rewind, not death
+
+- Contact definition is unchanged (occupancy at the arrival tick, plus a head-on swap, also across a wrap).
+- On contact the player snaps back to the last junction on their own trail. The trail retracts over about 250 ms with the clock held, then the player has N = 4 contact-free ticks (the marker blinks at 2 Hz). Obstacles still block during invulnerability.
+- Runtime safety: from the rewind cell the client runs the A* witness. If there is no witness it steps back to the previous trail junction, and finally to the validated start.
+- The validator keeps checking post-contact states at N = 2. More invulnerability is never worse, so a level that passes at N = 2 also passes at N = 4. The validator's own pushback model (witness-route junction) is a proof device; the trail rewind is what play does, and the runtime A* check closes the gap between them.
+- A mistake costs time and distance only: no lives, no level fail, no restart, no progress loss. The clear card adds "CLEAN" for a level cleared with no contact.
+- Trail consumers: the rewind retracts the trail cell by cell (it replaces the "pushback appends the pushback placement" rule in Consumer rules), so the trail still cannot teleport silently.
+
+### A3. Eject rule
+
+When a Pulse Gate closes on the cell the player occupies, the player is ejected one cell back along the trail. This is not a contact: no rewind, no invulnerability, no loss of CLEAN. Placement keeps gates off junctions and away from other gates, so that cell is always a legal floor cell. Witness routes are unchanged: a witness never stands in a cell at the tick it closes.
+
+### A4. Hunter burnout (mercy cap)
+
+The third contact with the same Hunter in one level burns it out: it fades to grey and is removed. This bounds the worst case to 3 rewinds per Hunter, can only make a level easier, and so invalidates no verdict. Hunters are checked by `chaserValidation` and the joint witness; the contact rule is the same contact definition above.
+
+### A5. Blocker removal
+
+The static `blocker` is dropped from the placement menu: a blocker is a wall in another colour, adds no verb and costs readability, and route changes are the geometry ladder's job. The `blocker` type may stay in `graphContract.ts` and `loadout.ts` as dormant draft code until slice H2 removes it from placement; nothing may place one. The only obstacle kind is the Pulse Gate (`timedGate`); the only patrol enemy is the Sentry (`patrol`); the Hunter is the `chaserEngine` junction-greedy kind. Unit counts follow the intro schedule and readability caps in the manifest (gates at most 6, Sentries at most 4, Hunters at most 2, enemies at most 5 in total), not the draft's linear counts.
+
+### A6. Chokepoints
+
+`rejectChokepointHazards` applies to patrols (Sentries): they never sit on chokepoints. Gates may, because waiting gets you through.
+
+### Open decisions: status after signing
+
+1. Sign the hazard contract: signed 2026-11-15.
+2. Arrival-tick vs departure-tick obstacle evaluation: arrival, with telegraph (accepted as drafted).
+3. Pushback model, invulnerability length, cost surface: A2 (rewind to last trail junction, N = 4 in play, time and distance only).
+4. Post-contact validation away from the witness route: stays witness states only (accepted as drafted); the runtime A* rewind check in A2 covers off-route contacts at play time.
+5. Chokepoint rejection: A6.
+6. Wait-versus-shuffle tie-break: stays up, left, down, right, wait (accepted as drafted).
+7. Patrol phase offsets and dwell: stays an optional integer phase, no dwell (accepted as drafted).
+8. Chaser contact when both parties are player-dependent: contact rule unchanged, extended state per the P6 handoff; A4 bounds the Hunter at 3 contacts.
+9. Combined-period bound of 720: accepted as drafted; slice H2 measures it against the generation budget.
