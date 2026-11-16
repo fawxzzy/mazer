@@ -24,6 +24,7 @@ import {
   LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID,
   type LegacyAuthSessionSnapshot
 } from './legacyAuth';
+import { HAZARD_LAB_LEVEL_PARAM, readHazardLabLevelJumpRaw } from './legacyHazardLayerFlag';
 import {
   LEGACY_PROGRESSION_MAX_COMPLEXITY,
   LEGACY_PROGRESSION_MIN_COMPLEXITY,
@@ -75,7 +76,10 @@ export const clampLegacyLevelPreviewLevel = (level: number): number => (
 export const resolveLegacyLevelPreviewLevel = (
   search?: string | URLSearchParams | null
 ): number | null => {
-  const raw = toSearchParams(search).get(LEGACY_LEVEL_PREVIEW_PARAM);
+  const params = toSearchParams(search);
+  // The hazard lab jump (`?lab=hazards&level=N`) is a level preview: same in-memory sandbox, so it can
+  // never submit progress. `level` without `lab=hazards` in the same URL is ignored.
+  const raw = params.get(LEGACY_LEVEL_PREVIEW_PARAM) ?? readHazardLabLevelJumpRaw(params);
   if (raw === null) {
     return null;
   }
@@ -179,5 +183,9 @@ export const createLegacyLevelPreviewAuthSnapshot = (): LegacyAuthSessionSnapsho
 export const buildLegacyLevelPreviewExitUrl = (href: string): string => {
   const url = new URL(href);
   url.searchParams.delete(LEGACY_LEVEL_PREVIEW_PARAM);
+  // A hazard lab jump also carries `level`; the lab switch itself stays (it is remembered anyway).
+  if (url.searchParams.get('lab') === 'hazards') {
+    url.searchParams.delete(HAZARD_LAB_LEVEL_PARAM);
+  }
   return url.toString();
 };

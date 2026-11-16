@@ -2560,7 +2560,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',
-    'publishVisualDiagnostics', 'publishRuntimeDiagnostics', 'tickLegacyPresence'
+    'publishVisualDiagnostics', 'publishRuntimeDiagnostics', 'tickLegacyPresence', 'updateHazardWorldClock'
   ];
   for (const name of noops) scene[name] = vi.fn();
   const demo = vi.fn();

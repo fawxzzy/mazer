@@ -240,3 +240,7 @@ Order rationale:
 - That release stops the marker within one tick. It is inferred from the intent resolver, and H1 measures it.
 - That the receipt RPC keeps unknown jsonb keys. The research doc says client-only; it was not re-read here.
 - The saturation level at scale 40 (about 420) and every runway number marked **Estimate**.
+
+## Update 2026-11-15, slice H1
+
+The dormant literal switch was replaced by `resolveHazardLayerEnabled()` (`src/legacy-runtime/legacyHazardLayerFlag.ts`): build constant `HAZARD_LAYER_BUILD_DEFAULT` (false) plus the lab switch `?lab=hazards` (remembered in localStorage, `?lab=off` clears it, a "LAB" chip shows while it is on). The lab level jump `?lab=hazards&level=N` runs through the Level Preview sandbox and never submits progress. With the layer on, H1 runs only the world clock over an empty hazard schedule; nothing is drawn and generation is byte-identical (golden hash corpus run with the flag off and on). Everything else in this contract is unchanged.

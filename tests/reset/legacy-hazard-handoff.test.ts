@@ -4,10 +4,10 @@ import { describe, expect, test } from 'vitest';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
 import {
-  LEGACY_HAZARD_LAYER_ENABLED,
   LEGACY_PHASE2_FEATURE_REGISTRY,
   resolveLegacyHazardHandoff
 } from '../../src/legacy-runtime/legacyHazardHandoff';
+import { HAZARD_LAYER_BUILD_DEFAULT, resolveHazardLayerEnabled } from '../../src/legacy-runtime/legacyHazardLayerFlag';
 import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeGenerationProfileForProgression
@@ -19,8 +19,9 @@ const listSource = (directory: string): string[] => readdirSync(directory).flatM
 });
 
 describe('Phase 2 hazard hand-off stays dormant', () => {
-  test('the feature switch is a literal false and the registry is frozen and off', () => {
-    expect(LEGACY_HAZARD_LAYER_ENABLED).toBe(false);
+  test('the build default is a literal false (no lab switch set) and the registry is frozen and off', () => {
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+    expect(resolveHazardLayerEnabled()).toBe(false);
     expect(LEGACY_PHASE2_FEATURE_REGISTRY.hazards.enabled).toBe(false);
     expect(LEGACY_PHASE2_FEATURE_REGISTRY.hazards.status).toBe('dormant-awaiting-product-contract');
     expect(Object.isFrozen(LEGACY_PHASE2_FEATURE_REGISTRY)).toBe(true);
@@ -54,7 +55,27 @@ describe('Phase 2 hazard hand-off stays dormant', () => {
     }
   });
 
-  test('no runtime module reads the switch or imports the hand-off module (nothing can reach a hazard path)', () => {
+  test('only the scene boot glue, the lab level route and the new H1 modules touch the flag; no geometry or generation module does', () => {
+    const root = join(__dirname, '..', '..', 'src');
+    const allowed = new Set([
+      'legacyHazardLayerFlag.ts',
+      'legacyHazardLabBoot.ts',
+      'legacyWorldClock.ts',
+      'legacyLevelPreview.ts',
+      'MenuScene.ts'
+    ]);
+    const offenders: string[] = [];
+    for (const file of listSource(root)) {
+      if (file.endsWith('legacyHazardHandoff.ts')) { continue; }
+      const source = readFileSync(file, 'utf8');
+      if (/legacyHazardLayerFlag|legacyHazardLabBoot|legacyWorldClock|resolveHazardLayerEnabled|HAZARD_LAYER_BUILD_DEFAULT|hazardLab\b/.test(source)) {
+        if (!allowed.has(file.split(/[\\/]/).pop()!)) { offenders.push(file); }
+      }
+    }
+    expect(offenders).toEqual([]);
+  }, 60_000);
+
+  test('no runtime module imports the dormant hand-off module or reads the retired literal', () => {
     const root = join(__dirname, '..', '..', 'src');
     const offenders: string[] = [];
     for (const file of listSource(root)) {

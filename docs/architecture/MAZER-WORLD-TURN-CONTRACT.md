@@ -78,3 +78,7 @@ telemetry behavior.
 ## Amendment pointer (2026-11-15)
 
 The signed hazard product contract (`docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md`, section 2.1) makes the world clock real time on the player's step clock: one tick per `repeatIntervalMs`, started by the first input of the level and stopped on pause, overlay, `visibilitychange` and blur with no catch-up. That enters through the `timed-mode-tick` capability above in slice H1 of its roadmap; until then timed mode stays disabled, the phase table above stays exact, and no deferred phase is wired.
+
+## Slice H1 landed (2026-11-15)
+
+The world clock exists as `src/legacy-runtime/legacyWorldClock.ts`, created by the scene only while the hazard layer flag is on (`resolveHazardLayerEnabled()` in `legacyHazardLayerFlag.ts`: build constant default false, plus the `?lab=hazards` lab switch). It starts on the first input of a level, stops on pause, overlay, lifecycle hold, `visibilitychange` (hidden) and blur, restarts on the next input with no catch-up, and its hazard schedule is empty. It does NOT go through `WorldTurnHost` yet: `timedModeEnabled` stays false, the phase table above stays exact, and no deferred phase is wired. Slice H3 is where a tick starts to enter the host as a `timed-mode-tick`. With the flag off none of it runs.
