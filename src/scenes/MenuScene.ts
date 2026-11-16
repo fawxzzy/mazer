@@ -189,6 +189,13 @@ import {
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
 import { bootHazardLab, describeHazardLabClock, type HazardLabBoot } from '../legacy-runtime/legacyHazardLabBoot';
+import {
+  createLegacyHazardGateController,
+  parseLegacyHazardLevel,
+  resolveLegacyHazardStepDelta,
+  type LegacyHazardGateController
+} from '../legacy-runtime/legacyHazardGateController';
+import { HazardGateCanvasView, resolveHazardGateRampStep } from '../render/hazardGateLayer';
 import { subscribeServiceWorkerCacheWarning } from '../boot/serviceWorkerCacheWarning';
 import {
   WorldTurnHost,
@@ -491,7 +498,9 @@ import {
   LegacyMazePrefetchSlot,
   createLegacyMazeGenerationJobInput,
   createLegacyMazeGenerationJobInputFromRequest,
-  resolveLegacyMazeGenerationJobKey
+  resolveLegacyMazeGenerationJobKey,
+  takeLegacyMazeHazardOverlay,
+  type LegacyMazeGenerationHazardJob
 } from '../legacy-runtime/legacyMazeGenerationJob';
 import { createLegacyMazeWorkerHost } from '../legacy-runtime/legacyMazeWorkerClient';
 import {
@@ -1871,6 +1880,15 @@ export class MenuScene extends Phaser.Scene {
   private legacyWorldTurnHost = this.createLegacyWorldTurnHost();
   // Hazard layer lab (slice H1): null runtime unless the layer flag is on; flag off does nothing here.
   private hazardLab: HazardLabBoot | null = null;
+  // Pulse Gates (slice H3): created only with the layer flag on, so flag off never reaches any of it.
+  private hazardGates: LegacyHazardGateController | null = null;
+  private hazardGateView: HazardGateCanvasView | null = null;
+  private hazardGateImage: Phaser.GameObjects.Image | null = null;
+  private hazardGateTextureKey: string | null = null;
+  private hazardGateEjecting = false;
+  private hazardGateTickMs = 0;
+  // Mutated in place by drawDynamicBoard (no per-frame allocation).
+  private readonly hazardGateLayout = { mazeLeft: 0, mazeTop: 0, tileSize: 0, resolution: 1, alpha: 0 };
   private readonly playKeyboardRepeatGate = new HumanInputRepeatGate();
   private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
@@ -2390,6 +2408,7 @@ export class MenuScene extends Phaser.Scene {
     markMazerBootStatus('menu-scene-create');
     const runtimeSearch = typeof window === 'undefined' ? '' : window.location.search;
     this.hazardLab = bootHazardLab(runtimeSearch);
+    this.hazardGates = this.hazardLab?.runtime ? createLegacyHazardGateController() : null;
     this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);
     const initialSeed = resolveInitialLegacyRuntimeSeed(runtimeSearch, {
       previousSeed: this.mazeSeed
@@ -2458,6 +2477,7 @@ export class MenuScene extends Phaser.Scene {
     this.playerGlowCanvasTextureKey = `legacy-nav-core-player-glow-${nextMenuSceneInstanceId()}`;
     this.playerGlowCanvasTexture = this.textures.createCanvas(this.playerGlowCanvasTextureKey, 1, 1);
     this.playerGlowCanvasImage = this.add.image(0, 0, this.playerGlowCanvasTextureKey).setOrigin(0, 0).setVisible(false);
+    this.createLegacyHazardGateCanvas();
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
@@ -2481,6 +2501,8 @@ export class MenuScene extends Phaser.Scene {
       // reason -- both must render before the crisp shapes Graphics draws.
       this.trailCanvasImage,
       this.playerGlowCanvasImage,
+      // Pulse Gate layer (slice H3): its own canvas over the trail and glow, under the crisp cast. Flag on only.
+      ...(this.hazardGateImage ? [this.hazardGateImage] : []),
       this.boardDynamicGraphics,
       // Same boardZoomContainer/boardDynamicGraphics-relative coordinate
       // space the settings-cog/leaderboard header icons were previously
@@ -2662,6 +2684,12 @@ export class MenuScene extends Phaser.Scene {
       this.playerGlowCanvasTexture = null;
       this.playerGlowCanvasImage = null;
       this.playerGlowCanvasTextureKey = null;
+      if (this.hazardGateTextureKey !== null && this.textures.exists(this.hazardGateTextureKey)) {
+        this.textures.remove(this.hazardGateTextureKey);
+      }
+      this.hazardGateTextureKey = null;
+      this.hazardGateView = null;
+      this.hazardGateImage = null;
       if (this.boardTileLayerTextureKey !== null && this.textures.exists(this.boardTileLayerTextureKey)) {
         this.textures.remove(this.boardTileLayerTextureKey);
       }
@@ -3538,6 +3566,9 @@ export class MenuScene extends Phaser.Scene {
     if (shouldDrawDynamicBoard) {
       this.drawDynamicBoard(time);
     }
+    if (this.hazardGateView) {
+      this.drawLegacyHazardGateLayer();
+    }
     if (this.hudDirty || shouldDrawDynamicBoard) {
       this.drawHud(time);
       this.hudDirty = false;
@@ -3817,7 +3848,7 @@ export class MenuScene extends Phaser.Scene {
           state: worldTurnDiagnostics.state,
           timedModeEnabled: worldTurnDiagnostics.timedModeEnabled
         },
-        ...(this.hazardLab?.runtime ? { worldClock: describeHazardLabClock(this.hazardLab) } : {}),
+        ...this.resolveLegacyHazardLabDiagnostics(),
         ...(this.hazardMomentDiagnostics ? { moments: { ...this.hazardMomentDiagnostics } } : {}),
         inputBuffer: {
           directionalIntent: this.playDirectionalIntent.getDiagnostics(),
@@ -5870,6 +5901,7 @@ export class MenuScene extends Phaser.Scene {
       // everything in between (deconstruct through build-out).
     }
     this.resetLegacyWorldTurnHost();
+    this.installLegacyHazardGateLayer();
     this.startHazardMomentsLevel();
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -5953,7 +5985,7 @@ export class MenuScene extends Phaser.Scene {
       scale: generationScale,
       seedOverride: seed,
       targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
-    }), generationScale);
+    }), generationScale, this.resolveLegacyHazardJob('play'));
   }
 
   // MAZER-PERF-008: the maze a worker built while the menu was idle, only if every generation input still
@@ -6490,7 +6522,9 @@ export class MenuScene extends Phaser.Scene {
     // full candidate-search quality is worth its cost there.
     // MAZER-PERF-008: off the main thread when a worker is available (identical call, identical maze).
     if (this.deconstructResetMazeSlot.start(
-      createLegacyMazeGenerationJobInput({ aspectRatio, mode, profile, scale, seed, selection: { candidateCount: 1, targetComplexity } }),
+      createLegacyMazeGenerationJobInput({
+        aspectRatio, mode, profile, scale, seed, selection: { candidateCount: 1, targetComplexity }, hazard: this.resolveLegacyHazardJob(mode)
+      }),
       mode
     )) {
       this.pendingLegacyDeconstructResetMaze = null;
@@ -7068,6 +7102,11 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    if (this.hazardGates?.demoReplayActive === true) {
+      this.advanceLegacyMenuDemoGateReplay(time);
+      return;
+    }
+
     const nextFrame = advanceLegacyMenuDemoFrame(
       this.menuDemoEpisode,
       this.menuDemoState,
@@ -7099,29 +7138,78 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
-      this.menuDemoCompletedAtMs ??= time;
-      this.recordMazeCycleCompletion('menu-demo');
-      this.armLegacyPlayerTransferEnergy(time);
-      // Build the next maze right now, at the goal-reached instant --
-      // mirrors applyLegacyWorldTurnPlayerMovement's own play-mode
-      // precompute exactly (see its own comment), just with a purpose-
-      // built hold instead of reusing schedulePlayResetReturn's, since the
-      // demo walker has its own separate state machine with no shared
-      // request/consume plumbing to play mode's. Deferring the actual arm
-      // call (armLegacyPlayerTransferEnergy above already fired -- only
-      // the outbound laser/corridor's own wall-clock timers, armed inside
-      // armLegacyMenuStaticDeconstructStage, are what needed the delay)
-      // to fire once LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS elapses (see the
-      // pendingMenuDemoDeconstructArmAtMs check near the top of this
-      // function) gives the synchronous build real wall-clock room to
-      // finish before those timers start, instead of running inside the
-      // same call that arms them.
-      this.precomputeLegacyDeconstructResetMaze('menu');
-      this.pendingMenuDemoDeconstructArmAtMs = time + LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS;
-      this.nextDemoMoveAtMs = this.pendingMenuDemoDeconstructArmAtMs;
-      this.boardDynamicDirty = true;
+      this.completeLegacyMenuDemoAtGoal(time);
       return;
     }
+    this.boardDynamicDirty = true;
+  }
+
+  // Slice H3: the menu demo on a Pulse Gate board walks the overlay's stored witness, one action per
+  // world tick (a wait holds the walker in place), instead of the AI walker, which knows nothing about
+  // gates. The witness reaches the goal by construction (validated at generation).
+  private advanceLegacyMenuDemoGateReplay(time: number): void {
+    const gates = this.hazardGates;
+    if (!gates || gates.demoFinished) {
+      return;
+    }
+    const cursor = gates.advanceDemo();
+    const delayMs = this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs;
+    this.nextDemoMoveAtMs = time + delayMs;
+    if (cursor < 0) {
+      return;
+    }
+    const target = { x: gates.demoX(cursor), y: gates.demoY(cursor) };
+    if (target.x !== this.player.x || target.y !== this.player.y) {
+      const delta = resolveLegacyHazardStepDelta(this.maze, this.player, target);
+      if (delta === null) {
+        return;
+      }
+      const nextStep = advanceLegacyPlayStep({
+        maze: this.maze,
+        player: this.player,
+        trail: this.trail,
+        deltaX: delta.deltaX,
+        deltaY: delta.deltaY,
+        toggleTrailFade: TRAIL_TAIL_FADE,
+        trailFadeTail: TRAIL_FADE_TAIL
+      });
+      if (!nextStep.moved) {
+        return;
+      }
+      const previousPlayer = copyPoint(this.player);
+      this.player = nextStep.player;
+      this.markLegacyPlayerLeftStartIfApplicable(this.maze.start);
+      this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, time, delayMs);
+      this.trail = nextStep.trail;
+    }
+    if (gates.demoFinished) {
+      this.completeLegacyMenuDemoAtGoal(time);
+      return;
+    }
+    this.boardDynamicDirty = true;
+  }
+
+  private completeLegacyMenuDemoAtGoal(time: number): void {
+    this.menuDemoCompletedAtMs ??= time;
+    this.recordMazeCycleCompletion('menu-demo');
+    this.armLegacyPlayerTransferEnergy(time);
+    // Build the next maze right now, at the goal-reached instant --
+    // mirrors applyLegacyWorldTurnPlayerMovement's own play-mode
+    // precompute exactly (see its own comment), just with a purpose-
+    // built hold instead of reusing schedulePlayResetReturn's, since the
+    // demo walker has its own separate state machine with no shared
+    // request/consume plumbing to play mode's. Deferring the actual arm
+    // call (armLegacyPlayerTransferEnergy above already fired -- only
+    // the outbound laser/corridor's own wall-clock timers, armed inside
+    // armLegacyMenuStaticDeconstructStage, are what needed the delay)
+    // to fire once LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS elapses (see the
+    // pendingMenuDemoDeconstructArmAtMs check near the top of updateMenuDemo)
+    // gives the synchronous build real wall-clock room to
+    // finish before those timers start, instead of running inside the
+    // same call that arms them.
+    this.precomputeLegacyDeconstructResetMaze('menu');
+    this.pendingMenuDemoDeconstructArmAtMs = time + LEGACY_MENU_DEMO_GOAL_RESET_HOLD_MS;
+    this.nextDemoMoveAtMs = this.pendingMenuDemoDeconstructArmAtMs;
     this.boardDynamicDirty = true;
   }
 
@@ -7180,16 +7268,140 @@ export class MenuScene extends Phaser.Scene {
 
   // Hazard layer lab (slice H1): one clock frame. No-op unless the flag is on. Active only in play with
   // no overlay or lifecycle hold; blur and hidden stop the clock inside the runtime itself.
+  // An idle or stopped clock, or inactive play, returns before the speed profile is resolved.
   private updateHazardWorldClock(time: number): void {
     const runtime = this.hazardLab?.runtime;
-    if (!runtime) {
+    if (!runtime || runtime.clock.phase !== 'running') {
       return;
     }
     const playActive = this.mode === 'play'
       && this.overlay === 'none'
       && this.playCompletedAtMs === null
       && !this.isLegacyPlayLifecycleInputLocked();
-    runtime.frame(time, playActive, this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs);
+    if (!playActive) {
+      runtime.frame(time, false, this.hazardGateTickMs); // stops the clock; no speed profile needed
+      return;
+    }
+    this.hazardGateTickMs = this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs;
+    const elapsed = runtime.frame(time, playActive, this.hazardGateTickMs);
+    if (elapsed > 0 && this.hazardGates && this.hazardGates.gateCount > 0 && this.hazardGates.mode === 'play') {
+      this.ejectLegacyPlayerFromClosedGate(runtime.clock.ticks, elapsed);
+    }
+  }
+
+  // A3 eject: a gate that closed on the player's cell during one of the ticks that elapsed this frame
+  // pushes the player one cell back along the trail, through the normal move path. Not a contact.
+  private ejectLegacyPlayerFromClosedGate(tick: number, elapsed: number): void {
+    const gates = this.hazardGates;
+    if (!gates) {
+      return;
+    }
+    for (let checked = tick - elapsed + 1; checked <= tick; checked += 1) {
+      const step = gates.resolveEjectStep(this.maze, this.player, this.trail, checked);
+      if (step !== null) {
+        this.hazardGateEjecting = true;
+        try {
+          this.tryMovePlayer(step.deltaX, step.deltaY);
+        } finally {
+          this.hazardGateEjecting = false;
+        }
+        return;
+      }
+    }
+  }
+
+  // Arrival-tick legality (slice H3): a step taken at world tick t onto a gate closed at t + 1 is refused.
+  private isLegacyHazardGateArrivalBlocked(target: LegacyPoint): boolean {
+    const gates = this.hazardGates;
+    const runtime = this.hazardLab?.runtime;
+    if (!gates || !runtime || this.hazardGateEjecting || gates.gateCount === 0 || gates.mode !== 'play' || this.mode !== 'play') {
+      return false;
+    }
+    return gates.isArrivalBlocked(target, runtime.clock.ticks);
+  }
+
+  // The hazard overlay job for the maze worker, or undefined with the layer off (unchanged job and key).
+  private resolveLegacyHazardJob(mode: LegacyGenerationMode): LegacyMazeGenerationHazardJob | undefined {
+    if (!this.hazardGates) {
+      return undefined;
+    }
+    const level = parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, mode).level);
+    const exposureStage = this.resolveLegacyHazardExposureStage(mode, level);
+    return exposureStage === undefined ? { enabled: true, level } : { enabled: true, level, exposureStage };
+  }
+
+  // Play builds use the H6 onboarding stage so the intro cards and the maze agree; the menu demo keeps the default.
+  private resolveLegacyHazardExposureStage(mode: LegacyGenerationMode, level: number): number | undefined {
+    return mode === 'play' ? this.resolveHazardOnboarding()?.exposureStageFor(level) : undefined;
+  }
+
+  // A new maze is live: load its Pulse Gates (the worker's overlay when it built one, else computed here).
+  private installLegacyHazardGateLayer(): void {
+    const gates = this.hazardGates;
+    if (!gates) {
+      return;
+    }
+    const level = parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, this.mode).level);
+    const exposureStage = this.resolveLegacyHazardExposureStage(this.mode, level);
+    gates.install(this.maze, {
+      mode: this.mode === 'play' ? 'play' : 'menu',
+      level,
+      exposureStage,
+      playerLevel: parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, 'play').level),
+      workerOverlay: takeLegacyMazeHazardOverlay(this.maze, level, exposureStage)
+    });
+  }
+
+  private createLegacyHazardGateCanvas(): void {
+    if (!this.hazardGates) {
+      return;
+    }
+    this.hazardGateTextureKey = `legacy-pulse-gates-${nextMenuSceneInstanceId()}`;
+    const texture = this.textures.createCanvas(this.hazardGateTextureKey, 1, 1);
+    if (!texture) {
+      this.hazardGateTextureKey = null;
+      return;
+    }
+    this.hazardGateImage = this.add.image(0, 0, this.hazardGateTextureKey).setOrigin(0, 0).setVisible(false);
+    this.hazardGateView = new HazardGateCanvasView(texture, this.hazardGateImage);
+  }
+
+  private recordLegacyHazardGateLayout(mazeLeft: number, mazeTop: number, tileSize: number, alpha: number): void {
+    const layout = this.hazardGateLayout;
+    layout.mazeLeft = mazeLeft;
+    layout.mazeTop = mazeTop;
+    layout.tileSize = tileSize;
+    layout.alpha = alpha;
+    const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
+    layout.resolution = Math.min(MAZER_CANVAS_RESOLUTION_MAX * 2, resolveMazerCanvasResolution() * zoomScale);
+  }
+
+  // Once per frame with the layer on. The view redraws only when the tick, ramp step, layout or fade changed.
+  private drawLegacyHazardGateLayer(): void {
+    const gates = this.hazardGates;
+    const view = this.hazardGateView;
+    if (!gates || !view) {
+      return;
+    }
+    const clock = this.hazardLab?.runtime?.clock;
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    if (gates.mode === 'menu') {
+      view.draw(gates, this.hazardGateLayout, gates.demoTick, 0, reducedMotion, this.hazardGateLayout.alpha);
+      return;
+    }
+    const tick = clock?.ticks ?? 0;
+    const rampStep = clock?.phase === 'running' ? resolveHazardGateRampStep(clock.remainderMs, this.hazardGateTickMs) : 0;
+    view.draw(gates, this.hazardGateLayout, tick, rampStep, reducedMotion, this.hazardGateLayout.alpha);
+  }
+
+  private resolveLegacyHazardLabDiagnostics(): { worldClock?: unknown; pulseGates?: unknown } {
+    if (!this.hazardLab?.runtime) {
+      return {};
+    }
+    return {
+      worldClock: describeHazardLabClock(this.hazardLab),
+      ...(this.hazardGates ? { pulseGates: this.hazardGates.describe() } : {})
+    };
   }
 
   private resetLegacyWorldTurnHost(): void {
@@ -7260,7 +7472,8 @@ export class MenuScene extends Phaser.Scene {
       toggleTrailFade: TRAIL_TAIL_FADE,
       trailFadeTail: TRAIL_FADE_TAIL
     });
-    if (!nextStep.moved) {
+    // A closed-next-tick Pulse Gate reads as a wall bump: the step is a WAIT and the clock keeps running.
+    if (!nextStep.moved || (this.hazardGates !== null && this.isLegacyHazardGateArrivalBlocked(nextStep.player))) {
       this.armLegacyWallBump(move.deltaX, move.deltaY);
       return { accepted: false };
     }
@@ -9113,7 +9326,11 @@ export class MenuScene extends Phaser.Scene {
       this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha * markerRevealAlpha, 'goal', time);
     }
 
-    if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
+    if (this.hazardGates) {
+      this.recordLegacyHazardGateLayout(mazeLeft, mazeTop, mazeTileSize, markerDeconstructAlpha * markerRevealAlpha);
+    }
+    // The AI memory overlay belongs to the walker; a Pulse Gate witness replay (slice H3) has no memory to show.
+    if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing' && this.hazardGates?.demoReplayActive !== true) {
       this.drawLegacyMenuAiMemoryOverlay(
         mazeLeft,
         mazeTop,
@@ -15022,7 +15239,8 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const routeDiagnostics = surface === 'menu-demo' && this.menuDemoEpisode && this.menuDemoConfig
+    // A Pulse Gate witness replay (slice H3) is not the AI walker's route, so it carries no walker summary.
+    const routeDiagnostics = surface === 'menu-demo' && this.menuDemoEpisode && this.menuDemoConfig && this.hazardGates?.demoReplayActive !== true
       ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
       : null;
     const playerPath = surface === 'play'
@@ -15061,7 +15279,8 @@ export class MenuScene extends Phaser.Scene {
           }
           : null,
         backtracks: routeDiagnostics?.telemetry.backtrackCount,
-        wrongTurns: routeDiagnostics?.telemetry.wrongBranchCount
+        wrongTurns: routeDiagnostics?.telemetry.wrongBranchCount,
+        ...(surface === 'play' && this.hazardGates ? { hazard: this.hazardGates.receiptFields() } : {})
       }
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;

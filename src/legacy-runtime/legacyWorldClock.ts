@@ -47,6 +47,8 @@ export interface WorldClock {
   reset(): void;
   readonly ticks: number;
   readonly phase: WorldClockPhase;
+  /** Running milliseconds toward the next tick (allocation-free read for per-frame renderers, slice H3). */
+  readonly remainderMs: number;
   snapshot(): WorldClockSnapshot;
 }
 
@@ -111,6 +113,9 @@ export const createWorldClock = (): WorldClock => {
     },
     get phase(): WorldClockPhase {
       return phase;
+    },
+    get remainderMs(): number {
+      return remainderMs;
     },
     snapshot(): WorldClockSnapshot {
       return { phase, ticks, remainderMs, starts, stops };
