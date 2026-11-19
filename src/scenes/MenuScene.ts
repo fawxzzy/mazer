@@ -498,7 +498,16 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
-import { resolveLegacyGenerationTrack, seedLegacyMenuDemoTrackFromPlayer } from '../legacy-runtime/legacyMenuDemoTrack';
+import { resolveLegacyGenerationTrack } from '../legacy-runtime/legacyMenuDemoTrack';
+import {
+  advanceLegacyMenuDemoSession,
+  applyLegacyMenuDemoSession,
+  createLegacyMenuDemoSessionProgressionStorage,
+  isLegacyMenuDemoSessionActive,
+  overlayLegacyMenuDemoSession,
+  resolveLegacyMenuDemoSessionUserId,
+  type LegacyMenuDemoSession
+} from '../legacy-runtime/legacyMenuDemoSession';
 import {
   LegacyMazePrefetchSlot,
   createLegacyMazeGenerationJobInput,
@@ -548,6 +557,10 @@ import {
   navigateToMazerAccountPortal,
   warmMazerProviderPreflight
 } from '../legacy-runtime/legacyAccountPortal';
+import {
+  readMazerSignInContinuation,
+  withMazerSignInContinuation
+} from '../legacy-runtime/legacySignInContinuation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   fetchLegacyLeaderboardPage,
@@ -1875,6 +1888,8 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoCycleRecorded = false;
   private mazeCycleTelemetryHistory: MazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(undefined);
   private progressionState: LegacyProgressionState = readLegacyProgressionState(undefined);
+  // L4: signed in, the menu demo's in-memory track for this session (legacyMenuDemoSession.ts); null = today's demo.
+  private menuDemoSession: LegacyMenuDemoSession | null = null;
   private latestAuthMessage: LegacyPlayerMessage | null = null;
   private latestRemoteSyncResult: LegacyRemoteProgressionSyncResult | null = null;
   private remoteSettingsSyncQueue: Promise<void> = Promise.resolve();
@@ -11564,8 +11579,11 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuLeaderboardButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
         ));
+        // Signed out, a profile-icon sign-in continues to the account page (legacySignInContinuation.ts).
         this.uiButtons.push(this.createLegacyMenuProfileButton(
-          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+          () => withMazerSignInContinuation('account', () => (
+            this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+          ))
         ));
       }
 
@@ -14567,7 +14585,7 @@ export class MenuScene extends Phaser.Scene {
     // The next attempt dismisses the previous failure: banner, code and toast.
     this.clearLegacyAuthFeedbackMessage();
     this.uiDirty = true;
-    const result = await beginMazerOAuthAuthorization();
+    const result = await beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() });
     if (result.status === 'failed') {
       this.authSubmitting = false;
       this.authOpeningStartedAtMs = null;
@@ -14782,6 +14800,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.progressionState = effects.state;
+    if (isLegacyMenuDemoSessionActive(this.menuDemoSession)) {
+      // L4: the session demo restarts on the (reset) player level.
+      this.menuDemoSession = null;
+      this.progressionState = this.applyLegacyMenuDemoSessionTo(effects.state);
+    }
     clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
     this.loadPersistedMazeCycleTelemetryHistory();
     this.resetLegacyWorldTurnHost();
@@ -15041,7 +15064,7 @@ export class MenuScene extends Phaser.Scene {
     this.rereadAccountUsernameAfterProfileCreate(snapshot.userId);
 
     if (result.progressionState) {
-      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(result.progressionState);
+      this.progressionState = this.applyLegacyMenuDemoSessionTo(result.progressionState);
     }
     if (result.remoteSyncResult) {
       this.publishLegacyRemoteSyncResult(result.remoteSyncResult);
@@ -15067,12 +15090,25 @@ export class MenuScene extends Phaser.Scene {
   private loadPersistedLegacyProgressionState(): void {
     if (this.levelPreviewLevel !== null) {
       this.progressionState = createLegacyLevelPreviewProgressionState(this.levelPreviewLevel);
+      this.menuDemoSession = null;
       return;
     }
     // The menu demo starts on the player's current level, then climbs.
-    this.progressionState = seedLegacyMenuDemoTrackFromPlayer(
+    this.progressionState = this.applyLegacyMenuDemoSessionTo(
       readLegacyProgressionState(this.resolveLegacyProgressionStorage())
     );
+  }
+
+  // L4 (legacyMenuDemoSession.ts): signed in, the demo follows the player's level for this
+  // session only and is never written; signed out keeps today's seeded, persisted demo.
+  private applyLegacyMenuDemoSessionTo(state: LegacyProgressionState): LegacyProgressionState {
+    const resolved = applyLegacyMenuDemoSession(
+      state,
+      this.menuDemoSession,
+      resolveLegacyMenuDemoSessionUserId(this.authSnapshot, { levelPreview: this.levelPreviewLevel !== null })
+    );
+    this.menuDemoSession = resolved.session;
+    return resolved.state;
   }
 
   private applyBootstrappedLegacyAccountState(): void {
@@ -15087,7 +15123,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (bootstrapped.progressionState) {
-      this.progressionState = seedLegacyMenuDemoTrackFromPlayer(writeLegacyProgressionState(
+      this.progressionState = this.applyLegacyMenuDemoSessionTo(writeLegacyProgressionState(
         this.resolveLegacyProgressionStorage(),
         bootstrapped.progressionState
       ));
@@ -15139,11 +15175,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyProgressionStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
-    return createLegacyAuthScopedStorage(
+    const storage = createLegacyAuthScopedStorage(
       this.resolveBrowserLocalStorage(),
       LEGACY_PROGRESSION_STORAGE_KEY,
       this.authSnapshot
     );
+    // L4: a signed-in session demo's climb never reaches storage (legacyMenuDemoSession.ts).
+    return isLegacyMenuDemoSessionActive(this.menuDemoSession)
+      ? createLegacyMenuDemoSessionProgressionStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY)
+      : storage;
   }
 
   private resolveLegacyProgressionStorageKey(): string {
@@ -15281,7 +15321,18 @@ export class MenuScene extends Phaser.Scene {
       }
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
-    if (latestReceipt) {
+    // L4: a signed-in session demo climbs in memory only: no storage write, no account write.
+    const menuDemoSession = surface === 'menu-demo' && isLegacyMenuDemoSessionActive(this.menuDemoSession)
+      ? this.menuDemoSession
+      : null;
+    if (latestReceipt && menuDemoSession) {
+      this.progressionState = recordLegacyProgressionCycle(undefined, this.progressionState, latestReceipt, this.maze);
+      clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
+      this.menuDemoSession = advanceLegacyMenuDemoSession(menuDemoSession, this.progressionState);
+      this.boardDynamicDirty = true;
+      this.uiDirty = true;
+      this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    } else if (latestReceipt) {
       const previousProgressionState = this.progressionState;
       const completionAuthSnapshot = { ...this.authSnapshot };
       const completionAuthSequence = this.authAccountHydrationSequence;
@@ -15311,10 +15362,10 @@ export class MenuScene extends Phaser.Scene {
             return;
           }
           if (result.progressionState) {
-            this.progressionState = writeLegacyProgressionState(
+            this.progressionState = overlayLegacyMenuDemoSession(writeLegacyProgressionState(
               completionProgressionStorage,
               result.progressionState
-            );
+            ), this.menuDemoSession);
           }
           this.publishLegacyRemoteSyncResult(result);
           this.offlineCompletionFlush?.noteCompletionResult(result);
@@ -15407,7 +15458,10 @@ export class MenuScene extends Phaser.Scene {
           return null;
         }
         if (result.progressionState) {
-          this.progressionState = writeLegacyProgressionState(storage, result.progressionState);
+          this.progressionState = overlayLegacyMenuDemoSession(
+            writeLegacyProgressionState(storage, result.progressionState),
+            this.menuDemoSession
+          );
         }
         this.publishLegacyRemoteSyncResult(result);
         return result;

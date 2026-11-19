@@ -28,6 +28,7 @@ import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { showMazerBootErrorScreen } from './bootErrorScreen';
 import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
+import { runMazerOAuthContinuationAtBoot } from './oauthContinuationBoot';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
 import {
@@ -220,9 +221,17 @@ const boot = async (): Promise<void> => {
     // The only stage whose splash says "Signing you in": a callback token
     // exchange (bounded by MAZER_OAUTH_TOKEN_TIMEOUT_MS) is really running.
     markMazerBootStatus('oauth-exchange');
-    await consumeMazerOAuthCallback(oauthCallback, async () => (
+    const oauthResult = await consumeMazerOAuthCallback(oauthCallback, async () => (
       await getLegacyAuthClient() as unknown as MazerOAuthClient | null
     ));
+    // A sign-in started from the profile icon continues to the shared account page.
+    await runMazerOAuthContinuationAtBoot(oauthResult, {
+      assign: (url) => window.location.assign(url),
+      clearTimer: (handle) => clearTimeout(handle),
+      lifecycle: window,
+      markRedirecting: () => markMazerBootStatus('shared-account-redirect'),
+      setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
+    });
   }
 
   // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in
