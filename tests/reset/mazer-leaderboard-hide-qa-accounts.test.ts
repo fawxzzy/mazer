@@ -64,8 +64,16 @@ describe('Mazer leaderboard hides QA accounts', () => {
   });
 
   test('rollback restores the exact prior function text and drops the column', () => {
-    const prior = section(runtimeContracts, 'create or replace function mazer.mazer_leaderboard_page(', 'comment on function mazer.mazer_leaderboard_self_rank is');
-    expect(rollback).toContain(prior);
+    // The rollback re-grants the page function one role at a time (so the ACL array order matches the
+    // live one), so compare each function definition exactly, up to its closing $$;, not the grant text.
+    const definition = (sql: string, name: string) =>
+      section(sql, `create or replace function mazer.${name}(`, '\n$$;\n') + '\n$$;\n';
+    for (const name of ['mazer_leaderboard_page', 'mazer_leaderboard_self_rank']) {
+      expect(rollback).toContain(definition(runtimeContracts, name));
+    }
+    expect(rollback).toContain('grant execute on function mazer.mazer_leaderboard_page(integer, integer) to anon;');
+    expect(rollback).toContain('grant execute on function mazer.mazer_leaderboard_page(integer, integer) to authenticated;');
+    expect(rollback).toContain('grant execute on function mazer.mazer_leaderboard_self_rank() to authenticated;');
     expect(rollback).toContain('drop trigger if exists mazer_protect_leaderboard_hidden_before_write on mazer.mazer_profiles');
     expect(rollback).toContain('alter table mazer.mazer_profiles drop column if exists leaderboard_hidden');
     expect(rollback).not.toContain('leaderboard_hidden\n      and');
