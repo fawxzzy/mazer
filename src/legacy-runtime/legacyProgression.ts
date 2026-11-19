@@ -1008,10 +1008,10 @@ export const resolveLegacyMenuDemoMazeGenerationProfileForProgression = (
   const band = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity, true);
   // Early levels have no bleed-off in the band switch; keep the ladder's first wrap rung there.
   if (!band.requiredOppositeBorderConnections.vertical && !band.requiredOppositeBorderConnections.horizontal) {
-    return applyLegacyMazeGenerationScaleContext(
-      resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity),
-      scaleContext
-    );
+    // MAZER-L8b: the ladder picks its wrap line by trial (bleedPlacement); the demo keeps the old seeded pick,
+    // so its early levels (10-13 carry the ladder's vertical wrap) look exactly as before.
+    const { bleedPlacement: _ladderOnly, ...ladder } = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity);
+    return applyLegacyMazeGenerationScaleContext(ladder, scaleContext);
   }
   // Frozen board: at most one feeder per side keeps the top bands to roughly a dozen openings.
   return applyLegacyMazeGenerationScaleContext(
