@@ -2,10 +2,6 @@
 
 Use this note as the anti-drift override when older prose, screenshots, or implementation layers disagree.
 
-## Game mode
-
-2026-11-19: the current game is the Endless mode (the only registered mode), and the leaderboard has one tab per registered mode, so one tab today. See `docs/architecture/MAZER-GAME-MODES-PRODUCT-CONTRACT.md`.
-
 ## Active lane
 
 The active lane is now:
