@@ -26,6 +26,19 @@ import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
 import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render/endpointMarkerLayering';
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
+import { drawLegacyBleedGateLayer } from '../render/bleedGateSceneLayer';
+import { BLEED_GATE_LIT, drawBleedGatePlan, resolveBleedGateDrawPlan } from '../render/bleedGateRenderer';
+import {
+  hasLegacyBleedGates,
+  isLegacyBleedGateAnimating,
+  isLegacyBleedGateCellHidden,
+  isLegacyBleedGateTriggered,
+  readLegacyBleedGateRevision,
+  readLegacyBleedGateTriggeredKeys,
+  resetLegacyBleedGates,
+  resolveLegacyBleedGateViewGrid,
+  syncLegacyBleedGatePassOver
+} from '../legacy-runtime/legacyBleedGateState';
 import { resolveStartSpiralRotation } from '../render/endpointSpiral';
 import { resolveSharedBorderColor } from '../render/trailPalette';
 import {
@@ -1344,6 +1357,9 @@ interface LegacyQaDiagnosticsApi {
   // request, continuing 5144999445. From is the real current player
   // position by default; to is always the real current goal.
   resolveShortestPathToGoal(from?: LegacyPoint): LegacyShortestPathResult;
+  // MAZER-L10: the current maze's bleed gates and which are lit (read-only, for evidence scripts).
+  // pathFromPlayer: the real wrap-aware solver's route from the player to the gate over the grid as it stands.
+  getBleedGates(): { x: number; y: number; axis: string; line: number; lit: boolean; pathFromPlayer: LegacyPoint[] }[];
   // Retired with the old diamond/conduit presentation (the one procedural edge
   // system replaced it): always null, kept so external QA scripts do not throw.
   getGameplayTransferPresentationDiagnostics(): null;
@@ -1833,6 +1849,9 @@ export class MenuScene extends Phaser.Scene {
   // O(perimeter) scan; ensureBoardTileMazeCaches and the reveal mask read it every
   // redraw, so caching keeps that from becoming O(perimeter * cellCount).
   private bleedOffDockVisualEligibilityForMaze: LegacyMazeSnapshot | null = null;
+  // MAZER-L10: the bleed-gate revision the dock caches were built at (a lit gate opens its path's docks).
+  private bleedOffDockVisualEligibilityGateRevision = -1;
+  private boardTileDockGateRevision = -1;
   private bleedOffDockVisualEligibilityKeys: Set<string> = new Set();
   private player!: LegacyPoint;
   private trail: LegacyPoint[] = [];
@@ -2966,8 +2985,17 @@ export class MenuScene extends Phaser.Scene {
       ),
       endTeleportPrimaryAnchorPreview: (): void => this.handleLegacyQaEndTeleportPrimaryAnchorPreview(),
       resolveShortestPathToGoal: (from?: LegacyPoint): LegacyShortestPathResult => (
-        resolveLegacyPlayableShortestPath(this.maze.grid, from ?? this.player, this.maze.goal)
+        // MAZER-L10: over the grid as it stands (an unlit bleed gate's path is closed).
+        resolveLegacyPlayableShortestPath(resolveLegacyBleedGateViewGrid(this.maze), from ?? this.player, this.maze.goal)
       ),
+      getBleedGates: () => (this.maze.bleedGates ?? []).map((gate) => ({
+        x: gate.x,
+        y: gate.y,
+        axis: gate.axis,
+        line: gate.line,
+        lit: isLegacyBleedGateTriggered(this.maze, gate),
+        pathFromPlayer: resolveLegacyPlayableShortestPath(resolveLegacyBleedGateViewGrid(this.maze), this.player, gate).path
+      })),
       // The conduit/shell presentation was retired with the old diamond art; kept as a
       // null-returning shim so QA scripts that call it do not throw.
       getGameplayTransferPresentationDiagnostics: () => null
@@ -3469,6 +3497,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
+    this.syncLegacyBleedGateFrame(time);
     // The goal star turns slowly (goalStarSpin.ts): the star is painted into boardDynamicGraphics, so an idle board
     // needs the dynamic redraw to keep it moving. It rides the same colour-redraw cadence as the trail, so it adds no
     // second schedule. Reduce Motion: the star is static, nothing to redraw.
@@ -7125,6 +7154,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.menuDemoState = nextFrame.state;
+    // MAZER-L10: a gated run reached its gate and continues on its second leg (legacyMenuDemoBleedGates.ts).
+    if (nextFrame.episode) {
+      this.menuDemoEpisode = nextFrame.episode;
+    }
     const previousPlayer = copyPoint(this.player);
     this.player = nextFrame.player;
     this.markLegacyPlayerLeftStartIfApplicable(this.maze.start);
@@ -8084,11 +8117,34 @@ export class MenuScene extends Phaser.Scene {
   // so a coordinate the full maze doesn't consider dock-eligible never
   // needs to render as one for a subset either.
   private resolveBleedOffDockVisualEligibility(): Set<string> {
-    if (this.bleedOffDockVisualEligibilityForMaze !== this.maze) {
+    if (
+      this.bleedOffDockVisualEligibilityForMaze !== this.maze
+      || this.bleedOffDockVisualEligibilityGateRevision !== readLegacyBleedGateRevision(this.maze)
+    ) {
       this.bleedOffDockVisualEligibilityForMaze = this.maze;
+      this.bleedOffDockVisualEligibilityGateRevision = readLegacyBleedGateRevision(this.maze);
       this.bleedOffDockVisualEligibilityKeys = resolveLegacyBleedOffDockVisualEligibility(this.maze);
     }
     return this.bleedOffDockVisualEligibilityKeys;
+  }
+
+  // MAZER-L10: walking over a bleed gate lights it (the board re-bakes with its path open); a lit gate keeps
+  // pulsing on the shared colour-redraw cadence, and its activation / draw-in runs every frame.
+  private syncLegacyBleedGateFrame(time: number): void {
+    if (!hasLegacyBleedGates(this.maze)) {
+      return;
+    }
+    if (syncLegacyBleedGatePassOver(this.maze, this.player, this.trail, time).length > 0) {
+      this.boardPathDirty = true;
+      this.boardDynamicDirty = true;
+    }
+    const reducedMotion = this.prefersLegacyReducedMotion();
+    if (isLegacyBleedGateAnimating(this.maze, time, reducedMotion)) {
+      this.boardDynamicDirty = true;
+    } else if (!reducedMotion && readLegacyBleedGateTriggeredKeys(this.maze).size > 0
+      && this.isLegacyColourRedrawDue(time)) {
+      this.boardDynamicDirty = true;
+    }
   }
 
   private hasLegacyBleedOffGlowPendingFrame(): boolean {
@@ -8159,7 +8215,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     for (const point of perimeterPoints) {
-      if (this.maze.grid[point.y]?.[point.x] !== true || !this.isLegacyMenuPointVisibleInStaticDraw(point)) {
+      if (
+        this.maze.grid[point.y]?.[point.x] !== true
+        || isLegacyBleedGateCellHidden(this.maze, point.x, point.y)
+        || !this.isLegacyMenuPointVisibleInStaticDraw(point)
+      ) {
         continue;
       }
       const dockDirections = resolveLegacyMenuBorderDockDirections(this.maze, point);
@@ -8227,7 +8287,8 @@ export class MenuScene extends Phaser.Scene {
     this.boardPathGraphics.clear();
     this.ensureBoardTileMazeCaches();
     this.boardTileLayer.update({
-      grid: this.maze.grid,
+      // MAZER-L10: an unlit bleed gate's path openings are drawn as wall.
+      grid: resolveLegacyBleedGateViewGrid(this.maze),
       width: this.maze.width,
       height: this.maze.height,
       tileSize: mazeRenderFrame.tileSize,
@@ -8258,8 +8319,9 @@ export class MenuScene extends Phaser.Scene {
   // dock owners), a dock-owner mask, and the rank grid built from the scene's reveal order. Rebuilt
   // only when the maze or its reveal-order array is replaced.
   private ensureBoardTileMazeCaches(): void {
-    if (this.boardTileDockMaze !== this.maze) {
+    if (this.boardTileDockMaze !== this.maze || this.boardTileDockGateRevision !== readLegacyBleedGateRevision(this.maze)) {
       this.boardTileDockMaze = this.maze;
+      this.boardTileDockGateRevision = readLegacyBleedGateRevision(this.maze);
       const docks: BoardTileDock[] = [];
       const owners = new Uint8Array(this.maze.width * this.maze.height);
       const eligible = this.resolveBleedOffDockVisualEligibility();
@@ -9286,6 +9348,19 @@ export class MenuScene extends Phaser.Scene {
       mazeTileSize,
       this.bleedGlowColourSmoother.next(resolveBleedGlowColor(this.trailPaletteHead, time, this.prefersLegacyReducedMotion()), time)
     );
+    // MAZER-L10: bleed gates (Pulse ring) and the draw-in of a lit gate's path, under the trail and player.
+    if (hasLegacyBleedGates(this.maze) && this.menuStaticDrawLifecyclePhase !== 'building') {
+      drawLegacyBleedGateLayer(this.boardDynamicGraphics, {
+        maze: this.maze,
+        mazeLeft,
+        mazeTop,
+        tileSize: mazeTileSize,
+        nowMs: time,
+        reducedMotion: this.prefersLegacyReducedMotion(),
+        fieldColor: this.settings.darkMode ? SHARED_BACKDROP_PHASER : resolveLegacyMenuBackdropPalette(this.settings.darkMode).fieldColor,
+        isVisible: (point) => this.isLegacyMenuPointVisibleInStaticDraw(point)
+      });
+    }
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);
 
@@ -12156,6 +12231,7 @@ export class MenuScene extends Phaser.Scene {
         case 'touch-stick': return cyberArcadeMaterial.rail.mint;
         case 'trail-swatch': return playerPalette.trailColor;
         case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
+        case 'bleed-gate': return BLEED_GATE_LIT;
         case 'level-numeral': return playerPalette.playerCoreColor;
         case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
         case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
@@ -12348,6 +12424,18 @@ export class MenuScene extends Phaser.Scene {
           { id: 1, inwardAngle: Math.PI / 2, isCorner: false, side: 'top', x: centerX, y: centerY },
           { alpha: 0.95, energized: false, energy: 0, fill: 0.6, flash: 0, hidden: false, id: 1, spinRad: 0 }
         );
+        return;
+      case 'bleed-gate':
+        // MAZER-L10: the board's own gate draw (src/render/bleedGateRenderer.ts), lit and still.
+        drawBleedGatePlan(graphics, resolveBleedGateDrawPlan({
+          axis: 'horizontal',
+          centerX,
+          centerY,
+          tileSize: badgeRadius * 2.2,
+          activation: 1,
+          timeSec: 0,
+          reducedMotion: true
+        }));
         return;
       case 'level-numeral': {
         // The same dot-matrix chip renderer the level announcer and wordmarks use, at icon scale.
@@ -14606,6 +14694,9 @@ export class MenuScene extends Phaser.Scene {
     const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);
 
     if (result.nextPlayer !== null) {
+      // MAZER-L10: a new attempt: every bleed gate goes dark and its path hides again.
+      resetLegacyBleedGates(this.maze);
+      this.boardPathDirty = true;
       this.player = result.nextPlayer;
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
