@@ -111,7 +111,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'goal',
-    text: 'Reach the star to clear the maze.'
+    text: 'Reach the spinning twin stars to clear the maze.'
   },
   {
     heading: 'Start',
@@ -181,7 +181,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'wrap',
-    text: 'Some mazes wrap around open edges. Trail-coloured edge stars fill as beams hit.'
+    text: 'Some mazes wrap around open edges. Edge stars fill with your colour as beams hit.'
   },
   {
     // MAZER-L10: the bleed gate (Gate D "Pulse ring"). The icon is the board's own gate draw, lit and still.
@@ -210,7 +210,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'levels',
-    text: 'Clears show your clear time and level. Harder mazes add shortcuts and loops.'
+    text: 'Endless mode: clears show your time and level. Harder mazes add shortcuts and loops.'
   },
   {
     heading: 'Online',
