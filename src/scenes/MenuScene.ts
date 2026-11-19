@@ -691,6 +691,7 @@ import {
   resolveLegacyMovementSpeedProfile,
   scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
+import { resolveDriftCorrectedRepeatWaitMs } from '../legacy-runtime/legacyRepeatCadence';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -1925,6 +1926,8 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playHeldTouchRepeatDueAtMs: number | null = null;
+  // When the repeat that is running now was due (see scheduleLegacyPlayHeldTouchRepeat).
+  private playHeldTouchRepeatFiredDueAtMs: number | null = null;
   private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
@@ -5351,12 +5354,17 @@ export class MenuScene extends Phaser.Scene {
     this.playHeldTouchRepeatDueAtMs = null;
   }
 
-  private scheduleLegacyPlayHeldTouchRepeat(delayMs: number): void {
+  // `anchorDueAtMs`: when the step that just fired was DUE. A chained repeat passes it so the average step period is the
+  // requested delay at any refresh rate (src/legacy-runtime/legacyRepeatCadence.ts); a fresh press passes nothing.
+  private scheduleLegacyPlayHeldTouchRepeat(delayMs: number, anchorDueAtMs: number | null = null): void {
     this.clearLegacyPlayHeldTouchRepeat();
-    const normalizedDelayMs = Math.max(0, Math.round(delayMs));
+    const normalizedDelayMs = anchorDueAtMs === null
+      ? Math.max(0, Math.round(delayMs))
+      : resolveDriftCorrectedRepeatWaitMs(anchorDueAtMs, this.time.now, delayMs);
     this.playHeldTouchRepeatDueAtMs = this.time.now + normalizedDelayMs;
     this.playHeldTouchRepeatTimer = this.time.delayedCall(normalizedDelayMs, () => {
       this.playHeldTouchRepeatTimer = null;
+      this.playHeldTouchRepeatFiredDueAtMs = this.playHeldTouchRepeatDueAtMs;
       this.playHeldTouchRepeatDueAtMs = null;
       this.repeatLegacyPlayHeldTouchMove();
     });
@@ -5405,10 +5413,12 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    const firedDueAtMs = this.playHeldTouchRepeatFiredDueAtMs;
+    this.playHeldTouchRepeatFiredDueAtMs = null;
     const moved = this.performLegacyPlayHeldTouchMove();
     if (!moved) {
       if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {
-        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'), firedDueAtMs);
         this.publishInteractionDiagnostics();
         return;
       }
@@ -5421,7 +5431,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+    this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'), firedDueAtMs);
     this.publishInteractionDiagnostics();
   }
 

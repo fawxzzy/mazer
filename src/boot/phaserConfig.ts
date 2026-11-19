@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
 import { MenuScene } from '../scenes/MenuScene';
+import { installFrameRateCap } from '../legacy-runtime/frameRateCap';
 
 export interface MazerPhaserViewport {
   height: number;
@@ -25,6 +26,12 @@ export const createMazerPhaserConfig = (
   fps: {
     target: 60,
     min: 30
+  },
+  // MAZER-PERF: a 120 Hz screen no longer doubles every update and render; installed before the loop starts.
+  callbacks: {
+    postBoot: (game) => {
+      installFrameRateCap(game);
+    }
   },
   input: {
     activePointers: 2
