@@ -3,37 +3,37 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-19T06:02:44.032Z",
+    "registryUpdatedAt": "2026-11-19T14:43:27.000Z",
     "boardSync": {
-      "at": "2026-11-19T06:02:44.032Z",
-      "appliedEventCount": 419,
-      "lastEventId": "ebb3b0a38ab4"
+      "at": "2026-11-19T14:43:27.000Z",
+      "appliedEventCount": 461,
+      "lastEventId": "9d8fa53c56c8"
     }
   },
   "counters": {
     "total": 298,
-    "open": 82,
-    "completed": 122,
+    "open": 80,
+    "completed": 192,
     "deferred": 26,
     "buckets": {
       "needs-you": 33,
       "in-review": 28,
       "blocked": 7,
-      "ready": 10,
+      "ready": 0,
       "in-progress": 1,
-      "unclassified": 71,
+      "unclassified": 11,
       "deferred": 26,
-      "completed": 122
+      "completed": 192
     },
     "needsYou": {
       "decisions": 6,
       "checks": 27
     },
     "completedByTier": {
-      "device": 0,
-      "headless": 44,
+      "device": 3,
+      "headless": 100,
       "source-only": 35,
-      "no-device-surface": 43,
+      "no-device-surface": 54,
       "unrecorded": 0
     },
     "blockedByGroup": {
@@ -765,95 +765,778 @@
     ]
   },
   "completed": {
-    "device": [],
-    "headless": [
+    "device": [
       {
-        "id": "MAZER-VIS-054",
-        "title": "Corner diamonds fully visible on rounded displays",
-        "status": "completed",
+        "id": "MAZER-FLOW-018",
+        "title": "Menu demo starts at player level; tap anywhere to play",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "device",
+        "prs": "#626",
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "updatedAt": "2026-11-16T14:57:32.000Z"
+      },
+      {
+        "id": "MAZER-VIS-056",
+        "title": "Bottom corner stars clear the real display corner",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "device",
+        "prs": "#631",
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "updatedAt": "2026-11-16T14:57:26.000Z"
+      },
+      {
+        "id": "MAZER-VIS-053",
+        "title": "Spiral start marker synced with the end star; polish start and end tiles",
+        "status": "archived",
         "priority": "high",
-        "date": "2026-11-15",
-        "tier": "headless",
-        "prs": "#593",
-        "deployedBuild": "hbvh1xpuf",
-        "updatedAt": "2026-11-15T15:36:32.000Z"
-      },
-      {
-        "id": "MAZER-GEN-005",
-        "title": "Unreachable floor islands appear in about 6% of generated mazes",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
-        "tier": "headless",
-        "prs": "#499",
-        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg",
-        "updatedAt": "2026-11-14T08:02:38.000Z"
-      },
-      {
-        "id": "MAZER-ACCT-012",
-        "title": "Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "headless",
-        "prs": "#485, #486",
-        "deployedBuild": "fawxzzy-mazer-dq6f32ysl",
-        "updatedAt": "2026-11-14T08:02:33.000Z"
-      },
-      {
-        "id": "MAZER-WORLD-001",
-        "title": "Complete the World Identity visual maintenance lane",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
-        "tier": "headless",
-        "prs": "#411, #416",
-        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
-        "updatedAt": "2026-11-14T08:01:57.000Z"
-      },
-      {
-        "id": "MAZER-ACCT-011",
-        "title": "Add a leaderboard username editor (Edit name): merged and deployed",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-12",
-        "tier": "headless",
-        "prs": "#450",
-        "deployedBuild": "f8c16c72",
-        "updatedAt": "2026-11-12T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-FLOW-014",
-        "title": "Make player speed constant and 8% slower: merged and deployed",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-12",
-        "tier": "headless",
-        "prs": "#449",
-        "deployedBuild": "f8c16c72",
-        "updatedAt": "2026-11-12T12:00:00.000Z"
-      },
+        "date": "2026-11-16",
+        "tier": "device",
+        "prs": "#617, #627",
+        "deployedBuild": "fawxzzy-mazer-pakov2avo",
+        "updatedAt": "2026-11-16T14:56:58.000Z"
+      }
+    ],
+    "headless": [
       {
         "id": "MAZER-ACCT-007",
         "title": "Give accounts made on the account site a Mazer profile",
-        "status": "completed",
+        "status": "archived",
         "priority": "high",
-        "date": "2026-11-11",
+        "date": "2026-11-19",
         "tier": "headless",
         "prs": "#446, #447",
         "deployedBuild": "8f757c76",
-        "updatedAt": "2026-11-11T23:00:00.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
         "id": "MAZER-ACCT-008",
         "title": "Widen the sign-in window to 15 minutes and name each sign-in failure",
-        "status": "completed",
+        "status": "archived",
         "priority": "high",
-        "date": "2026-11-11",
+        "date": "2026-11-19",
         "tier": "headless",
         "prs": "#444, #445",
         "deployedBuild": "8f757c76",
-        "updatedAt": "2026-11-11T23:00:00.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-011",
+        "title": "Add a leaderboard username editor (Edit name): merged and deployed",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#450",
+        "deployedBuild": "f8c16c72",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-012",
+        "title": "Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#485, #486",
+        "deployedBuild": "fawxzzy-mazer-dq6f32ysl",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-014",
+        "title": "Make player speed constant and 8% slower: merged and deployed",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#449",
+        "deployedBuild": "f8c16c72",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-GEN-005",
+        "title": "Unreachable floor islands appear in about 6% of generated mazes",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#499",
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PROG-015",
+        "title": "Double lure on levels 2-268 and the mastery tier removed (ladder v2): merged and deployed",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#420",
+        "deployedBuild": "b640f1da",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PWA-002",
+        "title": "Add PWA screenshots, iOS launch art and icon cleanup",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#438",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-022",
+        "title": "AI player and play player share one marker drawn like the end tiles",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#442",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-054",
+        "title": "Corner diamonds fully visible on rounded displays",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#593",
+        "deployedBuild": "hbvh1xpuf",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-WORLD-001",
+        "title": "Complete the World Identity visual maintenance lane",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "headless",
+        "prs": "#411, #416",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-19T14:28:36.000Z"
+      },
+      {
+        "id": "MAZER-AUDIO-004",
+        "title": "Gentler step sound and Sound on by default",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#605",
+        "deployedBuild": "5g35npa39",
+        "updatedAt": "2026-11-16T14:57:17.000Z"
+      },
+      {
+        "id": "MAZER-UI-056",
+        "title": "Online counter readability on the menu",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#604",
+        "deployedBuild": "5g35npa39",
+        "updatedAt": "2026-11-16T14:57:10.000Z"
+      },
+      {
+        "id": "MAZER-VIS-055",
+        "title": "Edge marker redesign",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#602",
+        "deployedBuild": "5023dd2a",
+        "updatedAt": "2026-11-16T14:57:04.000Z"
+      },
+      {
+        "id": "MAZER-UI-050",
+        "title": "Touch up the Start, Mazer title and Level text designs",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#598",
+        "deployedBuild": "5023dd2a",
+        "updatedAt": "2026-11-16T14:56:53.000Z"
+      },
+      {
+        "id": "MAZER-VIS-052",
+        "title": "Main menu: restore bleed-off paths that run off the screen edge",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#587",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:48.000Z"
+      },
+      {
+        "id": "MAZER-VIS-051",
+        "title": "Make trail colours bolder and more arcade, less pastel",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#588, #591, #613",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:42.000Z"
+      },
+      {
+        "id": "MAZER-VIS-050",
+        "title": "Remove the thin white pre-draw line and the centre dot on every maze tile",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#586, #590",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:36.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-020",
+        "title": "Replace the maze fade in and out with a smooth build and tear-down",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#590, #607, #616",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:27.000Z"
+      },
+      {
+        "id": "MAZER-PERF-011",
+        "title": "Drop the 934 KB app icon from the service worker precache",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#572",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:20.000Z"
+      },
+      {
+        "id": "MAZER-UI-035",
+        "title": "Move the settings gear off the top-right corner diamond at 390 wide",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#573, #584",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:48.000Z"
+      },
+      {
+        "id": "MAZER-UI-034",
+        "title": "Smaller font for the sign-in failure code line",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#573",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:41.000Z"
+      },
+      {
+        "id": "MAZER-VIS-044",
+        "title": "Keep the four corner edge diamonds anchored in the screen corners",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#560",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:30.000Z"
+      },
+      {
+        "id": "MAZER-UI-033",
+        "title": "Shrink the menu online counter to username text size and add an Online label",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#556",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:22.000Z"
+      },
+      {
+        "id": "MAZER-QA-009",
+        "title": "One ordered phone check list that closes several cards",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#554",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:15.000Z"
+      },
+      {
+        "id": "MAZER-UI-032",
+        "title": "Finish the wave 1C diagnostics type cleanup",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#546",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:09.000Z"
+      },
+      {
+        "id": "MAZER-UI-031",
+        "title": "Migrate stray colour literals to theme values in slices",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#555, #563, #549, #580, #582",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:02.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-011",
+        "title": "Rise and stagger entrance for overlays and controls",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#562",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:57.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-017",
+        "title": "Touch-first level 1 hint that follows the input in use",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#557",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:44.000Z"
+      },
+      {
+        "id": "MAZER-UI-030",
+        "title": "Show the offline cache update warning in the message toast",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#552",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:39.000Z"
+      },
+      {
+        "id": "MAZER-AUDIO-003",
+        "title": "Add small synthesized sound effects with a Settings toggle, default off",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#548",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:31.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-016",
+        "title": "Keep the same maze after quit or reload",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#543",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:25.000Z"
+      },
+      {
+        "id": "MAZER-VIS-042",
+        "title": "Mirror the Fitness loader hardening in the Mazer loader",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#540",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:06.000Z"
+      },
+      {
+        "id": "MAZER-PWA-007",
+        "title": "Install gate always on for browser access",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#518",
+        "deployedBuild": "fawxzzy-mazer-d6in8php0",
+        "updatedAt": "2026-11-16T14:53:54.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-041",
+        "title": "Account pages never scroll, host sign-out endpoint, reset ends other sessions",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "FawxzzyWeb#156",
+        "deployedBuild": "fawxzzyweb-geuv4lbht",
+        "updatedAt": "2026-11-16T14:53:42.000Z"
+      },
+      {
+        "id": "MAZER-VIS-041",
+        "title": "End star spins slowly and stays visible under the player",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#515",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:53:28.000Z"
+      },
+      {
+        "id": "MAZER-VIS-040",
+        "title": "Smooth maze build-in and build-out",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#523",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:53:16.000Z"
+      },
+      {
+        "id": "MAZER-UI-026",
+        "title": "Settings: three rows removed and a description line required on every row",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#525",
+        "deployedBuild": "fawxzzy-mazer-d6in8php0",
+        "updatedAt": "2026-11-16T14:53:05.000Z"
+      },
+      {
+        "id": "MAZER-UI-025",
+        "title": "Privacy text names the live Mazer online count",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "FawxzzyWeb#158",
+        "deployedBuild": "fawxzzyweb-geuv4lbht",
+        "updatedAt": "2026-11-16T14:52:59.000Z"
+      },
+      {
+        "id": "MAZER-UI-024",
+        "title": "Online counter in the main menu, profile and leaderboard icons swapped",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#520",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:52:54.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-043",
+        "title": "No Mazer account screens: only account.fawxzzy.com screens",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#522",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:52:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-038",
+        "title": "Edge diamonds: beams on the inner tip, half size while playing, continuous beams",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#512",
+        "deployedBuild": "fawxzzy-mazer-1hf3yrduh",
+        "updatedAt": "2026-11-16T14:52:39.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-040",
+        "title": "Load straight into the account sign-in instead of the Mazer sign-in screen",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#510",
+        "deployedBuild": "fawxzzy-mazer-ddyiq4ttb",
+        "updatedAt": "2026-11-16T14:52:34.000Z"
+      },
+      {
+        "id": "MAZER-VIS-039",
+        "title": "One smooth loader and the website app image everywhere",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#511",
+        "deployedBuild": "fawxzzy-mazer-ddyiq4ttb",
+        "updatedAt": "2026-11-16T14:52:23.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-039",
+        "title": "Test the account reset flow end to end",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "FawxzzyWeb#150",
+        "deployedBuild": "fawxzzyweb-r73je21xy",
+        "updatedAt": "2026-11-16T14:52:13.000Z"
+      },
+      {
+        "id": "MAZER-PERF-010",
+        "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#509",
+        "deployedBuild": "fawxzzy-mazer-ddyiq4ttb",
+        "updatedAt": "2026-11-16T14:52:03.000Z"
+      },
+      {
+        "id": "MAZER-PERF-009",
+        "title": "Prefetch or time-slice the first maze of a session",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#524",
+        "deployedBuild": "fawxzzy-mazer-d6in8php0",
+        "updatedAt": "2026-11-16T14:51:52.000Z"
+      },
+      {
+        "id": "MAZER-VIS-037",
+        "title": "Bound the trail canvas colour step at the sheen crossing",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#541",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:51:46.000Z"
+      },
+      {
+        "id": "MAZER-PWA-006",
+        "title": "Trim dev pages from the precache and decide update behaviour on deploy",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#544",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:51:39.000Z"
+      },
+      {
+        "id": "MAZER-VIS-036",
+        "title": "Centre the start arrow by its painted centroid",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#502",
+        "deployedBuild": "fawxzzy-mazer-o9hufd7kf",
+        "updatedAt": "2026-11-16T14:51:21.000Z"
+      },
+      {
+        "id": "MAZER-VIS-035",
+        "title": "Keep a few background stars rainbow-coloured",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#498, #573",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:51:14.000Z"
+      },
+      {
+        "id": "MAZER-VIS-034",
+        "title": "Centre the goal star by its centre of mass in the tile",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#496",
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq",
+        "updatedAt": "2026-11-16T14:51:09.000Z"
+      },
+      {
+        "id": "MAZER-VIS-033",
+        "title": "Edge diamonds: one fill only, fill inner to outer, drain outer to inner",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#497",
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq",
+        "updatedAt": "2026-11-16T14:51:03.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-015",
+        "title": "Show the level clear time above the level number between levels",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#494",
+        "deployedBuild": "fawxzzy-mazer-5dfftudqq",
+        "updatedAt": "2026-11-16T14:50:52.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-010",
+        "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#519",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:50:43.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-038",
+        "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#516, #517",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:50:34.000Z"
+      },
+      {
+        "id": "MAZER-UI-023",
+        "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#521",
+        "deployedBuild": "fawxzzy-mazer-dfh38rip1",
+        "updatedAt": "2026-11-16T14:50:27.000Z"
+      },
+      {
+        "id": "MAZER-GEN-006",
+        "title": "No one-tile dead-end stubs in generated mazes",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#464, #603",
+        "deployedBuild": "5023dd2a",
+        "updatedAt": "2026-11-16T14:50:20.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-031",
+        "title": "Show a failure code a player can read off a phone",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#545",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:50:11.000Z"
+      },
+      {
+        "id": "MAZER-PERF-008",
+        "title": "Spread level-start maze generation across frames or a worker",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#503",
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg",
+        "updatedAt": "2026-11-16T14:50:05.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-009",
+        "title": "Make the Create Account result honest",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "FawxzzyWeb#121",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:49.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-007",
+        "title": "Decide off-scale loops and durations and sweep dead motion code",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#547",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:39.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-001",
+        "title": "Teach the controls and the goal on level 1",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#542",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:30.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-002",
+        "title": "Animate overlays, controls and the Start and splash transitions",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#505",
+        "deployedBuild": "fawxzzy-mazer-qbu403nwk",
+        "updatedAt": "2026-11-16T14:49:23.000Z"
+      },
+      {
+        "id": "MAZER-UI-015",
+        "title": "Build one shared button kit",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#553, #576",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:13.000Z"
+      },
+      {
+        "id": "MAZER-UI-010",
+        "title": "Define one type scale and a second display typeface",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#550, #565, #566, #567",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:04.000Z"
+      },
+      {
+        "id": "MAZER-VIS-012",
+        "title": "Unify the backdrop across boot, install gate and sign-in",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "headless",
+        "prs": "#561",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:48:56.000Z"
       },
       {
         "id": "MAZER-CTRL-001",
@@ -933,28 +1616,6 @@
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
-        "id": "MAZER-PROG-015",
-        "title": "Double lure on levels 2-268 and the mastery tier removed (ladder v2): merged and deployed",
-        "status": "completed",
-        "priority": "high",
-        "date": "2026-11-11",
-        "tier": "headless",
-        "prs": "#420",
-        "deployedBuild": "b640f1da",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-PWA-002",
-        "title": "Add PWA screenshots, iOS launch art and icon cleanup",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-11",
-        "tier": "headless",
-        "prs": "#438",
-        "deployedBuild": "24e15cc1",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
         "id": "MAZER-UI-014",
         "title": "Make the in-play pause control a 44px target: shipped, now pinned by a test",
         "status": "completed",
@@ -1018,17 +1679,6 @@
         "tier": "headless",
         "prs": "#421",
         "deployedBuild": "b640f1da",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-VIS-022",
-        "title": "AI player and play player share one marker drawn like the end tiles",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-11",
-        "tier": "headless",
-        "prs": "#442",
-        "deployedBuild": "24e15cc1",
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
@@ -1254,6 +1904,28 @@
     ],
     "source-only": [
       {
+        "id": "MAZER-UI-022",
+        "title": "Move the offline-notice strings into the message module copy tables",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "source-only",
+        "prs": "#436",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-017",
+        "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "source-only",
+        "prs": "#439",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:30:46.000Z"
+      },
+      {
         "id": "MAZER-ACCT-017",
         "title": "Give account-site players the username they typed on the leaderboard: function v2",
         "status": "completed",
@@ -1263,28 +1935,6 @@
         "prs": "",
         "deployedBuild": null,
         "updatedAt": "2026-11-12T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-UI-022",
-        "title": "Move the offline-notice strings into the message module copy tables",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-11",
-        "tier": "source-only",
-        "prs": "#436",
-        "deployedBuild": "24e15cc1",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-VIS-017",
-        "title": "Purge the disabled backdrop glyph drawing code and its pinned source-string tests",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-11",
-        "tier": "source-only",
-        "prs": "#439",
-        "deployedBuild": "24e15cc1",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
         "id": "MAZER-GEN-004",
@@ -1641,279 +2291,422 @@
     ],
     "no-device-surface": [
       {
-        "id": "MAZER-QA-008",
-        "title": "Add ladder-end checkpoints 283 and 288 to the level preview",
+        "id": "MAZER-DOCS-002",
+        "title": "Refresh the current truth document for the new menu and demo",
         "status": "completed",
         "priority": "low",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
-        "prs": "#502",
-        "deployedBuild": "fawxzzy-mazer-o9hufd7kf",
-        "updatedAt": "2026-11-14T08:02:41.000Z"
-      },
-      {
-        "id": "MAZER-VIS-032",
-        "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#500",
-        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg",
-        "updatedAt": "2026-11-14T08:02:40.000Z"
-      },
-      {
-        "id": "MAZER-QA-007",
-        "title": "The level preview jump list now offers 218 instead of 268: merged and live, review",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#469",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:39.000Z"
-      },
-      {
-        "id": "MAZER-PROG-018",
-        "title": "Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#491",
+        "prs": "#651",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:02:37.000Z"
+        "updatedAt": "2026-11-19T14:43:27.000Z"
       },
       {
-        "id": "MAZER-PROG-017",
-        "title": "Every sign-in failure code is pinned to the class map by a test: merged and live, review",
+        "id": "MAZER-QA-012",
+        "title": "Point QA scripts at the Menu button instead of the old icons",
         "status": "completed",
         "priority": "low",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
-        "prs": "#469",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:36.000Z"
-      },
-      {
-        "id": "MAZER-MOTION-009",
-        "title": "The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#475",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:35.000Z"
-      },
-      {
-        "id": "MAZER-PROG-016",
-        "title": "Touch sprint diagnostics now live in the progression section: merged and live, review",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#469, #473",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:34.000Z"
-      },
-      {
-        "id": "MAZER-MOTION-006",
-        "title": "Scene motion constants read the motion scale, values unchanged: merged and live",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#471",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:32.000Z"
-      },
-      {
-        "id": "MAZER-VIS-027",
-        "title": "Unused backdrop shard, glass shard and rune generators deleted: merged and live",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#477",
-        "deployedBuild": "62f36472",
-        "updatedAt": "2026-11-14T08:02:31.000Z"
-      },
-      {
-        "id": "MAZER-VIS-024",
-        "title": "Make the marker diagnostics report the real block size: deployed",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#458",
-        "deployedBuild": "476c4789",
-        "updatedAt": "2026-11-14T08:02:30.000Z"
-      },
-      {
-        "id": "MAZER-DOCS-001",
-        "title": "Multi-target deployment architecture doc",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#405",
+        "prs": "#653",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:02:29.000Z"
-      },
-      {
-        "id": "MAZER-GOV-005",
-        "title": "Visual proof discipline: PR template line and repo pointer landed",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#474",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:02:28.000Z"
-      },
-      {
-        "id": "MAZER-GOV-004",
-        "title": "Retire the previous project board and refresh this one from all prior discussion",
-        "status": "completed",
-        "priority": "high",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#434",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:02:27.000Z"
+        "updatedAt": "2026-11-19T14:43:14.000Z"
       },
       {
         "id": "MAZER-ACCT-002",
         "title": "Finish the atomic sign-up username flow (blocked on provider)",
-        "status": "completed",
+        "status": "archived",
         "priority": "medium",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
         "prs": "#280, #281",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:02:26.000Z"
-      },
-      {
-        "id": "MAZER-MOTION-001",
-        "title": "Adopt one motion scale for durations, loops and easing",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#441",
-        "deployedBuild": "24e15cc1",
-        "updatedAt": "2026-11-14T08:02:25.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
         "id": "MAZER-AI-001",
         "title": "AI runner calibration: per-band thresholds and checker landed, retention not built",
-        "status": "completed",
+        "status": "archived",
         "priority": "medium",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
         "prs": "#479",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:56.000Z"
-      },
-      {
-        "id": "MAZER-HAZ-007",
-        "title": "Turn-synchronous simulation: phase status table landed, only the player phase is live",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#472",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:55.000Z"
-      },
-      {
-        "id": "MAZER-UI-019",
-        "title": "UI rework migration: wave status report landed, umbrella to split pending the owner",
-        "status": "completed",
-        "priority": "high",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#482",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:54.000Z"
-      },
-      {
-        "id": "MAZER-UI-021",
-        "title": "Route auth, sync, username and boot errors into the message toast",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#530",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:53.000Z"
-      },
-      {
-        "id": "MAZER-VIS-026",
-        "title": "Decide dense-board player prominence after the tile-sized ring",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#530",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:52.000Z"
-      },
-      {
-        "id": "MAZER-PROG-006",
-        "title": "Decide a minimum tile size for very large boards",
-        "status": "completed",
-        "priority": "low",
-        "date": "2026-11-14",
-        "tier": "no-device-surface",
-        "prs": "#530",
-        "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:51.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
         "id": "MAZER-AUDIO-001",
         "title": "Decide whether the game has sound",
-        "status": "completed",
+        "status": "archived",
         "priority": "medium",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
         "prs": "#530",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:50.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
-        "id": "MAZER-FLOW-011",
-        "title": "Decide when input unlocks during the level intro",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-14",
+        "id": "MAZER-DOCS-001",
+        "title": "Multi-target deployment architecture doc",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
-        "prs": "#530",
+        "prs": "#405",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:49.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
         "id": "MAZER-FLOW-006",
         "title": "Decide: resume the same maze after quit or reload",
-        "status": "completed",
+        "status": "archived",
         "priority": "medium",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
         "prs": "#530",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:48.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-FLOW-011",
+        "title": "Decide when input unlocks during the level intro",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#530",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-GOV-004",
+        "title": "Retire the previous project board and refresh this one from all prior discussion",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#434",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-GOV-005",
+        "title": "Visual proof discipline: PR template line and repo pointer landed",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#474",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-GOV-007",
+        "title": "Generated work report and work ledger",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#440",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-GOV-008",
+        "title": "Run the brand tests in CI",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#437",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-HAZ-007",
+        "title": "Turn-synchronous simulation: phase status table landed, only the player phase is live",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#472",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-001",
+        "title": "Adopt one motion scale for durations, loops and easing",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#441",
+        "deployedBuild": "24e15cc1",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-006",
+        "title": "Scene motion constants read the motion scale, values unchanged: merged and live",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#471",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-MOTION-009",
+        "title": "The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#475",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PROG-006",
+        "title": "Decide a minimum tile size for very large boards",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#530",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PROG-016",
+        "title": "Touch sprint diagnostics now live in the progression section: merged and live, review",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#469, #473",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PROG-017",
+        "title": "Every sign-in failure code is pinned to the class map by a test: merged and live, review",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#469",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-PROG-018",
+        "title": "Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#491",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-QA-007",
+        "title": "The level preview jump list now offers 218 instead of 268: merged and live, review",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#469",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-QA-008",
+        "title": "Add ladder-end checkpoints 283 and 288 to the level preview",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#502",
+        "deployedBuild": "fawxzzy-mazer-o9hufd7kf",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
       },
       {
         "id": "MAZER-UI-020",
         "title": "Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD",
-        "status": "completed",
+        "status": "archived",
         "priority": "high",
-        "date": "2026-11-14",
+        "date": "2026-11-19",
         "tier": "no-device-surface",
         "prs": "#530",
         "deployedBuild": null,
-        "updatedAt": "2026-11-14T08:01:47.000Z"
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-UI-021",
+        "title": "Route auth, sync, username and boot errors into the message toast",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#530",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-024",
+        "title": "Make the marker diagnostics report the real block size: deployed",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#458",
+        "deployedBuild": "476c4789",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-026",
+        "title": "Decide dense-board player prominence after the tile-sized ring",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#530",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-027",
+        "title": "Unused backdrop shard, glass shard and rune generators deleted: merged and live",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#477",
+        "deployedBuild": "62f36472",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-VIS-032",
+        "title": "Start the outro ring orbit from the master laser clock, not a fixed 600 ms",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#500",
+        "deployedBuild": "fawxzzy-mazer-1n3xcc1qg",
+        "updatedAt": "2026-11-19T14:36:45.000Z"
+      },
+      {
+        "id": "MAZER-UI-019",
+        "title": "UI rework migration: wave status report landed, umbrella to split pending the owner",
+        "status": "archived",
+        "priority": "high",
+        "date": "2026-11-19",
+        "tier": "no-device-surface",
+        "prs": "#482",
+        "deployedBuild": null,
+        "updatedAt": "2026-11-19T14:36:39.000Z"
+      },
+      {
+        "id": "MAZER-QA-011",
+        "title": "Player-reachable route to levels 60, 100 and 190 for checks",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#571",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:15.000Z"
+      },
+      {
+        "id": "MAZER-GOV-014",
+        "title": "Capture owed for wave 3A and a Wave 0C capture script",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#571",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:56:02.000Z"
+      },
+      {
+        "id": "MAZER-QA-010",
+        "title": "Make the online counter measurement check stable",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#571",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:54.000Z"
+      },
+      {
+        "id": "MAZER-DEBT-002",
+        "title": "Stop publishing constant formMode and invalidFields in menu diagnostics",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#575, #579, #581",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:55:35.000Z"
+      },
+      {
+        "id": "MAZER-GOV-011",
+        "title": "Run the owner export checks inside board apply",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#537, #570",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:50.000Z"
+      },
+      {
+        "id": "MAZER-UI-028",
+        "title": "Give every UI rework wave a visual proof surface (Wave 6)",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#559",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:54:16.000Z"
+      },
+      {
+        "id": "MAZER-GOV-010",
+        "title": "Board updates by event log and milestone fold, not per PR",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#495, #569",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:51:29.000Z"
+      },
+      {
+        "id": "MAZER-ACCT-020",
+        "title": "Fix the four account-site usernames longer than 15 characters",
+        "status": "archived",
+        "priority": "low",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#558",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:49:55.000Z"
+      },
+      {
+        "id": "MAZER-VIS-011",
+        "title": "Regenerate the HUD icons as one matched set and atlas",
+        "status": "archived",
+        "priority": "medium",
+        "date": "2026-11-16",
+        "tier": "no-device-surface",
+        "prs": "#564, #568, #574",
+        "deployedBuild": "none",
+        "updatedAt": "2026-11-16T14:48:49.000Z"
       },
       {
         "id": "MAZER-GOV-009",
@@ -1946,28 +2739,6 @@
         "tier": "no-device-surface",
         "prs": "#432",
         "deployedBuild": "b640f1da",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-GOV-007",
-        "title": "Generated work report and work ledger",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-11",
-        "tier": "no-device-surface",
-        "prs": "#440",
-        "deployedBuild": "24e15cc1",
-        "updatedAt": "2026-11-11T12:00:00.000Z"
-      },
-      {
-        "id": "MAZER-GOV-008",
-        "title": "Run the brand tests in CI",
-        "status": "completed",
-        "priority": "medium",
-        "date": "2026-11-11",
-        "tier": "no-device-surface",
-        "prs": "#437",
-        "deployedBuild": "24e15cc1",
         "updatedAt": "2026-11-11T12:00:00.000Z"
       },
       {
@@ -2416,150 +3187,8 @@
     "unknown": []
   },
   "ready": {
-    "queue": [
-      {
-        "id": "MAZER-FLOW-001",
-        "title": "Teach the controls and the goal on level 1",
-        "status": "archived",
-        "priority": "high",
-        "filesHint": [
-          "src/tutorial/exampleTutorials.ts",
-          "src/tutorial/tutorialRegistry.ts",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-MOTION-002",
-        "title": "Animate overlays, controls and the Start and splash transitions",
-        "status": "archived",
-        "priority": "medium",
-        "filesHint": [
-          "src/theme/tokens.ts",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts"
-        ]
-      },
-      {
-        "id": "MAZER-UI-010",
-        "title": "Define one type scale and a second display typeface",
-        "status": "archived",
-        "priority": "medium",
-        "filesHint": [
-          "src/theme/tokens.ts",
-          "public/fonts",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-MOTION-002 on src/theme/tokens.ts, src/scenes/MenuScene.ts"
-        ]
-      },
-      {
-        "id": "MAZER-UI-015",
-        "title": "Build one shared button kit",
-        "status": "archived",
-        "priority": "medium",
-        "filesHint": [
-          "src/legacy-runtime/legacyMenuButtonChrome.ts",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-MOTION-002 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-UI-010 on src/scenes/MenuScene.ts"
-        ]
-      },
-      {
-        "id": "MAZER-VIS-011",
-        "title": "Regenerate the HUD icons as one matched set and atlas",
-        "status": "archived",
-        "priority": "medium",
-        "filesHint": [
-          "public/icons",
-          "src/scenes/MenuScene.ts"
-        ],
-        "waves": [
-          "5C"
-        ],
-        "warnings": [
-          "overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-MOTION-002 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-UI-010 on src/scenes/MenuScene.ts",
-          "overlaps MAZER-UI-015 on src/scenes/MenuScene.ts"
-        ]
-      },
-      {
-        "id": "MAZER-ACCT-020",
-        "title": "Fix the four account-site usernames longer than 15 characters",
-        "status": "archived",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-ACCT-038",
-        "title": "Retire the remaining dead sign-in form helpers and sign-up sentinels",
-        "status": "archived",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-MOTION-010",
-        "title": "Delete or bind the unused tuning value menu.status.pulseDurationMs",
-        "status": "archived",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-PERF-008",
-        "title": "Spread level-start maze generation across frames or a worker",
-        "status": "archived",
-        "priority": "low",
-        "filesHint": [],
-        "waves": [],
-        "warnings": []
-      },
-      {
-        "id": "MAZER-UI-023",
-        "title": "Narrow the menu diagnostics form mode to login only (wave 1C)",
-        "status": "archived",
-        "priority": "low",
-        "filesHint": [
-          "src/scenes/menuRuntimeDiagnostics.ts"
-        ],
-        "waves": [
-          "1C"
-        ],
-        "warnings": []
-      }
-    ],
-    "menuSceneCards": [
-      "MAZER-FLOW-001",
-      "MAZER-MOTION-002",
-      "MAZER-UI-010",
-      "MAZER-UI-015",
-      "MAZER-VIS-011"
-    ]
+    "queue": [],
+    "menuSceneCards": []
   },
   "inProgress": [
     {
@@ -2782,121 +3411,9 @@
   ],
   "unclassified": [
     {
-      "id": "MAZER-ACCT-009",
-      "title": "Make the Create Account result honest",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-ACCT-040",
-      "title": "Load straight into the account sign-in instead of the Mazer sign-in screen",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-ACCT-041",
-      "title": "Account pages never scroll, host sign-out endpoint, reset ends other sessions",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-ACCT-043",
-      "title": "No Mazer account screens: only account.fawxzzy.com screens",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-GEN-006",
-      "title": "No one-tile dead-end stubs in generated mazes",
-      "status": "archived",
-      "priority": "high",
-      "lane": "owner-only"
-    },
-    {
-      "id": "MAZER-MOTION-020",
-      "title": "Replace the maze fade in and out with a smooth build and tear-down",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-PWA-007",
-      "title": "Install gate always on for browser access",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-050",
-      "title": "Remove the thin white pre-draw line and the centre dot on every maze tile",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-053",
-      "title": "Spiral start marker synced with the end star; polish start and end tiles",
-      "status": "archived",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-ACCT-039",
-      "title": "Test the account reset flow end to end",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-AUDIO-004",
-      "title": "Gentler step sound and Sound on by default",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-FLOW-015",
-      "title": "Show the level clear time above the level number between levels",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-FLOW-016",
-      "title": "Keep the same maze after quit or reload",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-FLOW-017",
-      "title": "Touch-first level 1 hint that follows the input in use",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-FLOW-018",
-      "title": "Menu demo starts at player level; tap anywhere to play",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
       "id": "MAZER-GEN-024",
       "title": "Weigh bleed gates in the felt tuner",
       "status": "planning",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-GOV-010",
-      "title": "Board updates by event log and milestone fold, not per PR",
-      "status": "archived",
       "priority": "medium",
       "lane": null
     },
@@ -2908,164 +3425,10 @@
       "lane": null
     },
     {
-      "id": "MAZER-GOV-014",
-      "title": "Capture owed for wave 3A and a Wave 0C capture script",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-PERF-010",
-      "title": "Investigate an intermittent slow boot seen by the QA sign-in test",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-QA-009",
-      "title": "One ordered phone check list that closes several cards",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-QA-010",
-      "title": "Make the online counter measurement check stable",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-024",
-      "title": "Online counter in the main menu, profile and leaderboard icons swapped",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
       "id": "MAZER-UI-027",
       "title": "Split the menu scene into smaller owned modules",
       "status": "planning",
       "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-033",
-      "title": "Shrink the menu online counter to username text size and add an Online label",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-050",
-      "title": "Touch up the Start, Mazer title and Level text designs",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-056",
-      "title": "Online counter readability on the menu",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-012",
-      "title": "Unify the backdrop across boot, install gate and sign-in",
-      "status": "archived",
-      "priority": "medium",
-      "lane": "owner-only"
-    },
-    {
-      "id": "MAZER-VIS-033",
-      "title": "Edge diamonds: one fill only, fill inner to outer, drain outer to inner",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-038",
-      "title": "Edge diamonds: beams on the inner tip, half size while playing, continuous beams",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-039",
-      "title": "One smooth loader and the website app image everywhere",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-040",
-      "title": "Smooth maze build-in and build-out",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-044",
-      "title": "Keep the four corner edge diamonds anchored in the screen corners",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-051",
-      "title": "Make trail colours bolder and more arcade, less pastel",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-052",
-      "title": "Main menu: restore bleed-off paths that run off the screen edge",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-055",
-      "title": "Edge marker redesign",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-056",
-      "title": "Bottom corner stars clear the real display corner",
-      "status": "archived",
-      "priority": "medium",
-      "lane": null
-    },
-    {
-      "id": "MAZER-ACCT-031",
-      "title": "Show a failure code a player can read off a phone",
-      "status": "archived",
-      "priority": "low",
-      "lane": "owner-only"
-    },
-    {
-      "id": "MAZER-AUDIO-003",
-      "title": "Add small synthesized sound effects with a Settings toggle, default off",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-DEBT-002",
-      "title": "Stop publishing constant formMode and invalidFields in menu diagnostics",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-DOCS-002",
-      "title": "Refresh the current truth document for the new menu and demo",
-      "status": "planning",
-      "priority": "low",
       "lane": null
     },
     {
@@ -3079,13 +3442,6 @@
       "id": "MAZER-FLOW-019",
       "title": "Show the build stamp in Settings",
       "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-GOV-011",
-      "title": "Run the owner export checks inside board apply",
-      "status": "archived",
       "priority": "low",
       "lane": null
     },
@@ -3104,114 +3460,9 @@
       "lane": null
     },
     {
-      "id": "MAZER-MOTION-007",
-      "title": "Decide off-scale loops and durations and sweep dead motion code",
-      "status": "archived",
-      "priority": "low",
-      "lane": "owner-only"
-    },
-    {
-      "id": "MAZER-MOTION-011",
-      "title": "Rise and stagger entrance for overlays and controls",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-PERF-009",
-      "title": "Prefetch or time-slice the first maze of a session",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-PERF-011",
-      "title": "Drop the 934 KB app icon from the service worker precache",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-PWA-006",
-      "title": "Trim dev pages from the precache and decide update behaviour on deploy",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-QA-011",
-      "title": "Player-reachable route to levels 60, 100 and 190 for checks",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-QA-012",
-      "title": "Point QA scripts at the Menu button instead of the old icons",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-025",
-      "title": "Privacy text names the live Mazer online count",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-026",
-      "title": "Settings: three rows removed and a description line required on every row",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-028",
-      "title": "Give every UI rework wave a visual proof surface (Wave 6)",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
       "id": "MAZER-UI-029",
       "title": "Retire the future-phaser path",
       "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-030",
-      "title": "Show the offline cache update warning in the message toast",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-031",
-      "title": "Migrate stray colour literals to theme values in slices",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-032",
-      "title": "Finish the wave 1C diagnostics type cleanup",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-034",
-      "title": "Smaller font for the sign-in failure code line",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-035",
-      "title": "Move the settings gear off the top-right corner diamond at 390 wide",
-      "status": "archived",
       "priority": "low",
       "lane": null
     },
@@ -3226,48 +3477,6 @@
       "id": "MAZER-UI-090",
       "title": "Update the in-app guide for hazards and menu changes",
       "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-034",
-      "title": "Centre the goal star by its centre of mass in the tile",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-035",
-      "title": "Keep a few background stars rainbow-coloured",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-036",
-      "title": "Centre the start arrow by its painted centroid",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-037",
-      "title": "Bound the trail canvas colour step at the sheen crossing",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-041",
-      "title": "End star spins slowly and stays visible under the player",
-      "status": "archived",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-042",
-      "title": "Mirror the Fitness loader hardening in the Mazer loader",
-      "status": "archived",
       "priority": "low",
       "lane": null
     },
@@ -3393,12 +3602,12 @@
       "sub": "source-only"
     },
     "MAZER-VIS-011": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-VIS-012": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-001": {
       "bucket": "completed",
@@ -3437,8 +3646,8 @@
       "sub": "source-only"
     },
     "MAZER-UI-010": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-011": {
       "bucket": "completed",
@@ -3457,8 +3666,8 @@
       "sub": "headless"
     },
     "MAZER-UI-015": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-016": {
       "bucket": "deferred",
@@ -3485,8 +3694,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-MOTION-002": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-MOTION-003": {
       "bucket": "completed",
@@ -3609,8 +3818,8 @@
       "sub": "other-card"
     },
     "MAZER-FLOW-001": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-FLOW-002": {
       "bucket": "completed",
@@ -3893,8 +4102,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-MOTION-007": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-007": {
       "bucket": "completed",
@@ -3905,8 +4114,8 @@
       "sub": "headless"
     },
     "MAZER-ACCT-009": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-010": {
       "bucket": "completed",
@@ -3949,8 +4158,8 @@
       "sub": "check"
     },
     "MAZER-ACCT-020": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-ACCT-021": {
       "bucket": "needs-you",
@@ -3997,8 +4206,8 @@
       "sub": null
     },
     "MAZER-PERF-008": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-028": {
       "bucket": "needs-you",
@@ -4049,8 +4258,8 @@
       "sub": null
     },
     "MAZER-ACCT-031": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-032": {
       "bucket": "needs-you",
@@ -4069,8 +4278,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-GEN-006": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-GEN-005": {
       "bucket": "completed",
@@ -4101,16 +4310,16 @@
       "sub": null
     },
     "MAZER-UI-023": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-038": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-MOTION-010": {
-      "bucket": "ready",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-031": {
       "bucket": "deferred",
@@ -4121,232 +4330,232 @@
       "sub": "no-device-surface"
     },
     "MAZER-FLOW-015": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-033": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-034": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-035": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-036": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-QA-008": {
       "bucket": "completed",
       "sub": "no-device-surface"
     },
     "MAZER-GOV-010": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-PWA-006": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-037": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-PERF-009": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-PERF-010": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-039": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-039": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-040": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-038": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-043": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-024": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-025": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-026": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-040": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-041": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-041": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-ACCT-042": {
       "bucket": "in-review",
       "sub": null
     },
     "MAZER-PWA-007": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-042": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-027": {
       "bucket": "unclassified",
       "sub": null
     },
     "MAZER-UI-028": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-UI-029": {
       "bucket": "unclassified",
       "sub": null
     },
     "MAZER-FLOW-016": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-AUDIO-003": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-030": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-043": {
       "bucket": "in-review",
       "sub": null
     },
     "MAZER-FLOW-017": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-GOV-011": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-MOTION-011": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-031": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-032": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-QA-009": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-GOV-013": {
       "bucket": "unclassified",
       "sub": null
     },
     "MAZER-UI-033": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-044": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-DEBT-001": {
       "bucket": "deferred",
       "sub": null
     },
     "MAZER-DEBT-002": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-UI-034": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-035": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-QA-010": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-UI-036": {
       "bucket": "unclassified",
       "sub": null
     },
     "MAZER-GOV-014": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-QA-011": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-PERF-011": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-MOTION-020": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-050": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-051": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-052": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-050": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-GEN-020": {
       "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-053": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "device"
     },
     "MAZER-PROG-021": {
       "bucket": "in-review",
@@ -4365,24 +4574,24 @@
       "sub": "headless"
     },
     "MAZER-VIS-055": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-UI-056": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-AUDIO-004": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-VIS-056": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "device"
     },
     "MAZER-FLOW-018": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "device"
     },
     "MAZER-HAZ-009": {
       "bucket": "in-review",
@@ -4461,12 +4670,12 @@
       "sub": null
     },
     "MAZER-QA-012": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-DOCS-002": {
-      "bucket": "unclassified",
-      "sub": null
+      "bucket": "completed",
+      "sub": "no-device-surface"
     },
     "MAZER-ECON-004": {
       "bucket": "unclassified",
