@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { MenuScene } from '../../src/scenes/MenuScene';
-import { createLegacyGuestAuthSnapshot } from '../../src/legacy-runtime/legacyAuth';
+import { createLegacyAuthScopedStorage, createLegacyGuestAuthSnapshot } from '../../src/legacy-runtime/legacyAuth';
 import {
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
@@ -12,6 +12,7 @@ import {
 } from '../../src/legacy-runtime/legacyMenuDemoTrack';
 import {
   createEmptyLegacyProgressionState,
+  LEGACY_PROGRESSION_STORAGE_KEY,
   resolveLegacyProgressionLevel,
   type LegacyProgressionState,
   type LegacyProgressionTrack
@@ -303,5 +304,88 @@ describe('menu demo uses the independent ai-runner track (MAZER-FLOW-007)', () =
     scene.progressionState = createEmptyLegacyProgressionState();
     expect(resolveLegacyGenerationTrack(scene.progressionState, 'menu').level).toBe('1');
     expect(scene.resolveLegacyMazeGenerationProfileForMode('menu')).toMatchObject({ layout: 'corridor' });
+  });
+});
+
+// L4 (2026-11-19): signed in, the demo follows the player's level for the session only.
+describe('signed-in menu demo follows the player level for the session (L4)', () => {
+  const USER_ID = 'menu-demo-session-user';
+
+  const persisted = (playerLevel: number, aiLevel: number): LegacyProgressionState => {
+    const base = createEmptyLegacyProgressionState();
+    return {
+      ...base,
+      tracks: {
+        player: withTrackLevel(base.tracks.player, playerLevel),
+        'ai-runner': withTrackLevel(base.tracks['ai-runner'], aiLevel)
+      }
+    };
+  };
+
+  const bootScene = (storage: MemoryStorage, signedIn: boolean): MenuDemoSceneHarness & Record<string, unknown> => {
+    const scene = createScene() as MenuDemoSceneHarness & Record<string, unknown>;
+    scene.authSnapshot = signedIn
+      ? { ...createLegacyGuestAuthSnapshot(), status: 'authenticated', userId: USER_ID }
+      : createLegacyGuestAuthSnapshot();
+    scene.levelPreviewLevel = null;
+    scene.menuDemoSession = null;
+    scene.resolveBrowserLocalStorage = () => storage;
+    for (const name of ['loadPersistedLegacyProgressionState', 'applyLegacyMenuDemoSessionTo', 'resolveLegacyProgressionStorage']) {
+      scene[name] = (...args: never[]) => proto[name]!.call(scene, ...args);
+    }
+    (scene.loadPersistedLegacyProgressionState as () => void)();
+    return scene;
+  };
+
+  const scopedStorage = (storage: MemoryStorage, userId: string | null) => (
+    createLegacyAuthScopedStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY, { userId })!
+  );
+  const readStored = (storage: MemoryStorage, userId: string | null): LegacyProgressionState => (
+    JSON.parse(scopedStorage(storage, userId).getItem(LEGACY_PROGRESSION_STORAGE_KEY)!) as LegacyProgressionState
+  );
+
+  test('starts on the player level, climbs in memory, never writes, and resets on the next open', () => {
+    const storage = new MemoryStorage();
+    scopedStorage(storage, USER_ID).setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(persisted(6, 30)));
+    const scene = bootScene(storage, true);
+    vi.useFakeTimers();
+    try {
+      expect(scene.progressionState.tracks['ai-runner'].level).toBe('6');
+      expect(scene.resolveLegacyTargetComplexityForMode('menu')).toBe(scene.progressionState.tracks.player.targetComplexity);
+
+      generateMenuMaze(scene);
+      completeMenuDemoCycle(scene, 0);
+      expect(scene.progressionState.tracks['ai-runner'].level).toBe('7');
+      expect(scene.progressionState.tracks.player.level).toBe('6');
+      expect((scene.menuDemoSession as { track: LegacyProgressionTrack }).track.level).toBe('7');
+
+      // Nothing about the demo reached storage, and nothing was queued for the account.
+      const stored = readStored(storage, USER_ID);
+      expect(stored.tracks['ai-runner'].level).toBe('30');
+      expect(stored.tracks.player.level).toBe('6');
+      expect([...storage.values.keys()].some((key) => key.includes('remote-completion-outbox'))).toBe(false);
+
+      // Next open: the demo is back on the player's level.
+      expect(bootScene(storage, true).progressionState.tracks['ai-runner'].level).toBe('6');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('signed out keeps today\'s persisted, climbing demo', () => {
+    const storage = new MemoryStorage();
+    scopedStorage(storage, null).setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(persisted(6, 30)));
+    const scene = bootScene(storage, false);
+    vi.useFakeTimers();
+    try {
+      expect(scene.menuDemoSession).toBeNull();
+      expect(scene.progressionState.tracks['ai-runner'].level).toBe('30');
+      generateMenuMaze(scene);
+      completeMenuDemoCycle(scene, 0);
+      expect(scene.progressionState.tracks['ai-runner'].level).toBe('31');
+      expect(readStored(storage, null).tracks['ai-runner'].level).toBe('31');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
