@@ -44,12 +44,36 @@ Conclusions:
 4. Gate-ready: `BleedPath.gated` plus `isBleedPathAvailable(path, triggeredKeys)`; `auditBleedPaths` and the
    search take the triggered set, so a gated path is unavailable until lit. No gate tile is built (L10).
 
-## Not switched on
+## Switched on: ladder default (L8b, 2026-11-19)
 
-`bleedPlacement: 'least-saving'` is NOT the ladder default: enabling it changes every wrapped ladder maze
-and re-pins the golden fingerprints (`legacy-progression-ladder`, hazard flag parity, felt-tuner wrap
-pricing) and shifts which levels land in their felt window. Recommended follow-up: flip it on as one ladder
-re-baseline with an owner look at a few levels on a phone.
+Owner pick (2026-11-19): `bleedPlacement: 'least-saving'` is now part of the budget-ladder base profile
+(`legacyGeometryBudget.ts`, `BASE_PROFILE`), so every ladder level picks its wrap line by trial. The menu demo
+keeps the old seeded pick (its levels 10-13 borrow the ladder profile and drop the key; levels 14+ use the band
+profile, which never had it), and the band/default profiles are unchanged (MAZER-VIS-052).
+
+Before / after, measured with `npx vite-node scripts/analysis/measure-bleed-paths.ts <seeds> seeded|shipped <levels>`
+(`seeded` forces the old carve-cost pick, `shipped` is the new default), both frozen boards:
+
+| Sample | Mean route left (all wraps open / no wrap) | Mazes whose route drops under 50% | Off the felt window | Build ms mean (max) |
+|---|---|---|---|---|
+| Levels 10-120 step 10, 20 seeds (480 mazes), before | 71% | 115 | 0 | 80 (394) |
+| same, after | 87% | 3 | 0 | 30 (199) |
+| Every level 10-139, 6 seeds (1560 mazes), before | 73% | 345 | 0 | 58 (301) |
+| same, after | 88% | 13 | 0 | 54 (328) |
+
+Per band (20 seeds, phone / desktop mean route left, before -> after): L10 70/88 -> 95/91, L30 58/58 -> 89/87,
+L50 69/59 -> 85/82, L70 72/61 -> 80/82, L100 76/69 -> 90/89, L120 76/88 -> 91/91. Build time is wall clock on a
+dev machine and noisy (a second 20-seed run gave 52 -> 23 ms mean); it did not rise in any run (cause not profiled; plausibly fewer base candidates rejected by the tuner).
+
+What remains: a required axis always keeps its least harmful line, so a few mazes (13 of 1560) still lose
+more than half of the route to a wrap (worst 30%, level 71 desktop) when no line on that axis is modest. The
+L10 gate tile can hide those; a later pass could also re-roll the base when the best line saves over 50%.
+
+Re-pinned deliberately: the ladder golden fingerprints (`tests/fixtures/progression-ladder-golden.v1.json`,
+also read by the hazard flag parity test): 111 phone and 102 desktop levels moved, all inside the wrapped band
+10-133; levels 1-9 and 134-300 are byte-identical. The gameplay profile sha256 in `legacy-menu-demo-bleed`
+(the 47 ladder profiles gain the one key; without it they hash to the old pin). The wrap-pricing tuner test
+allows one of its eight new bases to miss the window (the generator walks on to the next base for those).
 
 ## Bleed gates (L10, Gate D "Pulse ring")
 
@@ -64,8 +88,11 @@ the ring then lights (0.6 s), and the path draws in on the pulse (1.6 s; instant
   least `max(8, 15% of the hidden route)` walking steps from the path's mouths (never adjacent), off every
   shortest route (with the path hidden and with it open), and walking to it first must still beat ignoring
   it. Dead ends are preferred. A level that asks but has no such tile carries no gate.
-- Golden seeds (seed 20261106 + level): gated phone levels include 24, 28, 31, 32, 36, 42, 46, 48; desktop
-  22, 28, 29, 31, 34, 36, 42, 46. Live games use their own seeds, so a given level may or may not be gated.
+- Golden seeds (seed 20261106 + level): gated phone levels include 28, 31, 32, 34, 36, 42, 46, 56; desktop
+  22, 24, 28, 31, 32, 34, 42, 46. Live games use their own seeds, so a given level may or may not be gated.
+  With least-saving placement (L8b) fewer asking levels find a gate tile: over levels 20-139 (69 ask) the
+  golden seeds gate 35 phone / 37 desktop mazes, down from 46 / 45 with the old pick (a modest wrap rarely
+  makes the detour to a far gate worth it). Cadence (which levels ask) is unchanged.
 - Determinism: gates are a post-pass on the finished maze (`legacyGenerationLifecycle.ts`); the grid, start,
   goal and solution path are untouched, so the ladder golden fingerprints do not move.
 - Runtime (`legacyBleedGateState.ts`): lit state is per attempt (reset on restart), keyed by the maze's gates
