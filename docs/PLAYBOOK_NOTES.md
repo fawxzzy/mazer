@@ -458,3 +458,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: The menu backdrop no longer fills the whole canvas with a Graphics rect each redraw; the camera background colour carries the field colour, and the star redraw cadence is halved (`ambientUpdateIntervalMs.full` 16 -> 33 ms).
 - WHY it changed: On a phone-sized canvas at DPR 3 the full-screen fill was the dominant menu frame cost; headless frame time dropped from about 34 ms to 22-27 ms at 4x CPU throttle.
 - Status: headless only (tsc clean; full suite 3855 pass, 1 unrelated existing SQL-rollback test failure on origin/main); no phone check yet.
+## 2026-11-18 L2 menu cleanup
+
+- WHAT changed: removed the menu LEVEL line, the leaderboard "You" labels and self-row edit-username chip/hit target, and the between-levels completed-time display (legacyCompletionTime.ts deleted; time capture, storage and leaderboard submission untouched). Level announcer fade is now 900 ms in / 1200 ms out with smootherstep (new src/render/levelAnnouncerFade.ts, used by introTimeline.ts); reduced motion unchanged.
+- WHY it changed: owner-requested cleanup of redundant text and a gentler announcer fade; renames belong to the account screen.
+- Status: headless (tsc, full vitest, 390x844 emulated screenshots of menu and leaderboard); nothing checked on a real phone.
