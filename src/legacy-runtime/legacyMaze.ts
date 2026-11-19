@@ -1,3 +1,12 @@
+import {
+  BLEED_DEFAULT_MAX_SINGLE_SAVING_RATIO,
+  BLEED_DEFAULT_MIN_ROUTE_RATIO,
+  BLEED_TARGET_SAVING_RATIO,
+  DEFAULT_MIN_SEPARATION,
+  enforceBleedPathLimits,
+  measureBleedShortestSteps,
+  resolveBleedAxisCap
+} from './legacyBleedPaths';
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL } from './legacyGeometryBudget';
 import { fillFloorIslands } from './legacyMazeIslands';
@@ -89,6 +98,9 @@ export interface LegacyMazeGenerationProfile {
   // starts it in one end band of the board's long axis, so the longest-path tip it ends on is far away. Ignored
   // when journeyLegs is set (the journey plan then owns the start too).
   journeyStart?: boolean;
+  // MAZER-L8: 'least-saving' picks each mandatory bleed-off line by trial (the line whose wrap saves a
+  // modest share of the shortest route) instead of the carve-cost pick. Absent keeps the seeded pick exactly.
+  bleedPlacement?: 'least-saving';
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -370,6 +382,7 @@ export const normalizeLegacyMazeGenerationProfile = (
       : {}
   ),
   ...(profile?.journeyStart === true ? { journeyStart: true } : {}),
+  ...(profile?.bleedPlacement === 'least-saving' ? { bleedPlacement: 'least-saving' as const } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
@@ -1924,12 +1937,62 @@ const carveLegacyBorderSpoke = (
   }
 };
 
+interface LegacyBleedPlacementContext {
+  start: LegacyPoint;
+  goal: LegacyPoint;
+}
+
+// MAZER-L8 earlier placement: try each open candidate line on a copy of the grid, carve the same spokes the
+// real pass would, and keep the line whose wrap saves closest to BLEED_TARGET_SAVING_RATIO of the route: a
+// real but modest shortcut (ties: the seeded pick, then lower line).
+const resolveLeastSavingBleedLine = (
+  grid: boolean[][],
+  axis: LegacyOppositeBorderAxis,
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  seededLine: number
+): number => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const axisLength = axis === 'horizontal' ? height : width;
+  let bestLine = seededLine;
+  let bestMiss = Number.POSITIVE_INFINITY;
+  for (let line = 1; line < axisLength - 1; line += 1) {
+    if (isLegacyBorderFeederLineReserved(axisLength, line) || resolveLegacyMandatoryBorderLineOpenBlockHazards(grid, axis, line) > 0) {
+      continue;
+    }
+    const trial = grid.map((row) => [...row]);
+    const sink: LegacyPoint[] = [];
+    const seenTrial = new Set<string>();
+    if (axis === 'horizontal') {
+      carveLegacyBorderSpoke(trial, { x: 0, y: line }, { x: 1, y: 0 }, sink, seenTrial);
+      carveLegacyBorderSpoke(trial, { x: width - 1, y: line }, { x: -1, y: 0 }, sink, seenTrial);
+    } else {
+      carveLegacyBorderSpoke(trial, { x: line, y: 0 }, { x: 0, y: 1 }, sink, seenTrial);
+      carveLegacyBorderSpoke(trial, { x: line, y: height - 1 }, { x: 0, y: -1 }, sink, seenTrial);
+    }
+    const steps = measureBleedShortestSteps(trial, start, goal);
+    const trialDirect = measureBleedShortestSteps(trial, start, goal, new Set([`${axis}:${line}`]));
+    if (steps === null || trialDirect === null) {
+      continue;
+    }
+    const saving = Math.max(0, trialDirect - steps);
+    const miss = Math.abs((saving / Math.max(1, trialDirect)) - BLEED_TARGET_SAVING_RATIO);
+    if (miss < bestMiss || (miss === bestMiss && line === seededLine)) {
+      bestMiss = miss;
+      bestLine = line;
+    }
+  }
+  return bestLine;
+};
+
 const applyLegacyMandatoryOppositeBorderAxisConnection = (
   grid: boolean[][],
   axis: LegacyOppositeBorderAxis,
   seed: number,
   createdTiles: LegacyPoint[],
-  seen: Set<string>
+  seen: Set<string>,
+  placement?: LegacyBleedPlacementContext
 ): void => {
   if (hasLegacyOppositeBorderAxisConnection(grid, axis)) {
     return;
@@ -1937,7 +2000,9 @@ const applyLegacyMandatoryOppositeBorderAxisConnection = (
 
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
-  const line = resolveLegacyMandatoryBorderLine(grid, axis, seed);
+  const line = placement
+    ? resolveLeastSavingBleedLine(grid, axis, placement.start, placement.goal, resolveLegacyMandatoryBorderLine(grid, axis, seed))
+    : resolveLegacyMandatoryBorderLine(grid, axis, seed);
   if (axis === 'horizontal') {
     carveLegacyBorderSpoke(grid, { x: 0, y: line }, { x: 1, y: 0 }, createdTiles, seen);
     carveLegacyBorderSpoke(grid, { x: width - 1, y: line }, { x: -1, y: 0 }, createdTiles, seen);
@@ -1951,16 +2016,17 @@ const applyLegacyMandatoryOppositeBorderAxisConnection = (
 const applyLegacyMandatoryOppositeBorderConnections = (
   grid: boolean[][],
   seed: number,
-  requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections']
+  requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections'],
+  placement?: LegacyBleedPlacementContext
 ): LegacyPoint[] => {
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
 
   if (requiredConnections.horizontal) {
-    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'horizontal', seed ^ 0x2c1b3c6d, createdTiles, seen);
+    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'horizontal', seed ^ 0x2c1b3c6d, createdTiles, seen, placement);
   }
   if (requiredConnections.vertical) {
-    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'vertical', seed ^ 0x7f4a7c15, createdTiles, seen);
+    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'vertical', seed ^ 0x7f4a7c15, createdTiles, seen, placement);
   }
 
   return createdTiles;
@@ -3155,7 +3221,12 @@ export const createLegacyMaze = (
         vertical: profile.requiredOppositeBorderConnections.vertical
       }
     : profile.requiredOppositeBorderConnections;
-  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed, feederPairingConnections);
+  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(
+    grid,
+    seed,
+    feederPairingConnections,
+    profile.bleedPlacement === 'least-saving' ? { start, goal } : undefined
+  );
   const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(
     grid,
     seed,
@@ -3164,6 +3235,22 @@ export const createLegacyMaze = (
   );
   const borderWrapTiles = applyLegacyOppositeBorderConnections(grid, profile.requiredOppositeBorderConnections);
   normalizeLegacyAdjacentBorderOpenings(grid, seed ^ 0x4cf5ad43);
+  // MAZER-L8: cap bleed-off paths per axis, keep two on one axis far apart, and reject any that cuts the
+  // route below the floor (a required axis always keeps its least harmful path).
+  // Gameplay profiles only (the budget ladder, or a profile that opts in with bleedPlacement): the main-menu
+  // demo and the default profile show many openings by design (MAZER-VIS-052) and keep their old output.
+  const bleedLimitClosedTiles = (profile.geometryBudgetLevel !== undefined || profile.bleedPlacement !== undefined)
+    ? enforceBleedPathLimits(grid, start, goal, {
+    capPerAxis: {
+      horizontal: resolveBleedAxisCap(normalizedHeight, profile.borderFeederTargetPerSide),
+      vertical: resolveBleedAxisCap(normalizedWidth, profile.borderFeederTargetPerSide)
+    },
+    requiredAxes: profile.requiredOppositeBorderConnections,
+    minRouteRatio: BLEED_DEFAULT_MIN_ROUTE_RATIO,
+    maxSingleSavingRatio: BLEED_DEFAULT_MAX_SINGLE_SAVING_RATIO,
+    minSeparation: DEFAULT_MIN_SEPARATION
+  }).clearedTiles
+    : [];
   normalizeLegacyOpenTwoByTwoFloorBlocks(
     grid,
     start,
@@ -3225,7 +3312,7 @@ export const createLegacyMaze = (
     wrapTopologyDiagnostics,
     generationBuildTrace: {
       ...generationBuildTrace,
-      deadEndPrunedTiles: deadEndPruneTiles.map(clonePoint),
+      deadEndPrunedTiles: [...deadEndPruneTiles, ...bleedLimitClosedTiles].map(clonePoint),
       finalGoal: clonePoint(goal),
       reinforcementShortcutTiles: [
         ...reinforcementStats.createdTiles,
