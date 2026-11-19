@@ -12755,6 +12755,10 @@ export class MenuScene extends Phaser.Scene {
       'primary'
     ));
 
+    if (plan.modeTabs !== null) {
+      this.paintLegacyLeaderboardModeTabs(plan.modeTabs);
+    }
+
     const list = plan.list;
     const scrollMetrics = this.applyLegacySheetScroll(
       list?.railViewport ?? plan.card,
@@ -12777,6 +12781,19 @@ export class MenuScene extends Phaser.Scene {
     }
     if (plan.stateBlock !== null) {
       this.paintLegacyLeaderboardState(plan.stateBlock);
+    }
+  }
+
+  // Per-mode tab strip (lane L11): display-only chips, one per registered mode (Endless today).
+  private paintLegacyLeaderboardModeTabs(tabs: NonNullable<LegacyLeaderboardOverlayPlan['modeTabs']>): void {
+    const material = cyberArcadeMaterial;
+    for (const tab of tabs) {
+      const color = tab.selected ? material.rail.mint : material.rail.muted;
+      this.overlayGraphics.fillStyle(color, tab.selected ? 0.14 : 0.06);
+      this.overlayGraphics.fillRoundedRect(tab.left, tab.top, tab.width, tab.height, tab.height / 2);
+      this.overlayGraphics.lineStyle(1, color, tab.selected ? 0.7 : 0.3);
+      this.overlayGraphics.strokeRoundedRect(tab.left + 0.5, tab.top + 0.5, tab.width - 1, tab.height - 1, (tab.height - 1) / 2);
+      this.addLegacyLeaderboardText(tab.left + (tab.width / 2), tab.top + (tab.height / 2), tab.label, color, 13, 0.5, tab.width - 8, { bold: tab.selected });
     }
   }
 
