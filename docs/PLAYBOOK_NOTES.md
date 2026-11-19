@@ -508,3 +508,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: docs/architecture/MAZER-CONTROLS-REWORK-PRODUCT-CONTRACT.md (audit of touch, keyboard, speed and haptics with source numbers, plus what controls must do on a phone) and docs/ops/MAZER-CONTROLS-OPTIONS-2026-11-19.html (one standalone page, five labelled feel options A to E on a tiny test maze with tunable numbers). No src change.
 - WHY it changed: the owner un-parked the controls card on 2026-11-19; the card order is audit, then a proposal the owner picks from, then a build. Main finding: the touch stick repeats at 113 ms while keyboard repeats at 139 ms at the default Move Speed, and below about 45% Move Speed the stick ignores the slider.
 - Status: headless only (page driven with synthetic pointer events in Chromium 390x844, all five options step, tap-step works, no console errors); the audit numbers are read from source, not measured; nothing checked on a real phone.
+## 2026-11-19 Work report counts archived cards
+- WHAT changed: scripts/analysis/work-report.mjs treats an archived card like a completed one (keeps its evidence tier) instead of falling through to the ledger buckets; regenerated docs/ops/MAZER-WORK-REPORT.md and .json.
+- WHY it changed: the 2026-11-19 board fold archived 40 completed cards; the report had no archived branch, so archived cards left the shipped list and one reappeared as an owner decision with no ask, failing tests/reset/work-report.test.ts on main.
+- Status: work-report tests 7/7 pass; check passes.
