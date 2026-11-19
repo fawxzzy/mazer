@@ -95,6 +95,14 @@ describe('frame rate cap (MAZER-PERF)', () => {
     expect(ran).toBeLessThanOrEqual(14);
   });
 
+  it('always runs a re-render of the same instant (zero delta) without consuming a grid slot', () => {
+    const gate = createFrameRateGate(60);
+    expect(gate.offer(1000, 16.67)).toBe(16.67);
+    expect(gate.offer(1000, 0)).toBe(0);
+    expect(gate.offer(1000, 0)).toBe(0);
+    expect(gate.offer(1016.67, 16.67)).toBeCloseTo(16.67, 6);
+  });
+
   it('is a pass-through for a non-positive cap or a bad clock', () => {
     const off = createFrameRateGate(0);
     expect(off.offer(0, 8)).toBe(8);

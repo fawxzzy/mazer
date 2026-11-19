@@ -12,6 +12,8 @@
  * below half. Skipped frames' time is handed to the next run frame, so Phaser's clock (delayed calls, tweens) keeps true
  * time: only the number of updates and renders per second changes, never the game's speed.
  *
+ * A call whose timestamp has not advanced (a harness re-rendering the same instant) always runs, with a zero delta.
+ *
  * Pure: no Phaser, no DOM, no wall clock.
  */
 import type Phaser from 'phaser';
@@ -31,6 +33,11 @@ export const createFrameRateGate = (maxFps: number = FRAME_RATE_CAP_FPS): FrameR
   let pendingDeltaMs = 0;
   return {
     offer(timeMs, deltaMs) {
+      if (interval > 0 && lastTimeMs !== null && Number.isFinite(timeMs) && timeMs <= lastTimeMs) {
+        // The clock did not advance (a real display never repeats a timestamp; test and capture harnesses re-render the
+        // same instant with a zero delta). Run it: it adds no game time and must not consume a grid slot.
+        return 0;
+      }
       const safeDelta = Number.isFinite(deltaMs) && deltaMs > 0 ? deltaMs : 0;
       pendingDeltaMs += safeDelta;
       if (interval === 0 || !Number.isFinite(timeMs)) {
