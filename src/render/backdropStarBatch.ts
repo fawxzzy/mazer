@@ -81,6 +81,7 @@ export class BackdropStarDrawList {
 }
 
 const styleCache = new Map<number, string>();
+const PACKED_RGB_RANGE = 1 << 24;
 
 /** `#rrggbb` for a packed 0xRRGGBB colour, cached (no allocation after the first time a colour is seen). */
 export const resolveBackdropStarFillStyle = (color: number): string => {
@@ -89,7 +90,8 @@ export const resolveBackdropStarFillStyle = (color: number): string => {
     if (styleCache.size >= BACKDROP_STAR_STYLE_CACHE_LIMIT) {
       styleCache.clear();
     }
-    style = `#${((color & 0xffffff) | 0x1000000).toString(16).slice(1)}`;
+    // Packed 24-bit RGB plus a leading 1 bit, so toString(16) always gives 7 digits; drop the 1 for zero padding.
+    style = `#${((color & (PACKED_RGB_RANGE - 1)) | PACKED_RGB_RANGE).toString(16).slice(1)}`;
     styleCache.set(color, style);
   }
   return style;
