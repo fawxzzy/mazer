@@ -775,7 +775,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars(createBackdropStarRandom()).slice(0, LEGACY_MENU_STAR_COUNT);');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
     expect(menuSceneSource).toContain('if (this.stars.length === 0 || !resolveBackdropMotion(this.prefersLegacyReducedMotion())) {');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor, 1);');
+    expect(menuSceneSource).toContain('const fieldColor = this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor;');
     expect(menuSceneSource).toContain('animatedBackdropEnabled: resolveBackdropMotion(this.prefersLegacyReducedMotion())');
     expect(menuSceneSource).toContain('backdropDirty: this.backdropDirty');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');

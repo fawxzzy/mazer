@@ -49,7 +49,7 @@ describe('legacyTuning has no dead values (MAZER-MOTION-010)', () => {
   });
 
   test('the values that are read keep their shipped numbers', () => {
-    expect(legacyTuning.menu.runtime.ambientUpdateIntervalMs).toEqual({ full: 16, throttled: 100, hidden: 1000 });
+    expect(legacyTuning.menu.runtime.ambientUpdateIntervalMs).toEqual({ full: 33, throttled: 100, hidden: 1000 });
     expect(legacyTuning.menu.runtime.diagnosticsPublishIntervalMs).toBe(1500);
     expect(legacyTuning.menu.layout.narrowBreakpoint).toBe(620);
     expect(legacyTuning.menu.intentFeed.holdDurationMs).toBe(2600);

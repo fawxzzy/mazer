@@ -231,7 +231,10 @@ export const legacyTuning = {
       // second), which on a phone that counts as low power (4 or fewer cores, or Save-Data) made every star hop
       // four times a second instead of drifting; 100 ms (10 a second) keeps most of the saving and reads as motion.
       ambientUpdateIntervalMs: {
-        full: 16,
+        // MAZER-PERF-010: ~30 Hz, not 16 ms. The starfield replays ~4.7k Graphics commands per redraw, the largest remaining
+        // per-frame menu cost; stars drift slowly and twinkle off the scene clock, so 30 Hz still reads as continuous motion
+        // (the 83 ms / 12 fps value described above is the one that looked choppy) and the redraw cost halves.
+        full: 33,
         throttled: 100,
         hidden: 1000
       },

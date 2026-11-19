@@ -73,8 +73,17 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
         return args[0];
       }
     });
+    const cameraBackgrounds: number[] = [];
+    const mainCamera = {
+      backgroundColor: { color: -1, alpha: 0 },
+      setBackgroundColor: (color: number) => {
+        cameraBackgrounds.push(color);
+        mainCamera.backgroundColor = { color, alpha: 255 };
+      }
+    };
     const fakeScene = {
       layout: { width: 390, height: 844 },
+      cameras: { main: mainCamera },
       backdropGraphics: graphics,
       settings: { darkMode: true, toggleAnimatedBackdrop: motion },
       prefersLegacyReducedMotion: () => false,
@@ -85,10 +94,15 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
 
     (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
 
-    const allowed = new Set(['clear', 'fillStyle', 'fillRect', 'fillCircle']);
+    const allowed = new Set(['clear', 'fillStyle', 'fillCircle']);
     expect(calls.filter((name) => !allowed.has(name))).toEqual([]);
-    // One field rect only: no tail pixels, no shard/rune/sigil strokes (those were lineStyle + paths).
-    expect(calls.filter((name) => name === 'fillRect')).toHaveLength(1);
+    // MAZER-PERF-010: no full-screen Graphics rect (it was ~40% of a menu frame); the opaque field is the camera
+    // background, set once. No tail pixels, no shard/rune/sigil strokes (those were lineStyle + paths).
+    expect(calls).not.toContain('fillRect');
+    expect(cameraBackgrounds).toHaveLength(1);
+    // A second draw with the same field colour must not touch the camera again.
+    (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
+    expect(cameraBackgrounds).toHaveLength(1);
     expect(calls.filter((name) => name === 'fillCircle').length).toBeGreaterThanOrEqual(fakeScene.stars.length);
     expect(fakeScene.backdropDirty).toBe(false);
   });
