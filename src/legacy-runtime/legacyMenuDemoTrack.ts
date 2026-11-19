@@ -39,23 +39,34 @@ export const resolveLegacyGenerationTrack = (
 export const seedLegacyMenuDemoTrackFromPlayer = <T extends Pick<LegacyProgressionState, 'tracks'>>(
   state: T
 ): T => {
-  const player = state.tracks.player;
   const ai = state.tracks['ai-runner'];
-  if (ai.targetComplexity >= player.targetComplexity) {
+  const lifted = liftLegacyMenuDemoTrackToPlayer(ai, state.tracks.player);
+  if (lifted === ai) {
     return state;
   }
   return {
     ...state,
     tracks: {
       ...state.tracks,
-      'ai-runner': {
-        ...ai,
-        colorTier: player.colorTier,
-        level: player.level,
-        peakComplexity: Math.max(ai.peakComplexity, player.targetComplexity),
-        rank: player.rank,
-        targetComplexity: player.targetComplexity
-      }
+      'ai-runner': lifted
     }
+  };
+};
+
+/** Track-level lift behind seedLegacyMenuDemoTrackFromPlayer; returns the same track when it is at or above the player. */
+export const liftLegacyMenuDemoTrackToPlayer = (
+  ai: LegacyProgressionTrack,
+  player: LegacyProgressionTrack
+): LegacyProgressionTrack => {
+  if (ai.targetComplexity >= player.targetComplexity) {
+    return ai;
+  }
+  return {
+    ...ai,
+    colorTier: player.colorTier,
+    level: player.level,
+    peakComplexity: Math.max(ai.peakComplexity, player.targetComplexity),
+    rank: player.rank,
+    targetComplexity: player.targetComplexity
   };
 };
