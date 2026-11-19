@@ -103,7 +103,9 @@ const measure = (cells: boolean[][], tileSize: number, dpr: number, cell: BoardC
   marked.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawBoardMarkers(marked, {
     style: 'chip', tileSize, devicePixelRatio: dpr, originX: layout.originX, originY: layout.originY,
-    start: cell, startTile: tile, startSpiralRotation: direction
+    start: cell, startTile: tile, startSpiralRotation: direction,
+    // The pre-L5 two-arm spiral (a retired skin, still drawable); the L5 Seed spiral is pinned in endpointTileSkins.test.ts.
+    startTileSkin: 'pinwheel'
   });
   let n = 0;
   let sx = 0;
