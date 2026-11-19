@@ -26,7 +26,8 @@
  */
 import { BOARD_TILE_GEOMETRY, boardMaterial, clampBoardDevicePixelRatio, snapLineWidth } from './boardTileStyle';
 import { PLAYER_LOCATOR, resolvePingRingProgress, resolvePlayerLocatorMetrics } from './playerLocator';
-import { PALETTE_WHITE, mixPaletteRgb, sampleIridescentTrail, type IridescentTrailSample, type TrailPaletteHeadSample } from './trailPalette';
+import { samplePlayerColour } from './playerColour';
+import { PALETTE_WHITE, mixPaletteRgb, type IridescentTrailSample, type TrailPaletteHeadSample } from './trailPalette';
 import type { StartDirection } from './startDirection';
 
 export const SPARK_PLAYER = Object.freeze({
@@ -157,8 +158,8 @@ export const resolveSparkMaterial = (
   const distance = Number.isFinite(head?.distanceTiles) ? (head?.distanceTiles ?? 0) : 0;
   const time = Number.isFinite(head?.timeMs) ? (head?.timeMs ?? timeMs) : timeMs;
   const stopped = reducedMotion || head?.animated === false;
-  const front = sampleIridescentTrail(distance, time, stopped, SAMPLE_HEAD);
-  const rear = sampleIridescentTrail(distance - SPARK_PLAYER.rearSampleTiles, time, stopped, SAMPLE_REAR);
+  const front = samplePlayerColour(distance, time, stopped, SAMPLE_HEAD);
+  const rear = samplePlayerColour(distance - SPARK_PLAYER.rearSampleTiles, time, stopped, SAMPLE_REAR);
   out.core = front.core;
   out.glow = front.glow;
   out.catchlight = mixPaletteRgb(front.core, PALETTE_WHITE, SPARK_PLAYER.catchlightLift);
