@@ -692,6 +692,7 @@ import {
   scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
 import { resolveDriftCorrectedRepeatWaitMs } from '../legacy-runtime/legacyRepeatCadence';
+import { resolveHeldStepFreshWaitMs, resolveHeldStepRetargetWaitMs } from '../legacy-runtime/legacyHeldStepCadence';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -1928,6 +1929,9 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchRepeatDueAtMs: number | null = null;
   // When the repeat that is running now was due (see scheduleLegacyPlayHeldTouchRepeat).
   private playHeldTouchRepeatFiredDueAtMs: number | null = null;
+  // When the last accepted play step landed: a fresh step never comes sooner than one interval after it (legacyHeldStepCadence.ts).
+  private lastLegacyPlayStepAtMs: number | null = null;
+  private playKeyboardBufferedVector: { deltaX: number; deltaY: number } | null = null;
   private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
@@ -4976,12 +4980,23 @@ export class MenuScene extends Phaser.Scene {
     if (!wasHeld) {
       this.boardDynamicDirty = true;
     }
-    if (event.repeat) {
+    if (event.repeat && this.resolveLegacyPlayKeyboardStepWaitMs(0) === 0) {
       this.resolveLegacyPlayInputBuffer();
-    } else {
-      this.scheduleLegacyPlayInputBuffer();
+    } else if (!event.repeat || this.playMoveTimer === null) {
+      this.scheduleLegacyPlayInputBuffer(event.repeat ? 0 : LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS);
     }
     return true;
+  }
+
+  // Keyboard steps follow the same constant-speed floor as the stick: a press (a turn while another key is held, or a
+  // fast tap) waits out one repeat interval after the previous step instead of stepping 50 ms after the press.
+  private resolveLegacyPlayKeyboardStepWaitMs(delayMs: number): number {
+    return resolveHeldStepFreshWaitMs(
+      this.time.now,
+      delayMs,
+      this.lastLegacyPlayStepAtMs,
+      this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs
+    );
   }
 
   private handleLegacyPlayMovementKeyUp(event: KeyboardEvent): boolean {
@@ -4993,7 +5008,12 @@ export class MenuScene extends Phaser.Scene {
     event.preventDefault();
     const wasHeld = this.playMoveFlags[direction];
     if (wasHeld && this.playMoveTimer !== null) {
-      this.resolveLegacyPlayInputBuffer();
+      if (this.resolveLegacyPlayKeyboardStepWaitMs(0) === 0) {
+        this.resolveLegacyPlayInputBuffer();
+      } else {
+        // A tap released before its step is allowed: keep the step, it lands when the interval is up.
+        this.playKeyboardBufferedVector ??= resolveLegacyPlayMoveVector(this.playMoveFlags);
+      }
     }
     this.playMoveFlags[direction] = false;
     this.synchronizeLegacyPlayDirectionalIntent();
@@ -5247,7 +5267,7 @@ export class MenuScene extends Phaser.Scene {
         this.playHeldTouchRepeatTimer === null
         && (this.playTouchArrowPointerId === normalizedPointerId || this.playTouchStickPointerId === normalizedPointerId)
       ) {
-        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_STICK_RETARGET_STEP_MS);
+        this.retargetLegacyPlayHeldTouchRepeat();
       }
       return true;
     }
@@ -5274,16 +5294,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
 
     if (options.smoothRetarget) {
-      const currentDueAtMs = this.playHeldTouchRepeatDueAtMs;
-      const rescheduleThresholdMs = LEGACY_PLAY_STICK_RETARGET_STEP_MS
-        + LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS;
-      if (
-        this.playHeldTouchRepeatTimer === null
-        || currentDueAtMs === null
-        || currentDueAtMs - this.time.now > rescheduleThresholdMs
-      ) {
-        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_STICK_RETARGET_STEP_MS);
-      }
+      this.retargetLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return true;
     }
@@ -5346,6 +5357,22 @@ export class MenuScene extends Phaser.Scene {
     const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
 
     return releasedMove || releasedArrow || releasedStick;
+  }
+
+  // A new stick direction: answer within LEGACY_PLAY_STICK_RETARGET_STEP_MS from rest, but never pull the next step in
+  // closer than one repeat interval after the last one (that was the turn/corner speed boost; legacyHeldStepCadence.ts).
+  private retargetLegacyPlayHeldTouchRepeat(): void {
+    const waitMs = resolveHeldStepRetargetWaitMs({
+      nowMs: this.time.now,
+      currentDueAtMs: this.playHeldTouchRepeatTimer === null ? null : this.playHeldTouchRepeatDueAtMs,
+      lastStepAtMs: this.lastLegacyPlayStepAtMs,
+      repeatIntervalMs: this.resolveLegacyPlayHeldTouchDelay('repeat'),
+      retargetLeadMs: LEGACY_PLAY_STICK_RETARGET_STEP_MS,
+      graceMs: LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS
+    });
+    if (waitMs !== null) {
+      this.scheduleLegacyPlayHeldTouchRepeat(waitMs);
+    }
   }
 
   private clearLegacyPlayHeldTouchRepeat(): void {
@@ -5697,9 +5724,9 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private scheduleLegacyPlayInputBuffer(): void {
+  private scheduleLegacyPlayInputBuffer(delayMs: number = LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS): void {
     this.playMoveTimer?.remove(false);
-    this.playMoveTimer = this.time.delayedCall(LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS, () => {
+    this.playMoveTimer = this.time.delayedCall(this.resolveLegacyPlayKeyboardStepWaitMs(delayMs), () => {
       this.playMoveTimer = null;
       this.resolveLegacyPlayInputBuffer();
     });
@@ -5708,6 +5735,7 @@ export class MenuScene extends Phaser.Scene {
   private resetLegacyPlayInputBuffer(): void {
     this.playMoveTimer?.remove(false);
     this.playMoveTimer = null;
+    this.playKeyboardBufferedVector = null;
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
     this.playTouchArrowPointerId = null;
@@ -5721,6 +5749,7 @@ export class MenuScene extends Phaser.Scene {
   private resetLegacyPlayDirectionalInputBuffer(): void {
     this.playMoveTimer?.remove(false);
     this.playMoveTimer = null;
+    this.playKeyboardBufferedVector = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
@@ -5751,7 +5780,9 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayInputBuffer(): void {
     this.playMoveTimer?.remove(false);
     this.playMoveTimer = null;
-    const { deltaX, deltaY } = resolveLegacyPlayMoveVector(this.playMoveFlags);
+    const buffered = this.playKeyboardBufferedVector;
+    this.playKeyboardBufferedVector = null;
+    const { deltaX, deltaY } = buffered ?? resolveLegacyPlayMoveVector(this.playMoveFlags);
     if (deltaX === 0 && deltaY === 0) {
       return;
     }
@@ -7598,6 +7629,7 @@ export class MenuScene extends Phaser.Scene {
     const previousPlayer = copyPoint(this.player);
     this.player = nextStep.player;
     this.markLegacyPlayerLeftStartIfApplicable(this.maze.start);
+    this.lastLegacyPlayStepAtMs = this.time.now;
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
