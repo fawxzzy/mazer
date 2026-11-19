@@ -539,8 +539,8 @@ const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = 
   if (withKites.length === 0) { return { ok: false, problems: [{ why: 'no frame with 8 kites' }] }; }
   if (kind === 'departure') {
     const first = withKites[0];
-    // The first deconstruct frame is at most a frame into the grow (c = 16 ms of a >= 302 ms smoothstep): below 11 px.
-    if (!first.kiteLengths.every((v) => v >= KITE_REST_LENGTH_PX - KITE_LENGTH_TOLERANCE_PX && v <= 11)) { note('does not start at 50%', first.kiteLengths); }
+    // Held full size (edgeRingScaleHold.ts, owner choice 2026-11-19): the first deconstruct frame is already at 100%, no growth.
+    if (!first.kiteLengths.every((v) => approx(v, KITE_FULL_LENGTH_PX))) { note('does not start at 100%', first.kiteLengths); }
     ALL_STATION_IDS.forEach((id) => {
       let previous = 0;
       withKites.forEach((frame) => {
@@ -1006,7 +1006,7 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     const departureEdge = analyzeEdgeContact(departure.filter((f) => f.markerCount === 8 && f.outroAge <= DEPARTURE_BEAM_END_MS));
     check(`${label}: while the diamonds grow 50% to 100% and hold, every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
     const kitesDeparture = analyzeKiteSize(departure, 'departure');
-    check(`${label}: on goal the diamonds grow from 50% to 100%, are full size whenever their beam is attached, and stay full to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
+    check(`${label}: on goal the diamonds are held at 100%, are full size whenever their beam is attached, and stay full to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
     check(
       `${label}: the departure beams fire inside the deconstruct laser window (heads 0-${OUTRO_LASER_END_MS} ms, attached for the ${PULSE_TAIL_MS} ms fill, retracted within ${RETRACT_MS} ms more: <= ${DEPARTURE_BEAM_END_MS} ms, one frame of slack)`,
       d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= DEPARTURE_BEAM_END_MS + FRAME_MS,
