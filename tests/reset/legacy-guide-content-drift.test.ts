@@ -21,6 +21,10 @@ import {
   resolveGeometryBudgetWrapRungs
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
+import { BLEED_GATE_FIRST_LEVEL, isBleedGateLevel } from '../../src/legacy-runtime/legacyBleedGates';
+import { resetLegacyBleedGates, syncLegacyBleedGatePassOver } from '../../src/legacy-runtime/legacyBleedGateState';
+import { GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL as GATE_WRAP_FADE_TO_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
+import * as bleedGateRenderer from '../../src/render/bleedGateRenderer';
 import { legacyLoopPlanSize } from '../../src/legacy-runtime/legacyMazeLoops';
 import {
   incrementLegacyProgressionOrdinal,
@@ -51,12 +55,13 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
   if (module === 'src/render/boardTileBake.ts') return boardTileBake as Record<string, unknown>;
   if (module === 'src/render/edgeMarkers.ts') return edgeMarkers as Record<string, unknown>;
   if (module === 'src/render/playerMarker.ts') return playerMarker as Record<string, unknown>;
+  if (module === 'src/render/bleedGateRenderer.ts') return bleedGateRenderer as Record<string, unknown>;
   return null;
 };
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'levels', 'online', 'sound']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'sound']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -213,6 +218,32 @@ describe('guide copy only names things that exist', () => {
     expect(row('wrap').text).toMatch(/Trail-coloured edge stars fill as beams hit/);
   });
 
+  test('Wrap gate (MAZER-L10): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
+    // "Later mazes": no gate before the first gate level, which sits after the first wrapped levels, and some
+    // levels between it and the end of the wrap fade ask for one.
+    expect(BLEED_GATE_FIRST_LEVEL).toBeGreaterThan(10);
+    for (let level = 1; level < BLEED_GATE_FIRST_LEVEL; level += 1) {
+      expect(isBleedGateLevel(level), String(level)).toBe(false);
+    }
+    const asking = Array.from({ length: GATE_WRAP_FADE_TO_LEVEL - BLEED_GATE_FIRST_LEVEL }, (_, index) => BLEED_GATE_FIRST_LEVEL + index)
+      .filter(isBleedGateLevel);
+    expect(asking.length).toBeGreaterThan(0);
+    // "Hide a wrap ... walk over the ring to open it": the wrap is closed until the gate tile is walked over.
+    const maze = {
+      grid: [[false, false, false, false], [true, true, true, true], [false, true, true, false], [false, false, false, false]],
+      width: 4,
+      height: 4,
+      bleedGates: [{ axis: 'horizontal' as const, line: 1, x: 2, y: 2, pathDistance: 2, ungatedSaving: 2, gatedSaving: 1 }]
+    };
+    expect(resolveLegacyNavigationTarget(maze, { x: 1, y: 1 }, -1, 0)).toBeNull();
+    syncLegacyBleedGatePassOver(maze, { x: 2, y: 2 }, [], 0);
+    expect(resolveLegacyNavigationTarget(maze, { x: 1, y: 1 }, -1, 0)).toEqual({ x: 0, y: 1 });
+    expect(resolveLegacyNavigationTarget(maze, { x: 0, y: 1 }, -1, 0)).toEqual({ x: 3, y: 1 });
+    resetLegacyBleedGates(maze);
+    expect(bleedGateRenderer.drawBleedGatePlan).toBeTypeOf('function');
+    expect(row('bleed-gate').text).toMatch(/dashed ring/);
+  });
+
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {
     // "Some mazes wrap" is a claim about the ladder: wrap corridors from level 10, a seeded
     // share of every level while they fade out, none once the fade is over.
@@ -328,9 +359,9 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, levels and online share a board draw; move and sound are guide-local', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, bleed-gate, levels and online share a board draw; move and sound are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels', 'online']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online']);
     expect(byStatus('guide-local')).toEqual(['move', 'sound']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
@@ -355,7 +386,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'levels', 'online']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
@@ -368,6 +399,8 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(read('src/render/chipTileGraphics.ts')).toContain('computeChipGeometry(');
     // wrap: the perimeter diamond itself.
     expect(icon).toContain('drawEdgeMarker(');
+    // wrap gate: the board's own bleed gate draw (MAZER-L10).
+    expect(icon).toContain('drawBleedGatePlan(graphics, resolveBleedGateDrawPlan({');
     // levels: the dot-matrix wordmark chip renderer, same as the level announcer.
     expect(icon).toContain('this.drawLegacyGlyphWordTileBlock(graphics, layout, 0, 1, 1, false)');
     // online: the Guide icon is a chip-word sample; the counter itself is the web-style dot + text (MAZER-UI-033).

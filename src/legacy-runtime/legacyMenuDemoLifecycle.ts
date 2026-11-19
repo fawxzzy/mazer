@@ -14,6 +14,11 @@ import {
   type LegacyMenuDemoWalkerSkill
 } from './legacyDemoWalker';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
+import {
+  createLegacyMenuDemoEpisodeForMaze,
+  readLegacyMenuDemoTrailPrefix,
+  resolveLegacyMenuDemoNextLeg
+} from './legacyMenuDemoBleedGates';
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
@@ -28,15 +33,27 @@ const buildPathTrail = (
   return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
 };
 
+// episode: leg 2 of a gated run (MAZER-L10) shows the leg-1 trail in front of its own.
 export const resolveLegacyMenuDemoTrail = (
   state: DemoWalkerState,
   width: number,
   toggleTrailFade: boolean,
-  trailFadeTail: number
+  trailFadeTail: number,
+  episode?: MazeEpisode
 ): LegacyPoint[] => buildPathTrail(
-  resolveLegacyTrailFromDemoSteps(state.trailSteps, width),
+  [...readLegacyMenuDemoTrailPrefix(episode), ...resolveLegacyTrailFromDemoSteps(state.trailSteps, width)],
   toggleTrailFade ? trailFadeTail : null
 );
+
+// MAZER-L10: leg 1 of a gated run reached its gate: continue on leg 2 from the gate.
+const switchLegacyMenuDemoLeg = (
+  episode: MazeEpisode,
+  state: DemoWalkerState,
+  config: DemoWalkerConfig
+): { episode: MazeEpisode; state: DemoWalkerState } | null => {
+  const next = resolveLegacyMenuDemoNextLeg(episode, state, resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width));
+  return next ? { episode: next, state: { ...createDemoWalkerState(next, config), cue: 'explore' } } : null;
+};
 
 export const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'source'>): boolean => (
   maze.source === 'menu-snapshot'
@@ -52,6 +69,8 @@ export interface LegacyMenuDemoBootstrap {
 
 export interface LegacyMenuDemoAdvance {
   delayMs: number;
+  // Set when a gated run switched legs this frame (MAZER-L10): the episode to advance from now on.
+  episode?: MazeEpisode;
   player: LegacyPoint;
   shouldRegenerateMaze: boolean;
   state: DemoWalkerState;
@@ -77,7 +96,7 @@ export const createLegacyMenuDemoBootstrap = (
   trailFadeTail: number,
   skill?: LegacyMenuDemoWalkerSkill
 ): LegacyMenuDemoBootstrap => {
-  const episode = createLegacyDemoWalkerEpisode(maze);
+  let episode = isFixedLegacyMenuSnapshot(maze) ? createLegacyDemoWalkerEpisode(maze) : createLegacyMenuDemoEpisodeForMaze(maze);
   const isFixedSnapshot = isFixedLegacyMenuSnapshot(maze);
   const config = isFixedSnapshot
     ? createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)
@@ -124,6 +143,12 @@ export const createLegacyMenuDemoBootstrap = (
       if (advance.shouldRegenerateMaze || state.phase !== 'explore') {
         break;
       }
+      const switched = switchLegacyMenuDemoLeg(episode, advance.state, config);
+      if (switched) {
+        episode = switched.episode;
+        state = switched.state;
+        continue;
+      }
       if (advance.state.phase !== 'explore') {
         break;
       }
@@ -136,7 +161,7 @@ export const createLegacyMenuDemoBootstrap = (
     config,
     state,
     player: resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width),
-    trail: resolveLegacyMenuDemoTrail(state, episode.raster.width, toggleTrailFade, trailFadeTail)
+    trail: resolveLegacyMenuDemoTrail(state, episode.raster.width, toggleTrailFade, trailFadeTail, episode)
   };
 };
 
@@ -148,13 +173,24 @@ export const advanceLegacyMenuDemoFrame = (
   trailFadeTail: number
 ): LegacyMenuDemoAdvance => {
   const advance = advanceDemoWalker(episode, state, config);
+  const switched = switchLegacyMenuDemoLeg(episode, advance.state, config);
+  if (switched) {
+    return {
+      delayMs: advance.delayMs,
+      episode: switched.episode,
+      shouldRegenerateMaze: false,
+      state: switched.state,
+      player: resolveLegacyPointFromDemoIndex(switched.state.currentIndex, switched.episode.raster.width),
+      trail: resolveLegacyMenuDemoTrail(switched.state, switched.episode.raster.width, toggleTrailFade, trailFadeTail, switched.episode)
+    };
+  }
 
   return {
     delayMs: advance.delayMs,
     shouldRegenerateMaze: Boolean(advance.shouldRegenerateMaze),
     state: advance.state,
     player: resolveLegacyPointFromDemoIndex(advance.state.currentIndex, episode.raster.width),
-    trail: resolveLegacyMenuDemoTrail(advance.state, episode.raster.width, toggleTrailFade, trailFadeTail)
+    trail: resolveLegacyMenuDemoTrail(advance.state, episode.raster.width, toggleTrailFade, trailFadeTail, episode)
   };
 };
 
