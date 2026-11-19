@@ -13,8 +13,8 @@
  * START = SEED SPIRAL (default). A one-arm spiral of 26 beads, small and faint at the centre, larger and solid at the
  * rim, that turns clockwise about once per 2.2 s and breathes in and out (its radius swings +-7 %, period 2.1 s). It is
  * deliberately NOT in phase with the end tile (the owner asked for a faster spin, desynced from the end tile). Colour: the
- * start gold (`boardMaterial.start`, #F4C84A), each bead over a one-device-pixel dark keyline disc so it stays crisp on
- * the mid-tone chip.
+ * options-page green (#6DFF7C, `SEED_SPIRAL.color`, skin-local), each bead over a one-device-pixel dark keyline disc so it
+ * stays crisp on the mid-tone chip.
  *
  * END = TWIN STARS (default). A big OUTLINE star turning counter-clockwise (a turn per 5.6 s) and a smaller SOLID star
  * turning clockwise (a turn per 7 s), so the two weave. The solid star is today's end star (red fill, the shared border
@@ -214,6 +214,11 @@ const tracePolygon = (p: EndpointSkinPainter, pts: readonly number[]): void => {
 /* ------------------------------------------------------------------------------------------ */
 
 export const SEED_SPIRAL = Object.freeze({
+  /**
+   * Bead colour, skin-local: the green (#6DFF7C) the owner saw and picked on the options page. It is deliberately NOT
+   * `boardMaterial.start` (the gold the retired pinwheel and other start art still use), so the board palette is untouched.
+   */
+  color: 0x6dff7c,
   beads: 26,
   /** Turns the arm winds from the centre bead to the rim bead. */
   turns: 3.4,
@@ -231,7 +236,7 @@ export const SEED_SPIRAL = Object.freeze({
   alphaGrowth: 0.65,
   /**
    * The alpha is stepped into this many bands (0.35, 0.57, 0.78, 1.0) so the whole spiral is one keyline fill plus one
-   * gold fill per band (5 paint ops, not 27): the beads also grow outward, so the steps do not read as steps.
+   * green fill per band (5 paint ops, not 27): the beads also grow outward, so the steps do not read as steps.
    */
   alphaBands: 4
 });
@@ -321,7 +326,7 @@ export const resolveSeedSpiralBeads = (spec: SeedSpiralSpec, clock: SeedSpiralCl
   return beads;
 };
 
-/** Paints the seed spiral: every bead's keyline disc in one fill, then one gold fill per alpha band (beads are centre first). */
+/** Paints the seed spiral: every bead's keyline disc in one fill, then one green fill per alpha band (beads are centre first). */
 export const drawSeedSpiral = (
   p: EndpointSkinPainter,
   colours: EndpointSkinColours,
@@ -340,7 +345,7 @@ export const drawSeedSpiral = (
   let i = 0;
   while (i < beads.length) {
     const alpha = beads[i]!.alpha;
-    p.fillStyle(cssRgba(colours.start, alpha));
+    p.fillStyle(cssRgba(SEED_SPIRAL.color, alpha));
     p.begin();
     for (; i < beads.length && beads[i]!.alpha === alpha; i += 1) {
       p.circle(beads[i]!.x, beads[i]!.y, beads[i]!.radius);

@@ -35,7 +35,7 @@ import { createRecordingContext } from './support/boardTileFixtures';
 
 /**
  * L5 end-tile skins (endpointTileSkins.ts): Zac's picks (2026-11-19) are the defaults, START = Seed spiral (beaded
- * spiral, breathes as it turns, start gold), END = Twin stars (big outline star + solid star turning opposite ways, a
+ * spiral, breathes as it turns, options-page green #6DFF7C), END = Twin stars (big outline star + solid star turning opposite ways, a
  * five-point star ping). The pre-L5 looks stay drawable as retired skins (their own suites pin them); the other archive
  * designs are registered for a future shop and are neither selectable nor drawable.
  */
@@ -143,17 +143,22 @@ describe('drawBoardMarkers with the default skins (recorded calls)', () => {
     return { rec, stats };
   };
 
-  test('start: one keyline fill for every bead, then one gold fill per alpha band; no strokes', () => {
+  test('start: the bead colour is the options-page green, skin-local (the board start gold is untouched)', () => {
+    expect(SEED_SPIRAL.color).toBe(0x6dff7c);
+    expect(boardMaterial.start).not.toBe(SEED_SPIRAL.color);
+  });
+
+  test('start: one keyline fill for every bead, then one green fill per alpha band; no strokes', () => {
     const { rec } = draw({ start: { x: 1, y: 1 } });
     const fills = rec.log.filter((e) => e.startsWith('set fillStyle='));
     expect(fills[0]).toBe(`set fillStyle=${cssRgb(boardMaterial.void)}`);
     expect(fills.slice(1)).toEqual(
       [...new Set(Array.from({ length: SEED_SPIRAL.beads }, (_, i) => resolveSeedBeadAlpha(i / (SEED_SPIRAL.beads - 1))))]
-        .map((a) => `set fillStyle=${cssRgba(boardMaterial.start, a)}`)
+        .map((a) => `set fillStyle=${cssRgba(SEED_SPIRAL.color, a)}`)
     );
     expect(rec.count('fill(')).toBe(1 + SEED_SPIRAL.alphaBands);
     expect(rec.count('stroke(')).toBe(0);
-    // every bead is a disc twice: its keyline and its gold
+    // every bead is a disc twice: its keyline and its green
     expect(rec.count('arc(')).toBe(SEED_SPIRAL.beads * 2);
   });
 

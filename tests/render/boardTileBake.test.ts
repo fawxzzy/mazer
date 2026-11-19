@@ -22,6 +22,7 @@ import {
   cssRgba,
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
+import { SEED_SPIRAL } from '../../src/render/endpointTileSkins';
 import { resolveSharedBorderColor } from '../../src/render/trailPalette';
 import {
   braidedMazeGrid,
@@ -535,10 +536,10 @@ describe('markers', () => {
   test('start marker is skipped while the player stands on it', () => {
     const on = draw({ player: { x: 1, y: 1 }, goal: undefined });
     const off = draw({ player: { x: 2, y: 1 }, goal: undefined });
-    // the start gold's channels, so both rgb() (retired pinwheel) and rgba() (default Seed spiral beads) count
-    const gold = cssRgb(boardMaterial.start).slice('rgb('.length, -1);
-    expect(on.rec.log.some((e) => e.includes(gold))).toBe(false);
-    expect(off.rec.log.some((e) => e.includes(gold))).toBe(true);
+    // the default Seed spiral's bead colour (skin-local green, drawn as rgba()), by its channels
+    const beads = cssRgb(SEED_SPIRAL.color).slice('rgb('.length, -1);
+    expect(on.rec.log.some((e) => e.includes(beads))).toBe(false);
+    expect(off.rec.log.some((e) => e.includes(beads))).toBe(true);
   });
 
   test('reduced motion pins the phase: it is a no-op, while otherwise phase modulates the Trace goal ring (the Chip end markers are static)', () => {
@@ -564,7 +565,10 @@ describe('markers', () => {
       ['goal keyline', boardMaterial.void, chip],
       ['goal star on keyline', boardMaterial.goal, boardMaterial.void],
       ['start spiral keyline', boardMaterial.void, chip],
-      ['start spiral on keyline', boardMaterial.start, boardMaterial.void]
+      ['start spiral on keyline', boardMaterial.start, boardMaterial.void],
+      // the default Seed spiral's green beads (each over its own void keyline disc)
+      ['seed spiral beads', SEED_SPIRAL.color, chip],
+      ['seed spiral beads on keyline', SEED_SPIRAL.color, boardMaterial.void]
     ];
     console.info(`BOARD_TILE_CONTRAST ${rows.map(([n, f, b]) => `${n}: ${contrast(f, b).toFixed(2)}`).join(' | ')}`);
     for (const [name, fg, bg] of rows) {
