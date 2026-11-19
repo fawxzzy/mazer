@@ -181,12 +181,27 @@
       "filesHint": []
     },
     "MAZER-VIS-017": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 439, "mergedSha": "eca314f8"}], "deployedBuild": "24e15cc1", "headless": false, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 439,
+            "mergedSha": "eca314f8"
+          }
+        ],
+        "deployedBuild": "24e15cc1",
+        "headless": false,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": ["src/legacy-runtime/legacyMenuBackdrop.ts","src/config/tuning.ts","src/scenes/menuRuntimeDiagnostics.ts","tests/reset/legacy-menu-backdrop.test.ts"],
-      "note": "The unused backdrop glyph generators remain on purpose and are carried by MAZER-VIS-027."
+      "filesHint": [
+        "src/legacy-runtime/legacyMenuBackdrop.ts",
+        "src/config/tuning.ts",
+        "src/scenes/menuRuntimeDiagnostics.ts",
+        "tests/reset/legacy-menu-backdrop.test.ts"
+      ]
     },
     "MAZER-VIS-018": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 421}], "headless": true, "deviceChecked": false},
@@ -1287,12 +1302,26 @@
       "note": "PR #476 merged: proof fixtures. Signing and device test open."
     },
     "MAZER-PWA-002": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 438, "mergedSha": "987ea6af"}], "deployedBuild": "24e15cc1", "headless": true, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 438,
+            "mergedSha": "987ea6af"
+          }
+        ],
+        "deployedBuild": "24e15cc1",
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": ["public/manifest.webmanifest","public/icons","vite.config.ts"],
-      "note": "Done and live at main 24e15cc1. Not done, carried by MAZER-PWA-005: new icon art and a clean screenshot route."
+      "filesHint": [
+        "public/manifest.webmanifest",
+        "public/icons",
+        "vite.config.ts"
+      ]
     },
     "MAZER-PWA-003": {
       "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 367},{"repo": "fawxzzy/mazer", "number": 372}], "headless": false, "deviceChecked": false},
@@ -1800,20 +1829,50 @@
       "filesHint": []
     },
     "MAZER-ACCT-007": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 446, "mergedSha": "49590f86"}, {"repo": "fawxzzy/mazer", "number": 447, "mergedSha": "8f757c76"}], "deployedBuild": "8f757c76", "headless": true, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 446,
+            "mergedSha": "49590f86"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 447,
+            "mergedSha": "8f757c76"
+          }
+        ],
+        "deployedBuild": "8f757c76",
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Database function applied 2026-11-11 with the owner approval; client merged and deployed at main 8f757c76. Headless and mocks only; the phone check is on MAZER-ACCT-006."
+      "filesHint": []
     },
     "MAZER-ACCT-008": {
-      "evidence": {"prs": [{"repo": "fawxzzy/mazer", "number": 444, "mergedSha": "ca889604"}, {"repo": "fawxzzy/mazer", "number": 445, "mergedSha": "86fa412b"}], "deployedBuild": "8f757c76", "headless": true, "deviceChecked": false},
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 444,
+            "mergedSha": "ca889604"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 445,
+            "mergedSha": "86fa412b"
+          }
+        ],
+        "deployedBuild": "8f757c76",
+        "headless": true,
+        "deviceChecked": false
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Unit tests and headless Chromium with failures injected; no real failing round trip and no phone. The original report is not confirmed fixed."
+      "filesHint": []
     },
     "MAZER-ACCT-009": {
       "evidence": {
@@ -1861,8 +1920,7 @@
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Fixtures and mocks only; the phone check for Edit name is on MAZER-ACCT-006."
+      "filesHint": []
     },
     "MAZER-ACCT-012": {
       "evidence": {
@@ -2453,8 +2511,7 @@
       "blocker": null,
       "verify": [],
       "lane": null,
-      "filesHint": [],
-      "note": "Feel on a phone is not checked; the phone step is on MAZER-ACCT-006. Stick caps were scaled too (one-line revert)."
+      "filesHint": []
     },
     "MAZER-CTRL-003": {
       "evidence": null,
@@ -4776,14 +4833,34 @@
       "filesHint": []
     },
     "MAZER-QA-012": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 653,
+            "mergedSha": "d0de383feff6f6362c7dc4ce571d08e47f60c539"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
       "filesHint": []
     },
     "MAZER-DOCS-002": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 651,
+            "mergedSha": "424273501989252709d9363da8391a94ebe49dca"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
