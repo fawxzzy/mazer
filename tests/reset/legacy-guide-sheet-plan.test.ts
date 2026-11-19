@@ -20,6 +20,8 @@ const MEASURED_HEIGHTS = [
   resolveLegacyGuideRowHeight(3),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
+  // L6: the Menu row (three lines at the top right) sits between Online and Sound.
+  resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideKeyboardLineHeight(2)
 ];
@@ -53,7 +55,8 @@ describe('guide sheet plan', () => {
   );
 
   test('a tall desktop shows the whole guide; 320x568 scrolls and keeps Got it pinned', () => {
-    const wide = buildLegacyGuideSheetPlan({ height: 1100, itemHeights: MEASURED_HEIGHTS, width: 1280 });
+    // L6: the Menu row adds ~86 px, so the whole guide now needs ~1146 px of viewport; 1200 is a 1920x1200-class desktop.
+    const wide = buildLegacyGuideSheetPlan({ height: 1200, itemHeights: MEASURED_HEIGHTS, width: 1280 });
     expect(wide.scrollable).toBe(false);
     expect(wide.maxScrollOffset).toBe(0);
     const narrow = buildLegacyGuideSheetPlan({ height: 568, itemHeights: MEASURED_HEIGHTS, width: 320 });

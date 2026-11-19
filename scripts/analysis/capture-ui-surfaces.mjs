@@ -1358,6 +1358,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Wrap',
   'Levels',
   'Online',
+  'Menu',
   'Sound',
   'Got it'
 ]);
