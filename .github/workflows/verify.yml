@@ -87,6 +87,7 @@ jobs:
           tests/render/backdropStars.test.ts
           tests/render/trail-bloom-clip.test.ts
           tests/render/controller-halo-look.test.ts
+          tests/render/menu-play-label-attention.test.ts
           tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
           --maxWorkers=1
