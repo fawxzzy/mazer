@@ -1675,7 +1675,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Route through the Wave 3A bridge first, then the shared account flow.
     expect(menuSceneSource).toContain(
       'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
-      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '          () => withMazerSignInContinuation(\'account\', () => (\n'
+      + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '          ))\n'
       + '        ));'
     );
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
@@ -1742,7 +1744,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain("text: 'Play as guest',");
     expect(menuSceneSource).not.toContain('onClick: () => this.handleLegacyGuestPlay()');
     expect(menuSceneSource).toContain('private async handleSharedAccountAuthorization(): Promise<void>');
-    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
+    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() });');
     expect(menuSceneSource).toContain('void this.handleSharedAccountAuthorization();');
     expect(menuSceneSource).toContain('private createLegacySignedOutOAuthFailure(): void');
     expect(menuSceneSource).toContain('!isLegacyOAuthFailureCopy(this.authSnapshot.error)');
@@ -1799,7 +1801,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('createLegacyOverlayUsernameButton');
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
       'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
-      + '          () => this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '          () => withMazerSignInContinuation(\'account\', () => (\n'
+      + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '          ))\n'
       + '        ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
@@ -1893,7 +1897,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("this.authSnapshot.status !== 'authenticated'");
     // No subtitle paragraph on the forced screen (auth-surface family contract).
     expect(menuSceneSource).not.toContain('Use your shared Fawxzzy account to keep progression, settings, and leaderboard identity connected.');
-    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization();');
+    expect(menuSceneSource).toContain('const result = await beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() });');
     expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
     const clearUiSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private clearUi(): void'),

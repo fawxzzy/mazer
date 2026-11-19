@@ -535,6 +535,10 @@ import {
   navigateToMazerAccountPortal,
   warmMazerProviderPreflight
 } from '../legacy-runtime/legacyAccountPortal';
+import {
+  readMazerSignInContinuation,
+  withMazerSignInContinuation
+} from '../legacy-runtime/legacySignInContinuation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   fetchLegacyLeaderboardPage,
@@ -11489,8 +11493,11 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacyMenuLeaderboardButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
         ));
+        // Signed out, a profile-icon sign-in continues to the account page (legacySignInContinuation.ts).
         this.uiButtons.push(this.createLegacyMenuProfileButton(
-          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+          () => withMazerSignInContinuation('account', () => (
+            this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+          ))
         ));
       }
 
@@ -14479,7 +14486,7 @@ export class MenuScene extends Phaser.Scene {
     // The next attempt dismisses the previous failure: banner, code and toast.
     this.clearLegacyAuthFeedbackMessage();
     this.uiDirty = true;
-    const result = await beginMazerOAuthAuthorization();
+    const result = await beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() });
     if (result.status === 'failed') {
       this.authSubmitting = false;
       this.authOpeningStartedAtMs = null;
