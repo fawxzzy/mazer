@@ -86,7 +86,9 @@ const render = (tileSize: number, dpr: number, cell: BoardCell, options: Options
   if (options.star !== false) {
     drawBoardMarkers(marked, {
       style: 'chip', tileSize, devicePixelRatio: dpr, originX: layout.originX, originY: layout.originY,
-      goal: cell, goalTile: tile, goalStarRotation: options.rotation ?? 0
+      goal: cell, goalTile: tile, goalStarRotation: options.rotation ?? 0,
+      // The pre-L5 solid star (a retired skin, still drawable); the L5 Twin stars are pinned in endpointTileSkins.test.ts.
+      endTileSkin: 'solid-star'
     });
   }
   const center = resolvePlayerMarkerCenter(cell.x, cell.y, tileSize, dpr, layout.originX, layout.originY);

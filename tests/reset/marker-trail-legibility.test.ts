@@ -136,7 +136,9 @@ const recordGraphics = (): { calls: Recorded[]; graphics: import('phaser').GameO
 const drawGoal = (tileSize: number, minimum?: { goalBadgeDiameterCss?: number; startTileCss?: number }, style: 'chip' | 'trace' = 'chip'): Recorded[] => {
   const { calls, graphics } = recordGraphics();
   drawBoardMarkers(new PhaserGraphicsTileContext(graphics), {
-    style, tileSize, devicePixelRatio: 2, goal: { x: 3, y: 4 }, minimumMarkerSizes: minimum
+    style, tileSize, devicePixelRatio: 2, goal: { x: 3, y: 4 }, minimumMarkerSizes: minimum,
+    // The pre-L5 solid star (a retired skin): this suite pins its proportions; Twin stars are pinned in endpointTileSkins.test.ts.
+    endTileSkin: 'solid-star'
   });
   return calls;
 };

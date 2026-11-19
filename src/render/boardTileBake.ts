@@ -37,6 +37,18 @@ import {
 } from './endpointTiles';
 import { shouldDrawEndpointMarker } from './endpointMarkerLayering';
 import { resolveStartSpiralArm, START_SPIRAL } from './endpointSpiral';
+import {
+  drawSeedSpiral,
+  drawTwinStars,
+  resolveEndTileSkin,
+  resolveSeedSpiralClock,
+  resolveSeedSpiralTile,
+  resolveStartTileSkin,
+  resolveTwinStarsClock,
+  resolveTwinStarsTile,
+  type EndTileSkinId,
+  type StartTileSkinId
+} from './endpointTileSkins';
 import { resolveSharedBorderColor } from './trailPalette';
 
 /** The goal star's border when the caller has no live trail colour (the Guide icon): the static trail palette at its start. */
@@ -1034,6 +1046,18 @@ export interface BoardMarkerInput {
    */
   endpointBorderColor?: number;
   /**
+   * Chip style (L5): which registered end-tile skins to draw (endpointTileSkins.ts). Default: the owner's picks (Seed
+   * spiral, Twin stars). An archived or unknown id draws the default. 'pinwheel' / 'solid-star' are the pre-L5 looks,
+   * drawn by the rotation inputs above.
+   */
+  startTileSkin?: StartTileSkinId;
+  endTileSkin?: EndTileSkinId;
+  /**
+   * Chip style (L5): the shared scene clock in ms that the default skins animate on (the seed spiral's spin and breath,
+   * the twin stars' opposite turns). Default 0: the static frame the Guide icon draws. Ignored under reducedMotion.
+   */
+  endpointTimeMs?: number;
+  /**
    * Chip style: the start / goal cell's own chip geometry in BOARD-LOCAL css px (`computeChipTileAt`, from the
    * same bake layout), so the end marker is centred on the baked tile's device-snapped cell. `startTile.direction` is
    * the way the start arrow points. Omit for a standalone cell (Guide icons): an isolated chip, arrow pointing right.
@@ -1289,8 +1313,24 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
   painter.caps('round', 'round');
   const onStart = Boolean(input.start && input.player
     && input.player.x === input.start.x && input.player.y === input.start.y);
+  const startSkin = resolveStartTileSkin(input.startTileSkin);
+  const endSkin = resolveEndTileSkin(input.endTileSkin);
+  const skinTimeMs = input.endpointTimeMs ?? 0;
+  const reducedMotion = Boolean(input.reducedMotion);
   const paintEndpoint = (kind: EndpointKind, cell: BoardCell, tile: EndpointTileRect | null | undefined): void => {
     const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
+    // L5 (endpointTileSkins.ts): the owner's picks are the defaults; the pre-L5 looks stay drawable below.
+    if (kind === 'start' && startSkin === 'seed-spiral') {
+      drawSeedSpiral(painter, style.material, resolveSeedSpiralTile(rect, scale), resolveSeedSpiralClock(skinTimeMs, reducedMotion), ox, oy);
+      return;
+    }
+    if (kind === 'goal' && endSkin === 'twin-stars') {
+      drawTwinStars(
+        painter, style.material, resolveTwinStarsTile(rect, scale), resolveTwinStarsClock(skinTimeMs, reducedMotion),
+        input.endpointBorderColor ?? STATIC_ENDPOINT_BORDER_COLOR, ox, oy
+      );
+      return;
+    }
     drawEndpointGlyph(
       painter, style, resolveEndpointTile(kind, rect, scale), ox, oy,
       kind === 'goal' && !input.reducedMotion ? (input.goalStarRotation ?? 0) : 0,
