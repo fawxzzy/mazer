@@ -128,6 +128,7 @@ import {
   resolveBackdropRainbowColor,
   stepBackdropColourRedraw
 } from '../render/backdropStarHue';
+import { BackdropStarDrawList, installBackdropStarCanvasRenderer } from '../render/backdropStarBatch';
 import { SHARED_BACKDROP_PHASER } from '../render/sharedBackdrop';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
@@ -2056,6 +2057,8 @@ export class MenuScene extends Phaser.Scene {
   private menuAiProgressionBadgeTextBounds: VisualRect | null = null;
   private menuAiProgressionBadgeTextFits = false;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
+  // MAZER-PERF-014: the star circles the backdrop Graphics paints (src/render/backdropStarBatch.ts).
+  private readonly backdropStarList = new BackdropStarDrawList();
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
   // Z-order anchor for the board layer (edgeMarkers.test pins it). The board's tiles are NOT drawn
@@ -2483,6 +2486,7 @@ export class MenuScene extends Phaser.Scene {
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
+    installBackdropStarCanvasRenderer(this.backdropGraphics, this.backdropStarList);
     // See src/render/pixelAlignment.ts: no half-pixel camera offset on odd-sized viewports.
     alignCameraToWholePixels(this.cameras.main);
     this.boardZoomContainer = this.add.container(0, 0);
@@ -7794,6 +7798,10 @@ export class MenuScene extends Phaser.Scene {
     }
     const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
+    // MAZER-PERF-014: circles go to a flat draw list the backdrop Graphics paints with cached colour strings and
+    // globalAlpha (src/render/backdropStarBatch.ts); same circles, same order, same colour and alpha as fillStyle/fillCircle.
+    const starList = this.backdropStarList;
+    starList.reset();
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
       const pixelY = Math.round(star.y * height);
@@ -7848,18 +7856,13 @@ export class MenuScene extends Phaser.Scene {
       // instead of a tiny tile.
       const starRadius = (coreSize / 2) * sizeMultiplier;
       if (starDraw === 'hero') {
-        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.1);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 5);
-        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.16);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 3);
-        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.24);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
+        starList.fillCircle(starColor, starAlpha * 0.1, pixelX, pixelY, starRadius + 5);
+        starList.fillCircle(starColor, starAlpha * 0.16, pixelX, pixelY, starRadius + 3);
+        starList.fillCircle(starColor, starAlpha * 0.24, pixelX, pixelY, starRadius + 1.5);
       } else if (coreSize > 1) {
-        this.backdropGraphics.fillStyle(starColor, starAlpha * 0.18);
-        this.backdropGraphics.fillCircle(pixelX, pixelY, starRadius + 1.5);
+        starList.fillCircle(starColor, starAlpha * 0.18, pixelX, pixelY, starRadius + 1.5);
       }
-      this.backdropGraphics.fillStyle(starColor, starAlpha);
-      this.backdropGraphics.fillCircle(pixelX, pixelY, Math.max(0.6, starRadius));
+      starList.fillCircle(starColor, starAlpha, pixelX, pixelY, Math.max(0.6, starRadius));
     }
 
     this.backdropDirty = false;
