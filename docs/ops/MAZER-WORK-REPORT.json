@@ -3,26 +3,26 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-19T14:43:27.000Z",
+    "registryUpdatedAt": "2026-11-19T16:37:40.000Z",
     "boardSync": {
-      "at": "2026-11-19T14:43:27.000Z",
-      "appliedEventCount": 461,
-      "lastEventId": "9d8fa53c56c8"
+      "at": "2026-11-19T16:37:40.000Z",
+      "appliedEventCount": 477,
+      "lastEventId": "4834e0cad3b0"
     }
   },
   "counters": {
-    "total": 298,
-    "open": 80,
+    "total": 301,
+    "open": 84,
     "completed": 192,
-    "deferred": 26,
+    "deferred": 25,
     "buckets": {
       "needs-you": 33,
-      "in-review": 28,
-      "blocked": 7,
+      "in-review": 32,
+      "blocked": 8,
       "ready": 0,
       "in-progress": 1,
-      "unclassified": 11,
-      "deferred": 26,
+      "unclassified": 10,
+      "deferred": 25,
       "completed": 192
     },
     "needsYou": {
@@ -37,7 +37,7 @@
       "unrecorded": 0
     },
     "blockedByGroup": {
-      "Zac": 1,
+      "Zac": 2,
       "provider": 0,
       "device": 1,
       "other-card": 5,
@@ -2913,6 +2913,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-PERF-013",
+      "title": "Smoother loop: fewer redraws, 60 fps cap, and a slightly slower player",
+      "status": "review",
+      "priority": "high",
+      "prs": "#661",
+      "note": ""
+    },
+    {
       "id": "MAZER-PROG-020",
       "title": "Grow the maze board with progression (2-5 more tiles each way)",
       "status": "review",
@@ -2953,6 +2961,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-CTRL-004",
+      "title": "Floating touch anchor for the controls, off by default",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#656",
+      "note": ""
+    },
+    {
       "id": "MAZER-GEN-007",
       "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
       "status": "review",
@@ -2965,7 +2981,7 @@
       "title": "Limit bleed path shortcuts and make least-saving the default",
       "status": "review",
       "priority": "medium",
-      "prs": "#642, #646",
+      "prs": "#642, #646, #659",
       "note": ""
     },
     {
@@ -2974,6 +2990,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#648",
+      "note": ""
+    },
+    {
+      "id": "MAZER-MODE-001",
+      "title": "Game modes shell with Endless and a leaderboard tab per mode",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#655",
       "note": ""
     },
     {
@@ -3013,7 +3037,7 @@
       "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
       "status": "review",
       "priority": "medium",
-      "prs": "",
+      "prs": "#660",
       "note": "Worker running; no PR yet."
     },
     {
@@ -3021,7 +3045,7 @@
       "title": "Keep edge diamonds inside the screen with the outer tip on the edge",
       "status": "review",
       "priority": "medium",
-      "prs": "#536",
+      "prs": "#536, #660",
       "note": ""
     },
     {
@@ -3045,7 +3069,7 @@
       "title": "Edge stars travel with the ring and stay full size",
       "status": "review",
       "priority": "medium",
-      "prs": "#638, #643",
+      "prs": "#638, #643, #660",
       "note": ""
     },
     {
@@ -3105,6 +3129,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-090",
+      "title": "Update the in-app guide for hazards and menu changes",
+      "status": "review",
+      "priority": "low",
+      "prs": "#662",
+      "note": ""
+    },
+    {
       "id": "MAZER-UI-092",
       "title": "Menu cleanup: remove LEVEL, You and time labels",
       "status": "review",
@@ -3122,6 +3154,15 @@
         "priority": "medium",
         "kind": "provider",
         "ask": "Read the auth hook settings in the provider dashboard and tell me whether the before-user-created hook is set.",
+        "derived": false
+      },
+      {
+        "id": "MAZER-CTRL-003",
+        "title": "Revisit and rework the controls",
+        "status": "in_progress",
+        "priority": "medium",
+        "kind": "deferred-by-owner",
+        "ask": "Say when Phase 2 (obstacles and enemies) starts.",
         "derived": false
       }
     ],
@@ -3214,14 +3255,6 @@
       "status": "deferred_candidate",
       "priority": "medium",
       "why": "All candidate causes were fixed or replaced since the report.",
-      "waitsOn": "Zac"
-    },
-    {
-      "id": "MAZER-CTRL-003",
-      "title": "Revisit and rework the controls",
-      "status": "deferred_candidate",
-      "priority": "medium",
-      "why": "The owner placed the controls rework in the obstacles and enemies (Phase 2) work; it is held until he says it is ready.",
       "waitsOn": "Zac"
     },
     {
@@ -3469,13 +3502,6 @@
     {
       "id": "MAZER-UI-036",
       "title": "Move remaining legacy font stacks to the shared type scale",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-090",
-      "title": "Update the in-app guide for hazards and menu changes",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4174,8 +4200,8 @@
       "sub": "headless"
     },
     "MAZER-CTRL-003": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "Zac"
     },
     "MAZER-PROG-016": {
       "bucket": "completed",
@@ -4618,7 +4644,7 @@
       "sub": null
     },
     "MAZER-UI-090": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-058": {
@@ -4679,6 +4705,18 @@
     },
     "MAZER-ECON-004": {
       "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-CTRL-004": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-MODE-001": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PERF-013": {
+      "bucket": "in-review",
       "sub": null
     }
   }

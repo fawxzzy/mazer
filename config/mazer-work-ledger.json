@@ -2514,7 +2514,17 @@
       "filesHint": []
     },
     "MAZER-CTRL-003": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 658,
+            "mergedSha": "3fdf0e3bd1e974f4ab942a26b8f1be03ea72467a"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": null
+      },
       "blocker": {
         "kind": "deferred-by-owner",
         "summary": "The owner placed the controls rework in the obstacles and enemies (Phase 2) work; it is held until he says it is ready.",
@@ -3209,7 +3219,18 @@
       "note": "PR #484 open, not merged; density fill added at head 316acd0a."
     },
     "MAZER-VIS-030": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 660,
+            "mergedSha": "fe1ce2247fbd61b53f27ee4bc9bb4a7919cffed6"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
+      },
       "blocker": null,
       "verify": [],
       "lane": "agent-buildable",
@@ -3871,10 +3892,16 @@
             "repo": "fawxzzy/mazer",
             "number": 536,
             "mergedSha": "258cf20d"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 660,
+            "mergedSha": "fe1ce2247fbd61b53f27ee4bc9bb4a7919cffed6"
           }
         ],
         "headless": true,
-        "deviceChecked": false
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
       },
       "blocker": null,
       "verify": [],
@@ -4611,7 +4638,18 @@
       "filesHint": []
     },
     "MAZER-UI-090": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 662,
+            "mergedSha": "19fe3365d8ce0f559011bd416af12d4d701ef96c"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
@@ -4665,11 +4703,16 @@
             "repo": "fawxzzy/mazer",
             "number": 643,
             "mergedSha": "7d8fdfd3f7cc04cfe6a1b842399ca391629d1930"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 660,
+            "mergedSha": "fe1ce2247fbd61b53f27ee4bc9bb4a7919cffed6"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "main-CbmMpGpP"
+        "deployedBuild": "main-BxI0SzG9"
       },
       "blocker": null,
       "verify": [],
@@ -4796,11 +4839,16 @@
             "repo": "fawxzzy/mazer",
             "number": 646,
             "mergedSha": "f6adc52b94cd983f37edd6506798fbb02cc41363"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 659,
+            "mergedSha": "2a73e151756503b1eb503a272b213af98519626f"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "main-Dzf78yJ-"
+        "deployedBuild": "main-BxI0SzG9"
       },
       "blocker": null,
       "verify": [],
@@ -4868,6 +4916,60 @@
     },
     "MAZER-ECON-004": {
       "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CTRL-004": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 656,
+            "mergedSha": "99289c51c0c8728b6e0bad687e52211bfbb6e373"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-MODE-001": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 655,
+            "mergedSha": "47fad9b456cc1edf6498a8f616a70736cc847bf3"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-013": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 661,
+            "mergedSha": "80824ad40260d4d9f45908a5cc90d5c1e7be5ad3"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-BxI0SzG9"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
