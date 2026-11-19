@@ -42,12 +42,12 @@ describe('floating anchor: inch from CSS px and DPR', () => {
     expect(resolveCssPxPerInch({ coarsePointer: true, devicePixelRatio: Number.NaN })).toBe(130);
   });
 
-  test('the leash is one inch by default, scaled into logical px when the canvas is scaled', () => {
-    expect(FLOATING_ANCHOR_LEASH_INCHES).toBe(1);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 }).leashPx).toBe(160);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, logicalPerCssPx: 0.5 }).leashPx).toBe(80);
+  test('the leash is the option B 90 px on a phone by default, scaled into logical px when the canvas is scaled', () => {
+    expect(FLOATING_ANCHOR_LEASH_INCHES).toBeCloseTo(0.5625, 6);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 }).leashPx).toBeCloseTo(90, 6);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, logicalPerCssPx: 0.5 }).leashPx).toBeCloseTo(45, 6);
     expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: 0.75 }).leashPx).toBe(120);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: -2 }).leashPx).toBe(160);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: -2 }).leashPx).toBeCloseTo(90, 6);
   });
 });
 
@@ -147,7 +147,16 @@ describe('floating anchor: controller', () => {
     expect(cost).not.toBeNull();
     // A fixed anchor at the touch-down needs the finger back across 2 in (plus the deadzone).
     expect(cost!).toBeLessThan(2);
-    expect(cost!).toBeLessThanOrEqual(FLOATING_ANCHOR_LEASH_INCHES + 0.6);
+    expect(cost!).toBeLessThanOrEqual((CONFIG.leashPx / 160) + 0.6);
+  });
+
+  test('option B default (90 px leash on a phone): a reversal costs well under the 1-inch leash it replaces', () => {
+    const config = resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 });
+    const path = HARNESS_PATHS.find((p) => p.name === 'quick-reversal')!;
+    const fixedLeash = measureReversalCostInches(simulateHarnessPath(path, CONFIG, 160), 160, 0.1)!;
+    const optionB = measureReversalCostInches(simulateHarnessPath(path, config, 160), 160, 0.1)!;
+    expect(optionB).toBeLessThan(fixedLeash);
+    expect(optionB).toBeLessThanOrEqual(FLOATING_ANCHOR_LEASH_INCHES + 0.6);
   });
 });
 
@@ -165,18 +174,20 @@ describe('floating anchor: tuning harness', () => {
   });
 });
 
-describe('floating anchor: Settings toggle, default OFF', () => {
-  test('the preference reads off when absent, blocked or unrelated, and round-trips on/off', () => {
+describe('floating anchor: Settings toggle, default ON (CTRL-003 option B)', () => {
+  test('the preference reads on when absent, blocked or unrelated, off only when the player stored off, and round-trips', () => {
     const storage = memoryStorage();
-    expect(readLegacyFloatingAnchorPreference(undefined)).toBe(false);
-    expect(readLegacyFloatingAnchorPreference(storage)).toBe(false);
+    expect(readLegacyFloatingAnchorPreference(undefined)).toBe(true);
+    expect(readLegacyFloatingAnchorPreference(storage)).toBe(true);
     storage.values.set(LEGACY_FLOATING_ANCHOR_STORAGE_KEY, 'garbage');
+    expect(readLegacyFloatingAnchorPreference(storage)).toBe(true);
+    storage.values.set(LEGACY_FLOATING_ANCHOR_STORAGE_KEY, 'off');
     expect(readLegacyFloatingAnchorPreference(storage)).toBe(false);
     expect(writeLegacyFloatingAnchorPreference(storage, true)).toBe(true);
     expect(readLegacyFloatingAnchorPreference(storage)).toBe(true);
     expect(writeLegacyFloatingAnchorPreference(storage, false)).toBe(false);
     expect(readLegacyFloatingAnchorPreference(storage)).toBe(false);
-    expect(readLegacyFloatingAnchorPreference({ getItem: () => { throw new Error('blocked'); } })).toBe(false);
+    expect(readLegacyFloatingAnchorPreference({ getItem: () => { throw new Error('blocked'); } })).toBe(true);
     expect(writeLegacyFloatingAnchorPreference({ setItem: () => { throw new Error('blocked'); } }, true)).toBe(true);
   });
 
@@ -193,7 +204,7 @@ describe('floating anchor: Settings toggle, default OFF', () => {
 
   test('the scene wires the controller only when the toggle is on and keeps the stick maths unchanged', () => {
     const scene = readFileSync(resolve(__dirname, '../../src/scenes/MenuScene.ts'), 'utf8');
-    expect(scene).toMatch(/private floatingAnchorEnabled = false;/);
+    expect(scene).toMatch(/private floatingAnchorEnabled = true;/);
     expect(scene).toMatch(/if \(this\.floatingAnchorEnabled\) \{\s*this\.configureLegacyFloatingAnchor\(\);\s*this\.floatingAnchor\.down\(/);
     expect(scene).toMatch(/if \(this\.floatingAnchor\.active\) \{[\s\S]{0,200}this\.floatingAnchor\.move\(/);
     expect(scene).toMatch(/if \(this\.floatingAnchor\?\.active === true\) \{\s*this\.advanceLegacyFloatingAnchor\(time\);/);

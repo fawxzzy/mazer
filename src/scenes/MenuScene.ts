@@ -1941,9 +1941,9 @@ export class MenuScene extends Phaser.Scene {
   // handleLegacyPlayTouchControl) instead of a fixed on-screen position, so
   // the board never has to reserve permanent space for a control widget.
   private playFloatingStickOrigin: { x: number; y: number } | null = null;
-  // MAZER-L9: device-local Settings > Floating anchor (default off). When on, the controller drags
-  // playFloatingStickOrigin behind a far finger (src/legacy-runtime/legacyFloatingAnchor.ts).
-  private floatingAnchorEnabled = false;
+  // MAZER-L9: device-local Settings > Floating anchor (default on since CTRL-003 option B). When on, the controller
+  // drags playFloatingStickOrigin behind a far finger (src/legacy-runtime/legacyFloatingAnchor.ts).
+  private floatingAnchorEnabled = true;
   private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
     coarsePointer: true,
     devicePixelRatio: 3
