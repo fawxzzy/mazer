@@ -22,7 +22,7 @@
  * a stack of rectangles.
  */
 import { REDUCED_MOTION_BLEED_GLOW_PROGRESS } from './reducedMotion';
-import { resolveTrailPaletteBorderColor } from './trailPalette';
+import { resolveTrailPaletteBorderColor } from './playerColour';
 
 export const BLEED_GLOW = Object.freeze({
   periodMs: 1900,

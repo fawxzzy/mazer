@@ -30,9 +30,10 @@ export {
   resolveIridescentRestingCore,
   resolveTrailPulseWave,
   resolveTrailSheen,
-  sampleIridescentTrail,
   type IridescentTrailSample
 } from './trailPalette';
+// The trail's colour is the PLAYER colour (playerColour.ts): the shifting rainbow today, one flat colour if the player picks one.
+export { samplePlayerColour as sampleIridescentTrail } from './playerColour';
 
 /** The whole trail breathes: widths scale between 1 and 1 + this, once per breath period. */
 export const TRAIL_PULSE_WIDTH_SWING = 0.1;

@@ -1,6 +1,6 @@
 # Edge diamonds: beams on the inner tip, a 50% / 100% size cycle, beams that stay connected (MAZER-VIS-038)
 
-Update 2026-11-19: SUPERSEDED for drawing. The ring stars are now held at full size for the whole full-motion cycle (`src/render/edgeRingScaleHold.ts`, owner choice): no outro growth and no drain shrink; beam contact uses the same held size. The curve below remains in `edgeBeamTimeline.ts` as pure code. Rest (no lifecycle) and the reduced-motion crossfade keep 50%.
+Update 2026-11-19 (edge stars smooth): the drawn size is now driven by each star's FILL (`src/render/edgeStarMotion.ts`, smootherstep from 50% at fill 0 to 100% at fill 1): it grows smoothly while the laser fills it, stays exactly full size while full (the full-size decision stands), and shrinks smoothly while it drains back to 50%. This replaces the short-lived hold at 100% (`edgeRingScaleHold.ts`, removed), which popped 50% to 100% on the first frame of the cycle and back on the last. Beam contact follows the star's current size; stars scale about the outer tip, so their position glides with the size. The VIS-038 curve below remains in `edgeBeamTimeline.ts` as pure code (not drawn). Rest (no lifecycle) and the reduced-motion crossfade keep 50%.
 
 Status: implemented 2026-11-13 on branch `claude/vis-038-20261113`, on top of MAZER-VIS-030 (`docs/ui/MAZER-EDGE-BEAMS-DIAMOND-FILL-2026-11-12.md`) and MAZER-VIS-033 (`docs/ui/MAZER-EDGE-DIAMOND-ONE-FILL-2026-11-13.md`). Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 

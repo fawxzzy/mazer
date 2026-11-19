@@ -49,10 +49,10 @@ import {
   type EndTileSkinId,
   type StartTileSkinId
 } from './endpointTileSkins';
-import { resolveSharedBorderColor } from './trailPalette';
+import { resolveSharedBorderColor } from './playerColour';
 
-/** The goal star's border when the caller has no live trail colour (the Guide icon): the static trail palette at its start. */
-const STATIC_ENDPOINT_BORDER_COLOR = resolveSharedBorderColor(null, 0, true);
+/** The goal star's border when the caller has no live trail colour (the Guide icon): the player colour at the trail's start, read per call. */
+const resolveStaticEndpointBorderColor = (): number => resolveSharedBorderColor(null, 0, true);
 
 /**
  * Part of every bake hash: bump it whenever the baked pixels change. v2: the bright junction nodes are gone.
@@ -1167,7 +1167,7 @@ const drawEndpointGlyph = (
   oy: number,
   starRotation = 0,
   spiralRotation = 0,
-  borderColor = STATIC_ENDPOINT_BORDER_COLOR
+  borderColor = resolveStaticEndpointBorderColor()
 ): void => {
   const m = style.material;
   const { frame } = spec;
@@ -1327,7 +1327,7 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
     if (kind === 'goal' && endSkin === 'twin-stars') {
       drawTwinStars(
         painter, style.material, resolveTwinStarsTile(rect, scale), resolveTwinStarsClock(skinTimeMs, reducedMotion),
-        input.endpointBorderColor ?? STATIC_ENDPOINT_BORDER_COLOR, ox, oy
+        input.endpointBorderColor ?? resolveStaticEndpointBorderColor(), ox, oy
       );
       return;
     }

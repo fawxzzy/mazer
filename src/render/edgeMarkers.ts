@@ -35,10 +35,10 @@
  *   paired with the destination edge. The interior is never lit by those cues (there used to be a small instant core;
  *   it was removed in MAZER-VIS-033 because it showed a second, different fill next to the beam fill): the only colour
  *   inside a diamond is the beam fill below.
- * - Colour contract (trailPalette.ts is the single source of truth): the diamond's BORDER is always the live
- *   iridescent trail colour (the trail's own core colour at the trail head, same clock, same reduced-motion rule;
- *   never a fixed colour), and everything INSIDE it or fired out of it (the beam fill, the beams, the landing
- *   sparkles) is the player's colour, `PLAYER_COLOR`.
+ * - Colour contract (playerColour.ts is the single source of truth, lane "edge stars smooth + rainbow"): the player's colour is
+ *   the shifting rainbow today (the trail's own core colour at the trail head, same clock, same reduced-motion rule) and ONE
+ *   setter (`setPlayerColour`) changes it everywhere. The diamond's BORDER, the colour INSIDE it (the fill) and everything
+ *   fired out of it (the beams, the landing sparkles) all read it; none is a fixed green any more.
  *
  * Size (MAZER-VIS-038, anchor changed by MAZER-VIS-043): while the maze runs a diamond is EDGE_DIAMOND_REST_SCALE (50%) of
  * its full size. It is scaled about its OUTER tip (`anchorStationToOuterTip`), so the outer tip stays on the screen edge at every
@@ -55,7 +55,7 @@
  *
  * Lasers and fill (MAZER-VIS-030, VIS-038): on departure the player fires a beam out to ALL 8 diamonds; each diamond FILLS with
  * the player's colour from the exact instant its beam touches it (grows from its inner tip, full when the beam is fully
- * absorbed) and stays full through the deconstruct and the build. On arrival ALL 8 diamonds (orbiting, full, parked on
+ * absorbed) and stays full through the deconstruct and the build; its size follows the fill (edgeStarMotion.ts: grows smoothly while it fills, shrinks smoothly while it drains). On arrival ALL 8 diamonds (orbiting, full, parked on
  * their rest stations once the build completes) fire a beam inward to the spawn tile and each DRAINS from the exact
  * instant its beam leaves it (empty when the beam has fully left). The colour is always anchored at the inner tip: it
  * fills from the inner tip outward and drains the other way round, leaving from the OUTER tip first, so the last of it
@@ -71,7 +71,7 @@
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
 import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
-import { PLAYER_COLOR, resolveSharedBorderColor, resolveTrailPaletteBorderColor } from './trailPalette';
+import { resolvePlayerColour, resolveSharedBorderColor, resolveTrailPaletteBorderColor } from './playerColour';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
   EDGE_BEAM_FLIGHT_MS,
@@ -83,7 +83,7 @@ import {
   resolveEdgeBeamPulse,
   type EdgeBeamDirection
 } from './edgeBeamTimeline';
-import { resolveHeldEdgeDiamondScale } from './edgeRingScaleHold';
+import { resolveEdgeStarScale } from './edgeStarMotion';
 import {
   drawBeamPulse,
   drawContactRipple,
@@ -358,7 +358,11 @@ export const resolveOrbitingEdgeStation = (
     x = reach + ((cornerGap - cornerReach) * cornerBlend);
     y = along(bottomLeft.y, topLeft.y, (restStations[7] as EdgeStation).y);
   }
-  return { id, x, y, inwardAngle: angle, side, isCorner: false };
+  // A narrow phone caps the corner stars (edgeCornerAnchor.ts); the cap eases away as the star leaves the corner and back as it
+  // arrives, so the size has no step at the first/last orbit frame.
+  const cornerCap = (restStations[0] as EdgeStation).maxScale ?? 1;
+  const maxScale = 1 - ((1 - cornerCap) * cornerBlend);
+  return { id, x, y, inwardAngle: angle, side, isCorner: false, ...(maxScale < 1 ? { maxScale } : {}) };
 };
 
 /** All 8 diamonds at ring phase `phaseRad` (see resolveOrbitingEdgeStation). Phase 0 = resolveEdgeStations. */
@@ -563,6 +567,8 @@ export interface EdgeMarkerState {
    * icon (the Guide legend) can omit it and get the static trail gradient's start colour; the board always sets it.
    */
   readonly borderColor?: number;
+  /** The colour inside the diamond (the fill): the player colour. Optional: absent = the border colour. */
+  readonly fillColor?: number;
 }
 
 export interface EdgeWrapFlash {
@@ -599,8 +605,8 @@ export interface EdgeMarkerStateInput {
   readonly trailAnimated?: boolean;
 }
 
-/** Border colour of a marker with no explicit `borderColor`: the static trail palette at the trail's start. */
-const STATIC_BORDER_COLOR = resolveTrailPaletteBorderColor(0, 0, true);
+/** Border colour of a marker with no explicit `borderColor`: the player colour at the trail's start (read per draw, so a new player colour shows). */
+const resolveStaticBorderColor = (): number => resolveTrailPaletteBorderColor(0, 0, true);
 
 export const resolveEdgeMarkerIdleAlpha = (timeMs: number, reducedMotion: boolean): number => {
   const middle = (EDGE_MARKER_IDLE_ALPHA_MIN + EDGE_MARKER_IDLE_ALPHA_MAX) / 2;
@@ -650,7 +656,8 @@ export const resolveEdgeMarkerStates = (input: EdgeMarkerStateInput): ReadonlyAr
       spinRad: input.reducedMotion || !Number.isFinite(input.spinRad) ? 0 : (input.spinRad ?? 0),
       flash,
       hidden: input.hiddenIds?.has(id) ?? false,
-      borderColor
+      borderColor,
+      fillColor: borderColor
     };
   });
 };
@@ -750,6 +757,7 @@ export const drawEdgeMarker = (
   if ((state.fill ?? 0) > 0) {
     drawDiamondFill(graphics, {
       center: { x: anchored.x, y: anchored.y },
+      colour: state.fillColor ?? state.borderColor ?? resolveStaticBorderColor(),
       crossfade: state.fillCrossfade === true,
       fill: state.fill ?? 0,
       halfHeight: EDGE_MARKER_HALF_HEIGHT * scale,
@@ -760,7 +768,7 @@ export const drawEdgeMarker = (
   tracePolygon(graphics, outline);
   graphics.lineStyle(
     EDGE_MARKER_STROKE_PX,
-    state.borderColor ?? STATIC_BORDER_COLOR,
+    state.borderColor ?? resolveStaticBorderColor(),
     state.alpha
   );
   graphics.strokePath();
@@ -811,10 +819,12 @@ export interface EdgeRingLifecycle {
  * - reduced motion (`crossfade`): all 8 equal `ringFill`, no per-beam timing.
  * Null lifecycle = at rest = all zero.
  */
-export const resolveEdgeRingFills = (
+/** One star's interior fill (see `resolveEdgeRingFills`); allocation-free. */
+export const resolveEdgeRingFill = (
   lifecycle: EdgeRingLifecycle | null,
+  index: number,
   count = EDGE_STATION_COUNT
-): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => {
+): number => {
   if (lifecycle === null) {
     return 0;
   }
@@ -824,11 +834,18 @@ export const resolveEdgeRingFills = (
   }
   const pulse = resolveEdgeBeamPulse(lifecycle.direction, lifecycle.clockMs, index, count, ring);
   return lifecycle.direction === 'outward' ? Math.max(ring, pulse.diamondFill) : pulse.diamondFill;
-});
+};
+
+export const resolveEdgeRingFills = (
+  lifecycle: EdgeRingLifecycle | null,
+  count = EDGE_STATION_COUNT
+): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => resolveEdgeRingFill(lifecycle, index, count));
 
 /**
- * Per-station size 0..1 (index = station id): held at full size for any full-motion lifecycle (edgeRingScaleHold.ts; the MAZER-VIS-038
- * size cycle, edgeBeamTimeline.ts `resolveEdgeDiamondScale`, is no longer drawn).
+ * Per-station size 0..1 (index = station id): the size FOLLOWS THE FILL (edgeStarMotion.ts `resolveEdgeStarScale`): rest size when
+ * the star is empty, growing smoothly while it fills, full while it is full (the whole orbit between the fill and the drain, so a
+ * full star never shrinks mid-orbit), shrinking smoothly while it drains back to rest. Rest size and fill 0 are the same size, so
+ * the ring enters and leaves its lifecycle with no size jump (the older hold at 100% popped on the first and the last frame).
  * Null lifecycle (at rest, the maze is running) and the reduced-motion crossfade lifecycle both give the fixed rest size
  * EDGE_DIAMOND_REST_SCALE: reduced motion keeps the diamonds static at 50% (the same size the maze runs at) and only
  * crossfades the interior colour.
@@ -839,7 +856,7 @@ export const resolveEdgeRingScales = (
 ): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => (
   lifecycle === null || lifecycle.crossfade === true
     ? EDGE_DIAMOND_REST_SCALE
-    : resolveHeldEdgeDiamondScale(lifecycle.direction, lifecycle.clockMs, index, count, clampUnit(lifecycle.ringFill))
+    : resolveEdgeStarScale(resolveEdgeRingFill(lifecycle, index, count))
 ));
 
 export interface SpawnSparkle {
@@ -875,6 +892,8 @@ export interface EdgeBeamsInput {
   readonly clockMs?: number;
   /** Backing scale, so line ends and widths land on whole device pixels. Default 1. */
   readonly devicePixelRatio?: number;
+  /** The player colour the beams, the contact ripple and the landing sparkles are drawn in (playerColour.ts). Absent: the colour at the trail start. */
+  readonly playerColour?: number;
 }
 
 export interface EdgeBeam {
@@ -920,12 +939,13 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const firingIds = new Set<number>();
   const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
-    // The diamond grows/shrinks about its OUTER tip, so the inner tip moves: follow the diamond's current size every frame.
-    const scale = Math.min(resolveHeldEdgeDiamondScale(input.direction, clockMs, index, count), station.maxScale ?? 1);
+    const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
+    // The diamond grows/shrinks about its OUTER tip with its fill (edgeStarMotion.ts), so the inner tip moves: follow the diamond's
+    // current size every frame (the same size `resolveEdgeRingScales` draws it at).
+    const scale = Math.min(resolveEdgeStarScale(pulse.diamondFill), station.maxScale ?? 1);
     const contact = resolveEdgeInnerTip(station, scale);
     const from = input.direction === 'inward' ? contact : input.focus;
     const to = input.direction === 'inward' ? input.focus : contact;
-    const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
     const times = resolveBeamTimes(index, count);
     const windowStart = input.direction === 'inward' ? times.launchMs : times.contactMs;
     const rippleProgress = clockMs > windowStart && clockMs < windowStart + EDGE_BEAM_PULSE_MS
@@ -969,22 +989,24 @@ export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): Ed
   const geometry = resolveEdgeBeams(input);
   const dpr = input.devicePixelRatio ?? 1;
   const clockMs = resolveBeamClockMs(input);
+  const playerColour = input.playerColour ?? resolvePlayerColour(null, 0, true);
   for (const beam of geometry.beams) {
     if (!beam.firing) {
       continue;
     }
     drawBeamPulse(graphics, {
       clockMs,
+      colour: playerColour,
       devicePixelRatio: dpr,
       headPoint: beam.tip,
       tailPoint: beam.tailPoint,
       // An outgoing beam is attached to its diamond's tip until the drain is over: glow there.
       tailPort: input.direction === 'inward' && beam.connected
     });
-    drawContactRipple(graphics, beam.contact, beam.rippleProgress, dpr);
+    drawContactRipple(graphics, beam.contact, beam.rippleProgress, dpr, playerColour);
   }
   geometry.sparkles.forEach((sparkle) => {
-    graphics.lineStyle(1, PLAYER_COLOR, sparkle.alpha);
+    graphics.lineStyle(1, playerColour, sparkle.alpha);
     graphics.lineBetween(sparkle.x - sparkle.size, sparkle.y, sparkle.x + sparkle.size, sparkle.y);
     graphics.lineBetween(sparkle.x, sparkle.y - sparkle.size, sparkle.x, sparkle.y + sparkle.size);
   });

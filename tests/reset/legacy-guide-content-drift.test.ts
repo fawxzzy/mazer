@@ -198,7 +198,9 @@ describe('guide copy only names things that exist', () => {
   test('You are colour-shifting: the spark takes the trail palette at the trail head, not a fixed colour', () => {
     expect(row('you').text).toMatch(/colour-shifting spark/);
     expect(row('you').text).not.toMatch(/green/);
-    expect(read('src/render/sparkPlayerSkin.ts')).toContain('sampleIridescentTrail(distance, time, stopped, SAMPLE_HEAD)');
+    expect(read('src/render/sparkPlayerSkin.ts')).toContain('samplePlayerColour(distance, time, stopped, SAMPLE_HEAD)');
+    // ...and that shared player colour is the trail palette today (playerColour.ts samples it), so the guide claim still holds.
+    expect(read('src/render/playerColour.ts')).toContain('sampleIridescentTrail(distanceTiles, timeMs, motionStopped, out)');
     expect(sceneMethod('private fillLegacyPlayerMarkerTile(')).toContain('resolveSparkMaterial(this.trailPaletteHead, time, reducedMotion,');
   });
 

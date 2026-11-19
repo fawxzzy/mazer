@@ -801,8 +801,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const edgeMarkersSource = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
     // colour contract: the border is the live trail colour and the inside / the beams are the player colour,
     // both from the single trail-palette module (no fixed mint / cyan any more)
-    expect(edgeMarkersSource).toContain('PLAYER_COLOR');
+    expect(edgeMarkersSource).toContain('resolvePlayerColour');
     expect(edgeMarkersSource).toContain('resolveTrailPaletteBorderColor');
+    expect(edgeMarkersSource).not.toContain('PLAYER_COLOR');
     expect(edgeMarkersSource).not.toContain('rail.mint');
     expect(edgeMarkersSource).not.toContain('rail.cyan');
     expect(edgeMarkersSource).not.toMatch(/0x[0-9a-fA-F]{6}/);
