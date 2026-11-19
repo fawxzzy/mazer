@@ -50,6 +50,13 @@ import {
   type StartTileSkinId
 } from './endpointTileSkins';
 import { resolveSharedBorderColor } from './playerColour';
+import { resolveBleedGateDrawPlan } from './bleedGateRenderer';
+import {
+  BLEED_GATE_BRACKET_IDLE,
+  BLEED_GATE_FLOOR,
+  resolveBleedGateBrackets,
+  type BleedGateBracketPlan
+} from './bleedGateTileLook';
 
 /** The goal star's border when the caller has no live trail colour (the Guide icon): the player colour at the trail's start, read per call. */
 const resolveStaticEndpointBorderColor = (): number => resolveSharedBorderColor(null, 0, true);
@@ -124,6 +131,16 @@ export interface BoardTileDock {
   lengthPx?: number;
 }
 
+/**
+ * MAZER-VIS-063: a bleed gate's tile. Every gate tile gets the darker gate floor; a gate that is not lit yet also
+ * gets its idle corner brackets baked in (a lit gate's brackets breathe, so the scene draws those live).
+ */
+export interface BoardTileGate {
+  x: number;
+  y: number;
+  lit?: boolean;
+}
+
 export interface BoardTileBakeInput {
   /** grid[y][x] === true is a floor (path) tile. */
   grid: ReadonlyArray<ReadonlyArray<boolean>>;
@@ -136,6 +153,8 @@ export interface BoardTileBakeInput {
   docks?: readonly BoardTileDock[];
   start?: BoardCell;
   goal?: BoardCell;
+  /** MAZER-VIS-063: bleed gate tiles (cells that are not floor are ignored). */
+  gates?: readonly BoardTileGate[];
   /**
    * Accepted for API symmetry. The bake is static, so reduced motion is a no-op here: it changes
    * neither the draw list nor the hash. (Marker phase is gated by it in drawBoardMarkers.)
@@ -188,6 +207,7 @@ interface NormalizedInput {
   docks: readonly BoardTileDock[];
   start: BoardCell | null;
   goal: BoardCell | null;
+  gates: readonly BoardTileGate[];
 }
 
 const normalizeInput = (input: BoardTileBakeInput): NormalizedInput => {
@@ -215,7 +235,8 @@ const normalizeInput = (input: BoardTileBakeInput): NormalizedInput => {
     style: resolveBoardTileStyleId(input.style ?? DEFAULT_BOARD_TILE_STYLE),
     docks: input.docks ?? [],
     start: input.start ?? null,
-    goal: input.goal ?? null
+    goal: input.goal ?? null,
+    gates: (input.gates ?? []).filter((gate) => isFloor(input.grid, gate.x, gate.y))
   };
 };
 
@@ -250,6 +271,11 @@ const gridSignature = (grid: ReadonlyArray<ReadonlyArray<boolean>>): string => g
 
 const cellSignature = (cell: BoardCell | null): string => (cell ? `${cell.x},${cell.y}` : '-');
 
+const gateSignature = (gates: readonly BoardTileGate[]): string => `gates=${[...gates]
+  .map((gate) => `${gate.x},${gate.y},${gate.lit === true ? 'l' : 'i'}`)
+  .sort()
+  .join(';')}`;
+
 const dockSignature = (docks: readonly BoardTileDock[]): string => [...docks]
   .map((d) => `${d.side}:${d.x},${d.y},${d.lengthPx ?? 'd'}`)
   .sort()
@@ -270,7 +296,9 @@ export const computeBoardTileBakeHash = (input: BoardTileBakeInput): string => {
     gridSignature(n.grid),
     dockSignature(n.docks),
     cellSignature(n.start),
-    cellSignature(n.goal)
+    cellSignature(n.goal),
+    // Only when there are gates, so every gateless board keeps the hash it had before gates were baked.
+    ...(n.gates.length > 0 ? [gateSignature(n.gates)] : [])
   ].join('|'));
 };
 
@@ -713,7 +741,8 @@ const paintSockets = (p: Painter, sockets: readonly BoardCell[], layout: BoardTi
 const paintChipFloor = (
   p: Painter,
   style: ResolvedBoardTileStyle,
-  tiles: readonly ChipTileGeometry[]
+  tiles: readonly ChipTileGeometry[],
+  gateTiles: readonly ChipTileGeometry[] = []
 ): void => {
   const m = style.material;
   if (tiles.length === 0) {
@@ -737,6 +766,16 @@ const paintChipFloor = (
     p.roundedRect(t.fill.left, t.fill.top, t.fill.width, t.fill.height, t.fillRadii);
   }
   p.fill();
+
+  // pass 2b (MAZER-VIS-063): the darker gate floor over each gate tile's own fill rect; the rim stays.
+  if (gateTiles.length > 0) {
+    p.fillStyle(cssRgb(BLEED_GATE_FLOOR));
+    p.begin();
+    for (const t of gateTiles) {
+      p.roundedRect(t.fill.left, t.fill.top, t.fill.width, t.fill.height, t.fillRadii);
+    }
+    p.fill();
+  }
 
   // pass 3: concave rim patches
   const rim = style.rimWidth;
@@ -919,6 +958,96 @@ const paintTraceFloor = (
   }
 };
 
+/* MAZER-VIS-063: gate tiles (darker floor + corner brackets; bleedGateTileLook.ts) ----------------------- */
+
+const gateTileGeometry = (
+  n: NormalizedInput,
+  layout: BoardTileLayout,
+  style: ResolvedBoardTileStyle
+): { gate: BoardTileGate; chip: ChipTileGeometry }[] => {
+  const out: { gate: BoardTileGate; chip: ChipTileGeometry }[] = [];
+  for (const gate of n.gates) {
+    const tile = analyzeTileAt(n, layout, gate.x, gate.y);
+    if (!tile) {
+      continue;
+    }
+    if (n.style === 'trace') {
+      // Trace has no chip fill: the brackets frame the whole cell.
+      out.push({
+        gate,
+        chip: {
+          ...tile,
+          radii: [0, 0, 0, 0],
+          fill: { left: tile.left, top: tile.top, width: tile.width, height: tile.height },
+          fillRadii: [0, 0, 0, 0],
+          concave: { tl: false, tr: false, br: false, bl: false }
+        }
+      });
+    } else {
+      out.push({ gate, chip: chipGeometryOf(n, tile, style) });
+    }
+  }
+  return out;
+};
+
+const gateBracketPlanOf = (n: NormalizedInput, chip: ChipTileGeometry): BleedGateBracketPlan => {
+  const ring = resolveBleedGateDrawPlan({
+    axis: 'horizontal', centerX: 0, centerY: 0, tileSize: n.tileSize, activation: 0, timeSec: 0, reducedMotion: true
+  });
+  return resolveBleedGateBrackets({
+    tile: chip,
+    tileSize: n.tileSize,
+    scale: n.scale,
+    ringOuterRadius: ring.radius + (ring.lineWidth / 2)
+  });
+};
+
+/**
+ * The corner brackets of every gate tile, board-local css px, keyed `x,y` (same device-snapped layout the bake
+ * uses). The scene draws a LIT gate's brackets from this, offset by the layer's snapped origin, so they land on
+ * the pixels the baked idle brackets used.
+ */
+export const computeBleedGateBracketPlans = (input: BoardTileBakeInput): Map<string, BleedGateBracketPlan> => {
+  const n = normalizeInput(input);
+  const style = resolveBoardTileStyle(n.style, n.tileSize, n.scale);
+  const layout = buildLayout(n, style);
+  const plans = new Map<string, BleedGateBracketPlan>();
+  for (const { gate, chip } of gateTileGeometry(n, layout, style)) {
+    plans.set(`${gate.x},${gate.y}`, gateBracketPlanOf(n, chip));
+  }
+  return plans;
+};
+
+const paintGateBrackets = (
+  p: Painter,
+  n: NormalizedInput,
+  gates: readonly { gate: BoardTileGate; chip: ChipTileGeometry }[]
+): void => {
+  const idle = gates.filter((entry) => entry.gate.lit !== true);
+  if (idle.length === 0) {
+    return;
+  }
+  // Butt caps and miter joins: what Phaser Graphics strokes with, so the live (lit) brackets match the baked ones.
+  p.caps('butt', 'miter');
+  p.strokeStyle(cssRgb(BLEED_GATE_BRACKET_IDLE));
+  let width = -1;
+  for (const { chip } of idle) {
+    const plan = gateBracketPlanOf(n, chip);
+    if (plan.lineWidth !== width) {
+      width = plan.lineWidth;
+      p.lineWidth(width);
+    }
+    p.begin();
+    for (const bracket of plan.brackets) {
+      const [first, ...rest] = bracket;
+      if (!first) continue;
+      p.move(first.x, first.y);
+      for (const point of rest) p.line(point.x, point.y);
+    }
+    p.stroke();
+  }
+};
+
 export function bakeBoardTiles<TCanvas = unknown>(
   input: BoardTileBakeInput,
   factory: TileBakeSurfaceFactory<TCanvas>
@@ -938,12 +1067,14 @@ export function bakeBoardTiles<TCanvas = unknown>(
   paintSockets(p, sockets, layout, style);
 
   const base = analyzeTiles(n, layout);
+  const gates = gateTileGeometry(n, layout, style);
   if (n.style === 'trace') {
     paintTraceFloor(p, n, layout, style, base);
   } else {
-    paintChipFloor(p, style, base.map((tile) => chipGeometryOf(n, tile, style)));
+    paintChipFloor(p, style, base.map((tile) => chipGeometryOf(n, tile, style)), gates.map((entry) => entry.chip));
     paintChipDocks(p, layout, style);
   }
+  paintGateBrackets(p, n, gates);
 
   p.alpha(1);
   p.transform(1, 0, 0, 1, 0, 0);

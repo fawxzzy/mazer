@@ -24,6 +24,7 @@
  */
 import type Phaser from 'phaser';
 import {
+  computeBleedGateBracketPlans,
   computeBoardTileLayout,
   computeChipTileAt,
   createBoardTileBakeCache,
@@ -32,11 +33,13 @@ import {
   type BoardTileBakeInput,
   type BoardTileBakeResult,
   type BoardTileDock,
+  type BoardTileGate,
   type BoardTileLayout,
   type TileBakeContext2D,
   type TileBakeSurface
 } from './boardTileBake';
 import { resolveRevealMaskLength } from './boardRevealMask';
+import type { BleedGateBracketPlan } from './bleedGateTileLook';
 import { toWholeImagePosition } from './pixelAlignment';
 import { PALETTE_MASK_BLACK_CSS } from './trailPalette';
 import { resolveStartDirection, type StartDirection } from './startDirection';
@@ -455,6 +458,8 @@ export interface BoardTileLayerFrame {
   docks: readonly BoardTileDock[];
   start?: BoardCell;
   goal?: BoardCell;
+  /** MAZER-VIS-063: bleed gate tiles (darker floor; idle corner brackets baked in until the gate is lit). */
+  gates?: readonly BoardTileGate[];
   /** Layout-px position of board cell (0,0)'s top-left corner. */
   boardLeft: number;
   boardTop: number;
@@ -497,6 +502,7 @@ export class BoardTileLayer {
   private composedKey: string | null = null;
   private composedHash: string | null = null;
   private endpoints: BoardTileEndpoints = { start: null, goal: null };
+  private gateBrackets: ReadonlyMap<string, BleedGateBracketPlan> = new Map();
   private textureWidth = 0;
   private textureHeight = 0;
   private softCellExtent = new Uint8ClampedArray(0);
@@ -517,6 +523,14 @@ export class BoardTileLayer {
 
   get currentBake(): BoardTileBakeResult<HTMLCanvasElement> | null {
     return this.cache.current;
+  }
+
+  /**
+   * MAZER-VIS-063: each gate tile's corner brackets in the current bake, keyed `x,y` (board-local css px,
+   * origin = `snappedOrigin`). The scene strokes a lit gate's brackets from these.
+   */
+  get bleedGateBrackets(): ReadonlyMap<string, BleedGateBracketPlan> {
+    return this.gateBrackets;
   }
 
   /** Start/goal chip geometry of the current bake (board-local css px, origin = `snappedOrigin`). */
@@ -544,7 +558,8 @@ export class BoardTileLayer {
       style: frame.style,
       docks: frame.docks,
       start: frame.start,
-      goal: frame.goal
+      goal: frame.goal,
+      gates: frame.gates
     };
     const t0 = performance.now();
     const { result, rebuilt } = this.cache.bake(input, createDocumentSurface);
@@ -560,6 +575,7 @@ export class BoardTileLayer {
           : null,
         goal: frame.goal ? computeChipTileAt(input, frame.goal) : null
       };
+      this.gateBrackets = frame.gates && frame.gates.length > 0 ? computeBleedGateBracketPlans(input) : new Map();
       this.composedKey = null;
     }
     const layout = this.layout!;

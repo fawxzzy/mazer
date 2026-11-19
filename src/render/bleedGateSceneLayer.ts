@@ -5,6 +5,10 @@
 // field-coloured cover over each of the path's two openings (and the dock strip past the board edge) that
 // fades out under a travelling ring. The board bake already shows the opened path from the moment the gate
 // is lit (legacyBleedGateState.ts, resolveLegacyBleedGateViewGrid), so the cover is what makes it draw in.
+//
+// MAZER-VIS-063: the gate tile's darker floor and its idle corner brackets are in the board bake; a LIT gate's
+// brackets (cyan, breathing on the ring's pulse clock) are stroked here, under the ring, on the redraws that
+// already repaint the ring. The ring itself is drawn exactly as before.
 
 import {
   readLegacyBleedGateTriggeredAtMs,
@@ -19,6 +23,11 @@ import {
   BLEED_GATE_LIT,
   type BleedGateGraphics
 } from './bleedGateRenderer';
+import {
+  drawBleedGateBrackets,
+  resolveBleedGateBracketStyle,
+  type BleedGateBracketPlan
+} from './bleedGateTileLook';
 
 export interface BleedGateSceneLayerInput {
   maze: {
@@ -35,6 +44,11 @@ export interface BleedGateSceneLayerInput {
   fieldColor: number;
   alpha?: number;
   isVisible?: (point: { x: number; y: number }) => boolean;
+  /**
+   * MAZER-VIS-063: the bake's gate brackets (BoardTileLayer.bleedGateBrackets, keyed `x,y`, board-local css px)
+   * and the layer's snapped origin they are relative to. Absent: no live brackets are drawn.
+   */
+  brackets?: { origin: { x: number; y: number }; plans: ReadonlyMap<string, BleedGateBracketPlan> } | null;
 }
 
 // Cell rect, rounded the same way MenuScene.resolveLegacyPixelTileRect rounds.
@@ -87,6 +101,11 @@ export const drawLegacyBleedGateLayer = (graphics: BleedGateGraphics, input: Ble
     }
     if (input.isVisible && !input.isVisible({ x: gate.x, y: gate.y })) {
       continue;
+    }
+    const bracketPlan = lit ? input.brackets?.plans.get(`${gate.x},${gate.y}`) : undefined;
+    if (bracketPlan && input.brackets) {
+      const look = resolveBleedGateBracketStyle({ activation: state.activation, timeSec: nowMs / 1000, reducedMotion });
+      drawBleedGateBrackets(graphics, bracketPlan, look.color, look.alpha * alpha, input.brackets.origin.x, input.brackets.origin.y);
     }
     const rect = cellRect(mazeLeft, mazeTop, tileSize, gate.x, gate.y);
     drawBleedGatePlan(graphics, resolveBleedGateDrawPlan({

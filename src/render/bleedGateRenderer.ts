@@ -32,6 +32,8 @@ const ARROW_SLIDE_RATE = 8;
 const PULSE_RATE = 0.9;
 const PULSE_REACH_SHARE = 0.9;
 const GLOW_PX = 9;
+/** MAZER-VIS-063: the pulse clock (pulse rings per second), shared with the lit gate's corner brackets. */
+export const BLEED_GATE_PULSE_RATE = PULSE_RATE;
 
 export const mixBleedGateColor = (from: number, to: number, amount: number): number => {
   const t = Math.max(0, Math.min(1, amount));
