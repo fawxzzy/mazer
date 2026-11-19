@@ -53,6 +53,7 @@
  * No Phaser, DOM, randomness or wall-clock dependency.
  */
 
+import { resolveYoYoDeconstructPhase, resolveYoYoRebuildPhase } from './ringYoYoMotion';
 import {
   MOTION_DURATION_MS,
   MOTION_EASING,
@@ -293,24 +294,6 @@ export const skipIntroElapsedMs = (
   { reducedMotion, tileCount }: { readonly reducedMotion: boolean; readonly tileCount: number }
 ): number => Math.max(normalizeElapsed(elapsedMs), resolveIntroDurationMs(reducedMotion, tileCount));
 
-/**
- * Ring orbit phase in radians over [startMs, endMs] (the timeline field is still
- * called ringSpinRad): direction * 2*pi*laps*smoothstep. 2*pi = one full lap
- * of the perimeter (resolveOrbitingEdgeStations). Exactly 0 before the window
- * and exactly 0 (a whole number of laps = the rest layout) once it has ended.
- */
-export const resolveRingOrbitRad = (
-  elapsedMs: number,
-  startMs: number,
-  endMs: number,
-  direction: 1 | -1
-): number => {
-  const progress = (elapsedMs - startMs) / (endMs - startMs);
-  // smoothstep, not smootherstep: zero speed at both ends, but the mid-window peak is 1.5x the average
-  // speed (smootherstep would be 2.25x here), which reads as travel instead of a lurch on a long edge.
-  return progress <= 0 || progress >= 1 ? 0 : direction * Math.PI * 2 * RING_ORBIT_LAPS * smoothstep(progress);
-};
-
 /** 1 until `fadeStartMs`, then falls linearly to exactly 0 over RING_ENERGY_FADE_MS. */
 export const resolveRingEnergyEnvelope = (elapsedMs: number, fadeStartMs: number): number => (
   1 - clamp01((elapsedMs - fadeStartMs) / RING_ENERGY_FADE_MS)
@@ -408,8 +391,8 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
     goalPulse: goalPulseProgress > 0 && goalPulseProgress < 1 ? Math.sin(goalPulseProgress * Math.PI) : 0,
     bleedProgress: elapsed >= revealEndMs ? 1 : 0,
     boardAlpha: 1,
-    // One clockwise lap over the whole build: exactly 0 (rest stations) when the beams fire.
-    ringSpinRad: resolveRingOrbitRad(elapsed, INTRO_BUILD_START_MS, revealEndMs, 1),
+    // Yo-yo (ringYoYoMotion.ts): clockwise from the deconstruct turnaround (a whole lap away) to exactly 0 (rest) at the build end.
+    ringSpinRad: resolveYoYoRebuildPhase(elapsed, 0, revealEndMs),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, laserEndMs),
     ringFill: options.digitAlreadyVisible === true
       ? 1
@@ -490,7 +473,7 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
     digitScale: INTRO_DIGIT_MIN_SCALE + ((1 - INTRO_DIGIT_MIN_SCALE) * digitAlpha),
     bleedProgress: elapsed < OUTRO_EDGE_PATHS_OFF_MS ? 1 : 0,
     laserProgress: smoothstep(elapsed / OUTRO_LASER_MS),
-    ringSpinRad: resolveRingOrbitRad(elapsed, OUTRO_RING_ORBIT_START_MS, totalMs, -1),
+    ringSpinRad: resolveYoYoDeconstructPhase(elapsed, OUTRO_RING_ORBIT_START_MS, totalMs),
     ringEnergy: resolveRingEnergyEnvelope(elapsed, totalMs - RING_ENERGY_FADE_MS),
     ringFill: 0,
     laserClockMs: elapsed,
