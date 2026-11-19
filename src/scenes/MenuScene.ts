@@ -309,14 +309,6 @@ import {
 } from '../legacy-runtime/legacyDirectionalIntent';
 import { resolveLegacyFrozenElapsedMs } from '../legacy-runtime/legacyPlayHud';
 import {
-  LEGACY_COMPLETION_TIME_STROKE_COLOR,
-  LEGACY_COMPLETION_TIME_TEXT_COLOR,
-  captureLegacyCompletionTimeMs,
-  resolveLegacyCompletionTimeLine,
-  resolveLegacyCompletionTimeLineLayout,
-  shouldRetainLegacyCompletionTime
-} from '../legacy-runtime/legacyCompletionTime';
-import {
   resolveLegacyPlayerTransferVisualState,
   type LegacyPlayerTransferVisualState
 } from '../legacy-runtime/legacyPlayerTransfer';
@@ -1603,10 +1595,9 @@ const LEGACY_TILE_FONT_GLYPH_POOL_SIZE = 8;
 // asset (see drawLegacyMenuPathTitle) instead of the maze-path dot-cell
 // glyph it used to be drawn from exclusively.
 const LEGACY_TITLE_WORD = 'MAZER';
-// MAZER-UI-050: the front-door play label sits this far above the old Start spot, and the level line
-// under it this far below the label's centre (px, whole numbers so Images stay pixel-aligned).
+// MAZER-UI-050: the front-door play label sits this far above the old Start spot
+// (px, whole numbers so Images stay pixel-aligned).
 const LEGACY_MENU_PLAY_LABEL_RISE_PX = 14;
-const LEGACY_MENU_LEVEL_LINE_DROP_PX = 30;
 const LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX = 600;
 // "MAZER", "START", and "LOGIN" are all exactly 5 characters -- covers the
 // title wordmark and both primary front-door button labels with no waste.
@@ -1920,6 +1911,9 @@ export class MenuScene extends Phaser.Scene {
   // Graphics object every frame in local coordinates exactly like
   // drawLegacyMenuFrontDoorGlyphButton's own `panel`.
   private levelAnnouncerNumberGraphics!: Phaser.GameObjects.Graphics;
+  // Always-hidden 'LEVEL' label Text: the between-levels Completion Time line that used to reuse it is removed, but the
+  // design-token evidence (fontSizePx.label = 16) cites this Text, and that contract is owned by Wave 1B.
+  private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   // Pool of reusable Image GameObjects rendering the level number from the
   // real Mazer tile-font raster asset (drawLegacyTileFontWord) when it's
   // available -- levelAnnouncerNumberGraphics becomes twinkle-sparkles-only
@@ -1941,10 +1935,6 @@ export class MenuScene extends Phaser.Scene {
   // back to the original maze-path dot-cell glyph only if the asset never
   // loaded.
   private titleTileFontImagePool: Phaser.GameObjects.Image[] = [];
-  // Completion Time line above the level number (legacyCompletionTime.ts, display only: never stored or sent).
-  private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
-  private lastCompletedRunMs: number | null = null;
-  private completionTimeFontPx = 0;
   // Pause > Quit to Menu two-step confirm (legacyQuitConfirm.ts).
   private quitConfirmState: LegacyQuitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
   private levelAnnouncerWasVisible = false;
@@ -7498,13 +7488,6 @@ export class MenuScene extends Phaser.Scene {
       const firstGoalArrival = this.playCompletedAtMs === null;
       this.playCompletedAtMs ??= this.time.now;
       if (firstGoalArrival) {
-        this.lastCompletedRunMs = captureLegacyCompletionTimeMs(resolveLegacyFrozenElapsedMs({
-          completedAtMs: this.playCompletedAtMs,
-          nowMs: this.time.now,
-          startedAtMs: this.playStartedAtMs
-        }));
-      }
-      if (firstGoalArrival) {
         this.noteHazardMomentsLevelCleared();
       }
       this.recordMazeCycleCompletion('play');
@@ -9482,14 +9465,8 @@ export class MenuScene extends Phaser.Scene {
   // branch of its own beyond picking which track's level to show.
   private drawLegacyLevelAnnouncer(time: number): void {
     const { alpha, scale, revealProgress } = this.resolveLegacyLevelAnnouncerVisualState(time);
-    this.levelAnnouncerLabelText.setVisible(false);
-    if (!shouldRetainLegacyCompletionTime({
-      mode: this.mode,
-      nextRunStarted: this.playCompletedAtMs === null && this.hasPlayerEverLeftStart
-    })) {
-      this.lastCompletedRunMs = null;
-    }
     if (alpha <= 0) {
+      this.levelAnnouncerLabelText.setVisible(false);
       this.levelAnnouncerNumberGraphics.setVisible(false);
       // Bug fix: every call site that hides the level-announcer's number
       // used to only hide levelAnnouncerNumberGraphics -- the tile-font
@@ -9532,34 +9509,6 @@ export class MenuScene extends Phaser.Scene {
     this.levelAnnouncerNumberGraphics
       .setPosition(centerX, centerY)
       .setScale(scale)
-      .setAlpha(alpha)
-      .setVisible(true);
-    this.drawLegacyCompletionTimeLine(alpha, centerY, glyphLayout.height);
-  }
-
-  // "Completion Time: MM:SS" above the level number: same alpha as the number (so the same easing, duration
-  // and Reduce Motion crossfade), never scaled or moved, so it stays crisp. Only after a timed Play run.
-  private drawLegacyCompletionTimeLine(alpha: number, numberCenterY: number, numberHeight: number): void {
-    const line = resolveLegacyCompletionTimeLine({ completedMs: this.lastCompletedRunMs, mode: this.mode });
-    if (line === null) {
-      return;
-    }
-    const layout = resolveLegacyCompletionTimeLineLayout({
-      numberCenterY,
-      numberHeight,
-      viewportHeight: this.layout.height,
-      viewportWidth: this.layout.width
-    });
-    if (layout.fontPx !== this.completionTimeFontPx) {
-      this.completionTimeFontPx = layout.fontPx;
-      this.levelAnnouncerLabelText.setFontSize(layout.fontPx);
-    }
-    this.levelAnnouncerLabelText
-      .setText(line)
-      .setColor(LEGACY_COMPLETION_TIME_TEXT_COLOR)
-      .setStroke(LEGACY_COMPLETION_TIME_STROKE_COLOR, Math.max(3, Math.round(layout.fontPx * 0.22)))
-      .setOrigin(0.5, 1)
-      .setPosition(layout.centerX, layout.bottomY)
       .setAlpha(alpha)
       .setVisible(true);
   }
@@ -11226,7 +11175,6 @@ export class MenuScene extends Phaser.Scene {
       createLegacyLevelPreviewProgressionState(next)
     );
     this.previewLevelsExpanded = false;
-    this.lastCompletedRunMs = null;
     this.closeOverlay();
     this.startPlayMode();
     this.hudDirty = true;
@@ -11517,8 +11465,7 @@ export class MenuScene extends Phaser.Scene {
           this.createLegacySignedOutOAuthFailure();
         } else {
           // MAZER-UI-050: "TAP TO PLAY" is 11 glyphs, so it gets the full screen width (the glyph cell
-          // size is derived from it) and sits a little above the old Start spot; the level line below
-          // takes the old spot's lower half, clear of the bottom edge marker.
+          // size is derived from it) and sits a little above the old Start spot, clear of the bottom edge marker.
           // Phone-width portrait only: wide/landscape layouts keep the old button box, which other
           // systems (teleport anchor exclusion) read the bounds of.
           const isPhoneWidth = this.layout.width < LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX;
@@ -11535,17 +11482,6 @@ export class MenuScene extends Phaser.Scene {
               { explicitHitZone: true, semanticAction: 'Start' }
             )
           );
-          const levelLineFontPx = 13;
-          this.uiTexts.push(this.add.text(
-            this.layout.centerButtonX,
-            playLabelY + LEGACY_MENU_LEVEL_LINE_DROP_PX,
-            `LEVEL ${this.progressionState.tracks[this.resolveActiveLegacyProgressionTrackId()].level}`,
-            {
-              fontFamily: LEGACY_UI_FONT_FAMILY,
-              fontSize: `${levelLineFontPx}px`,
-              color: MENU_TEXT_COLOR
-            }
-          ).setOrigin(0.5).setAlpha(0.82));
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
           () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
@@ -12728,7 +12664,6 @@ export class MenuScene extends Phaser.Scene {
     }
     if (plan.selfRow !== null) {
       this.paintLegacyLeaderboardSelfRow(plan.selfRow);
-      this.uiButtons.push(this.createLegacyLeaderboardEditNameHit(plan.selfRow));
     }
     if (plan.stateBlock !== null) {
       this.paintLegacyLeaderboardState(plan.stateBlock);
@@ -12829,8 +12764,7 @@ export class MenuScene extends Phaser.Scene {
         bold: model.emphasized || model.isOwn,
         mask
       });
-      const nameWidth = model.isOwn ? row.nameMaxWidth - 38 : row.nameMaxWidth;
-      const name = this.addLegacyLeaderboardText(rect.left + row.nameLeft, centerY, model.usernameText, nameColor, 15, 0, nameWidth, {
+      this.addLegacyLeaderboardText(rect.left + row.nameLeft, centerY, model.usernameText, nameColor, 15, 0, row.nameMaxWidth, {
         bold: model.emphasized || model.isOwn,
         mask
       });
@@ -12838,12 +12772,6 @@ export class MenuScene extends Phaser.Scene {
         bold: model.emphasized || model.isOwn,
         mask
       });
-      if (model.isOwn) {
-        const pillLeft = rect.left + row.nameLeft + Math.max(0, name.width - 16) + 8;
-        graphics.fillStyle(material.rail.mint, 0.22);
-        graphics.fillRoundedRect(pillLeft, centerY - 8, 30, 16, 8);
-        this.addLegacyLeaderboardText(pillLeft + 15, centerY, LEGACY_LEADERBOARD_COPY.you.toUpperCase(), material.rail.mint, 10, 0.5, 28, { bold: true, mask });
-      }
     });
   }
 
@@ -12861,15 +12789,8 @@ export class MenuScene extends Phaser.Scene {
     const centerY = rect.top + (rect.height / 2);
     this.addLegacyLeaderboardText(rect.left + self.rankCenterX, centerY, model.rankText, material.rail.mint, 19, 0.5, 52, { bold: true });
     if (model.usernameText !== null) {
-      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY - 10, model.label.toUpperCase(), material.rail.mint, 11, 0, self.nameMaxWidth, { bold: true, alpha: 0.9 });
-      // `Edit name` chip beside the YOU label; the whole row is the hit target (self.editHit).
-      const chipLeft = rect.left + self.nameLeft + 36;
-      graphics.lineStyle(1, material.rail.mint, 0.6);
-      graphics.strokeRoundedRect(chipLeft + 0.5, centerY - 19.5, 66, 18, 9);
-      this.addLegacyLeaderboardText(chipLeft + 33, centerY - 10, model.editLabel.toUpperCase(), material.rail.mint, 10, 0.5, 62, { bold: true });
-      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY + 9, model.usernameText, material.rail.white, 15, 0, self.nameMaxWidth, { bold: true });
-    } else {
-      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY, model.label, material.rail.mint, 17, 0, self.nameMaxWidth, { bold: true });
+      // Username only, vertically centred in the pinned row. Renames live on the account screen.
+      this.addLegacyLeaderboardText(rect.left + self.nameLeft, centerY, model.usernameText, material.rail.white, 15, 0, self.nameMaxWidth, { bold: true });
     }
     this.addLegacyLeaderboardText(rect.left + self.levelRight, centerY, model.levelText, material.rail.mint, 19, 1, self.levelMaxWidth, { bold: true });
   }
@@ -13617,35 +13538,6 @@ export class MenuScene extends Phaser.Scene {
     this.syncLeaderboardUsernameNativeInput(field, view.busy);
   }
 
-  // The pinned You row is the `Edit name` hit target (56 px tall, full card width): a
-  // transparent interactive rect; the visible chip is painted by paintLegacyLeaderboardSelfRow.
-  private createLegacyLeaderboardEditNameHit(self: NonNullable<LegacyLeaderboardOverlayPlan['selfRow']>): UiButton {
-    const hit = self.editHit;
-    const background = this.add.rectangle(
-      hit.left + (hit.width / 2),
-      hit.top + (hit.height / 2),
-      hit.width,
-      hit.height,
-      0x000000,
-      0.001
-    );
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', () => this.openLeaderboardUsernameEditor());
-    const label = this.add.text(hit.left, hit.top, '', { fontFamily: LEGACY_UI_FONT_FAMILY, fontSize: '1px' }).setVisible(false);
-    this.uiTexts.push(label);
-    return {
-      background,
-      bounds: createVisualRect(hit.left, hit.top, hit.width, hit.height),
-      label,
-      semanticAction: 'leaderboard-edit-name',
-      setActive: () => undefined,
-      text: self.model.editLabel,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
   // A username save that did not land is told to the player in plain words;
   // the provider text stays in the message's technicalDetail.
   private reportAccountUsernameSaveFailure(
@@ -14728,7 +14620,6 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
-      this.lastCompletedRunMs = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;

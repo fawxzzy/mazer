@@ -79,8 +79,6 @@ export interface LegacyLeaderboardPlanSelfRow {
   model: LegacyLeaderboardSelfRowModel;
   /** Screen-space rect. */
   rect: LegacyLeaderboardPlanRect;
-  /** Hit target of the `Edit name` control: the whole pinned row (>= 44 px tall and wide). */
-  editHit: LegacyLeaderboardPlanRect;
   rankCenterX: number;
   nameLeft: number;
   nameMaxWidth: number;
@@ -270,8 +268,7 @@ export const buildLegacyLeaderboardOverlayPlan = (
     selfRow = {
       ...cols,
       model: view.selfRow,
-      rect: rectOf(innerLeft, top, innerWidth, z.selfRowHeight),
-      editHit: rectOf(innerLeft, top, innerWidth, z.selfRowHeight)
+      rect: rectOf(innerLeft, top, innerWidth, z.selfRowHeight)
     };
   }
 

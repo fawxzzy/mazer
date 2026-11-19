@@ -166,7 +166,6 @@ describe('MenuScene interactive-zone inventory', () => {
   const EXPECTED_INTERACTIVE_SITES: Record<string, string> = {
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
     createLegacyAuthActionButton: 'account failure fallback: the one Try again button (44+)',
-    createLegacyLeaderboardEditNameHit: 'leaderboard You row: the whole pinned row (full card width x 56 px) is the Edit name target',
     createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',

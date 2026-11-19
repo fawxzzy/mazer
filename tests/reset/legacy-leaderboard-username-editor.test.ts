@@ -271,16 +271,15 @@ describe('leaderboard: Edit name is on the player row and on the gate', () => {
     usernameGate: 'ok'
   };
 
-  test('the pinned You row carries the Edit name label and a >= 44 px hit target at every audit viewport', () => {
+  test('the pinned self row has no Edit name control, no "You" label and no edit hit target (renames live on the account screen)', () => {
     const view = buildLegacyLeaderboardViewModel(base);
-    expect(view.selfRow?.editLabel).toBe('Edit name');
+    expect(view.selfRow).not.toBeNull();
+    expect(view.selfRow).not.toHaveProperty('editLabel');
+    expect(view.selfRow).not.toHaveProperty('label');
     for (const { height, width } of LEGACY_LEADERBOARD_PLAN_VIEWPORTS) {
       const plan = buildLegacyLeaderboardOverlayPlan(view, width, height);
       expect(plan.selfRow).not.toBeNull();
-      const hit = plan.selfRow!.editHit;
-      expect(hit.height).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
-      expect(hit.width).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
-      expect(hit).toEqual(plan.selfRow!.rect);
+      expect(plan.selfRow).not.toHaveProperty('editHit');
     }
   });
 
@@ -293,10 +292,9 @@ describe('leaderboard: Edit name is on the player row and on the gate', () => {
 describe('MenuScene wiring (source contract)', () => {
   const menu = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
-  test('Edit name opens the editor from the row hit and the gate action', () => {
-    expect(menu).toContain('this.uiButtons.push(this.createLegacyLeaderboardEditNameHit(plan.selfRow));');
+  test('Edit name opens the editor only from the gate action, not from the pinned self row', () => {
+    expect(menu).not.toContain('createLegacyLeaderboardEditNameHit');
     expect(menu).toContain("case 'edit-username':\n        this.openLeaderboardUsernameEditor();");
-    expect(menu).toContain("background.on('pointerdown', () => this.openLeaderboardUsernameEditor());");
   });
 
   test('cancel: Back (Escape, the scrim tap and Cancel all route through it) closes the editor before the sheet', () => {
