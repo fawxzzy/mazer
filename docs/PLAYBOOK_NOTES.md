@@ -504,3 +504,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: scripts/analysis/capture-world-identity-ui-evidence.mjs readIconState no longer reads the retired corner Settings and Leaderboard icon fields; it reports menuDropdownShown and the touch Settings cog state instead.
 - WHY it changed: the corner icons are rows of the Menu dropdown now, so the old fields always read null and hid real state in the evidence output. Script only: no runtime change, no deploy.
 - Status: node --check ok; no assertion referenced the removed fields.
+## 2026-11-19 MAZER-CTRL-003 controls rework: audit, contract and live options page
+- WHAT changed: docs/architecture/MAZER-CONTROLS-REWORK-PRODUCT-CONTRACT.md (audit of touch, keyboard, speed and haptics with source numbers, plus what controls must do on a phone) and docs/ops/MAZER-CONTROLS-OPTIONS-2026-11-19.html (one standalone page, five labelled feel options A to E on a tiny test maze with tunable numbers). No src change.
+- WHY it changed: the owner un-parked the controls card on 2026-11-19; the card order is audit, then a proposal the owner picks from, then a build. Main finding: the touch stick repeats at 113 ms while keyboard repeats at 139 ms at the default Move Speed, and below about 45% Move Speed the stick ignores the slider.
+- Status: headless only (page driven with synthetic pointer events in Chromium 390x844, all five options step, tap-step works, no console errors); the audit numbers are read from source, not measured; nothing checked on a real phone.

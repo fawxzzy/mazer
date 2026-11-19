@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Mazer controls: feel options (MAZER-CTRL-003)</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a1020; --panel:#121a30; --line:#26335a; --ink:#e9eefc; --dim:#93a0c4; --mint:#4ff0c0; --aqua:#46c8ff; --warn:#ffcf5a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, sans-serif; padding:12px max(12px, env(safe-area-inset-right)) 28px max(12px, env(safe-area-inset-left)); }
+  main { max-width:420px; margin:0 auto; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p.sub { margin:0 0 10px; color:var(--dim); font-size:13px; }
+  #stage { width:100%; display:block; margin:0 auto; border:1px solid var(--line); border-radius:10px; background:#070c1a; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .tabs { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:10px 0; }
+  .tabs button { min-height:48px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:600 16px system-ui; }
+  .tabs button[aria-pressed="true"] { border-color:var(--mint); color:var(--mint); background:#0f2b2c; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0; }
+  .card h2 { font-size:15px; margin:0 0 2px; color:var(--mint); }
+  .card p { margin:2px 0 0; color:var(--dim); font-size:13px; }
+  label.row { display:grid; grid-template-columns:1fr auto; gap:2px 8px; align-items:center; margin:8px 0 0; font-size:13px; }
+  label.row output { color:var(--aqua); font-variant-numeric:tabular-nums; }
+  label.row input[type=range] { grid-column:1 / -1; width:100%; min-height:32px; }
+  .metrics { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; font-size:13px; font-variant-numeric:tabular-nums; }
+  .metrics span b { color:var(--warn); font-weight:600; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .btns button { min-height:44px; padding:0 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:600 14px system-ui; }
+  .chk { display:flex; align-items:center; gap:8px; min-height:44px; font-size:14px; }
+  .chk input { width:22px; height:22px; }
+  textarea { width:100%; min-height:84px; background:#070c1a; color:var(--ink); border:1px solid var(--line); border-radius:8px; font:12px ui-monospace, monospace; padding:8px; }
+  small.hint { color:var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mazer controls: feel options</h1>
+  <p class="sub">Test maze only. Drag anywhere on the maze like in the game. Pick A to E, tune the numbers, then press Copy my pick and send it back. Nothing here changes the real game.</p>
+  <canvas id="stage" width="312" height="408" aria-label="Test maze"></canvas>
+  <div class="tabs" id="tabs" role="group" aria-label="Control option"></div>
+  <div class="card" id="desc"></div>
+  <div class="card" id="tune"></div>
+  <div class="card">
+    <div class="metrics">
+      <span>First step after drag: <b id="m-lat">-</b></span>
+      <span>Steps per second: <b id="m-sps">0.0</b></span>
+      <span>Direction flips: <b id="m-flip">0</b></span>
+      <span>Blocked ticks: <b id="m-blk">0</b></span>
+      <span>Turns taken: <b id="m-turn">0</b></span>
+      <span>Goals reached: <b id="m-goal">0</b></span>
+    </div>
+    <label class="chk"><input type="checkbox" id="hap"> Vibrate on each step (Android only, iPhone has no vibration)</label>
+    <div class="btns">
+      <button id="reset" type="button">Reset maze</button>
+      <button id="zero" type="button">Zero counters</button>
+      <button id="copy" type="button">Copy my pick</button>
+    </div>
+  </div>
+  <textarea id="out" readonly aria-label="Your pick, copy this text"></textarea>
+  <p class="sub"><small class="hint">Current game numbers for reference (390 wide phone): dead zone 12 px, full pull 33 px, one step every 113 ms with the stick (139 ms keyboard), first step about 32 ms after the drag starts. Option A reproduces them.</small></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const MAZE = [
+    '#############', '#S..#.......#', '#.#.#.#####.#', '#.#...#...#.#', '#.#####.#.#.#',
+    '#.......#...#', '#.#######.###', '#.#.....#...#', '#.#.###.###.#', '#...#.#.....#',
+    '#.###.#####.#', '#.#...#...#.#', '#.#.###.#.#.#', '#.#.....#...#', '#.#######.###',
+    '#........G..#', '#############'
+  ];
+  const COLS = 13, ROWS = 17, TILE = 24;
+  const DIRS = { R: [1, 0], L: [-1, 0], D: [0, 1], U: [0, -1] };
+  const isOpen = (x, y) => y >= 0 && y < ROWS && x >= 0 && x < COLS && MAZE[y][x] !== '#';
+
+  // Tunable numbers per option. min/max/step are for the slider; v is the default.
+  const OPTIONS = {
+    A: { name: 'A  Current feel', blurb: 'Fixed anchor where the finger lands, constant speed. Matches the live game, so this is your baseline.',
+      p: { dz: [12, 4, 40, 1, 'Dead zone (px)'], stepMs: [113, 70, 220, 1, 'Time per step (ms)'], firstMs: [32, 0, 150, 1, 'First step delay (ms)'], lean: [30, 0, 60, 1, 'Side lean that counts as a turn hint (%)'] } },
+    B: { name: 'B  Floating anchor', blurb: 'Same as A, but the anchor follows your finger once it is past a leash distance. Reversing no longer needs a long drag back. (This is the idea in open PR 656.)',
+      p: { dz: [12, 4, 40, 1, 'Dead zone (px)'], stepMs: [113, 70, 220, 1, 'Time per step (ms)'], leash: [90, 30, 220, 1, 'Leash before anchor follows (px)'], easeMs: [140, 30, 400, 5, 'Anchor catch-up time (ms)'], firstMs: [32, 0, 150, 1, 'First step delay (ms)'], lean: [30, 0, 60, 1, 'Side lean that counts as a turn hint (%)'] } },
+    C: { name: 'C  Analog speed', blurb: 'Drag distance sets speed: just past the dead zone is slow and precise, far out is fast. Max drag is doubled (66 px). Good for stopping exactly at a gate.',
+      p: { dz: [12, 4, 40, 1, 'Dead zone (px)'], maxPull: [66, 30, 140, 1, 'Drag for full speed (px)'], slowMs: [230, 120, 400, 5, 'Slowest step (ms)'], fastMs: [85, 50, 160, 1, 'Fastest step (ms)'], firstMs: [32, 0, 150, 1, 'First step delay (ms)'], lean: [30, 0, 60, 1, 'Side lean that counts as a turn hint (%)'] } },
+    D: { name: 'D  Turn forgiveness', blurb: 'Same as A, plus: if you pull toward a wall opening you have not reached yet, the player keeps running and takes the turn at the first opening. Diagonal pulls stick to one axis until you clearly change.',
+      p: { dz: [12, 4, 40, 1, 'Dead zone (px)'], stepMs: [113, 70, 220, 1, 'Time per step (ms)'], carry: [8, 0, 20, 1, 'Keep running up to (tiles)'], hyst: [25, 0, 80, 1, 'Axis switch margin (%)'], firstMs: [32, 0, 150, 1, 'First step delay (ms)'], lean: [30, 0, 60, 1, 'Side lean that counts as a turn hint (%)'] } },
+    E: { name: 'E  Tap to step', blurb: 'Same as A, plus a quick tap on one side of the player moves exactly one tile that way. Precise single steps, drag still runs.',
+      p: { dz: [12, 4, 40, 1, 'Dead zone (px)'], stepMs: [113, 70, 220, 1, 'Time per step (ms)'], tapMs: [220, 100, 400, 10, 'Max tap time (ms)'], tapPx: [10, 4, 24, 1, 'Max tap wobble (px)'], firstMs: [32, 0, 150, 1, 'First step delay (ms)'], lean: [30, 0, 60, 1, 'Side lean that counts as a turn hint (%)'] } }
+  };
+  const vals = {};
+  for (const k of Object.keys(OPTIONS)) { vals[k] = {}; for (const [n, d] of Object.entries(OPTIONS[k].p)) vals[k][n] = d[0]; }
+  let cur = 'A';
+
+  const cv = document.getElementById('stage'), ctx = cv.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  cv.width = COLS * TILE * dpr; cv.height = ROWS * TILE * dpr;
+  cv.style.maxWidth = (COLS * TILE) + 'px';
+  let scale = 1; // css px per canvas unit
+  const updateScale = () => { scale = cv.getBoundingClientRect().width / (COLS * TILE); };
+
+  const S = { x: 1, y: 1, dir: 'R', nextAt: 0, carry: 0, lastKey: null, axis: null, steps: [], flips: 0, blocked: 0, turns: 0, goals: 0, lat: null, intentSince: null, firstStepDone: true, flash: 0 };
+  const P = { on: false, id: null, ax: 0, ay: 0, fx: 0, fy: 0, downAt: 0, dx0: 0, dy0: 0, stepped: false, maxMove: 0 };
+
+  const resetMaze = () => { S.x = 1; S.y = 1; S.dir = 'R'; S.carry = 0; };
+  const zero = () => { S.flips = 0; S.blocked = 0; S.turns = 0; S.goals = 0; S.lat = null; S.steps = []; refreshMetrics(); };
+
+  const buzz = () => { if ($('hap').checked && navigator.vibrate) { try { navigator.vibrate(6); } catch (e) { /* ignore */ } } };
+
+  const step = (dirKey, now) => {
+    const d = DIRS[dirKey], nx = S.x + d[0], ny = S.y + d[1];
+    if (!isOpen(nx, ny)) return false;
+    if (S.dir !== dirKey) S.turns += (S.dir === 'L' && dirKey === 'R') || (S.dir === 'R' && dirKey === 'L') || (S.dir === 'U' && dirKey === 'D') || (S.dir === 'D' && dirKey === 'U') ? 0 : 1;
+    S.x = nx; S.y = ny; S.dir = dirKey; S.steps.push(now); P.stepped = true; buzz();
+    if (S.lat === null && S.intentSince !== null) { S.lat = Math.round(now - S.intentSince); S.intentSince = null; }
+    if (MAZE[ny][nx] === 'G') { S.goals++; S.flash = now; resetMaze(); }
+    return true;
+  };
+
+  // Rank direction candidates from the pull vector. hyst keeps the current axis until the other one wins by that margin.
+  const rank = (vx, vy, hyst, leanPct) => {
+    const ax = Math.abs(vx), ay = Math.abs(vy);
+    let axis = ax >= ay ? 'x' : 'y';
+    if (hyst > 0 && S.axis) {
+      const cur_ = S.axis === 'x' ? ax : ay, oth = S.axis === 'x' ? ay : ax;
+      axis = oth > cur_ * (1 + hyst) ? (S.axis === 'x' ? 'y' : 'x') : S.axis;
+    }
+    S.axis = axis;
+    const total = Math.hypot(vx, vy) || 1;
+    const prim = axis === 'x' ? (vx >= 0 ? 'R' : 'L') : (vy >= 0 ? 'D' : 'U');
+    const sv = axis === 'x' ? vy : vx, sMag = Math.abs(sv) / total;
+    const sec = sMag >= leanPct / 100 ? (axis === 'x' ? (vy >= 0 ? 'D' : 'U') : (vx >= 0 ? 'R' : 'L')) : null;
+    return { prim, sec };
+  };
+
+  const intervalFor = (v, dist) => {
+    if (cur === 'C') { const r = Math.max(0, Math.min(1, (dist - v.dz) / Math.max(1, v.maxPull - v.dz))); return v.slowMs + (v.fastMs - v.slowMs) * r; }
+    return v.stepMs;
+  };
+
+  const tick = (now, dt) => {
+    const v = vals[cur];
+    if (!P.on) { S.lastKey = null; S.nextAt = 0; S.axis = null; return; }
+    // floating anchor (B)
+    if (cur === 'B') {
+      const dx = P.fx - P.ax, dy = P.fy - P.ay, dist = Math.hypot(dx, dy);
+      if (dist > v.leash) { const k = 1 - Math.exp(-dt / Math.max(1, v.easeMs)); const ex = (dist - v.leash) * k; P.ax += dx / dist * ex; P.ay += dy / dist * ex; }
+    }
+    const vx = P.fx - P.ax, vy = P.fy - P.ay, dist = Math.hypot(vx, vy);
+    if (dist < v.dz) { S.lastKey = null; S.nextAt = 0; S.intentSince = null; S.axis = null; return; }
+    const r = rank(vx, vy, cur === 'D' ? v.hyst / 100 : 0, v.lean);
+    const key = r.prim + (r.sec || '');
+    if (S.lastKey === null) { S.intentSince = now; S.nextAt = now + v.firstMs; S.lat = null; S.firstStepDone = false; }
+    else if (key !== S.lastKey) { if (r.prim !== S.lastKey[0]) S.flips++; S.nextAt = Math.min(S.nextAt, now + v.firstMs + 16); }
+    S.lastKey = key;
+    if (now < S.nextAt) return;
+    const wasDir = S.dir;
+    let moved = step(r.prim, now);
+    if (!moved && r.sec) moved = step(r.sec, now);
+    if (!moved && cur === 'D' && v.carry > 0 && S.carry < v.carry) { moved = step(S.dir, now); if (moved) S.carry++; }
+    if (moved && S.dir === r.prim) S.carry = 0;
+    if (!moved) S.blocked++;
+    void wasDir;
+    S.nextAt = now + intervalFor(v, dist);
+  };
+
+  const draw = (now) => {
+    const c = ctx; c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = '#070c1a'; c.fillRect(0, 0, COLS * TILE, ROWS * TILE);
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      const t = MAZE[y][x];
+      if (t === '#') { c.fillStyle = '#16224a'; c.fillRect(x * TILE + 1, y * TILE + 1, TILE - 2, TILE - 2); }
+      else { c.fillStyle = '#0d1530'; c.fillRect(x * TILE, y * TILE, TILE, TILE); }
+      if (t === 'G') { c.fillStyle = '#ffcf5a'; c.beginPath(); c.arc(x * TILE + TILE / 2, y * TILE + TILE / 2, 7, 0, 7); c.fill(); }
+    }
+    const px = S.x * TILE + TILE / 2, py = S.y * TILE + TILE / 2;
+    c.fillStyle = now - S.flash < 300 ? '#ffffff' : '#4ff0c0'; c.beginPath(); c.arc(px, py, 8, 0, 7); c.fill();
+    if (P.on) {
+      const ax = P.ax / scale, ay = P.ay / scale, fx = P.fx / scale, fy = P.fy / scale, v = vals[cur];
+      c.strokeStyle = 'rgba(70,200,255,.55)'; c.lineWidth = 1.5; c.beginPath(); c.arc(ax, ay, 47 / scale, 0, 7); c.stroke();
+      c.setLineDash([3, 3]); c.beginPath(); c.arc(ax, ay, v.dz / scale, 0, 7); c.stroke(); c.setLineDash([]);
+      const dx = fx - ax, dy = fy - ay, d = Math.hypot(dx, dy), travel = 22 / scale, k = d > travel ? travel / d : 1;
+      c.fillStyle = 'rgba(79,240,192,.85)'; c.beginPath(); c.arc(ax + dx * k, ay + dy * k, 9 / scale * 1, 0, 7); c.fill();
+      c.strokeStyle = 'rgba(255,207,90,.5)'; c.beginPath(); c.moveTo(ax, ay); c.lineTo(fx, fy); c.stroke();
+    }
+  };
+
+  const refreshMetrics = () => {
+    const now = performance.now();
+    S.steps = S.steps.filter((t) => now - t < 1000);
+    $('m-lat').textContent = S.lat === null ? '-' : S.lat + ' ms';
+    $('m-sps').textContent = S.steps.length.toFixed(1);
+    $('m-flip').textContent = S.flips; $('m-blk').textContent = S.blocked; $('m-turn').textContent = S.turns; $('m-goal').textContent = S.goals;
+  };
+
+  const out = () => {
+    const o = { option: cur, name: OPTIONS[cur].name.replace(/\s+/g, ' '), values: Object.fromEntries(Object.entries(vals[cur]).map(([k, x]) => [OPTIONS[cur].p[k][4], x])), haptics: $('hap').checked };
+    $('out').value = JSON.stringify(o, null, 1);
+  };
+
+  const buildUi = () => {
+    const tabs = $('tabs'); tabs.textContent = '';
+    for (const k of Object.keys(OPTIONS)) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.setAttribute('aria-pressed', String(k === cur));
+      b.onclick = () => { cur = k; P.on = false; S.carry = 0; buildUi(); out(); }; tabs.appendChild(b);
+    }
+    $('desc').innerHTML = ''; const h = document.createElement('h2'); h.textContent = OPTIONS[cur].name; const pp = document.createElement('p'); pp.textContent = OPTIONS[cur].blurb; $('desc').append(h, pp);
+    const t = $('tune'); t.textContent = '';
+    for (const [n, d] of Object.entries(OPTIONS[cur].p)) {
+      const lab = document.createElement('label'); lab.className = 'row';
+      const sp = document.createElement('span'); sp.textContent = d[4];
+      const o = document.createElement('output'); o.textContent = vals[cur][n];
+      const inp = document.createElement('input'); inp.type = 'range'; inp.min = d[1]; inp.max = d[2]; inp.step = d[3]; inp.value = vals[cur][n];
+      inp.oninput = () => { vals[cur][n] = Number(inp.value); o.textContent = inp.value; out(); };
+      lab.append(sp, o, inp); t.appendChild(lab);
+    }
+  };
+
+  const pt = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', (e) => {
+    if (P.on) return; e.preventDefault(); updateScale(); cv.setPointerCapture(e.pointerId);
+    const [x, y] = pt(e); Object.assign(P, { on: true, id: e.pointerId, ax: x, ay: y, fx: x, fy: y, downAt: performance.now(), dx0: x, dy0: y, stepped: false, maxMove: 0 });
+    S.lastKey = null; S.axis = null; S.carry = 0;
+  });
+  cv.addEventListener('pointermove', (e) => { if (!P.on || e.pointerId !== P.id) return; e.preventDefault(); const [x, y] = pt(e); P.fx = x; P.fy = y; P.maxMove = Math.max(P.maxMove, Math.hypot(x - P.dx0, y - P.dy0)); });
+  const up = (e) => {
+    if (!P.on || e.pointerId !== P.id) return;
+    const now = performance.now(), v = vals[cur];
+    if (cur === 'E' && !P.stepped && now - P.downAt <= v.tapMs && P.maxMove <= v.tapPx) {
+      const [x, y] = pt(e), dx = x - (S.x * TILE + TILE / 2) * scale, dy = y - (S.y * TILE + TILE / 2) * scale;
+      const k = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'R' : 'L') : (dy >= 0 ? 'D' : 'U');
+      if (!step(k, now)) S.blocked++;
+    }
+    P.on = false; S.lastKey = null; S.nextAt = 0; S.carry = 0;
+  };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('lostpointercapture', up);
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  $('reset').onclick = resetMaze; $('zero').onclick = zero; $('hap').onchange = out;
+  $('copy').onclick = async () => { out(); try { await navigator.clipboard.writeText($('out').value); $('copy').textContent = 'Copied'; } catch (e) { $('out').select(); $('copy').textContent = 'Select and copy below'; } setTimeout(() => { $('copy').textContent = 'Copy my pick'; }, 1800); };
+
+  let last = performance.now();
+  const loop = (now) => { const dt = Math.min(64, now - last); last = now; tick(now, dt); draw(now); refreshMetrics(); requestAnimationFrame(loop); };
+  window.addEventListener('resize', updateScale);
+  window.__CTRL_OPTIONS__ = { S, P, vals, setOption: (k) => { cur = k; buildUi(); out(); } };
+  buildUi(); out(); updateScale(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
