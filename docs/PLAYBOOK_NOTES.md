@@ -450,3 +450,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: tests/project-board-owner-export.test.mjs now adds `exported_archived_card_count` to the open+completed+deferred reconciliation, maps `archived` to the active/archived lifecycle, and makes the archived-card test relative to the real archived count of the registry instead of assuming zero.
 - WHY it changed: the exporter and its docs already export archived cards, but three tests assumed none existed, so folding the first 68 archive close-outs was refused by the owner-export preflight (283 cards vs 215 counted). The exporter itself is unchanged.
 - Status: headless (owner-export tests 19/19 on a locally applied 79-event fold; board-sync tests 39/39); nothing player-visible.
+
+## 2026-11-18 Edge stars yo-yo (MAZER L3)
+- WHAT changed: new pure curve src/render/ringYoYoMotion.ts; introTimeline.ts uses it for ringSpinRad (deconstruct counter-clockwise half, mirrored rebuild half starting at intro elapsed 0 at the turnaround). resolveRingOrbitRad (smoothstep both ends, parked 100 ms dwell) is removed. Tests: ringYoYoMotion.test.ts (velocity continuity, no plateau) and the rewritten orbit-phase test in edgeMarkers.test.ts.
+- WHY it changed: the ring stopped dead when the maze was fully gone and sat parked before the build; it now decelerates and reverses through one turnaround instant (speed 0 only at that instant) and settles to rest at build end. Reduced motion (ringSpinRad 0) and corner anchoring unchanged.
+- Status: headless (tsc, unit tests, station-position sampling across the cycle); real phone not checked.
