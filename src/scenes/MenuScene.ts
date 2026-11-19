@@ -40,7 +40,7 @@ import {
   syncLegacyBleedGatePassOver
 } from '../legacy-runtime/legacyBleedGateState';
 import { resolveStartSpiralRotation } from '../render/endpointSpiral';
-import { resolveSharedBorderColor } from '../render/trailPalette';
+import { resolvePlayerColour, resolveSharedBorderColor } from '../render/playerColour';
 import {
   resolveBleedGlowColor,
   resolveBleedGlowEnvelope,
@@ -9102,6 +9102,8 @@ export class MenuScene extends Phaser.Scene {
         x: this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX),
         y: this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY)
       };
+      // The lasers are drawn in the player's colour (playerColour.ts): the same shifting rainbow as the trail and the Spark.
+      const playerColour = resolvePlayerColour(this.trailPaletteHead, time, false);
       const outro = this.resolveLegacyOutroState(time);
       if (outro !== null) {
         firingIds = drawEdgeBeams(this.spawnLaserGraphics, {
@@ -9110,6 +9112,7 @@ export class MenuScene extends Phaser.Scene {
           direction: 'outward',
           focus,
           laserProgress: outro.laserProgress,
+          playerColour,
           spawnPop: 0,
           stations: this.resolveLegacyEdgeStations()
         }).firingIds;
@@ -9120,6 +9123,7 @@ export class MenuScene extends Phaser.Scene {
           direction: 'inward',
           focus,
           laserProgress: spawnBurst.travelProgress,
+          playerColour,
           spawnPop: spawnBurst.flashProgress,
           stations: this.resolveLegacyEdgeStations()
         }).firingIds;

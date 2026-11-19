@@ -524,10 +524,11 @@ const analyzeEdgeContact = (frames) => {
 
 /**
  * MAZER-VIS-038 size cycle, checked on the drawn kites (tip -> outer tip length: 20 css px at full size, 10 at 50%).
- * DEPARTURE frames (`kind` 'departure'): every kite starts at ~50%, only ever grows, is full size on every frame its own beam head
- * sits on its tip, and is full size from the last contact to the end of the deconstruct.
+ * Lane "edge stars smooth": the size follows each star's FILL (edgeStarMotion.ts), so there is no pop anywhere.
+ * DEPARTURE frames (`kind` 'departure'): every kite starts at ~50% (the rest size), only ever grows (smoothly, as its beam fills it),
+ * and is full size from the last contact to the end of the deconstruct.
  * ARRIVAL frames (`kind` 'arrival', `buildEndAge` = the age the beams leave): full size through the build (after the cold-start charge),
- * only ever shrinks from the moment its own beam has left and drained, never shrinks while its beam is draining it, and is back
+ * never shrinks before its own beam has left, only ever shrinks from then on (smoothly, as its beam drains it), and is back
  * at 50% by the end.
  */
 const lengthOf = (frame, id) => frame.kiteLengths[id];
@@ -539,19 +540,14 @@ const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = 
   if (withKites.length === 0) { return { ok: false, problems: [{ why: 'no frame with 8 kites' }] }; }
   if (kind === 'departure') {
     const first = withKites[0];
-    // Held full size (edgeRingScaleHold.ts, owner choice 2026-11-19): the first deconstruct frame is already at 100%, no growth.
-    if (!first.kiteLengths.every((v) => approx(v, KITE_FULL_LENGTH_PX))) { note('does not start at 100%', first.kiteLengths); }
+    // The size follows the fill (edgeStarMotion.ts): the first deconstruct frame is the rest size (no pop), then each star grows as its beam fills it.
+    if (!first.kiteLengths.every((v) => approx(v, KITE_REST_LENGTH_PX))) { note('does not start at 50%', first.kiteLengths); }
     ALL_STATION_IDS.forEach((id) => {
       let previous = 0;
       withKites.forEach((frame) => {
         const length = lengthOf(frame, id);
         if (length < previous - 0.01) { note('shrank during the departure', { id, previous, length }); }
         previous = length;
-        const order = frame.firing.indexOf(id);
-        const pair = order >= 0 ? frame.beamPairs[order] : undefined;
-        const station = frame.stations.find((s) => s.id === id);
-        const headOnTip = pair && station && dist({ x: pair[2], y: pair[3] }, innerTipOf(station, lengthOf(frame, id))) <= 1.01 / frame.dpr;
-        if (headOnTip && !approx(length, KITE_FULL_LENGTH_PX)) { note('beam attached to a diamond that is not full size', { id, length, age: frame.outroAge }); }
         if (frame.outroAge !== null && frame.outroAge >= OUTRO_LASER_END_MS + FRAME_MS && !approx(length, KITE_FULL_LENGTH_PX)) { note('not full size after the last contact', { id, length, age: frame.outroAge }); }
       });
     });
@@ -576,8 +572,8 @@ const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = 
       if (length > previous + 0.01) { note('grew during the arrival', { id, previous, length }); }
       previous = length;
       const launch = firstFiringAge.get(id);
-      // The diamond must not shrink while its own beam is still draining it (drain = 200 ms from its launch).
-      if (launch !== undefined && age < launch + PULSE_TAIL_MS - (2 * FRAME_MS) && !approx(length, KITE_FULL_LENGTH_PX)) { note('shrank before it was drained', { id, length, age, launch }); }
+      // The diamond must not shrink before its own beam has left it; from then on it shrinks smoothly with its drain (200 ms from its launch).
+      if ((launch === undefined || age < launch - FRAME_MS) && !approx(length, KITE_FULL_LENGTH_PX)) { note('shrank before its beam left', { id, length, age, launch }); }
     });
   });
   const last = withKites[withKites.length - 1];
@@ -936,7 +932,7 @@ const assertArrival = (label, frames, stations, { reducedMotion = false, viewpor
   const buildTiles = buildFrames[0]?.tiles ?? 0;
   check(`${label}: every arrival beam starts exactly on its diamond's INNER TIP (pixel snapped, within 1 device pixel) and stays attached there for the whole drain (>= ${Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2} frames)`, a.attachment.worstTipError <= 1.01 / (buildFrames.find((f) => f.firing.length > 0)?.dpr ?? 1) && a.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2, JSON.stringify(a.attachment));
   const kitesArrival = analyzeKiteSize(buildFrames, 'arrival', { buildEndAge: introBuildEndMs(buildTiles), chargedAge: INTRO_BUILD_START_MS + INTRO_RING_CHARGE_MS + (3 * FRAME_MS) });
-  check(`${label}: the diamonds are 100% size through the build, hold it while their beam drains them, then each shrinks back to 50% (anchored on its OUTER tip) and rests at 50%`, kitesArrival.ok, JSON.stringify(kitesArrival.problems));
+  check(`${label}: the diamonds are 100% size through the build, then each shrinks smoothly back to 50% as its beam drains it (anchored on its OUTER tip) and rests at 50%`, kitesArrival.ok, JSON.stringify(kitesArrival.problems));
   const arrivalEdge = analyzeEdgeContact(buildFrames.filter((f) => f.markerCount === 8 && f.introAge !== null && f.introAge >= introBuildEndMs(buildTiles)));
   check(`${label}: through the beam launch, the drain and the shrink every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${arrivalEdge.checked} samples)`, arrivalEdge.ok, JSON.stringify(arrivalEdge));
   check(
@@ -1004,9 +1000,9 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
       JSON.stringify(d.attachment)
     );
     const departureEdge = analyzeEdgeContact(departure.filter((f) => f.markerCount === 8 && f.outroAge <= DEPARTURE_BEAM_END_MS));
-    check(`${label}: while the diamonds grow 50% to 100% and hold, every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
+    check(`${label}: while the diamonds grow 50% to 100% with their fill, every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
     const kitesDeparture = analyzeKiteSize(departure, 'departure');
-    check(`${label}: on goal the diamonds are held at 100%, are full size whenever their beam is attached, and stay full to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
+    check(`${label}: on goal the diamonds start at 50%, grow smoothly with their fill and stay full size to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
     check(
       `${label}: the departure beams fire inside the deconstruct laser window (heads 0-${OUTRO_LASER_END_MS} ms, attached for the ${PULSE_TAIL_MS} ms fill, retracted within ${RETRACT_MS} ms more: <= ${DEPARTURE_BEAM_END_MS} ms, one frame of slack)`,
       d.firstAge !== null && d.firstAge >= 0 && d.lastAge <= DEPARTURE_BEAM_END_MS + FRAME_MS,
