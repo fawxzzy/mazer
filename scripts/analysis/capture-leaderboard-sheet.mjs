@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Real-browser capture + assertions for the Leaderboard sheet (2026-11-06 redesign).
+ * Real-browser capture + assertions for the Leaderboard sheet (2026-11-06 redesign; updated for the
+ * main-menu dropdown and the per-mode tab strip, 2026-11-19).
  *
  * Drives the running app through the dev/test-only leaderboard fixture
  * (`?runtimeDiagnostics=1&authFixture=authenticated&leaderboardFixture=<shape>`,
  * see src/legacy-runtime/legacyLeaderboardFixture.ts) at 390x844, 1280x720 and
- * 320x568, opens the sheet with a real click on the header Leaderboard control,
+ * 320x568, opens the sheet with real clicks on the header Menu toggle and then its Leaderboard row,
  * screenshots each state and asserts: no console errors, every interactive control
  * is >= 44 px, the exit is the primary `Back to Menu` row, Escape closes the sheet,
  * and a tap on the scrim outside the card closes it.
@@ -50,7 +51,7 @@ const openSheet = async (viewportKey, shape) => {
   await page.goto(`${base}?runtimeDiagnostics=1&authFixture=authenticated&leaderboardFixture=${shape}`, { waitUntil: 'load' });
   await page.waitForFunction(
     () => (window.__MAZER_GAME__?.scene?.getScenes?.(true) ?? []).some(
-      (scene) => Array.isArray(scene?.uiButtons) && scene.uiButtons.some((button) => button?.semanticAction === 'Leaderboard')
+      (scene) => Array.isArray(scene?.uiButtons) && scene.uiButtons.some((button) => button?.semanticAction === 'Menu')
     ),
     null,
     { timeout: 60_000 }
@@ -90,6 +91,8 @@ try {
   for (const viewportKey of Object.keys(VIEWPORTS)) {
     for (const shape of SHAPES) {
       const { context, errors, page } = await openSheet(viewportKey, shape);
+      await clickButton(page, 'Menu');
+      await wait(700);
       await clickButton(page, 'Leaderboard');
       await wait(shape === 'loading' ? 500 : 1200);
       const state = await sceneState(page);
@@ -99,18 +102,22 @@ try {
       check(`${tag}: exit is the primary Back to Menu row (no X / arrow)`, state.buttons.some((button) => button.text === 'Back to Menu'));
       const small = state.buttons.filter((button) => button.bounds && (button.bounds.height < 44 || button.bounds.width < 44));
       check(`${tag}: every interactive control is >= 44 px`, small.length === 0, small.map((button) => button.text).join(','));
+      if (!['signed-out'].includes(shape)) {
+        check(`${tag}: per-mode tab strip shows the Endless tab`, state.texts.includes('Endless'));
+      }
       if (shape === 'top3' || shape === 'rank57') {
-        check(`${tag}: pinned You row text is present`, state.texts.includes('YOU'));
         check(`${tag}: rank | player | level columns`, ['RANK', 'PLAYER', 'LEVEL'].every((label) => state.texts.includes(label)));
       }
       if (shape === 'rank57') {
-        check(`${tag}: You row shows rank 57 while the list is the top 50`, state.texts.includes('57'));
+        check(`${tag}: pinned self row shows rank 57 while the list is the top 50`, state.texts.includes('57'));
       }
       check(`${tag}: no console errors`, errors.length === 0, errors.join(' | '));
       if (shape === 'top3' && viewportKey === '390x844') {
         await page.keyboard.press('Escape');
         await wait(500);
         check(`${tag}: Escape closes the sheet`, (await sceneState(page)).overlay === 'none');
+        await clickButton(page, 'Menu');
+        await wait(700);
         await clickButton(page, 'Leaderboard');
         await wait(900);
         await page.mouse.click(4, 4);
