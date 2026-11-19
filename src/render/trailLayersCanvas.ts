@@ -9,6 +9,7 @@
  * halo on the chips beside the trail) and never washes the dark ground the core's contrast depends on.
  */
 import { chunkTrailSegments, type TrailCanvasSegment } from './navigationCoreTrailCanvas';
+import { resolveTrailBloomClip } from './trailBloomClip';
 
 export interface TrailLayerSegment extends TrailCanvasSegment {
   /** Alpha for the underlay, independent of `alpha` (the age fade). Falls back to `alpha`. */
@@ -125,8 +126,27 @@ const drawBloomDownscaled = (
   }
   sctx.shadowBlur = 0;
   sctx.shadowColor = 'transparent';
+  // Upscale only where the bloom can have pixels (trailBloomClip.ts): same image, same transform, same smoothing.
+  const clip = resolveTrailBloomClip(chunks, {
+    width: target.width!,
+    height: target.height!,
+    scale: ctx.getTransform().a,
+    originX: options.originX,
+    originY: options.originY,
+    glowWidth: options.glowWidth,
+    glowBlurPx: options.glowBlurPx,
+    factor
+  });
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (clip) {
+    ctx.beginPath();
+    const r = clip.rects;
+    for (let i = 0; i < r.length; i += 4) {
+      ctx.rect(r[i]!, r[i + 1]!, r[i + 2]!, r[i + 3]!);
+    }
+    ctx.clip();
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(scratch.canvas as CanvasImageSource, 0, 0, scratch.canvas.width, scratch.canvas.height, 0, 0, target.width!, target.height!);
