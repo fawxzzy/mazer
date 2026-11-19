@@ -15223,63 +15223,66 @@ export class MenuScene extends Phaser.Scene {
       }
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
-    if (latestReceipt) {
+    // L4: a signed-in session demo climbs in memory only: no storage write, no account write.
+    const menuDemoSession = surface === 'menu-demo' && isLegacyMenuDemoSessionActive(this.menuDemoSession)
+      ? this.menuDemoSession
+      : null;
+    if (latestReceipt && menuDemoSession) {
+      this.progressionState = recordLegacyProgressionCycle(undefined, this.progressionState, latestReceipt, this.maze);
+      clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
+      this.menuDemoSession = advanceLegacyMenuDemoSession(menuDemoSession, this.progressionState);
+      this.boardDynamicDirty = true;
+      this.uiDirty = true;
+      this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    } else if (latestReceipt) {
       const previousProgressionState = this.progressionState;
       const completionAuthSnapshot = { ...this.authSnapshot };
       const completionAuthSequence = this.authAccountHydrationSequence;
       const completionProgressionStorage = this.resolveLegacyProgressionStorage();
-      // L4: a signed-in session demo climbs in memory only: no storage write, no account write.
-      const menuDemoSession = surface === 'menu-demo' && isLegacyMenuDemoSessionActive(this.menuDemoSession)
-        ? this.menuDemoSession
-        : null;
       this.progressionState = recordLegacyProgressionCycle(
-        menuDemoSession ? undefined : completionProgressionStorage,
+        completionProgressionStorage,
         this.progressionState,
         latestReceipt,
         this.maze
       );
       clearScopedLegacyAttemptSeed(this.resolveBrowserLocalStorage(), this.authSnapshot);
-      if (menuDemoSession) {
-        this.menuDemoSession = advanceLegacyMenuDemoSession(menuDemoSession, this.progressionState);
-      } else {
-        void writeLegacyRemoteCompletion(
-          completionAuthSnapshot,
-          previousProgressionState,
-          this.progressionState,
-          latestReceipt,
-          undefined,
-          this.resolveBrowserLocalStorage()
-        )
-          .then((result) => {
-            if (!isLegacyRemoteCompletionContextCurrent(
-              completionAuthSnapshot,
-              completionAuthSequence,
-              this.authSnapshot,
-              this.authAccountHydrationSequence
-            )) {
-              return;
-            }
-            if (result.progressionState) {
-              this.progressionState = overlayLegacyMenuDemoSession(writeLegacyProgressionState(
-                completionProgressionStorage,
-                result.progressionState
-              ), this.menuDemoSession);
-            }
-            this.publishLegacyRemoteSyncResult(result);
-            this.offlineCompletionFlush?.noteCompletionResult(result);
-          })
-          .catch((error: unknown) => {
-            if (!isLegacyRemoteCompletionContextCurrent(
-              completionAuthSnapshot,
-              completionAuthSequence,
-              this.authSnapshot,
-              this.authAccountHydrationSequence
-            )) {
-              return;
-            }
-            this.publishLegacyRemoteSyncException('progression', error);
-          });
-      }
+      void writeLegacyRemoteCompletion(
+        completionAuthSnapshot,
+        previousProgressionState,
+        this.progressionState,
+        latestReceipt,
+        undefined,
+        this.resolveBrowserLocalStorage()
+      )
+        .then((result) => {
+          if (!isLegacyRemoteCompletionContextCurrent(
+            completionAuthSnapshot,
+            completionAuthSequence,
+            this.authSnapshot,
+            this.authAccountHydrationSequence
+          )) {
+            return;
+          }
+          if (result.progressionState) {
+            this.progressionState = overlayLegacyMenuDemoSession(writeLegacyProgressionState(
+              completionProgressionStorage,
+              result.progressionState
+            ), this.menuDemoSession);
+          }
+          this.publishLegacyRemoteSyncResult(result);
+          this.offlineCompletionFlush?.noteCompletionResult(result);
+        })
+        .catch((error: unknown) => {
+          if (!isLegacyRemoteCompletionContextCurrent(
+            completionAuthSnapshot,
+            completionAuthSequence,
+            this.authSnapshot,
+            this.authAccountHydrationSequence
+          )) {
+            return;
+          }
+          this.publishLegacyRemoteSyncException('progression', error);
+        });
       this.boardDynamicDirty = true;
       this.uiDirty = true;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
