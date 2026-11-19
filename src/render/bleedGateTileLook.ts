@@ -22,11 +22,12 @@
 
 import type { BoardCell, BoardTileGate } from './boardTileBake';
 import { mixBleedGateColor, BLEED_GATE_LIT, BLEED_GATE_PULSE_RATE } from './bleedGateRenderer';
+import { BLEED_GATE_TILE_BRACKET, BLEED_GATE_TILE_FLOOR } from './palette';
 
 /** D: the gate tile's floor (the chip fill inside the rim). The rim keeps the board's normal lit edge. */
-export const BLEED_GATE_FLOOR = 0x1f3a38;
+export const BLEED_GATE_FLOOR = BLEED_GATE_TILE_FLOOR;
 /** C: the corner brackets while the gate sleeps. */
-export const BLEED_GATE_BRACKET_IDLE = 0xf2fbfa;
+export const BLEED_GATE_BRACKET_IDLE = BLEED_GATE_TILE_BRACKET;
 /** C: the corner brackets once the gate is lit (the ring's own lit cyan, token semantic.info #6be8e1). */
 export const BLEED_GATE_BRACKET_LIT = BLEED_GATE_LIT;
 
