@@ -28,6 +28,7 @@ import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
 import { drawLegacyBleedGateLayer } from '../render/bleedGateSceneLayer';
 import { BLEED_GATE_LIT, drawBleedGatePlan, resolveBleedGateDrawPlan } from '../render/bleedGateRenderer';
+import { resolveBoardTileGates } from '../render/bleedGateTileLook';
 import {
   hasLegacyBleedGates,
   isLegacyBleedGateAnimating,
@@ -8422,6 +8423,8 @@ export class MenuScene extends Phaser.Scene {
       docks: this.boardTileDocks,
       start: this.maze.start ? { x: this.maze.start.x, y: this.maze.start.y } : undefined,
       goal: this.maze.goal ? { x: this.maze.goal.x, y: this.maze.goal.y } : undefined,
+      // MAZER-VIS-063: gate tiles bake a darker floor (and idle corner brackets until lit).
+      gates: resolveBoardTileGates(this.maze.bleedGates, (gate) => isLegacyBleedGateTriggered(this.maze, gate)),
       boardLeft: mazeRenderFrame.boardLeft,
       boardTop: mazeRenderFrame.boardTop,
       reveal: this.resolveBoardTileReveal(),
@@ -9487,7 +9490,8 @@ export class MenuScene extends Phaser.Scene {
         nowMs: time,
         reducedMotion: this.prefersLegacyReducedMotion(),
         fieldColor: this.settings.darkMode ? SHARED_BACKDROP_PHASER : resolveLegacyMenuBackdropPalette(this.settings.darkMode).fieldColor,
-        isVisible: (point) => this.isLegacyMenuPointVisibleInStaticDraw(point)
+        isVisible: (point) => this.isLegacyMenuPointVisibleInStaticDraw(point),
+        brackets: this.boardTileLayer.snappedOrigin && { origin: this.boardTileLayer.snappedOrigin, plans: this.boardTileLayer.bleedGateBrackets }
       });
     }
     this.drawLegacyProgressionBadge();
