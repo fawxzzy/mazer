@@ -29,17 +29,24 @@ describe('MenuScene wiring: the header identity label is retired (MAZER-UI-024)'
     expect(scene).toContain('this.drawLegacyMenuPresenceCounter(time);');
   });
 
-  test('the leaderboard icon holds the leading slot and the profile icon sits beside the settings cog (slot 1)', () => {
-    const leaderboardButton = methodSource('private createLegacyMenuLeaderboardButton(onClick: () => void): UiButton');
-    const leaderboardDraw = methodSource('private drawLegacyMenuLeaderboardIcon(time: number): void');
-    const profileButton = methodSource('private createLegacyMenuProfileButton(onClick: () => void): UiButton');
-    for (const source of [leaderboardButton, leaderboardDraw]) {
-      expect(source).toContain("placement: 'leading'");
-      expect(source).not.toContain('slot: 1');
+  test('L6: one menu button in the trailing slot replaces the leaderboard / profile / settings corner icons', () => {
+    const build = methodSource('private buildLegacyMenuDropdownButtons(): UiButton[]');
+    expect(build).toContain("placement: 'trailing'");
+    expect(build).toContain('safeArea: this.layout.headerSafeInset');
+    expect(build).not.toContain("placement: 'leading'");
+    expect(build).not.toContain('slot: 1');
+    expect(scene).toContain('this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());');
+    for (const retired of [
+      'createLegacyMenuLeaderboardButton',
+      'createLegacyMenuProfileButton',
+      'createLegacyMenuSettingsCogButton',
+      'drawLegacyMenuLeaderboardIcon',
+      'drawLegacyMenuSettingsCog'
+    ]) {
+      expect(scene).not.toContain(retired);
     }
-    expect(profileButton).toContain("placement: 'trailing'");
-    expect(profileButton).toContain('slot: 1');
-    expect(profileButton).not.toContain("placement: 'leading'");
+    // The panel only lives on the plain menu; a played game keeps just its settings (pause) icon.
+    expect(scene).toContain("this.menuDropdown.syncVisibility(this.overlay === 'none' && this.mode === 'menu');");
   });
 });
 

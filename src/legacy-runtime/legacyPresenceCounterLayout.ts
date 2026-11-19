@@ -133,7 +133,10 @@ export interface LegacyPresenceCounterPlacementInput {
   readonly measure: (value: string) => number;
 }
 
-/** Real header geometry: the leading icon frame and the drawn inline title's left edge. */
+/**
+ * Real header geometry: the leading header slot and the drawn inline title's left edge. L6 (menu dropdown) retired the
+ * leaderboard corner icon, so the counter starts where that icon's frame started instead of beside it.
+ */
 export const resolveLegacyPresenceCounterPlacement = (
   input: LegacyPresenceCounterPlacementInput
 ): LegacyPresenceCounterLayout => {
@@ -150,10 +153,7 @@ export const resolveLegacyPresenceCounterPlacement = (
   };
   const leading = resolveLegacyHeaderControlFrame({ ...base, placement: 'leading' });
   const titleInline = layout.lanes.title === null;
-  const trailingLeft = Math.min(
-    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing' }).left,
-    resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing', slot: 1 }).left
-  );
+  const trailingLeft = resolveLegacyHeaderControlFrame({ ...base, placement: 'trailing' }).left;
   let titleLeft = trailingLeft;
   if (titleInline) {
     const path = resolveLegacyMenuPathTitleLayout(layout.titleX, 0, resolveLegacyMenuTitleFontSize(layout.titleReserveHeight));
@@ -162,7 +162,7 @@ export const resolveLegacyPresenceCounterPlacement = (
   return resolveLegacyPresenceCounterLayout({
     centerY: leading.centerY,
     countText: input.countText,
-    leadingRight: leading.right,
+    leadingRight: leading.left - LEGACY_PRESENCE_ICON_GAP_PX,
     measure: input.measure,
     titleLeft,
     viewportWidth: layout.width

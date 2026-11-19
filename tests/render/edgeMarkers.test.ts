@@ -458,7 +458,7 @@ describe('depth (diamonds sit behind all UI)', () => {
     const order = (name: string): number => list.indexOf(`this.${name}`);
     // First child of the container = lowest depth.
     expect(order('edgeMarkerGraphics')).toBeGreaterThanOrEqual(0);
-    for (const above of ['boardStaticGraphics', 'boardPathGraphics', 'boardDynamicGraphics', 'headerSettingsIconImage', 'headerLeaderboardIconImage', 'titleGraphics']) {
+    for (const above of ['boardStaticGraphics', 'boardPathGraphics', 'boardDynamicGraphics', 'titleGraphics']) {
       expect(order('edgeMarkerGraphics')).toBeLessThan(order(above));
     }
     // Above the starfield backdrop (created before the container) and below the

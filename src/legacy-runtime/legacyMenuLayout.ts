@@ -331,7 +331,7 @@ export const resolveLegacyMenuLayout = (
   // Always reserve real space for the header icons (AI badge, settings cog)
   // on the menu surface, even in ultra-narrow width. The previous code
   // zeroed this reserve below 300px on the theory the header would occupy
-  // no space there, but createLegacyMenuSettingsCogButton draws the header
+  // no space there, but the header menu button (L6; was the settings cog) draws the header
   // icon unconditionally regardless of width -- the reserve-vs-actual
   // mismatch let the title lane start underneath it, causing a real,
   // reproducible overlap at every ultra-narrow size.

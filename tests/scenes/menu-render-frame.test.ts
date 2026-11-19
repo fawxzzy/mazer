@@ -1005,14 +1005,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('drawLegacyCompletionTimeLine');
     expect(menuSceneSource).not.toContain('lastCompletedRunMs');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
-    expect(menuSceneSource).toContain("placement: 'leading'");
+    // L6: the leading-slot leaderboard icon is gone; the menu dropdown button holds the trailing slot.
+    expect(menuSceneSource).not.toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
     // No panel/border chrome function at all any more -- both the level
     // badge and the play settings cog are bare, matching the menu surface's
     // own settings cog exactly (zero chrome, not lighter chrome).
     expect(menuSceneSource).not.toContain('private drawLegacyHeaderControlChrome(');
-    expect(menuSceneSource).toContain('private menuSettingsCogActive = false;');
-    expect(menuSceneSource).toContain('this.menuSettingsCogActive = active;');
+    // L6: the menu settings cog (and its hover flag) became the Settings row of the menu dropdown.
+    expect(menuSceneSource).not.toContain('menuSettingsCogActive');
+    expect(menuSceneSource).toContain('private menuDropdown!: LegacyMenuDropdownController;');
     expect(menuSceneSource).toContain('this.boardDynamicDirty = true;');
     expect(menuSceneSource).toContain('this.prefersLegacyReducedMotion()');
     expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
@@ -1560,9 +1562,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('stroke: frontDoorChrome?.strokeColor');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
     expect(menuSceneSource).toContain('? MENU_TEXT_COLOR');
-    expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
-    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
-    expect(menuSceneSource).toContain("text: 'Settings'");
+    // L6: the menu Settings entry is the dropdown's Settings row (same semantic action, same bridge command).
+    expect(menuSceneSource).not.toContain('createLegacyMenuSettingsCogButton');
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDropdown.ts'), 'utf8')).toContain("semanticAction: 'Settings'");
+    expect(menuSceneSource).toContain("this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));");
     // Only the removed pause home icon's door cutout used this constant.
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_TOUCH_COG_HUB');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
@@ -1572,9 +1575,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // surface's own settings icon too -- not just "no box" but the actual
     // same icon/texture.
     expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.applyLegacyHudIconFrame\(\s*this\.touchSettingsCogIconImage,\s*MAZER_HUD_SETTINGS_ICON_METRICS,/);
-    expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
-    // The menu cog's blink is drawn inside drawBoardPaths, gated by
+    // L6: the menu cog is gone (the dropdown button blinks on its own per-frame update); the flag below still drives
+    // the menu board redraw.
+    expect(menuSceneSource).not.toContain('drawLegacyMenuSettingsCog');
+    // The menu cog's blink was drawn inside drawBoardPaths, gated by
     // boardPathDirty -- update() must re-arm that flag every menu-mode
     // frame the same way it already does for play mode's cog (hudDirty)
     // and LVL badge (boardDynamicDirty), or the blink freezes between
@@ -1588,10 +1592,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
-    expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      hit.centerX,');
+    // L6: the menu header control is the dropdown toggle; its zone is the 44 px-grown hit rect from MenuScene.
+    const dropdownButtonsSource = readFileSync(resolve(process.cwd(), 'src/render/menuDropdownButtons.ts'), 'utf8');
+    expect(dropdownButtonsSource).toContain('const background = scene.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, HIT_ZONE_FILL, HIT_ZONE_ALPHA);');
+    expect(dropdownButtonsSource).toContain('bounds: hitRect(layout.toggle)');
     // 44px touch-target floor: the zone is grown by resolveLegacyMinHitRect (legacy-hit-targets.test.ts).
-    expect(menuSceneSource).toContain('const hit = resolveLegacyMinHitRect(pauseRect, this.layout);');
-    expect(menuSceneSource).toContain('bounds: hitBounds');
+    expect(menuSceneSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
@@ -1658,47 +1664,39 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).not.toContain("this.createOverlayTitle('Settings'");
     expect(menuSceneSource).not.toContain("this.createOverlayTitle('Paused'");
-    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
-    expect(menuSceneSource).toContain("text: 'Settings'");
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDropdown.ts'), 'utf8')).toContain("id: 'settings', label: 'Settings', semanticAction: 'Settings'");
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).toContain('const trackId = this.resolveActiveLegacyProgressionTrackId();');
     expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
   });
 
-  test('replaces the menu username with the inner-only animated green profile control', () => {
+  test('replaces the menu username with the profile row of the menu dropdown (L6; was the green corner icon)', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
-    const profileButtonSource = menuSceneSource.slice(
-      menuSceneSource.indexOf('private createLegacyMenuProfileButton('),
-      menuSceneSource.indexOf('private drawLegacyProfileIcon(')
+    const dropdownSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createLegacyMenuDropdown('),
+      menuSceneSource.indexOf('private clearUi(')
     );
 
     // Route through the Wave 3A bridge first, then the shared account flow.
-    expect(menuSceneSource).toContain(
-      'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
-      + '          () => withMazerSignInContinuation(\'account\', () => (\n'
+    // Signed out, the Profile row's sign-in continues to the account page (#645).
+    expect(dropdownSource).toContain(
+      'withMazerSignInContinuation(\'account\', () => (\n'
       + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
-      + '          ))\n'
-      + '        ));'
+      + '          ));'
     );
+    expect(menuSceneSource).toContain('this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());');
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
     expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
-    // MAZER-UI-024: the profile icon now sits beside the settings cog (trailing slot 1); the leaderboard icon leads.
-    expect(profileButtonSource).toContain("placement: 'trailing'");
-    expect(profileButtonSource).toContain('slot: 1');
-    expect(profileButtonSource).toContain('sizeScale: this.layout.headerIconScale');
-    expect(profileButtonSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
-    expect(profileButtonSource).toContain('bounds: hitBounds');
-    expect(profileButtonSource).toContain('const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);');
-    expect(profileButtonSource).toContain('const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);');
-    expect(profileButtonSource).toMatch(/this\.drawLegacyProfileIcon\([\s\S]*?blinkScale,\s*false\s*\);/);
-    expect(menuSceneSource).toContain('if (showOuterRing) {');
-    // Integration 3: this used to pin `const color = cyberArcadeMaterial.signal.player;`,
-    // which only ever matched the pause home icon (deleted by the header/pause
-    // lane) and the leaderboard title glyph (deleted by the leaderboard lane).
-    // Each lane removed a different one, so the merged tree has neither. The
-    // profile control's own contract is the profile texture it draws.
-    expect(menuSceneSource).toContain('MAZER_HUD_PROFILE_TEXTURE_KEY');
-    expect(profileButtonSource).toContain('MAZER_HUD_PROFILE_TEXTURE_KEY');
+    expect(menuSceneSource).not.toContain('createLegacyMenuProfileButton');
+    expect(menuSceneSource).not.toContain('drawLegacyProfileIcon');
+    // The menu button owns the trailing header slot, grown to the 44 px floor.
+    expect(dropdownSource).toContain("placement: 'trailing'");
+    expect(dropdownSource).toContain('sizeScale: this.layout.headerIconScale');
+    expect(dropdownSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
+    // The Profile row hides while the account service is unavailable (the corner icon did the same).
+    expect(dropdownSource).toContain("item.id !== 'profile'");
+    // The profile row keeps drawing the real profile texture.
+    expect(dropdownSource).toContain('profile: MAZER_HUD_PROFILE_TEXTURE_KEY');
   });
 
   test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
@@ -1799,12 +1797,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // menu's top-left profile icon only, which uses the same shared surface.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).not.toContain('createLegacyOverlayUsernameButton');
+    // L6: the main menu's account entry is the Profile row of the menu dropdown (same shared surface).
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
-      'this.uiButtons.push(this.createLegacyMenuProfileButton(\n'
-      + '          () => withMazerSignInContinuation(\'account\', () => (\n'
+      'withMazerSignInContinuation(\'account\', () => (\n'
       + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
-      + '          ))\n'
-      + '        ));'
+      + '          ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain("authUnavailable: AUTH_SURFACE_MESSAGES['signin.unavailable'],");

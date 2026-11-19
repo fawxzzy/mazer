@@ -7,6 +7,7 @@ import {
   LEGACY_MIN_HIT_TARGET_PX,
   resolveLegacyMinHitRect
 } from '../../src/legacy-runtime/legacyHitTarget';
+import { resolveLegacyMenuDropdownLayout } from '../../src/legacy-runtime/legacyMenuDropdown';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { buildLegacyGuideSheetPlan } from '../../src/legacy-runtime/legacyGuideSheetPlan';
 import { buildLegacySettingsSheetPlan } from '../../src/legacy-runtime/legacySettingsSheetPlan';
@@ -42,15 +43,19 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     sizeScale: menuLayout.headerIconScale,
     width: menuLayout.width
   };
-  const headerZones = [
-    // MAZER-UI-024: leaderboard leads (top-left); the account icon sits beside the settings cog.
-    ['menu-header-account', { ...headerInput, placement: 'trailing' as const, slot: 1 }],
-    ['menu-header-leaderboard', { ...headerInput, placement: 'leading' as const }],
-    ['menu-header-settings', { ...headerInput, placement: 'trailing' as const }]
-  ] as const;
-  for (const [name, input] of headerZones) {
-    const hit = resolveLegacyMinHitRect(resolveLegacyHeaderControlFrame(input), viewport);
-    zones.push({ height: hit.height, name, width: hit.width });
+  // L6: one menu button in the trailing slot replaced the leaderboard / account / settings trio; its dropdown rows
+  // are touch targets too.
+  const menuFrame = resolveLegacyHeaderControlFrame({ ...headerInput, placement: 'trailing' });
+  const menuHit = resolveLegacyMinHitRect(menuFrame, viewport);
+  zones.push({ height: menuHit.height, name: 'menu-header-menu', width: menuHit.width });
+  const dropdown = resolveLegacyMenuDropdownLayout({
+    safeArea: menuLayout.headerSafeInset,
+    toggleFrame: menuFrame,
+    toggleHit: menuHit,
+    viewport
+  });
+  for (const row of dropdown.rows) {
+    zones.push({ height: row.rect.height, name: `menu-dropdown-${row.item.id}`, width: row.rect.width });
   }
 
   const playLayout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'play');
@@ -127,13 +132,14 @@ describe('legacy hit targets (Wave 5C)', () => {
       }
     }
     expect(undersized).toEqual([]);
-    // The header trio and play pause (the 2026-11-06 UI audit's under-44 px controls) plus
+    // The header menu button and its rows, play pause (the 2026-11-06 UI audit's under-44 px controls) plus
     // every interactive row of the shared Settings sheet (Back to Menu / Resume are the exits; no Close pill) and the Guide sheet (Got it).
     expect([...names].sort()).toEqual([
       'guide-got-it',
-      'menu-header-account',
-      'menu-header-leaderboard',
-      'menu-header-settings',
+      'menu-dropdown-leaderboard',
+      'menu-dropdown-profile',
+      'menu-dropdown-settings',
+      'menu-header-menu',
       'play-pause',
       'settings-row-back-to-menu',
       'settings-row-haptics',
@@ -166,9 +172,6 @@ describe('MenuScene interactive-zone inventory', () => {
   const EXPECTED_INTERACTIVE_SITES: Record<string, string> = {
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
     createLegacyAuthActionButton: 'account failure fallback: the one Try again button (44+)',
-    createLegacyMenuLeaderboardButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createLegacyMenuProfileButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
-    createLegacyMenuSettingsCogButton: 'header: grown to LEGACY_MIN_HIT_TARGET_PX via resolveLegacyMinHitRect',
     createToggleSwitchRow: 'toggle card (52+)'
   };
 
@@ -182,9 +185,20 @@ describe('MenuScene interactive-zone inventory', () => {
     expect([...found].sort()).toEqual(Object.keys(EXPECTED_INTERACTIVE_SITES).sort());
   });
 
-  test('the header trio sizes its zones through the shared 44 px resolver', () => {
+  test('the header menu button sizes its zone through the shared 44 px resolver', () => {
     expect(source).not.toMatch(/Math\.max\(36,\s*(?:pauseRect|rect|frame)\.width/);
-    // Three header controls (the Guide header that made it 4 is gone: the Guide is a sheet now).
-    expect(source.match(/resolveLegacyMinHitRect\(/g)?.length).toBeGreaterThanOrEqual(3);
+    // L6: one header control (the menu dropdown button); its rows are 44 px by construction (legacyMenuDropdown.ts).
+    const build = source.slice(source.indexOf('private buildLegacyMenuDropdownButtons('), source.indexOf('private clearUi('));
+    expect(build).toContain('resolveLegacyMinHitRect(frame, this.layout)');
+  });
+
+  test('the menu dropdown module owns exactly its three hand-built zones: toggle, scrim and rows', () => {
+    const dropdown = normalizeSourceLineEndings(readFileSync(resolve(process.cwd(), 'src/render/menuDropdownButtons.ts'), 'utf8'));
+    const sites = [...dropdown.matchAll(/\.setInteractive\(/g)].map((match) => {
+      const before = dropdown.slice(0, match.index ?? 0);
+      const methods = [...before.matchAll(/^ {2}(?:private |public )?([A-Za-z0-9_]+)\(/gm)];
+      return methods[methods.length - 1]?.[1];
+    });
+    expect(sites).toEqual(['createToggle', 'createScrim', 'createRow']);
   });
 });
