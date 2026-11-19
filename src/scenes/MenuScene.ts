@@ -57,13 +57,8 @@ import { UiEntranceDriver } from '../render/uiEntranceDriver';
 import { PlayerLocatorState } from '../render/playerLocator';
 import { stepTrailColourRedraw } from '../render/trailColourRedraw';
 import {
-  PLAYER_MARKER,
-  createPlayerMarkerFrame,
-  drawPlayerMarker,
   resolvePlayerMarkerCenter,
-  resolvePlayerMarkerDiagnosticRadii,
-  resolvePlayerMarkerFrame,
-  type PlayerMarkerFrame
+  resolvePlayerMarkerDiagnosticRadii
 } from '../render/playerMarker';
 import { PlayerGlide } from '../render/playerGlide';
 import {
@@ -74,10 +69,29 @@ import {
 } from '../render/playerMotionTiming';
 import { drawTrailLayersToCanvasContext, type TrailLayerSegment } from '../render/trailLayersCanvas';
 import {
+  SPARK_PLAYER,
+  SparkHeading,
+  createSparkFrame,
+  createSparkMaterial,
+  drawSparkGlowToCanvasContext,
+  drawSparkPlayer,
+  resolveSparkFrame,
+  resolveSparkGlowPadding,
+  resolveSparkMaterial,
+  resolveStartDirectionAngle,
+  type SparkFrame
+} from '../render/sparkPlayerSkin';
+import {
+  drawStarDustToGraphics,
+  drawStarDustTrailToCanvasContext,
+  resolveStarDustReach,
+  type StarDustSegment
+} from '../render/starDustTrailCanvas';
+import { resolveTrailSkin } from '../render/skinRegistry';
+import {
   TRAIL_FADE_ALPHA_MIN,
   TRAIL_GLOW_ALPHA_RATIO,
   TRAIL_UNDERLAY_ALPHA,
-  TRAIL_UNDERLAY_PAD_MIN_CSS,
   TRAIL_WIDTH_RATIO,
   resolveTrailWidths
 } from '../render/trailLegibility';
@@ -110,17 +124,14 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
-import { createPlayerRingMorph, resolveEndpointRingBlend, resolvePlayerMarkerEndpointMorph } from '../render/playerRingMorph';
+import { resolveEndpointRingBlend } from '../render/playerRingMorph';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
 import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
 import {
   computeTrailCanvasBounds,
   drawTrailToCanvasContext
 } from '../render/navigationCoreTrailCanvas';
-import {
-  computePlayerGlowCanvasBounds,
-  drawPlayerGlowToCanvasContext
-} from '../render/navigationCorePlayerGlowCanvas';
+import { computePlayerGlowCanvasBounds } from '../render/navigationCorePlayerGlowCanvas';
 import { resolveTeleportAnchorCandidates, type TeleportRect, type TeleportViewportBounds } from '../render/teleportAnchorPose';
 import {
   EDGE_STATION_COUNT,
@@ -1487,7 +1498,6 @@ const LEGACY_PLAY_TRAIL_WIDTH_RATIO = TRAIL_WIDTH_RATIO;
 // Width, underlay, core lift and fade floor live in src/render/trailLegibility.ts;
 // tests/render/trailLegibility.test.ts pins every energy stop's contrast against the real chip, rim and gap.
 const LEGACY_TRAIL_UNDERLAY_ALPHA = TRAIL_UNDERLAY_ALPHA;
-const LEGACY_TRAIL_UNDERLAY_PAD_CSS = TRAIL_UNDERLAY_PAD_MIN_CSS;
 // Amendment 6.2's neon-tube glow refinement: a soft outer spectral glow
 // pass drawn from the same canonical geometry/color as the crisp core,
 // wider but bounded well under the player/goal markers' own glow alpha
@@ -2057,8 +2067,11 @@ export class MenuScene extends Phaser.Scene {
   private goalBeaconGraphics!: Phaser.GameObjects.Graphics;
   // Find-me ping scheduler for the play-mode player locator (src/render/playerLocator.ts).
   private readonly playerLocatorState = new PlayerLocatorState();
-  // Scratch records for the player marker (one geometry for play, the demo AI and the Guide): no per-frame allocation.
-  private readonly playerMarkerFrameScratch = createPlayerMarkerFrame();
+  // Scratch records for the player marker (one geometry for play and the demo AI): no per-frame allocation.
+  // L7 player skin Spark (src/render/sparkPlayerSkin.ts): the drawn heading (eases through turns) and scratch records.
+  private readonly sparkHeading = new SparkHeading();
+  private readonly sparkFrameScratch = createSparkFrame();
+  private readonly sparkMaterialScratch = createSparkMaterial();
   private readonly playerMarkerCenterScratch = { x: 0, y: 0 };
   // Navigation Core v1's continuous play trail is composited on a real 2D
   // canvas (src/render/navigationCoreTrailCanvas.ts), not stroked as
@@ -2215,7 +2228,6 @@ export class MenuScene extends Phaser.Scene {
   // Blocked-move feedback (MAZER-MOTION-003): a short whole-pixel nudge toward the wall plus a light buzz.
   private wallBump: { startedAtMs: number; deltaX: number; deltaY: number } | null = null;
   private lastWallBumpBuzzAtMs: number | null = null;
-  private readonly playerRingMorphScratch = createPlayerRingMorph();
   private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
   // One shared, PAUSABLE animation clock for Navigation Core v1's continuous
   // trail (base spectral color phase + shared shine distance + its quiet
@@ -10415,7 +10427,13 @@ export class MenuScene extends Phaser.Scene {
       // The dark ground follows the lifecycle fade only, never the age fade (keeps the core's contrast).
       underlayAlpha: alphaMultiplier
     }));
-    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale);
+    this.drawTrailCanvasSegments(canvasSegments, coreWidth, glowWidth, underlayWidth, glowAlphaScale, {
+      tileSize,
+      timeMs: animationTime,
+      animated: trailAnimated,
+      originAdvancePx: this.trailOriginAdvanceDistancePx,
+      lifecycleAlpha: alphaMultiplier
+    });
 
     const perfDrawEndedAtMs = performance.now();
     this.trailRebuildCount += 1;
@@ -10469,12 +10487,14 @@ export class MenuScene extends Phaser.Scene {
     coreWidth: number,
     glowWidth: number,
     underlayWidth: number,
-    glowAlphaScale: number
+    glowAlphaScale: number,
+    starDust: { tileSize: number; timeMs: number; animated: boolean; originAdvancePx: number; lifecycleAlpha: number }
   ): void {
     if (!this.trailCanvasTexture || !this.trailCanvasImage || segments.length === 0) {
       return;
     }
-    const padding = Math.ceil(glowWidth);
+    // Star dust sparkles reach further from the route than the bloom on small tiles (src/render/starDustTrailCanvas.ts).
+    const padding = Math.ceil(Math.max(glowWidth, resolveStarDustReach(starDust.tileSize)));
     const rawBounds = computeTrailCanvasBounds(segments, padding);
     if (!rawBounds || rawBounds.width <= 0 || rawBounds.height <= 0) {
       return;
@@ -10533,7 +10553,19 @@ export class MenuScene extends Phaser.Scene {
       glowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO * glowAlphaScale,
       glowBlurPx: Math.max(2, glowWidth * 0.5) * resolution
     };
-    if (this.boardTileStyle === 'chip') {
+    // L7 trail skin Star dust (skinRegistry.ts): four-point sparkles in today's trail colours along the same route,
+    // each with its own dark keyline (which carries the contrast job the neon tube's underlay did on the Chip floor).
+    if (resolveTrailSkin().id === 'star-dust') {
+      drawStarDustTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
+        ...trailDrawOptions,
+        tileSize: starDust.tileSize,
+        keylineColor: boardMaterial.void,
+        keylineAlpha: starDust.lifecycleAlpha,
+        timeMs: starDust.timeMs,
+        animated: starDust.animated,
+        originAdvancePx: starDust.originAdvancePx
+      });
+    } else if (this.boardTileStyle === 'chip') {
       // Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
       // the trail sits on a dark underlay (bg.canvas, wider than the core: resolveTrailWidths). Layering,
       // bottom to top: neon bloom, dark underlay, crisp core (src/render/trailLayersCanvas.ts). Same path and
@@ -10679,37 +10711,38 @@ export class MenuScene extends Phaser.Scene {
       snappedOrigin.y + bumpNudge.y,
       this.playerMarkerCenterScratch
     );
-    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor(time);
-    // Squash-and-stretch along the direction of travel while gliding, smoothed with the glide (no per-step pulse).
-    const motionPose = this.playerGlide.getMotionPose(time);
+    // L7 skin Spark (src/render/sparkPlayerSkin.ts, skinRegistry.ts): a faceted kite in the trail's own colours, read
+    // at the trail head this frame (the trail draws first and sets trailPaletteHead; null in a frame without a trail).
     const reducedMotion = this.prefersLegacyReducedMotion();
-    const frame = resolvePlayerMarkerFrame({
+    const material = resolveSparkMaterial(this.trailPaletteHead, time, reducedMotion, this.sparkMaterialScratch);
+    // Points along the travel heading (eased through turns); before the first move, along the start tile's direction.
+    const motionPose = this.playerGlide.getMotionPose(time);
+    const angle = this.sparkHeading.update(
+      time,
+      motionPose.headingX,
+      motionPose.headingY,
+      resolveStartDirectionAngle(this.boardTileLayer.endpointTiles.start?.direction),
+      reducedMotion
+    );
+    const frame = resolveSparkFrame({
       centerX: center.x,
       centerY: center.y,
       tileSize,
       devicePixelRatio: backingScale,
       timeMs: time,
       reducedMotion,
-      motionAmount: motionPose.amount,
-      headingX: motionPose.headingX,
-      headingY: motionPose.headingY
-    }, this.playerMarkerFrameScratch);
-    const endpointMorph = resolvePlayerMarkerEndpointMorph(
-      point.x, point.y, this.maze.start, this.maze.goal, this.boardTileLayer.endpointTiles, reducedMotion,
-      this.playerRingMorphScratch
-    );
-    // Soft shadowBlur glow (a canvas image under the Graphics), then locator, block and accent stroke.
-    this.drawPlayerGlowCanvas(frame, tileSize, alpha, playerCoreColor);
-    drawPlayerMarker(this.boardDynamicGraphics, frame, {
+      angle,
+      motionAmount: motionPose.amount
+    }, this.sparkFrameScratch);
+    // Soft shadowBlur glow (a canvas image under the Graphics), then ping, keyline and facets.
+    this.drawPlayerGlowCanvas(frame, tileSize, alpha, material.glow, material.core);
+    drawSparkPlayer(this.boardDynamicGraphics, frame, {
       tileSize,
       devicePixelRatio: backingScale,
       alpha,
       timeMs: time,
-      coreColor: playerCoreColor,
-      // On the start / goal (dead-end cap) tile the ring follows the tile's rounded shape, morphing while gliding on or off.
-      tileCornerRadii: endpointMorph.radii,
-      tileCornerBlend: endpointMorph.blend,
-      // Over the goal the core is translucent so the star (always drawn, under the marker) shows through.
+      material,
+      // Over the goal the facets are translucent so the star (always drawn, under the marker) shows through.
       coreAlphaScale: resolvePlayerCoreAlphaScale(
         this.maze.goal ? resolveEndpointRingBlend(point.x, point.y, this.maze.goal, reducedMotion) : 0
       ),
@@ -10728,26 +10761,28 @@ export class MenuScene extends Phaser.Scene {
   // including squash-stretch and idle breathing) plus enough padding that
   // the wider of the two blur passes is never clipped at the canvas edge.
   private drawPlayerGlowCanvas(
-    frame: PlayerMarkerFrame,
+    frame: SparkFrame,
     tileSize: number,
     alpha: number,
-    playerCoreColor: number
+    wideGlowColor: number,
+    tightGlowColor: number
   ): void {
     if (!this.playerGlowCanvasTexture || !this.playerGlowCanvasImage) {
       return;
     }
-    const shapeLeft = frame.centerX - frame.coreHalfWidth;
-    const shapeTop = frame.centerY - frame.coreHalfHeight;
-    const shapeWidth = frame.coreHalfWidth * 2;
-    const shapeHeight = frame.coreHalfHeight * 2;
-    const wideGlowBlurPx = tileSize * PLAYER_MARKER.glow.wideBlurTileRatio;
-    const tightGlowBlurPx = tileSize * PLAYER_MARKER.glow.tightBlurTileRatio;
+    // Spark: a square about the centre that holds the kite at any heading, so the canvas does not resize as it turns.
+    const shapeLeft = frame.centerX - frame.reachCss;
+    const shapeTop = frame.centerY - frame.reachCss;
+    const shapeWidth = frame.reachCss * 2;
+    const shapeHeight = frame.reachCss * 2;
+    const wideGlowBlurPx = tileSize * SPARK_PLAYER.glow.wideBlurTileRatio;
+    const tightGlowBlurPx = tileSize * SPARK_PLAYER.glow.tightBlurTileRatio;
     // A blurred shape's own visible falloff reaches well past its own
     // nominal blur radius (a Gaussian tail, not a hard cutoff at
     // shadowBlur's own value) -- 2.5x the wider pass's radius is a
     // generous, empirically-checked margin (see the trail canvas's own
     // padding comment for the same reasoning applied to glowWidth there).
-    const padding = Math.ceil(wideGlowBlurPx * 2.5);
+    const padding = resolveSparkGlowPadding(tileSize);
     // Whole-pixel origin, same reason as the trail image (src/render/pixelAlignment.ts).
     const bounds = alignBoundsToWholePixels(
       computePlayerGlowCanvasBounds(shapeLeft, shapeTop, shapeWidth, shapeHeight, padding)
@@ -10774,20 +10809,15 @@ export class MenuScene extends Phaser.Scene {
       this.playerGlowCanvasTexture.clear(0, 0, backingWidth, backingHeight, false);
     }
     this.playerGlowCanvasTexture.context.setTransform(resolution, 0, 0, resolution, 0, 0);
-    drawPlayerGlowToCanvasContext(this.playerGlowCanvasTexture.context, {
+    drawSparkGlowToCanvasContext(this.playerGlowCanvasTexture.context, frame, {
       originX: bounds.left,
       originY: bounds.top,
-      shapeLeft,
-      shapeTop,
-      shapeWidth,
-      shapeHeight,
-      cornerRadius: frame.coreCornerRadius,
-      wideGlowColor: playerCoreColor,
-      wideGlowAlpha: PLAYER_MARKER.glow.wideAlpha * alpha,
-      wideGlowBlurPx: wideGlowBlurPx * resolution,
-      tightGlowColor: PLAYER_MARKER.accentColor,
-      tightGlowAlpha: PLAYER_MARKER.glow.tightAlpha * alpha,
-      tightGlowBlurPx: tightGlowBlurPx * resolution
+      wideColor: wideGlowColor,
+      wideAlpha: SPARK_PLAYER.glow.wideAlpha * alpha,
+      wideBlurPx: wideGlowBlurPx * resolution,
+      tightColor: tightGlowColor,
+      tightAlpha: SPARK_PLAYER.glow.tightAlpha * alpha,
+      tightBlurPx: tightGlowBlurPx * resolution
     });
     this.playerGlowCanvasTexture.refresh();
     this.playerGlowCanvasImage.setPosition(bounds.left, bounds.top);
@@ -12395,9 +12425,9 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // The player marker at guide scale: the same shared frame + draw as the board (src/render/playerMarker.ts), frozen
-  // (no ping, reduced motion, centred in its cell). The soft shadowBlur glow is a canvas image the board composites
-  // underneath, so the icon has the locator, block and stroke only.
+  // The player (skin Spark) at guide scale: the same shared frame + draw as the board (src/render/sparkPlayerSkin.ts),
+  // frozen (no ping, reduced motion, pointing right, the trail palette's resting colours at distance 0). The soft
+  // shadowBlur glow is a canvas image the board composites underneath, so the icon has the keyline and facets only.
   private drawLegacyOptionsGuidePlayerGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -12405,23 +12435,22 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number
   ): void {
     const devicePixelRatio = this.resolveBoardTileBackingScale();
-    const frame = resolvePlayerMarkerFrame({
+    const frame = resolveSparkFrame({
       centerX,
       centerY,
       tileSize,
       devicePixelRatio,
       timeMs: 0,
       reducedMotion: true,
-      motionAmount: 0,
-      headingX: 0,
-      headingY: 0
-    }, this.playerMarkerFrameScratch);
-    drawPlayerMarker(graphics, frame, {
+      angle: 0,
+      motionAmount: 0
+    }, createSparkFrame());
+    drawSparkPlayer(graphics, frame, {
       tileSize,
       devicePixelRatio,
       alpha: 1,
       timeMs: 0,
-      coreColor: resolveLegacyIridescentPlayerCoreColor(0),
+      material: resolveSparkMaterial(null, 0, true, createSparkMaterial()),
       pingStartMs: -1,
       reducedMotion: true
     });
@@ -12494,9 +12523,9 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Trail legend: three chip tiles in an L (the board's own tile geometry) with a trail line over a dark
-  // underlay, the same layering the board trail uses, in the board trail's iridescent colours (resting
-  // sweep, frozen: no time term and no pulse, so the legend is static).
+  // Trail legend: three chip tiles in an L (the board's own tile geometry) with the star-dust trail (skin Star dust,
+  // src/render/starDustTrailCanvas.ts) along it: the board's own sparkle placement, sizes and keyline, in the board
+  // trail's iridescent colours (resting sweep, frozen: no time term, no twinkle, so the legend is static).
   private drawLegacyOptionsGuideTrailGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -12518,28 +12547,30 @@ export class MenuScene extends Phaser.Scene {
       { x: left + (cellSize * 1.5), y: top + (cellSize * 1.5) }
     ];
     const coreWidth = Math.max(2, cellSize * LEGACY_PLAY_TRAIL_WIDTH_RATIO);
-    // Four sub-strokes (two per leg) so the legend shows the colour shifting along the line.
-    const legs: Array<[{ x: number; y: number }, { x: number; y: number }, number]> = [];
+    // Four sub-segments (two per leg) so the legend shows the colour shifting along the route.
+    const segments: StarDustSegment[] = [];
     for (let leg = 0; leg < 2; leg += 1) {
       const from = points[leg]!;
       const to = points[leg + 1]!;
       const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
-      legs.push([from, mid, (leg * 2) + 0.5], [mid, to, (leg * 2) + 1.5]);
-    }
-    const layers = [
-      { width: coreWidth + (2 * LEGACY_TRAIL_UNDERLAY_PAD_CSS), alpha: LEGACY_TRAIL_UNDERLAY_ALPHA, core: false },
-      { width: coreWidth, alpha: 1, core: true }
-    ] as const;
-    for (const layer of layers) {
-      for (const [from, to, distanceTiles] of legs) {
-        const color = layer.core ? resolveIridescentRestingCore(distanceTiles * 1.6, 0) : boardMaterial.void;
-        graphics.lineStyle(layer.width, color, layer.alpha);
-        graphics.beginPath();
-        graphics.moveTo(from.x, from.y);
-        graphics.lineTo(to.x, to.y);
-        graphics.strokePath();
+      const start = leg * cellSize;
+      for (const [a, b, d0, distanceTiles] of [[from, mid, start, (leg * 2) + 0.5], [mid, to, start + (cellSize / 2), (leg * 2) + 1.5]] as const) {
+        const color = resolveIridescentRestingCore(distanceTiles * 1.6, 0);
+        segments.push({
+          previous: { x: a.x, y: a.y, distance: d0 },
+          current: { x: b.x, y: b.y, distance: d0 + (cellSize / 2) },
+          glowColor: color,
+          coreColor: color,
+          alpha: 1
+        });
       }
     }
+    drawStarDustToGraphics(graphics, segments, {
+      tileSize: cellSize,
+      threadWidth: Math.max(1, coreWidth * 0.4),
+      keylineColor: boardMaterial.void,
+      keylineAlpha: 1
+    });
   }
 
   // Leaderboard sheet (redesign 2026-11-06): the scene only paints the plan

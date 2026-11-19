@@ -32,8 +32,7 @@ import {
 } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 import * as boardTileBake from '../../src/render/boardTileBake';
 import * as edgeMarkers from '../../src/render/edgeMarkers';
-import * as playerMarker from '../../src/render/playerMarker';
-import { designTokens } from '../../src/theme/tokens';
+import * as sparkPlayerSkin from '../../src/render/sparkPlayerSkin';
 
 /**
  * Guide drift guard. Standing rule (Zac, 2026-11-06): any PR that changes
@@ -47,10 +46,15 @@ import { designTokens } from '../../src/theme/tokens';
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n?/g, '\n');
 const MENU_SCENE = read('src/scenes/MenuScene.ts');
 const row = (id: LegacyGuideRow['id']): LegacyGuideRow => LEGACY_GUIDE_ROWS.find((r) => r.id === id)!;
+const sceneMethod = (signature: string): string => {
+  const start = MENU_SCENE.indexOf(signature);
+  expect(start, signature).toBeGreaterThanOrEqual(0);
+  return MENU_SCENE.slice(start, MENU_SCENE.indexOf('\n  }\n', start));
+};
 const exportsOf = (module: string): Record<string, unknown> | null => {
   if (module === 'src/render/boardTileBake.ts') return boardTileBake as Record<string, unknown>;
   if (module === 'src/render/edgeMarkers.ts') return edgeMarkers as Record<string, unknown>;
-  if (module === 'src/render/playerMarker.ts') return playerMarker as Record<string, unknown>;
+  if (module === 'src/render/sparkPlayerSkin.ts') return sparkPlayerSkin as Record<string, unknown>;
   return null;
 };
 
@@ -141,16 +145,18 @@ describe('guide copy only names things that exist', () => {
     expect(read('src/render/boardTileBake.ts')).not.toMatch(/spec.play|startArm/);
   });
 
-  test('You: the player is a rounded green block in the Chip tile corner proportion, inside a ring of the same shape', () => {
-    expect(row('you').text).toMatch(/rounded block inside a bright ring/);
-    // one marker for the board, the menu demo's AI and the Guide icon: the Chip corner proportion lives in one module
-    expect(read('src/render/playerMarker.ts')).toContain('cornerRatio: CHIP_CORNER_RATIO');
-    expect(read('src/render/playerLocator.ts')).toContain('CHIP_CORNER_RATIO');
+  test('You: the player is the Spark skin, a kite that points the way it moves (L7, skinRegistry.ts)', () => {
+    expect(row('you').text).toMatch(/spark\. It points the way you move/);
+    // one draw for the board, the menu demo's AI and the Guide icon: the kite lives in one module and turns to the heading
+    expect(read('src/render/skinRegistry.ts')).toContain("DEFAULT_PLAYER_SKIN: PlayerSkinId = 'spark'");
+    expect(sceneMethod('private fillLegacyPlayerMarkerTile(')).toContain('this.sparkHeading.update(');
     expect(MENU_SCENE).not.toContain('LEGACY_PLAY_PLAYER_MARKER_SQUARE_FILL_RATIO');
   });
 
-  test('Trail row: the copy says the line shimmers and shifts colour, and the legend draws the iridescent palette', () => {
-    expect(row('trail').text).toMatch(/shimmering, colour-shifting line is your route/);
+  test('Trail row: the copy says the route is twinkling star dust, and the board and legend draw the Star dust skin', () => {
+    expect(row('trail').text).toMatch(/twinkling star dust marks your route/);
+    expect(read('src/render/skinRegistry.ts')).toContain("DEFAULT_TRAIL_SKIN: TrailSkinId = 'star-dust'");
+    expect(sceneMethod('private drawTrailCanvasSegments(')).toContain('drawStarDustTrailToCanvasContext(');
     expect(read('src/render/trailPalette.ts')).toMatch(/export const sampleIridescentTrail/);
   });
 
@@ -171,13 +177,11 @@ describe('guide copy only names things that exist', () => {
     expect(read('src/render/boardTileBake.ts')).toMatch(/const starPath = /);
   });
 
-  test('You are the green block: the player core token is a green-dominant color', () => {
-    const hex = designTokens.legacy.color['player.core'].replace('#', '');
-    const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
-    expect(g).toBeGreaterThan(r);
-    expect(g).toBeGreaterThan(b);
-    expect(row('you').text).toMatch(/green/);
-    expect(MENU_SCENE).toMatch(/private fillLegacyPlayerMarkerTile\(/);
+  test('You are colour-shifting: the spark takes the trail palette at the trail head, not a fixed colour', () => {
+    expect(row('you').text).toMatch(/colour-shifting spark/);
+    expect(row('you').text).not.toMatch(/green/);
+    expect(read('src/render/sparkPlayerSkin.ts')).toContain('sampleIridescentTrail(distance, time, stopped, SAMPLE_HEAD)');
+    expect(sceneMethod('private fillLegacyPlayerMarkerTile(')).toContain('resolveSparkMaterial(this.trailPaletteHead, time, reducedMotion,');
   });
 
   test('Move: touch uses the floating stick that spawns where the thumb lands, and there is no control-style toggle to contradict it', () => {
@@ -362,8 +366,9 @@ describe('the scene paints exactly what the guide data declares', () => {
     const marker = method('private drawLegacyGuideBoardMarker(');
     expect(marker).toContain('drawBoardMarkers(context, {');
     expect(marker).toContain('new PhaserGraphicsTileContext(graphics)');
-    // trail: chip tiles from the board's computeChipGeometry (via resolveChipGridGeometry), plus a miniature trail line.
+    // trail: chip tiles from the board's computeChipGeometry (via resolveChipGridGeometry), plus the board's own star dust.
     expect(icon).toContain('this.drawLegacyOptionsGuideTrailGlyph(');
+    expect(method('private drawLegacyOptionsGuideTrailGlyph(')).toContain('drawStarDustToGraphics(graphics, segments, {');
     expect(method('private drawLegacyGuideChipCells(')).toContain('resolveChipGridGeometry(');
     expect(read('src/render/chipTileGraphics.ts')).toContain('computeChipGeometry(');
     // wrap: the perimeter diamond itself.
@@ -373,11 +378,11 @@ describe('the scene paints exactly what the guide data declares', () => {
     // online: the Guide icon is a chip-word sample; the counter itself is the web-style dot + text (MAZER-UI-033).
     expect(icon).toContain("this.drawLegacyPresenceGlyphWord(graphics, '12',");
     expect(method('private drawLegacyMenuPresenceCounter(time: number): void')).toContain('view.draw(this.boardDynamicGraphics');
-    // you: the board's own marker draw (src/render/playerMarker.ts: block, keyline, ring, accent stroke), frozen for the icon,
+    // you: the board's own Spark draw (src/render/sparkPlayerSkin.ts: ping, keyline, four facets), frozen for the icon,
     // the same function fillLegacyPlayerMarkerTile calls for the human player and for the menu demo's AI.
-    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawPlayerMarker(graphics, frame, {');
-    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('resolvePlayerMarkerFrame(');
-    expect(method('private fillLegacyPlayerMarkerTile(')).toContain('drawPlayerMarker(this.boardDynamicGraphics, frame, {');
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawSparkPlayer(graphics, frame, {');
+    expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('resolveSparkFrame(');
+    expect(method('private fillLegacyPlayerMarkerTile(')).toContain('drawSparkPlayer(this.boardDynamicGraphics, frame, {');
     // move mirrors the stick.
     expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
     expect(icon).toContain('this.progressionState.tracks.player.level');
