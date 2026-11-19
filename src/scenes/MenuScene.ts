@@ -7650,8 +7650,14 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.clear();
     // MAZER-VIS-012: the dark menu field and the opaque sign-in surface are the shared near-black (same as the boot splash).
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
-    this.backdropGraphics.fillStyle(this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor, 1);
-    this.backdropGraphics.fillRect(0, 0, width, height);
+    // MAZER-PERF-010: the opaque field is the camera background, not a full-screen Graphics fillRect. Replaying a
+    // viewport-sized rect through GraphicsCanvasRenderer every frame cost ~14 of ~34 ms per menu frame under 4x CPU
+    // throttle at DPR 3 (measured headless); the camera paints the same colour underneath everything for free.
+    const fieldColor = this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor;
+    const mainCamera = this.cameras.main;
+    if (mainCamera.backgroundColor.color !== fieldColor || mainCamera.backgroundColor.alpha !== 255) {
+      mainCamera.setBackgroundColor(fieldColor);
+    }
     const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
     const animationTime = backdropMotionEnabled ? this.time.now : 0;
     for (const star of this.stars) {

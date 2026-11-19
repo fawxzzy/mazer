@@ -1526,7 +1526,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const uiRebuilt = this.uiDirty;');
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, uiRebuilt);');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
-    expect(tuningSource).toContain('full: 16,');
+    expect(tuningSource).toContain('full: 33,');
     expect(tuningSource).toContain('throttled: 100,');
   });
 

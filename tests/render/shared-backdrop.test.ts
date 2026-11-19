@@ -43,7 +43,8 @@ describe('shared near-black backdrop (MAZER-VIS-012)', () => {
 
   it('the in-game sign-in surface and the dark menu field are the shared colour', () => {
     const source = read('src/scenes/MenuScene.ts');
-    expect(source).toContain('this.backdropGraphics.fillStyle(this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor, 1);');
+    expect(source).toContain('const fieldColor = this.settings.darkMode ? SHARED_BACKDROP_PHASER : palette.fieldColor;');
+    expect(source).toContain('mainCamera.setBackgroundColor(fieldColor);');
     // The auth overlay is fully opaque, so what a player sees on sign-in is this fill, not the field or the stars.
     expect(source).toContain("this.overlayGraphics.fillStyle(this.overlay === 'auth' ? SHARED_BACKDROP_PHASER : 0x02040a,");
     expect(source).not.toContain('this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);');
