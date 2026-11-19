@@ -40,8 +40,24 @@ describe('MAZER-VIS-052 menu demo bleed-off paths', () => {
     }
     // Re-pinned by MAZER-GEN-021: every budget-ladder gameplay profile now carries `journeyLegs` (1 to 3 legs of
     // the planned start-to-goal journey, 47 of these 51 profiles); nothing else in them moved.
-    expect(createHash('sha256').update(JSON.stringify(out)).digest('hex'))
+    // Re-pinned by MAZER-L8b: every budget-ladder gameplay profile also carries `bleedPlacement: 'least-saving'`;
+    // with that one key removed the profiles still hash to the GEN-021 pin, so nothing else moved.
+    const withoutPlacement = out.map((profile) => {
+      const { bleedPlacement: _placement, ...rest } = profile as { bleedPlacement?: string };
+      return rest;
+    });
+    expect(createHash('sha256').update(JSON.stringify(withoutPlacement)).digest('hex'))
       .toBe('d151ce7a805e57a978d797c12d8019fc429f94e3d5d36df783a3d3a399688b99');
+    expect(out.filter((profile) => (profile as { bleedPlacement?: string }).bleedPlacement === 'least-saving').length).toBe(47);
+    expect(createHash('sha256').update(JSON.stringify(out)).digest('hex'))
+      .toBe('6d8cc29dd54d4d0afbfad2a9a4f1a970936a6a98699443bf996ed5b3417a2efd');
+  });
+
+  test('MAZER-L8b: no menu demo profile carries the ladder bleed placement (the demo keeps its seeded wrap pick)', () => {
+    for (let level = 1; level <= 300; level += 1) {
+      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(level)).bleedPlacement).toBeUndefined();
+      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(level), { fraction: 0.5 }).bleedPlacement).toBeUndefined();
+    }
   });
 
   test('the demo profile never carries a budget-ladder gate and keeps feeders past level 140', () => {
