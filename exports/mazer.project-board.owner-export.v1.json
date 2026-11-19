@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_de53e33973ad",
+  "export_id": "pbe_mazer_owner_registry_744121546071",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:de53e33973ad203f605b1208850a7d7191045b0ef44a86b910ae118fb0450b86",
-  "generated_at": "2026-11-19T14:43:27.000Z",
+  "source_revision": "sha256:7441215460712fbeefd671637be06e8c037314ea268e7af4def6eeb67bdd8214",
+  "generated_at": "2026-11-19T16:37:40.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:c05bf25a16ac694b5d4031638d79080c279e5b3af5c39041911a5d68d95dd588",
-      "observed_at": "2026-11-19T14:43:27.000Z"
+      "revision": "sha256:8d9279ebfe6579c373058a45b27d7b972adef5f1b566950093205211780a9cdd",
+      "observed_at": "2026-11-19T16:37:40.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-19T14:43:27.000Z"
+      "observed_at": "2026-11-19T16:37:40.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-19T14:43:27.000Z"
+      "observed_at": "2026-11-19T16:37:40.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-19T14:43:27.000Z"
+      "observed_at": "2026-11-19T16:37:40.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-19T14:43:27.000Z"
+      "observed_at": "2026-11-19T16:37:40.000Z"
     }
   ],
   "cards": [
@@ -3095,16 +3095,16 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ctrl-003_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-CTRL-003",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Revisit and rework the controls",
-        "description": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started.",
+        "description": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
         "card_type": "feature",
-        "lifecycle": "intake",
+        "lifecycle": "in-progress",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
@@ -3112,10 +3112,10 @@
           "MAZER-HAZ-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-12T14:00:00.000Z",
+        "updated_at": "2026-11-19T16:00:45.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-003",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "in_progress",
           "public_safe": true
         }
       },
@@ -3123,15 +3123,66 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-003",
         "source_status": "current",
-        "source_updated_at": "2026-11-12T14:00:00.000Z"
+        "source_updated_at": "2026-11-19T16:00:45.000Z"
       },
       "content": {
-        "summary": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started.",
-        "objective": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started.",
+        "summary": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
+        "objective": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
         "acceptance_criteria": [
           "A short controls audit across touch drag, the touch stick, keyboard and any other no-gamepad options, with measured feel at 390x844 and 1280x720",
           "A written controls proposal the owner chooses between before any build starts",
           "A player-facing Settings and Guide update ships with whatever is built"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ctrl-004_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-CTRL-004",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Floating touch anchor for the controls, off by default",
+        "description": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T16:37:40.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-004",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-004",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
+      },
+      "content": {
+        "summary": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "The setting is off by default and the current controls feel is unchanged",
+          "With the setting on, the touch anchor follows the thumb without a jump",
+          "A test pins the default and the on path"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5231,14 +5282,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Limit bleed path shortcuts and make least-saving the default",
-        "description": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+        "description": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps. Board update 2026-11-19: Menu demo mazes now use the play bleed rules and gate tiles; merged, not deployed PR #659 merged (2a73e151). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Menu demo mazes use the play bleed rules and gate tiles. Deployed to production; headless-only, phone check pending PR #659 merged (2a73e151). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T06:02:44.032Z",
+        "updated_at": "2026-11-19T16:37:40.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-022",
         "extensions": {
           "owner_status": "review",
@@ -5249,11 +5300,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-022",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T06:02:44.032Z"
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
       },
       "content": {
-        "summary": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
-        "objective": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+        "summary": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps. Board update 2026-11-19: Menu demo mazes now use the play bleed rules and gate tiles; merged, not deployed PR #659 merged (2a73e151). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Menu demo mazes use the play bleed rules and gate tiles. Deployed to production; headless-only, phone check pending PR #659 merged (2a73e151). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps. Board update 2026-11-19: Menu demo mazes now use the play bleed rules and gate tiles; merged, not deployed PR #659 merged (2a73e151). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Menu demo mazes use the play bleed rules and gate tiles. Deployed to production; headless-only, phone check pending PR #659 merged (2a73e151). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Bleed paths are measured and limited so a wrap cannot skip most of the route.",
           "Least-saving placement is the ladder default and the ladder fingerprints are re-pinned deliberately.",
@@ -6717,6 +6768,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-mode-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-MODE-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Game modes shell with Endless and a leaderboard tab per mode",
+        "description": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T16:37:40.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
+      },
+      "content": {
+        "summary": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "acceptance_criteria": [
+          "Endless plays exactly like the current game with progression kept",
+          "The leaderboard shows one tab per mode and existing scores count as Endless",
+          "The database mode column is applied only after the exact SQL is approved"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-motion-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -8063,6 +8165,57 @@
           "The menu backdrop is no longer filled every frame.",
           "The menu star redraw rate is halved.",
           "Menu render tests pass and the look is unchanged at normal speed."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-013_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-013",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Smoother loop: fewer redraws, 60 fps cap, and a slightly slower player",
+        "description": "Cut per-frame canvas cost with one wall fill, a throttled trail rebuild during glide and a 60 fps grid-timed loop, and slow the player step rate by a single constant.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T16:37:40.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-013",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-013",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
+      },
+      "content": {
+        "summary": "Cut per-frame canvas cost with one wall fill, a throttled trail rebuild during glide and a 60 fps grid-timed loop, and slow the player step rate by a single constant.",
+        "objective": "Cut per-frame canvas cost with one wall fill, a throttled trail rebuild during glide and a 60 fps grid-timed loop, and slow the player step rate by a single constant.",
+        "acceptance_criteria": [
+          "Wall tiles draw as one fill and the trail rebuild is throttled during glide",
+          "The loop is capped at 60 fps and step timing does not depend on frame rate",
+          "Player pace is set by one constant pinned by tests and feels slower on the phone"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -12515,24 +12668,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ui-090_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-UI-090",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Update the in-app guide for hazards and menu changes",
-        "description": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior.",
+        "description": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "card_type": "documentation",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-16T14:26:47.000Z",
+        "updated_at": "2026-11-19T16:37:40.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-090",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -12540,11 +12693,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-090",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T14:26:47.000Z"
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
       },
       "content": {
-        "summary": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior.",
-        "objective": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior.",
+        "summary": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Guide text covers hazards and menu tap-anywhere",
           "Guide icons match current visuals",
@@ -14210,14 +14363,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
-        "description": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
+        "description": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032. Board update 2026-11-19: Edge stars grow while they fill and shrink while they drain, rainbow lasers and star fills from one shared player colour; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star smooth grow and rainbow colour. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-13T12:00:00.000Z",
+        "updated_at": "2026-11-19T16:37:40.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
         "extensions": {
           "owner_status": "review",
@@ -14228,11 +14381,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-030",
         "source_status": "current",
-        "source_updated_at": "2026-11-13T12:00:00.000Z"
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
       },
       "content": {
-        "summary": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
-        "objective": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032.",
+        "summary": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032. Board update 2026-11-19: Edge stars grow while they fill and shrink while they drain, rainbow lasers and star fills from one shared player colour; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star smooth grow and rainbow colour. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner request 2026-11-13: redesign the diamond lasers and make the beam fill and drain the diamond, timed to contact. Merged and deployed; not checked on a real phone. PR #492 (merge 1dc4e9ca, head 7a006ab7), live on production build fawxzzy-mazer-dq6f32ysl (Guide copy verified in the shipped bundle). Each edge diamond is empty until the beam head touches it, then fills linearly and is full when the beam tail arrives 200 ms later; on the way out it drains the same way, so the colour leaves through the beam end. Beams are comets in the player colour with a ripple on the contact point. Flight timing, the 400 ms laser and the input unlock are unchanged; the outro ring orbit now starts at 600 ms instead of 400. Reduced Motion shows no travelling beam and a 200 ms crossfade of the diamond fill. The Guide Wrap row now mentions the filling diamonds. Evidence: source, unit, pixel and headless Chromium only. Not checked on a real phone: beam look, contact timing and frame rate on a phone are unknown. No independent review recorded. A design note is in the repository UI docs. Follow-ups: MAZER-VIS-031 and MAZER-VIS-032. Board update 2026-11-19: Edge stars grow while they fill and shrink while they drain, rainbow lasers and star fills from one shared player colour; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star smooth grow and rainbow colour. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The diamond lasers are redesigned as comet beams: PR #492 merged and deployed, headless only",
           "The beam fills the diamond on contact and drains it on release: pure timeline with unit tests, headless Chromium frames; not checked on a phone",
@@ -14890,14 +15043,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Keep edge diamonds inside the screen with the outer tip on the edge",
-        "description": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "description": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-14T16:25:20.000Z",
+        "updated_at": "2026-11-19T16:37:40.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-043",
         "extensions": {
           "owner_status": "review",
@@ -14908,11 +15061,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-043",
         "source_status": "current",
-        "source_updated_at": "2026-11-14T16:25:20.000Z"
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
       },
       "content": {
-        "summary": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Edge diamonds sat inside the screen with the outer tip on the edge and stayed anchored there when they shrink. Superseded for corner diamonds by MAZER-VIS-044. Board update 2026-11-14: Edge diamonds now sit fully inside the screen with the outer tip on the edge and stay anchored there when they shrink; merged, not yet deployed PR #536 merged (258cf20d). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill; merged, not deployed PR #660 merged (fe1ce224). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge stars stay inside the screen while sized by fill. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The behaviour is covered by a test",
           "Checked in Chromium and WebKit phone emulation",
@@ -15506,14 +15659,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Edge stars travel with the ring and stay full size",
-        "description": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+        "description": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size. Board update 2026-11-19: Edge star size now follows fill instead of a held full size; merged, not deployed PR #660 merged (fe1ce224). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star size follows fill instead of a held full size. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T06:02:44.032Z",
+        "updated_at": "2026-11-19T16:37:40.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-060",
         "extensions": {
           "owner_status": "review",
@@ -15524,11 +15677,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-060",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T06:02:44.032Z"
+        "source_updated_at": "2026-11-19T16:37:40.000Z"
       },
       "content": {
-        "summary": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
-        "objective": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+        "summary": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size. Board update 2026-11-19: Edge star size now follows fill instead of a held full size; merged, not deployed PR #660 merged (fe1ce224). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star size follows fill instead of a held full size. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size. Board update 2026-11-19: Edge star size now follows fill instead of a held full size; merged, not deployed PR #660 merged (fe1ce224). Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Edge star size follows fill instead of a held full size. Deployed to production; headless-only, phone check pending PR #660 merged (fe1ce224). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Edge stars move with the ring yo-yo motion.",
           "Edge stars stay at full size through the intro and the spawn beam.",
@@ -15603,11 +15756,11 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 298,
-    "exported_public_card_count": 298,
-    "exported_open_card_count": 80,
+    "stable_identity_count": 301,
+    "exported_public_card_count": 301,
+    "exported_open_card_count": 84,
     "exported_completed_card_count": 84,
-    "exported_deferred_card_count": 26,
+    "exported_deferred_card_count": 25,
     "exported_archived_card_count": 108,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,
