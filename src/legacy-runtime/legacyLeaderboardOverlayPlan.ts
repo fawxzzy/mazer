@@ -29,6 +29,11 @@ import type {
   LegacyLeaderboardViewModel
 } from './legacyLeaderboardView';
 import {
+  LEGACY_LEADERBOARD_MODE_TAB_SIZES,
+  layoutLegacyLeaderboardModeTabs,
+  type LegacyLeaderboardModeTabRect
+} from './legacyLeaderboardModeTabs';
+import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyOverlayPanelLayout,
   type LegacyOverlayPanelLayout
@@ -106,6 +111,8 @@ export interface LegacyLeaderboardOverlayPlan {
   title: { centerX: number; centerY: number; text: string };
   exit: LegacyLeaderboardPlanRect;
   exitLabel: string;
+  /** Per-mode tab strip under the exit row (lane L11); null for the signed-out and username-gate bodies. */
+  modeTabs: readonly LegacyLeaderboardModeTabRect[] | null;
   columnHeader: {
     centerY: number;
     levelRight: number;
@@ -184,7 +191,8 @@ export const buildLegacyLeaderboardOverlayPlan = (
   const hasSelf = view.selfRow !== null && view.rows.length > 0;
 
   const exitHeight = s.actionHeight;
-  const headBlock = (cardPadding * 2) + titleHeight + titleGap + exitHeight;
+  const modeBlock = view.modeTabs === null ? 0 : z.sectionGap + LEGACY_LEADERBOARD_MODE_TAB_SIZES.height;
+  const headBlock = (cardPadding * 2) + titleHeight + titleGap + exitHeight + modeBlock;
   const colBlock = hasColumns ? z.sectionGap + z.columnHeaderHeight : 0;
   const selfBlock = hasSelf ? z.selfRowGap + z.selfRowHeight : 0;
 
@@ -216,7 +224,10 @@ export const buildLegacyLeaderboardOverlayPlan = (
 
   const exitTop = cardTop + cardPadding + titleHeight + titleGap;
   const exit = rectOf(innerLeft, exitTop, innerWidth, exitHeight);
-  const afterExit = exitTop + exitHeight;
+  const afterExit = exitTop + exitHeight + modeBlock;
+  const modeTabs = view.modeTabs === null
+    ? null
+    : layoutLegacyLeaderboardModeTabs(view.modeTabs, innerLeft, innerWidth, exitTop + exitHeight + z.sectionGap);
 
   let columnHeader: LegacyLeaderboardOverlayPlan['columnHeader'] = null;
   if (hasColumns) {
@@ -311,6 +322,7 @@ export const buildLegacyLeaderboardOverlayPlan = (
     exit,
     exitLabel: view.exit.label,
     list,
+    modeTabs,
     naturalCardHeight,
     panel,
     selfRow,
