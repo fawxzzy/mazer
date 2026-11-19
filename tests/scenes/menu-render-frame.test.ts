@@ -2561,7 +2561,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'expireLegacyPlayerMessages', 'drawLegacyPlayerMessageToast', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
-    'hasLegacyBleedOffGlowPendingFrame', 'hasGoalStarSpinPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
+    'hasLegacyBleedOffGlowPendingFrame', 'syncLegacyBleedGateFrame', 'hasGoalStarSpinPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
     'drawBoardPaths', 'drawDynamicBoard', 'drawHud', 'rebuildUi',
