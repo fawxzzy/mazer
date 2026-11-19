@@ -1934,7 +1934,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('await signOutLegacyAuth(this.authSnapshot)');
     expect(authSource).not.toContain("await client.auth.signOut({ scope: 'local' })");
     expect(authSource).toContain('LEGACY_AUTH_CREDENTIAL_TIMEOUT_MS = 10_000');
-    expect(authSource).toContain('sessionResult = await client.auth.getSession();');
+    // L1: the boot read is bounded so a stalled refresh cannot hold the sign-in shield up (legacyAuthBootResolution.ts).
+    expect(authSource).toContain('const read = client.auth.getSession();');
+    expect(authSource).toContain('await raceLegacyAuthSessionRead(read)');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });
 
