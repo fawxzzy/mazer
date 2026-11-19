@@ -63,10 +63,22 @@ export type MazerOAuthFailureCategory =
   | 'session_invalid'
   | 'storage_unavailable';
 
+/**
+ * Where a successful sign-in continues after the callback. Only the profile
+ * icon asks for 'account' (the shared account page, as for a signed-in tap);
+ * absent means the Mazer menu, as before. A closed enum: the destination URL
+ * is always buildMazerAccountPortalUrl('account'), never caller supplied.
+ */
+export type MazerOAuthContinuation = 'account';
+
 export type MazerOAuthBootResult =
   | { status: 'none' }
-  | { status: 'connected' }
+  | { continueTo?: MazerOAuthContinuation; status: 'connected' }
   | { category: MazerOAuthFailureCategory; status: 'failed' };
+
+export interface MazerOAuthAuthorizationOptions {
+  continueTo?: MazerOAuthContinuation | null;
+}
 
 export interface MazerOAuthCapturedCallback {
   code: string | null;
@@ -82,6 +94,8 @@ interface MazerOAuthPendingRecord {
   authSessionPreimageRaw: string | null;
   authMutationEpoch: number;
   codeVerifier: string;
+  // Optional so records written before this field (and by older builds) still parse.
+  continueTo?: MazerOAuthContinuation;
   createdAtEpochMs: number;
   returnPath: MazerOAuthReturnPath;
   sharedAuthMutationEpoch: number;
@@ -491,8 +505,11 @@ const verifyMazerOAuthAuthStorageWritable = (runtime: MazerOAuthRuntime): boolea
 };
 
 export const beginMazerOAuthAuthorization = async (
-  runtime?: MazerOAuthRuntime | null
+  runtime?: MazerOAuthRuntime | null,
+  options: MazerOAuthAuthorizationOptions = {}
 ): Promise<MazerOAuthBootResult> => {
+  // Read before the first await: callers pass a value captured at tap time.
+  const continueTo: MazerOAuthContinuation | null = options.continueTo === 'account' ? 'account' : null;
   const resolution: MazerOAuthRuntimeResolution = runtime === undefined
     ? resolveBrowserRuntime()
     : runtime === null
@@ -566,6 +583,7 @@ export const beginMazerOAuthAuthorization = async (
       authSessionPreimageRaw: sharedMutationState.authSessionPreimageRaw,
       authMutationEpoch,
       codeVerifier,
+      ...(continueTo === null ? {} : { continueTo }),
       createdAtEpochMs: resolvedRuntime.now(),
       returnPath: resolveMazerOAuthReturnPath(resolvedRuntime.location.search),
       sharedAuthMutationEpoch: sharedMutationState.sharedAuthMutationEpoch,
@@ -655,6 +673,7 @@ const parsePendingRecord = (raw: string | null): MazerOAuthPendingRecord | null 
     if (
       record.version !== 2
       || (record.returnPath !== '/' && record.returnPath !== '/?mode=play')
+      || (record.continueTo !== undefined && record.continueTo !== 'account')
       || (record.authSessionPreimageRaw !== null && typeof record.authSessionPreimageRaw !== 'string')
       || !Number.isSafeInteger(record.createdAtEpochMs)
       || !Number.isSafeInteger(record.authMutationEpoch)
@@ -1350,7 +1369,9 @@ const consumeMazerOAuthCallbackInner = async (
     } catch {
       // The shared-storage listener remains the fallback reconciliation path.
     }
-    return { status: 'connected' };
+    return pending.continueTo === 'account'
+      ? { continueTo: 'account', status: 'connected' }
+      : { status: 'connected' };
   };
   // Code exchange is one-time. Queue this final commit behind any in-flight
   // auth-js refresh instead of failing after the provider code is consumed.
@@ -1414,6 +1435,18 @@ export const navigateToMazerAccountPortal = (
 ): void => {
   location.assign(buildMazerAccountPortalUrl(route));
 };
+
+/**
+ * The page a finished sign-in continues to, or null for the Mazer menu. Only a
+ * connected callback whose pending record asked for 'account' continues, and
+ * the destination is the fixed shared account page (same URL as a signed-in
+ * profile tap), so nothing in the callback URL can choose where it goes.
+ */
+export const resolveMazerOAuthContinuationUrl = (result: MazerOAuthBootResult): string | null => (
+  result.status === 'connected' && result.continueTo === 'account'
+    ? buildMazerAccountPortalUrl('account')
+    : null
+);
 
 export const navigateToMazerLegalPortal = (
   route: MazerLegalRoute,
