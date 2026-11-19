@@ -16,6 +16,8 @@
  * resolveControllerHaloSectorAxisRelation names that relation for diagnostics and tests.
  */
 
+import { phaserMaterialAliases } from '../theme/tokens';
+
 export interface ControllerHaloPoint {
   readonly x: number;
   readonly y: number;
@@ -56,7 +58,8 @@ export const CONTROLLER_HALO = Object.freeze({
   sectorHysteresisRad: Math.PI / 30,
   /** Near the player the whole controller drops toward minAlpha so it never covers the Spark or the tiles ahead. */
   nearPlayer: Object.freeze({ minAlpha: 0.3, ringClearancePx: 20, startPx: 14, rangePx: 36 }),
-  colors: Object.freeze({ cyan: 0x6be8e1, white: 0xf1faf6 })
+  // Theme tokens semantic.info (the lit cyan) and text.primary (the nub core); no new colour literals.
+  colors: Object.freeze({ cyan: phaserMaterialAliases['semantic.info'], white: phaserMaterialAliases['text.primary'] })
 });
 
 export const CONTROLLER_HALO_SECTOR_NAMES = Object.freeze([
@@ -366,7 +369,7 @@ export interface ControllerHaloCanvasContext {
   shadowBlur: number;
 }
 
-export const toControllerHaloCss = (color: number): string => `#${(color & 0xffffff).toString(16).padStart(6, '0')}`;
+export const toControllerHaloCss = (color: number): string => `#${Math.trunc(color).toString(16).padStart(6, '0').slice(-6)}`;
 
 /** Full-opacity ring; the view sets the image alpha (ringAlpha) per frame. Context is already scaled to css px. */
 export const drawControllerHaloRing = (ctx: ControllerHaloCanvasContext, box: ControllerHaloBakeBox): void => {
