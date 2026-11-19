@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_744121546071",
+  "export_id": "pbe_mazer_owner_registry_68dede5a09aa",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:7441215460712fbeefd671637be06e8c037314ea268e7af4def6eeb67bdd8214",
-  "generated_at": "2026-11-19T16:37:40.000Z",
+  "source_revision": "sha256:68dede5a09aa350623adc8a9d74602fa9913ec349aefdf2d30e37d43f3e9a10b",
+  "generated_at": "2026-11-19T19:08:01.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:8d9279ebfe6579c373058a45b27d7b972adef5f1b566950093205211780a9cdd",
-      "observed_at": "2026-11-19T16:37:40.000Z"
+      "revision": "sha256:c16e7d4077228c570cf6b46ea0ce79c600914d6c7d94b29488cebc179c16eb5f",
+      "observed_at": "2026-11-19T19:08:01.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-19T16:37:40.000Z"
+      "observed_at": "2026-11-19T19:08:01.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-19T16:37:40.000Z"
+      "observed_at": "2026-11-19T19:08:01.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-19T16:37:40.000Z"
+      "observed_at": "2026-11-19T19:08:01.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-19T16:37:40.000Z"
+      "observed_at": "2026-11-19T19:08:01.000Z"
     }
   ],
   "cards": [
@@ -3102,9 +3102,9 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Revisit and rework the controls",
-        "description": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
+        "description": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface. Board update 2026-11-19: Held moves keep one speed through turns; floating anchor is now the default stick (controls option B). Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
@@ -3112,10 +3112,10 @@
           "MAZER-HAZ-003"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-19T16:00:45.000Z",
+        "updated_at": "2026-11-19T17:16:53.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-003",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -3123,11 +3123,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-003",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T16:00:45.000Z"
+        "source_updated_at": "2026-11-19T17:16:53.000Z"
       },
       "content": {
-        "summary": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
-        "objective": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface.",
+        "summary": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface. Board update 2026-11-19: Held moves keep one speed through turns; floating anchor is now the default stick (controls option B). Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner request 2026-11-12, then placed by the owner in the obstacles and enemies (Phase 2 hazards) work: it is held with that work until the owner says it is ready. When it starts: a short audit first, then a written proposal the owner chooses between, and only then a build. Related: MAZER-CTRL-001 (haptics) and MAZER-FLOW-014 (constant, slower speed). Not started. Board update 2026-11-19: Controls rework un-parked by the owner 2026-11-19: contract and live options page first, no input change until the owner picks No device surface. Board update 2026-11-19: Controls rework: product contract and five-option page merged; waiting on the owner pick PR #658 merged (3fdf0e3b). No runtime surface to deploy. No device surface. Board update 2026-11-19: Held moves keep one speed through turns; floating anchor is now the default stick (controls option B). Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "A short controls audit across touch drag, the touch stick, keyboard and any other no-gamepad options, with measured feel at 390x844 and 1280x720",
           "A written controls proposal the owner chooses between before any build starts",
@@ -3156,14 +3156,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Floating touch anchor for the controls, off by default",
-        "description": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "description": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Floating touch anchor is now on by default with a Settings switch back. Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T16:37:40.000Z",
+        "updated_at": "2026-11-19T17:16:53.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-004",
         "extensions": {
           "owner_status": "review",
@@ -3174,15 +3174,66 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-004",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T16:37:40.000Z"
+        "source_updated_at": "2026-11-19T17:16:53.000Z"
       },
       "content": {
-        "summary": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
-        "objective": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "summary": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Floating touch anchor is now on by default with a Settings switch back. Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
+        "objective": "An optional floating anchor for touch movement, shipped behind a setting that is off by default so the current feel does not change. Board update 2026-11-19: Floating touch anchor, default off. Deployed to production; headless-only, phone check pending PR #656 merged (99289c51). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-19: Floating touch anchor is now on by default with a Settings switch back. Deployed to production; headless-only, phone check pending PR #665 merged (6944c999). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The setting is off by default and the current controls feel is unchanged",
           "With the setting on, the touch anchor follows the thumb without a jump",
           "A test pins the default and the on path"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ctrl-005_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-CTRL-005",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Make stick and keyboard step at the same speed at every Move Speed",
+        "description": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T17:23:23.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-005",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-005",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T17:23:23.000Z"
+      },
+      "content": {
+        "summary": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
+        "objective": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
+        "acceptance_criteria": [
+          "Stick and keyboard produce the same step interval at each Move Speed",
+          "The chosen pace is set by one constant pinned by tests",
+          "The owner confirms the pace on a phone"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5377,24 +5428,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-gen-024_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-GEN-024",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Weigh bleed gates in the felt tuner",
-        "description": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+        "description": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit. Board update 2026-11-19: Felt tuner prices bleed gates; 44 gate-level fingerprints re-pinned on purpose. Deployed to production; headless-only, phone check pending PR #663 merged (197d202e). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T06:02:44.032Z",
+        "updated_at": "2026-11-19T17:16:53.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-024",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5402,11 +5453,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-024",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T06:02:44.032Z"
+        "source_updated_at": "2026-11-19T17:16:53.000Z"
       },
       "content": {
-        "summary": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
-        "objective": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+        "summary": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit. Board update 2026-11-19: Felt tuner prices bleed gates; 44 gate-level fingerprints re-pinned on purpose. Deployed to production; headless-only, phone check pending PR #663 merged (197d202e). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit. Board update 2026-11-19: Felt tuner prices bleed gates; 44 gate-level fingerprints re-pinned on purpose. Deployed to production; headless-only, phone check pending PR #663 merged (197d202e). Deployed: production build main-DcCD4Odn. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The felt tuner treats a gated wrap as closed until its ring is lit.",
           "Gated levels land inside their difficulty window.",
@@ -8216,6 +8267,108 @@
           "Wall tiles draw as one fill and the trail rebuild is throttled during glide",
           "The loop is capped at 60 fps and step timing does not depend on frame rate",
           "Player pace is set by one constant pinned by tests and feels slower on the phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-014_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-014",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Cut the star field draw cost, still about 4.5 ms per frame",
+        "description": "The star field is now the largest remaining per-frame render cost. A baked-canvas attempt showed no gain under the headless harness, so a different approach is needed. Board update 2026-11-19: Owner asked for a cheaper star field; profiling and a safe cut under way No device surface. Board update 2026-11-19: Star field draw cost cut from about 4.3 to 1.5 ms per frame with the same picture; live in build main-D_Z-IG9v, headless only, not phone checked PR #667 merged (159ffa9d). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T19:08:01.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-014",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-014",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T19:08:01.000Z"
+      },
+      "content": {
+        "summary": "The star field is now the largest remaining per-frame render cost. A baked-canvas attempt showed no gain under the headless harness, so a different approach is needed. Board update 2026-11-19: Owner asked for a cheaper star field; profiling and a safe cut under way No device surface. Board update 2026-11-19: Star field draw cost cut from about 4.3 to 1.5 ms per frame with the same picture; live in build main-D_Z-IG9v, headless only, not phone checked PR #667 merged (159ffa9d). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "objective": "The star field is now the largest remaining per-frame render cost. A baked-canvas attempt showed no gain under the headless harness, so a different approach is needed. Board update 2026-11-19: Owner asked for a cheaper star field; profiling and a safe cut under way No device surface. Board update 2026-11-19: Star field draw cost cut from about 4.3 to 1.5 ms per frame with the same picture; live in build main-D_Z-IG9v, headless only, not phone checked PR #667 merged (159ffa9d). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "acceptance_criteria": [
+          "The star field costs measurably less per frame in the throttled harness",
+          "No visible change to star look, twinkle or fill behaviour",
+          "A test or harness number pins the saving"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-015_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-015",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Find why steps slow as the trail grows late in a level",
+        "description": "In a headless run the step interval grew from about 120 ms to about 200 ms as the trail got long, which points to longer frames late in a level. Board update 2026-11-19: Trail glow repaint clipped to the route band so long trails cost far less, same picture; live in build main-D_Z-IG9v, headless only, sparkles and player glow still unprofiled PR #669 merged (6b4dff3e). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T19:08:01.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-015",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-015",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T19:08:01.000Z"
+      },
+      "content": {
+        "summary": "In a headless run the step interval grew from about 120 ms to about 200 ms as the trail got long, which points to longer frames late in a level. Board update 2026-11-19: Trail glow repaint clipped to the route band so long trails cost far less, same picture; live in build main-D_Z-IG9v, headless only, sparkles and player glow still unprofiled PR #669 merged (6b4dff3e). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "objective": "In a headless run the step interval grew from about 120 ms to about 200 ms as the trail got long, which points to longer frames late in a level. Board update 2026-11-19: Trail glow repaint clipped to the route band so long trails cost far less, same picture; live in build main-D_Z-IG9v, headless only, sparkles and player glow still unprofiled PR #669 merged (6b4dff3e). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "acceptance_criteria": [
+          "The cause of the late-level slowdown is measured and named",
+          "Step interval stays within one frame of the target through a whole long level",
+          "A harness check pins the late-level interval"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -12819,6 +12972,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-ui-093_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-093",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Check whether the Arrows setting does anything",
+        "description": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T17:23:23.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-093",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-093",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T17:23:23.000Z"
+      },
+      "content": {
+        "summary": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
+        "objective": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
+        "acceptance_criteria": [
+          "The setting either changes behaviour or is removed",
+          "The Settings sheet and Guide match",
+          "A test pins the result"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-vis-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -15701,6 +15905,159 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-061_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-061",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Smooth the edge star orbit speed at screen corners",
+        "description": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T17:23:23.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-061",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-061",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T17:23:23.000Z"
+      },
+      "content": {
+        "summary": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
+        "objective": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
+        "acceptance_criteria": [
+          "Orbit speed is constant around the screen including the corners",
+          "The orbit starts together with the fills",
+          "A test pins both"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-062_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-062",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Make the player locator ring and glow follow the player colour",
+        "description": "The locator ring and glow around the player are still green when the player colour changes.",
+        "card_type": "bug",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T17:23:23.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-062",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-062",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T17:23:23.000Z"
+      },
+      "content": {
+        "summary": "The locator ring and glow around the player are still green when the player colour changes.",
+        "objective": "The locator ring and glow around the player are still green when the player colour changes.",
+        "acceptance_criteria": [
+          "Ring and glow follow the shared player colour",
+          "Rainbow mode shifts them with the laser and star fill",
+          "A test pins the shared colour source"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-063_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-063",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Make idle gate tiles easy to see: darker floor plus corner brackets, keeping the ring",
+        "description": "Idle bleed gate tiles blend into the board. Darken the gate tile floor and add four corner brackets that turn cyan and pulse when active, keeping today's ring and its animation unchanged. Board update 2026-11-19: Dark gate floor plus corner brackets with the ring kept; live in build main-D_Z-IG9v, headless only, not phone checked PR #668 merged (6a9034ed). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T19:08:01.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-063",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-063",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T19:08:01.000Z"
+      },
+      "content": {
+        "summary": "Idle bleed gate tiles blend into the board. Darken the gate tile floor and add four corner brackets that turn cyan and pulse when active, keeping today's ring and its animation unchanged. Board update 2026-11-19: Dark gate floor plus corner brackets with the ring kept; live in build main-D_Z-IG9v, headless only, not phone checked PR #668 merged (6a9034ed). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "objective": "Idle bleed gate tiles blend into the board. Darken the gate tile floor and add four corner brackets that turn cyan and pulse when active, keeping today's ring and its animation unchanged. Board update 2026-11-19: Dark gate floor plus corner brackets with the ring kept; live in build main-D_Z-IG9v, headless only, not phone checked PR #668 merged (6a9034ed). Deployed: production build main-D_Z-IG9v. No device surface.",
+        "acceptance_criteria": [
+          "Idle gate tiles read as a dark patch with corner brackets from across the maze",
+          "The current ring, arrows and animation are unchanged",
+          "The dark floor does not read as a wall or hole next to real walls"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -15756,9 +16113,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 301,
-    "exported_public_card_count": 301,
-    "exported_open_card_count": 84,
+    "stable_identity_count": 308,
+    "exported_public_card_count": 308,
+    "exported_open_card_count": 91,
     "exported_completed_card_count": 84,
     "exported_deferred_card_count": 25,
     "exported_archived_card_count": 108,
