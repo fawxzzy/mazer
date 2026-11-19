@@ -691,7 +691,7 @@ import {
   resolveLegacyMovementSpeedProfile,
   scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
-import { resolveDriftCorrectedRepeatWaitMs } from '../legacy-runtime/legacyRepeatCadence';
+import { resolveDriftCorrectedRepeatWaitMs, resolveRepeatMaxLateMs } from '../legacy-runtime/legacyRepeatCadence';
 import { resolveHeldStepFreshWaitMs, resolveHeldStepRetargetWaitMs } from '../legacy-runtime/legacyHeldStepCadence';
 import {
   createLegacyDemoWalkerEpisode,
@@ -5387,7 +5387,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearLegacyPlayHeldTouchRepeat();
     const normalizedDelayMs = anchorDueAtMs === null
       ? Math.max(0, Math.round(delayMs))
-      : resolveDriftCorrectedRepeatWaitMs(anchorDueAtMs, this.time.now, delayMs);
+      : resolveDriftCorrectedRepeatWaitMs(anchorDueAtMs, this.time.now, delayMs, resolveRepeatMaxLateMs(this.game?.loop?.actualFps ?? 60));
     this.playHeldTouchRepeatDueAtMs = this.time.now + normalizedDelayMs;
     this.playHeldTouchRepeatTimer = this.time.delayedCall(normalizedDelayMs, () => {
       this.playHeldTouchRepeatTimer = null;
