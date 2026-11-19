@@ -70,8 +70,7 @@ export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   signedOutBody: 'Sign in to see where you stand among other players.',
   signedOutHeading: 'Sign in to see the board',
   unreachableBody: 'Check your connection and try again.',
-  unreachableHeading: 'Can’t reach the leaderboard',
-  you: 'You'
+  unreachableHeading: 'Can’t reach the leaderboard'
 });
 
 /** The failure strings legacyLeaderboard.ts emits, matched (not shown) to choose a designed state. */
@@ -172,13 +171,10 @@ const buildRow = (entry: LegacyLeaderboardEntry, usernameMaxChars: number): Lega
 };
 
 export interface LegacyLeaderboardSelfRowModel {
-  label: string;
   rankText: string;
   tier: LegacyLeaderboardRankTier;
   /** The player's saved username (ellipsis-safe), or null when it is not known. */
   usernameText: string | null;
-  /** Label of the `Edit name` control on this row (the whole pinned row is its hit target). */
-  editLabel: string;
   levelText: string;
   /** True when the You row repeats a row that is in the loaded list. */
   inList: boolean;
@@ -205,10 +201,8 @@ const buildSelfRow = (
       return null;
     }
     return {
-      accessibilityLabel: `You have no rank yet. ${LEGACY_LEADERBOARD_COPY.editName}`,
-      editLabel: LEGACY_LEADERBOARD_COPY.editName,
+      accessibilityLabel: 'You have no rank yet.',
       inList: false,
-      label: LEGACY_LEADERBOARD_COPY.you,
       levelText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
       ranked: false,
       rankText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
@@ -219,10 +213,8 @@ const buildSelfRow = (
   const rankText = formatLegacyProgressionOrdinal(selfRank.rank);
   const levelText = formatLegacyProgressionOrdinal(selfRank.playerLevel);
   return {
-    accessibilityLabel: `You are rank ${rankText}, level ${levelText}. ${LEGACY_LEADERBOARD_COPY.editName}`,
-    editLabel: LEGACY_LEADERBOARD_COPY.editName,
+    accessibilityLabel: `You are rank ${rankText}, level ${levelText}.`,
     inList: loadedRankKeys.has(normalizeLegacyProgressionOrdinal(selfRank.rank)),
-    label: LEGACY_LEADERBOARD_COPY.you,
     levelText,
     ranked: true,
     rankText,

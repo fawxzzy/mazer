@@ -100,7 +100,7 @@ describe('leaderboard view-model: rows', () => {
 describe('leaderboard view-model: the pinned You row', () => {
   test('a player outside the loaded top N still gets a You row with their rank and level', () => {
     const view = buildLegacyLeaderboardViewModel(state({ entries: entries(50), selfRank: self('57', '68') }));
-    expect(view.selfRow).toMatchObject({ inList: false, label: 'You', levelText: '68', rankText: '57', usernameText: 'qa-player' });
+    expect(view.selfRow).toMatchObject({ inList: false, levelText: '68', rankText: '57', usernameText: 'qa-player' });
     expect(view.rows.some((row) => row.isOwn)).toBe(false);
   });
 
@@ -114,13 +114,11 @@ describe('leaderboard view-model: the pinned You row', () => {
     expect(buildLegacyLeaderboardViewModel(state({ selfRank: null, selfUsername: '' })).selfRow).toBeNull();
   });
 
-  test('MAZER-ACCT-022: a named player with no rank yet still gets a You row, so Edit name stays reachable', () => {
+  test('MAZER-ACCT-022: a named player with no rank yet still gets a pinned self row', () => {
     for (const selfRank of [null, self(null, '5', true), self(null, '5', false)]) {
       const view = buildLegacyLeaderboardViewModel(state({ selfRank }));
       expect(view.selfRow).toMatchObject({
-        editLabel: 'Edit name',
         inList: false,
-        label: 'You',
         levelText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
         ranked: false,
         rankText: LEGACY_LEADERBOARD_UNRANKED_TEXT,

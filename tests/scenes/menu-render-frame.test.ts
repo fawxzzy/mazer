@@ -1001,7 +1001,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // is gone; the underlying bounds fields/diagnostics key remain (always
     // null now) since other diagnostics code still references them.
     expect(menuSceneSource).not.toContain('private drawLegacyMenuAiProgressionBadge(');
-    expect(menuSceneSource).toContain("this.levelAnnouncerLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'LEVEL',");
+    // The between-levels completed-time line is removed (the hidden label Text stays: design-token evidence cites it).
+    expect(menuSceneSource).not.toContain('drawLegacyCompletionTimeLine');
+    expect(menuSceneSource).not.toContain('lastCompletedRunMs');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
@@ -1470,11 +1472,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T');
     expect(menuSceneSource).toContain('return applyTextResolution(text, this.resolveLegacyUiTextResolution());');
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
-    // The level-announcer number is no longer a Text object (see the tile-
-    // block glyph rewrite, drawLegacyLevelAnnouncerNumberGlyph) so it has no
-    // text-crispness call of its own -- the label ('LEVEL') sitting right
-    // beside it is still a real Text object and still goes through the same
-    // crispness path, so it stands in for this spot check instead.
     expect(menuSceneSource).toContain('this.levelAnnouncerLabelText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
     expect(menuSceneSource).toContain('textTextureResolution: this.resolveLegacyUiTextResolution()');

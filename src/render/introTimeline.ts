@@ -60,6 +60,7 @@ import {
   MOTION_REDUCED_MS,
   MOTION_STAGGER_BEAM_TOTAL_MS
 } from './motionScale';
+import { LEVEL_ANNOUNCER_FADE_IN_MS, LEVEL_ANNOUNCER_FADE_OUT_MS } from './levelAnnouncerFade';
 
 export type IntroPhase = 'digit-in' | 'reveal' | 'laser' | 'pop' | 'done' | 'crossfade';
 
@@ -117,6 +118,7 @@ export interface IntroState {
   readonly done: boolean;
 }
 
+/** Token-pinned (design-tokens-sync). The level digit's fade-in now follows levelAnnouncerFade.ts instead (2026-11-18). */
 export const INTRO_DIGIT_IN_MS = MOTION_DURATION_MS.base;
 /** @deprecated Pre-reorder laser start; see INTRO_REVEAL_START_MS. The beams now leave at resolveIntroLaserStartMs(N). */
 export const INTRO_LASER_START_MS = 100;
@@ -165,7 +167,7 @@ export const INTRO_REVEAL_TILES_PER_S = 70;
 export const INTRO_REVEAL_MIN_MS = 2000;
 export const INTRO_REVEAL_MAX_MS = 3200;
 /** The level digit fades out over the last INTRO_DIGIT_OUT_MS of the reveal. */
-export const INTRO_DIGIT_OUT_MS = 500;
+export const INTRO_DIGIT_OUT_MS = LEVEL_ANNOUNCER_FADE_OUT_MS;
 export const INTRO_POP_MS = 350;
 /** A ring with no deconstruct before it (cold start) charges up over this long once the build starts. */
 export const INTRO_RING_CHARGE_MS = MOTION_DURATION_MS.long;
@@ -361,9 +363,9 @@ export const resolveIntro = (elapsedMs: number, options: IntroOptions): IntroSta
       ? tileCount
       : Math.min(tileCount, Math.max(1, Math.ceil((tileCount * (elapsed - INTRO_BUILD_START_MS)) / revealMs)));
 
-  const digitIn = options.digitAlreadyVisible === true ? 1 : smootherstep(elapsed / INTRO_DIGIT_IN_MS);
+  const digitIn = options.digitAlreadyVisible === true ? 1 : smootherstep(elapsed / LEVEL_ANNOUNCER_FADE_IN_MS);
   const digitOutStartMs = revealEndMs - INTRO_DIGIT_OUT_MS;
-  const digitOut = 1 - smootherstep((elapsed - digitOutStartMs) / INTRO_DIGIT_OUT_MS);
+  const digitOut = 1 - smootherstep((elapsed - digitOutStartMs) / LEVEL_ANNOUNCER_FADE_OUT_MS);
   const digitAlpha = elapsed >= revealEndMs ? 0 : Math.min(digitIn, digitOut);
 
   const laser = resolveSpawnLaser(elapsed - laserStartMs);
@@ -463,7 +465,7 @@ export const resolveIntroDeconstruct = (elapsedMs: number, options: IntroOptions
   const tilesVisible = tileProgress >= 1
     ? 0
     : Math.min(tileCount, Math.ceil(tileCount * (1 - tileProgress)));
-  const digitAlpha = smootherstep(elapsed / OUTRO_DIGIT_IN_MS);
+  const digitAlpha = smootherstep(elapsed / LEVEL_ANNOUNCER_FADE_IN_MS);
 
   return {
     tilesVisible,

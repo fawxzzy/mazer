@@ -461,3 +461,8 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: The menu ring (edge) stars now stay full size for the whole teardown + rebuild cycle: no growth during the outro and no VIS-038 shrink to 50% when the spawn beams fire; the beam contact points use the same held size. New `src/render/edgeRingScaleHold.ts` is consumed by `resolveEdgeRingScales` and `resolveEdgeBeams`; the pure curve in `edgeBeamTimeline.ts` is kept but no longer drawn. Idle (no lifecycle) and reduced-motion crossfade stay at 50%.
 - WHY it changed: Owner saw the ring stars shrink for a split second at the deconstruct-to-construct switch every time; the only size change on that path was the VIS-038 cycle, and the owner chose to hold full size (option 1, 2026-11-19). MenuScene is untouched.
 - Status: headless only (tsc, render unit tests); the shrink itself was not reproducible in headless Chromium at DPR 3, so the effect is not phone-checked.
+## 2026-11-18 L2 menu cleanup
+
+- WHAT changed: removed the menu LEVEL line, the leaderboard "You" labels and self-row edit-username chip/hit target, and the between-levels completed-time display (legacyCompletionTime.ts deleted; time capture, storage and leaderboard submission untouched). Level announcer fade is now 900 ms in / 1200 ms out with smootherstep (new src/render/levelAnnouncerFade.ts, used by introTimeline.ts); reduced motion unchanged.
+- WHY it changed: owner-requested cleanup of redundant text and a gentler announcer fade; renames belong to the account screen.
+- Status: headless (tsc, full vitest, 390x844 emulated screenshots of menu and leaderboard); nothing checked on a real phone.
