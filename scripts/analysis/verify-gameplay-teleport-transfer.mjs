@@ -526,7 +526,7 @@ const analyzeEdgeContact = (frames) => {
  * MAZER-VIS-038 size cycle, checked on the drawn kites (tip -> outer tip length: 20 css px at full size, 10 at 50%).
  * Lane "edge stars smooth": the size follows each star's FILL (edgeStarMotion.ts), so there is no pop anywhere.
  * DEPARTURE frames (`kind` 'departure'): every kite starts at ~50% (the rest size), only ever grows (smoothly, as its beam fills it),
- * and is full size from the last contact to the end of the deconstruct.
+ * and is full size once the last contact's fill has completed (200 ms after the last beam lands) to the end of the deconstruct.
  * ARRIVAL frames (`kind` 'arrival', `buildEndAge` = the age the beams leave): full size through the build (after the cold-start charge),
  * never shrinks before its own beam has left, only ever shrinks from then on (smoothly, as its beam drains it), and is back
  * at 50% by the end.
@@ -548,7 +548,7 @@ const analyzeKiteSize = (frames, kind, { buildEndAge = null, chargedAge = 0 } = 
         const length = lengthOf(frame, id);
         if (length < previous - 0.01) { note('shrank during the departure', { id, previous, length }); }
         previous = length;
-        if (frame.outroAge !== null && frame.outroAge >= OUTRO_LASER_END_MS + FRAME_MS && !approx(length, KITE_FULL_LENGTH_PX)) { note('not full size after the last contact', { id, length, age: frame.outroAge }); }
+        if (frame.outroAge !== null && frame.outroAge >= OUTRO_LASER_END_MS + PULSE_TAIL_MS + FRAME_MS && !approx(length, KITE_FULL_LENGTH_PX)) { note('not full size once the last fill has completed', { id, length, age: frame.outroAge }); }
       });
     });
     return { ok: problems.length === 0, problems };
