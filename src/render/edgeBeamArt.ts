@@ -9,7 +9,7 @@
  *   and the last of it exits at the inner tip, toward where the outgoing laser shoots out. One shape function, one
  *   direction, so a diamond can never show two different fills. A one-pixel bright front line sits on the cut while it
  *   moves. Reduced motion: no sweeping front, the whole interior crossfades by alpha instead.
- * - Beam (MAZER-VIS-038): one colour (the player's, trailPalette.PLAYER_COLOR). A beam is a steady STREAM between its
+ * - Beam (MAZER-VIS-038): one colour (the player's: playerColour.ts, the shifting rainbow today, passed in as `colour` by the scene). A beam is a steady STREAM between its
  *   source end (tail) and sink end (head): a soft bloom (two wide, low-alpha strokes), a body whose alpha ramps up toward the
  *   head (a few nested spans, so no seam and no per-segment overdraw), short bright dashes that flow tail -> head at a fixed
  *   px/s speed (so the beam visibly keeps flowing while it is attached), and a pulsing head. While the beam is still
@@ -20,10 +20,12 @@
  * - Contact ripple: one thin ring on the contact point, growing and fading over the pulse window.
  * - Crisp on fractional DPR: line ends and widths snap to the device pixel grid (`snapToDevice`).
  *
- * Colours: PLAYER_COLOR and mixes of it toward white (trailPalette.mixPaletteRgb) only. No Phaser import.
+ * Colours: the player colour (`colour`, default `resolvePlayerColour(null, 0, true)`) and mixes of it toward white
+ * (trailPalette.mixPaletteRgb) only. No Phaser import.
  */
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
-import { PLAYER_COLOR, mixPaletteRgb } from './trailPalette';
+import { resolvePlayerColour } from './playerColour';
+import { mixPaletteRgb } from './trailPalette';
 
 export interface ArtPoint {
   readonly x: number;
@@ -46,7 +48,7 @@ export interface ArtGraphics {
 
 /** Peak alpha of the interior fill (the border stroke stays on top). */
 export const DIAMOND_FILL_ALPHA = 0.82;
-/** The fill front line and the beam head are this far from PLAYER_COLOR toward white. */
+/** The fill front line and the beam head are this far from the player colour toward white. */
 export const BEAM_HOT_MIX = 0.55;
 export const BEAM_PEAK_ALPHA = 0.95;
 export const BEAM_BODY_LAYERS = 5;
@@ -179,6 +181,8 @@ export interface DiamondFillDraw {
   readonly fill: number;
   /** Reduced motion: no sweeping front, the whole interior is drawn at alpha = fill. */
   readonly crossfade: boolean;
+  /** The player colour the interior is filled with (playerColour.ts). Absent: the player colour at the trail start. */
+  readonly colour?: number;
 }
 
 /** Fill the inside of one diamond. Drawn BEFORE its outline stroke. Nothing at fill 0. */
@@ -187,9 +191,10 @@ export const drawDiamondFill = (graphics: ArtGraphics, input: DiamondFillDraw): 
   if (level <= 0) {
     return;
   }
+  const colour = input.colour ?? resolvePlayerColour(null, 0, true);
   if (input.crossfade) {
     tracePolygon(graphics, input.vertices);
-    graphics.fillStyle(PLAYER_COLOR, DIAMOND_FILL_ALPHA * level);
+    graphics.fillStyle(colour, DIAMOND_FILL_ALPHA * level);
     graphics.fillPath();
     return;
   }
@@ -198,10 +203,10 @@ export const drawDiamondFill = (graphics: ArtGraphics, input: DiamondFillDraw): 
     return;
   }
   tracePolygon(graphics, shape.polygon);
-  graphics.fillStyle(PLAYER_COLOR, DIAMOND_FILL_ALPHA);
+  graphics.fillStyle(colour, DIAMOND_FILL_ALPHA);
   graphics.fillPath();
   if (shape.front) {
-    graphics.lineStyle(1, mixPaletteRgb(PLAYER_COLOR, WHITE, BEAM_HOT_MIX), 0.9);
+    graphics.lineStyle(1, mixPaletteRgb(colour, WHITE, BEAM_HOT_MIX), 0.9);
     graphics.lineBetween(shape.front[0].x, shape.front[0].y, shape.front[1].x, shape.front[1].y);
   }
 };
@@ -226,6 +231,8 @@ export interface BeamPulseDraw {
   readonly devicePixelRatio: number;
   /** True while the tail is still held at the source (a diamond is still being fed or emptied): draws the pulsing port glow on the tail end. */
   readonly tailPort?: boolean;
+  /** The player colour the beam is drawn in (playerColour.ts). Absent: the player colour at the trail start. */
+  readonly colour?: number;
 }
 
 /** Where the stream's dashes start along a beam of `length` css px at laser clock `clockMs` (distances from the tail). */
@@ -242,9 +249,10 @@ export const resolveStreamDashStarts = (length: number, clockMs: number): number
   return starts;
 };
 
-/** One beam: bloom, ramped body, flowing stream dashes and a pulsing head (and port while attached). PLAYER_COLOR family only. */
+/** One beam: bloom, ramped body, flowing stream dashes and a pulsing head (and port while attached). player colour family only. */
 export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void => {
   const dpr = input.devicePixelRatio;
+  const colour = input.colour ?? resolvePlayerColour(null, 0, true);
   const tail = { x: snapToDevice(input.tailPoint.x, dpr), y: snapToDevice(input.tailPoint.y, dpr) };
   const head = { x: snapToDevice(input.headPoint.x, dpr), y: snapToDevice(input.headPoint.y, dpr) };
   const spanFrom = (fraction: number): ArtPoint => ({
@@ -253,12 +261,12 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
   });
   const clock = Number.isFinite(input.clockMs) ? input.clockMs : 0;
   const pulse = 0.5 + (0.5 * Math.sin((clock / BEAM_HEAD_PULSE_PERIOD_MS) * Math.PI * 2));
-  const hot = mixPaletteRgb(PLAYER_COLOR, WHITE, BEAM_HOT_MIX);
+  const hot = mixPaletteRgb(colour, WHITE, BEAM_HOT_MIX);
   // A fixed set of strokes per beam (a zero-length one paints nothing), so a beam is a constant-size group of draw calls.
   // Bloom: two wide, low-alpha gradients under the body.
   for (const [width, peak] of [[BEAM_BLOOM_OUTER_PX, BEAM_BLOOM_OUTER_ALPHA], [BEAM_BLOOM_INNER_PX, BEAM_BLOOM_INNER_ALPHA]] as const) {
     const alpha = resolveLayerAlpha(peak, BEAM_BLOOM_LAYERS);
-    graphics.lineStyle(snapWidthToDevice(width, dpr), PLAYER_COLOR, alpha);
+    graphics.lineStyle(snapWidthToDevice(width, dpr), colour, alpha);
     for (let layer = 0; layer < BEAM_BLOOM_LAYERS; layer += 1) {
       const from = spanFrom(resolveLayerStart(layer, BEAM_BLOOM_LAYERS));
       graphics.lineBetween(from.x, from.y, head.x, head.y);
@@ -270,7 +278,7 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
     const taper = BEAM_BODY_LAYERS > 1 ? layer / (BEAM_BODY_LAYERS - 1) : 1;
     graphics.lineStyle(
       snapWidthToDevice(BEAM_BODY_MIN_WIDTH_PX + ((BEAM_BODY_MAX_WIDTH_PX - BEAM_BODY_MIN_WIDTH_PX) * taper), dpr),
-      PLAYER_COLOR,
+      colour,
       bodyAlpha
     );
     const from = spanFrom(resolveLayerStart(layer, BEAM_BODY_LAYERS));
@@ -288,10 +296,10 @@ export const drawBeamPulse = (graphics: ArtGraphics, input: BeamPulseDraw): void
     }
   }
   if (input.tailPort === true) {
-    graphics.fillStyle(PLAYER_COLOR, 0.3);
+    graphics.fillStyle(colour, 0.3);
     graphics.fillCircle(tail.x, tail.y, BEAM_PORT_HALO_RADIUS_PX + (BEAM_HEAD_PULSE_PX * (1 - pulse)));
   }
-  graphics.fillStyle(PLAYER_COLOR, 0.28);
+  graphics.fillStyle(colour, 0.28);
   graphics.fillCircle(head.x, head.y, BEAM_HEAD_HALO_RADIUS_PX + (BEAM_HEAD_PULSE_PX * pulse));
   graphics.fillStyle(hot, BEAM_PEAK_ALPHA);
   graphics.fillCircle(head.x, head.y, BEAM_HEAD_RADIUS_PX + (BEAM_HEAD_PULSE_PX * pulse * 0.5));
@@ -302,13 +310,14 @@ export const drawContactRipple = (
   graphics: ArtGraphics,
   center: ArtPoint,
   progress: number,
-  devicePixelRatio: number
+  devicePixelRatio: number,
+  colour: number = resolvePlayerColour(null, 0, true)
 ): void => {
   if (!(progress > 0 && progress < 1)) {
     return;
   }
   const radius = RIPPLE_START_RADIUS_PX + ((RIPPLE_END_RADIUS_PX - RIPPLE_START_RADIUS_PX) * progress);
-  graphics.lineStyle(snapWidthToDevice(1, devicePixelRatio), PLAYER_COLOR, RIPPLE_PEAK_ALPHA * ((1 - progress) ** 2));
+  graphics.lineStyle(snapWidthToDevice(1, devicePixelRatio), colour, RIPPLE_PEAK_ALPHA * ((1 - progress) ** 2));
   graphics.beginPath();
   for (let step = 0; step < RIPPLE_SEGMENTS; step += 1) {
     const angle = (step / RIPPLE_SEGMENTS) * Math.PI * 2;

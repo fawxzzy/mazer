@@ -144,7 +144,7 @@ const BASE_PROFILE: Readonly<LegacyMazeGenerationProfile> = {
   // share of the shortest route (aim 15%) instead of the carve-cost pick that routinely removed 50-80% of it.
   // Measured over levels 10-120 x 20 seeds x both boards (docs/research/MAZER_BLEED_PATH_AUDIT.md): mean route
   // left with every wrap open 71% -> 87%, builds 80 -> 29 ms mean, every maze still in its felt window.
-  // Ladder only: the menu demo and default profile keep their many openings (MAZER-VIS-052).
+  // Ladder only: the default profile keeps its many openings. The menu demo reads this profile too (MAZER-MENU-BLEED).
   bleedPlacement: 'least-saving'
 };
 

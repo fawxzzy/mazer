@@ -745,9 +745,7 @@ export interface LegacyMazeGenerationScaleContext {
 }
 
 const resolveLegacyMazeGenerationBaseProfileForProgression = (
-  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
-  // MAZER-VIS-052: the main-menu demo reads the band switch below instead of the budget ladder.
-  skipGeometryBudget = false
+  trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
@@ -755,7 +753,7 @@ const resolveLegacyMazeGenerationBaseProfileForProgression = (
     : trackOrTargetComplexity.targetComplexity;
   // Levels 2..LAST_BUDGET_LEVEL: geometry comes from the budget ladder, not
   // from the band switch below (the band stays for labels and diagnostics).
-  const geometryBudgetLevel = skipGeometryBudget ? null : resolveGeometryBudgetLevel(trackOrTargetComplexity);
+  const geometryBudgetLevel = resolveGeometryBudgetLevel(trackOrTargetComplexity);
   if (geometryBudgetLevel !== null) {
     return resolveGeometryBudgetProfile(geometryBudgetLevel);
   }
@@ -996,29 +994,15 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   scaleContext
 );
 
-// MAZER-VIS-052: the MAIN MENU demo only. The budget ladder (levels 2+) sets
-// borderFeederTargetPerSide 0 and fades wrap corridors to none at level 140, so the
-// demo showed ~0-4 bleed-off openings. The demo is attract-loop art, not a calibrated
-// difficulty, so it reads the band profile (feeders + both border connections, band
-// held at its top past level 99) with no geometryBudgetLevel. Gameplay never calls this.
+// MAZER-MENU-BLEED (2026-11-19, owner): the main-menu demo follows the SAME bleed rules as play. MAZER-VIS-052 gave
+// it a band profile (no geometryBudgetLevel, no bleedPlacement) so it showed many openings and never ran the bleed
+// limits or attached a gate; Zac saw many bleed paths and no gate tiles in the menu. The demo now reads the
+// gameplay profile for its level, so it gets the same bleed-path cap, wrap placement and gate cadence. Kept as a
+// named entry point so MenuScene (Wave 5C) and the analysis scripts do not change.
 export const resolveLegacyMenuDemoMazeGenerationProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
   scaleContext?: LegacyMazeGenerationScaleContext
-): LegacyMazeGenerationProfile => {
-  const band = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity, true);
-  // Early levels have no bleed-off in the band switch; keep the ladder's first wrap rung there.
-  if (!band.requiredOppositeBorderConnections.vertical && !band.requiredOppositeBorderConnections.horizontal) {
-    // MAZER-L8b: the ladder picks its wrap line by trial (bleedPlacement); the demo keeps the old seeded pick,
-    // so its early levels (10-13 carry the ladder's vertical wrap) look exactly as before.
-    const { bleedPlacement: _ladderOnly, ...ladder } = resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity);
-    return applyLegacyMazeGenerationScaleContext(ladder, scaleContext);
-  }
-  // Frozen board: at most one feeder per side keeps the top bands to roughly a dozen openings.
-  return applyLegacyMazeGenerationScaleContext(
-    { ...band, borderFeederTargetPerSide: Math.min(1, band.borderFeederTargetPerSide ?? 0), journeyStart: true },
-    scaleContext
-  );
-};
+): LegacyMazeGenerationProfile => resolveLegacyMazeGenerationProfileForProgression(trackOrTargetComplexity, scaleContext);
 
 const resolveLegacyProgressionColorTier = (targetComplexity: number): number => (
   clampInteger(

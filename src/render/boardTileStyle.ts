@@ -129,7 +129,7 @@ export const boardMaterial = Object.freeze({
   start: cyberArcadeMaterial.signal.start,
   goal: cyberArcadeMaterial.signal.goal,
   goalHalo: cyberArcadeMaterial.signal.violet,
-  /** The player's colour: the trail palette module's PLAYER_COLOR, the one source the diamonds' fill also uses. */
+  /** The static player token (trail palette module's PLAYER_COLOR): the find-me locator's glow/ring only. The Spark, the trail, the lasers and the edge star fills read playerColour.ts instead. */
   player: PLAYER_COLOR,
   playerEdge: cyberArcadeMaterial.signal.playerAccent,
   /** Trail reference colour used for the 3:1 contrast check (the real trail keeps its energy stops). */

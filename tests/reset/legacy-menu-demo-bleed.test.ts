@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
+import { isBleedGateLevel } from '../../src/legacy-runtime/legacyBleedGates';
+import { listBleedPaths } from '../../src/legacy-runtime/legacyBleedPaths';
 import {
   createLegacyRuntimeMazeForMode
 } from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import { isLegacyMenuDemoGateLeg } from '../../src/legacy-runtime/legacyMenuDemoBleedGates';
+import {
+  advanceLegacyMenuDemoFrame,
+  createLegacyMenuDemoBootstrap
+} from '../../src/legacy-runtime/legacyMenuDemoLifecycle';
 import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeGenerationProfileForProgression,
@@ -11,7 +18,8 @@ import {
   resolveLegacyProgressionScaleDetail
 } from '../../src/legacy-runtime/legacyProgression';
 
-// MAZER-VIS-052: the menu demo shows bleed-off paths again; gameplay profiles are untouched.
+// MAZER-MENU-BLEED (supersedes the MAZER-VIS-052 band profile): the menu demo follows the same bleed rules as play
+// (path cap, wrap placement, gates); gameplay profiles are untouched.
 const aiTrack = (level: number) => ({
   ...createEmptyLegacyProgressionState().tracks['ai-runner'],
   level: String(level),
@@ -27,7 +35,7 @@ const countRingOpenings = (grid: boolean[][]): number => {
   return count;
 };
 
-describe('MAZER-VIS-052 menu demo bleed-off paths', () => {
+describe('MAZER-MENU-BLEED menu demo follows the play bleed rules', () => {
   test('gameplay generation profiles are byte-identical to before the demo profile existed', () => {
     const out: unknown[] = [];
     for (const level of [1, 2, 3, 5, 9, 10, 15, 19, 20, 30, 60, 99, 100, 120, 140, 200, 288]) {
@@ -53,34 +61,94 @@ describe('MAZER-VIS-052 menu demo bleed-off paths', () => {
       .toBe('6d8cc29dd54d4d0afbfad2a9a4f1a970936a6a98699443bf996ed5b3417a2efd');
   });
 
-  test('MAZER-L8b: no menu demo profile carries the ladder bleed placement (the demo keeps its seeded wrap pick)', () => {
+  test('MAZER-MENU-BLEED: the menu demo profile IS the gameplay profile on every level, with and without a device fraction', () => {
     for (let level = 1; level <= 300; level += 1) {
-      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(level)).bleedPlacement).toBeUndefined();
-      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(level), { fraction: 0.5 }).bleedPlacement).toBeUndefined();
+      const track = aiTrack(level);
+      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(track)).toEqual(resolveLegacyMazeGenerationProfileForProgression(track));
+      expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction: 0.5 }))
+        .toEqual(resolveLegacyMazeGenerationProfileForProgression(track, { fraction: 0.5 }));
     }
-  });
-
-  test('the demo profile never carries a budget-ladder gate and keeps feeders past level 140', () => {
-    for (const level of [20, 60, 140, 200]) {
+    // So a ladder level carries the ladder's bleed rules: a budget level and the least-saving wrap placement.
+    for (const level of [20, 60, 120]) {
       const profile = resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(level), { fraction: 0.5 });
-      expect(profile.geometryBudgetLevel).toBeUndefined();
-      expect(profile.requiredOppositeBorderConnections).toEqual({ horizontal: true, vertical: true });
+      expect(profile.geometryBudgetLevel).toBeDefined();
+      expect(profile.bleedPlacement).toBe('least-saving');
     }
-    expect(resolveLegacyMenuDemoMazeGenerationProfileForProgression(aiTrack(200)).borderFeederTargetPerSide).toBeGreaterThan(0);
   });
 
-  test.each([
-    [20, 2],
-    [60, 4],
-    [140, 8]
-  ])('demo mazes at level %i carry at least %i edge openings across seeds', (level, floor) => {
+  const buildMenuMaze = (level: number, seed: number) => {
     const track = aiTrack(level);
     const scale = resolveLegacyProgressionGenerationScale(50, track, {});
     const { fraction } = resolveLegacyProgressionScaleDetail(50, track, {});
     const profile = resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction });
-    for (const seed of [1000, 8919, 16838]) {
-      const maze = createLegacyRuntimeMazeForMode('menu', scale, seed, profile, { targetComplexity: track.targetComplexity }, 1);
-      expect(countRingOpenings(maze.grid)).toBeGreaterThanOrEqual(floor);
+    return createLegacyRuntimeMazeForMode('menu', scale, seed, profile, { targetComplexity: track.targetComplexity }, 1);
+  };
+  const SEEDS = [1000, 8919, 16838, 24757, 32676];
+
+  test.each([20, 60, 100, 140, 200])('menu mazes at level %i carry at most one bleed path per axis (the play cap), never the old 9', (level) => {
+    for (const seed of SEEDS.slice(0, 3)) {
+      const paths = listBleedPaths(buildMenuMaze(level, seed).grid);
+      expect(paths.filter((path) => path.axis === 'horizontal').length).toBeLessThanOrEqual(1);
+      expect(paths.filter((path) => path.axis === 'vertical').length).toBeLessThanOrEqual(1);
+    }
+  }, 60000);
+
+  test('wraps fade out of the menu demo where they fade out of play (level 140 and up)', () => {
+    for (const level of [140, 200]) {
+      expect(countRingOpenings(buildMenuMaze(level, 1000).grid)).toBe(0);
+    }
+  }, 60000);
+
+  const GATE_LEVELS = [28, 72, 90].filter((level) => isBleedGateLevel(level));
+
+  test('menu mazes on a gate level carry one bleed gate (the cadence is the play cadence); non-gate levels never do', () => {
+    expect(GATE_LEVELS.length).toBeGreaterThan(0);
+    for (const level of GATE_LEVELS) {
+      const counts = SEEDS.map((seed) => buildMenuMaze(level, seed).bleedGates?.length ?? 0);
+      expect(Math.max(...counts), `level ${level}`).toBe(1);
+    }
+    for (const level of [5, 20, 140]) {
+      expect(isBleedGateLevel(level) && level < 140, `level ${level}`).toBe(false);
+      expect(buildMenuMaze(level, 1000).bleedGates, `level ${level}`).toBeUndefined();
+    }
+  }, 120000);
+
+  test('the menu AI walks to the gate of a menu-built gated maze before the goal, then takes the wrap', () => {
+    const level = GATE_LEVELS[0]!;
+    const maze = SEEDS.map((seed) => buildMenuMaze(level, seed)).find((built) => (built.bleedGates?.length ?? 0) > 0)!;
+    expect(maze).toBeDefined();
+    const gate = maze.bleedGates![0]!;
+    const boot = createLegacyMenuDemoBootstrap(maze, false, 0);
+    expect(isLegacyMenuDemoGateLeg(boot.episode)).toBe(true);
+    let { episode, state } = boot;
+    let visitedGateAt = -1;
+    let switchedAt = -1;
+    for (let frame = 0; frame < 20000 && !state.reachedGoal; frame += 1) {
+      const next = advanceLegacyMenuDemoFrame(episode, state, boot.config, false, 0);
+      if (next.episode) {
+        episode = next.episode;
+        switchedAt = frame;
+      }
+      state = next.state;
+      if (visitedGateAt < 0 && next.player.x === gate.x && next.player.y === gate.y) {
+        visitedGateAt = frame;
+      }
+      if (next.shouldRegenerateMaze) {
+        break;
+      }
+    }
+    expect(switchedAt).toBeGreaterThanOrEqual(0);
+    expect(visitedGateAt).toBeGreaterThanOrEqual(0);
+    expect(visitedGateAt).toBeLessThanOrEqual(switchedAt + 1);
+    expect(episode.raster.startIndex).toBe((gate.y * maze.width) + gate.x);
+  }, 60000);
+
+  test.each([
+    [20, 2],
+    [60, 2]
+  ])('menu mazes at level %i still carry at least %i edge openings (one wrap pair)', (level, floor) => {
+    for (const seed of SEEDS.slice(0, 3)) {
+      expect(countRingOpenings(buildMenuMaze(level, seed).grid)).toBeGreaterThanOrEqual(floor);
     }
   }, 60000);
 });

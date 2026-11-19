@@ -12,8 +12,9 @@ import {
   type EdgeMarkerState
 } from '../../src/render/edgeMarkers';
 import { DIAMOND_FILL_ALPHA, drawBeamPulse, resolveDiamondFillShape, snapToDevice } from '../../src/render/edgeBeamArt';
-import { EDGE_DIAMOND_REST_SCALE, resolveBeamTimes } from '../../src/render/edgeBeamTimeline';
-import { PLAYER_COLOR } from '../../src/render/trailPalette';
+import { EDGE_BEAM_PULSE_MS, EDGE_DIAMOND_REST_SCALE, resolveBeamTimes, resolveEdgeBeamPulse } from '../../src/render/edgeBeamTimeline';
+import { resolvePlayerColour } from '../../src/render/playerColour';
+import { resolveEdgeStarScale } from '../../src/render/edgeStarMotion';
 import { RasterContext } from './support/rasterContext';
 
 /**
@@ -178,7 +179,9 @@ describe('diamond interior fill on real pixels', () => {
     const px = Math.round(CENTER.x * dpr);
     const py = Math.round(CENTER.y * dpr);
     const index = ((py * width) + px) * 4;
-    expect([ctx.data[index], ctx.data[index + 1], ctx.data[index + 2]]).toEqual([(PLAYER_COLOR >> 16) & 255, (PLAYER_COLOR >> 8) & 255, PLAYER_COLOR & 255]);
+    // The inside of the star is the player colour (the shifting rainbow at the trail start with no colour given), not a fixed green.
+    const colour = resolvePlayerColour(null, 0, true);
+    expect([ctx.data[index], ctx.data[index + 1], ctx.data[index + 2]]).toEqual([(colour >> 16) & 255, (colour >> 8) & 255, colour & 255]);
     expect((ctx.data[index + 3] ?? 0) / 255).toBeCloseTo(DIAMOND_FILL_ALPHA, 1);
   });
 });
@@ -222,10 +225,11 @@ describe('beam endpoints on the (moving) inner tip, on real pixels (MAZER-VIS-03
 
   test.each(DPRS)('at DPR %s the beam body is a line from the focus to the tip: the recorded strokes end exactly on the snapped tip (departure) / start on it (arrival)', (dpr) => {
     for (const index of [1, 3, 5, 7, 0, 4]) {
-      const tip = resolveEdgeInnerTip(stations[index]!);
-      const snapped = { x: snapToDevice(tip.x, dpr), y: snapToDevice(tip.y, dpr) };
       const times = resolveBeamTimes(index);
       for (const [direction, clock] of [['outward', times.contactMs + 50], ['inward', times.launchMs + 100]] as const) {
+        // The beam end sits on the inner tip of the star at its CURRENT (fill-driven) size.
+        const tip = resolveEdgeInnerTip(stations[index]!, resolveEdgeStarScale(resolveEdgeBeamPulse(direction, clock, 0, 1).diamondFill));
+        const snapped = { x: snapToDevice(tip.x, dpr), y: snapToDevice(tip.y, dpr) };
         const segments: Array<[number, number, number, number]> = [];
         const probe: EdgeGraphics = {
           fillStyle: () => undefined, lineStyle: () => undefined, beginPath: () => undefined, moveTo: () => undefined,
@@ -290,22 +294,27 @@ describe('beam endpoints on the (moving) inner tip, on real pixels (MAZER-VIS-03
     }
   });
 
-  test.each(DPRS)('at DPR %s the real draw path lands the head on the full-size tip at contact and the tip is lit one frame before (no jump)', (dpr) => {
+  test.each(DPRS)('at DPR %s the real draw path lands the head on the rest-size tip at contact, then follows the growing tip with no jump', (dpr) => {
     for (const index of [0, 1, 2, 3, 4, 5, 6, 7]) {
       const station = stations[index]!;
       const times = resolveBeamTimes(index);
-      const fullTip = resolveEdgeInnerTip(station, 1);
-      expect(pixelAt(rasteriseBeam(index, 'outward', times.contactMs, dpr), station, fullTip, dpr), `contact ${index} dpr ${dpr}`).toBeGreaterThan(0);
-      // 16 ms before contact the diamond is ~full already: the head is within a few px of the full-size tip, never far away.
+      const restTip = resolveEdgeInnerTip(station, EDGE_DIAMOND_REST_SCALE);
+      expect(pixelAt(rasteriseBeam(index, 'outward', times.contactMs, dpr), station, restTip, dpr), `contact ${index} dpr ${dpr}`).toBeGreaterThan(0);
       const probe: EdgeGraphics = {
         fillStyle: () => undefined, lineStyle: () => undefined, beginPath: () => undefined, moveTo: () => undefined,
         lineTo: () => undefined, closePath: () => undefined, fillPath: () => undefined, strokePath: () => undefined,
         fillCircle: () => undefined, lineBetween: () => undefined
       };
-      const geometry = drawEdgeBeams(probe, { clockMs: times.contactMs - 16, devicePixelRatio: dpr, direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations });
-      const beam = geometry.beams[index]!;
-      expect(Math.hypot(beam.tip.x - fullTip.x, beam.tip.y - fullTip.y)).toBeLessThan(25);
-      expect(Math.hypot(beam.to.x - fullTip.x, beam.to.y - fullTip.y)).toBeLessThan(2);
+      const toAt = (clockMs: number) => drawEdgeBeams(probe, { clockMs, devicePixelRatio: dpr, direction: 'outward', focus, laserProgress: 0, spawnPop: 0, stations }).beams[index]!;
+      // Before contact the target is the rest tip; one frame after, the star has barely begun to grow (the tip moved under 2 px).
+      const before = toAt(times.contactMs - 16);
+      expect(Math.hypot(before.to.x - restTip.x, before.to.y - restTip.y)).toBeLessThan(1e-9);
+      const after = toAt(times.contactMs + 16);
+      expect(Math.hypot(after.to.x - restTip.x, after.to.y - restTip.y)).toBeLessThan(2);
+      // Fully filled: the full-size tip.
+      const fullTip = resolveEdgeInnerTip(station, 1);
+      const done = toAt(times.contactMs + EDGE_BEAM_PULSE_MS);
+      expect(Math.hypot(done.to.x - fullTip.x, done.to.y - fullTip.y)).toBeLessThan(1e-9);
     }
   });
 

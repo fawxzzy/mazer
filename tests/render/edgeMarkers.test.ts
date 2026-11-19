@@ -1,6 +1,7 @@
 import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { describe, expect, test } from 'vitest';
-import { EDGE_RING_HELD_SCALE, resolveHeldEdgeDiamondScale } from '../../src/render/edgeRingScaleHold';
+import { resolveEdgeStarScale } from '../../src/render/edgeStarMotion';
+import { resolvePlayerColour } from '../../src/render/playerColour';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
   EDGE_MARKER_IDLE_ALPHA_MAX,
@@ -81,7 +82,9 @@ import { BEAM_BLOOM_LAYERS, BEAM_BLOOM_OUTER_PX, BEAM_BODY_LAYERS, BEAM_HOT_MIX,
 import { MOTION_REDUCED_MS } from '../../src/render/motionScale';
 import { mixPaletteRgb } from '../../src/render/trailPalette';
 
-const HOT = mixPaletteRgb(PLAYER_COLOR, cyberArcadeMaterial.rail.white, BEAM_HOT_MIX);
+/** The player colour a draw without an explicit colour uses: the shifting rainbow at the trail's start (playerColour.ts). */
+const START_COLOUR = resolvePlayerColour(null, 0, true);
+const HOT = mixPaletteRgb(START_COLOUR, cyberArcadeMaterial.rail.white, BEAM_HOT_MIX);
 
 /** True when `point` lies on an edge of the closed polygon (within a hair). */
 const isOnPolygonEdge = (vertices: ReadonlyArray<{ x: number; y: number }>, point: { x: number; y: number }): boolean => (
@@ -376,7 +379,7 @@ describe('edge marker animation budget', () => {
     const energized = new Set<number>([1, 3]);
     const flash = { ids: [1, 3], startedAtMs: 0 };
     const withoutColour = (states: ReturnType<typeof resolveEdgeMarkerStates>) => (
-      states.map(({ borderColor: _borderColor, ...rest }) => rest)
+      states.map(({ borderColor: _borderColor, fillColor: _fillColor, ...rest }) => rest)
     );
     const reference = withoutColour(resolveEdgeMarkerStates({ energizedIds: energized, flash, reducedMotion: true, timeMs: 0 }));
     for (let ms = 0; ms <= 8000; ms += 137) {
@@ -576,15 +579,15 @@ describe('all-8 beams (arrival and departure)', () => {
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     stations.forEach((station, index) => {
       const clock = 200; // laserProgress 0.5 on the master laser clock
-      const inScale = resolveHeldEdgeDiamondScale('inward', clock, index);
-      const outScale = resolveHeldEdgeDiamondScale('outward', clock, index);
+      const inScale = resolveEdgeStarScale(resolveBeamFillAt('inward', clock, index));
+      const outScale = resolveEdgeStarScale(resolveBeamFillAt('outward', clock, index));
       const inContact = inward.beams[index]?.contact as { x: number; y: number };
       const outContact = outward.beams[index]?.contact as { x: number; y: number };
       // The diamond end of the path is the INNERMOST point of the diamond at its CURRENT size (it grows / shrinks about its OUTER tip,
       // so the inner tip moves), in both directions, not an outline-crossing point and not the centre.
       expect(inContact).toEqual(resolveEdgeInnerTip(station, inScale));
       expect(outContact).toEqual(resolveEdgeInnerTip(station, outScale));
-      expect(outScale).toBe(1); // held full size: the tip is on the full-size point from the first frame (no growth)
+      expect(outScale).toBeLessThanOrEqual(1); // the size follows the fill (edgeStarMotion.ts)
       const outer = resolveEdgeMarkerVertices(station, 1)[2] as { x: number; y: number };
       const vertices = resolveEdgeMarkerVertices(anchorStationToOuterTip(station, outScale), outScale);
       expect(vertices[2]?.x).toBeCloseTo(outer.x, 9);
@@ -595,17 +598,27 @@ describe('all-8 beams (arrival and departure)', () => {
       expect(inward.beams[index]?.to).toEqual(focus);
       expect(outward.beams[index]?.from).toEqual(focus);
       expect(outward.beams[index]?.to).toEqual(outContact);
-      // At the instant of contact (departure) the diamond is exactly full: the head lands exactly on the full-size inner tip, no jump.
+      // Departure: the beam touches the star at its REST size (fill 0), the head lands exactly on that tip, and the star then grows
+      // smoothly (the tip glides inward with the fill, no jump) until it is full: exactly the full-size inner tip.
       const times = resolveBeamTimes(index);
-      const landed = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: times.contactMs }).beams[index] as { to: { x: number; y: number }; tip: { x: number; y: number } };
+      const tipAt = (clockMs: number): { x: number; y: number } => (
+        resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs }).beams[index] as { to: { x: number; y: number } }
+      ).to;
+      const restTip = resolveEdgeInnerTip(station, EDGE_DIAMOND_REST_SCALE);
+      expect(tipAt(times.contactMs).x).toBeCloseTo(restTip.x, 9);
+      expect(tipAt(times.contactMs).y).toBeCloseTo(restTip.y, 9);
+      expect(tipAt(times.contactMs - 16).x).toBeCloseTo(restTip.x, 9);
+      let previous = tipAt(times.contactMs);
+      let steepest = 0;
+      for (let ms = 1; ms <= EDGE_BEAM_PULSE_MS; ms += 1) {
+        const now = tipAt(times.contactMs + ms);
+        steepest = Math.max(steepest, Math.hypot(now.x - previous.x, now.y - previous.y));
+        previous = now;
+      }
+      expect(steepest).toBeLessThan(1);
       const full = resolveEdgeMarkerVertices(station, 1)[0] as { x: number; y: number };
-      expect(landed.to.x).toBeCloseTo(full.x, 9);
-      expect(landed.to.y).toBeCloseTo(full.y, 9);
-      expect(landed.tip.x).toBeCloseTo(full.x, 9);
-      expect(landed.tip.y).toBeCloseTo(full.y, 9);
-      // One frame earlier the target is already within a hair of it (continuous, not a jump).
-      const before = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations, clockMs: times.contactMs - 16 }).beams[index] as { to: { x: number; y: number } };
-      expect(Math.hypot(before.to.x - full.x, before.to.y - full.y)).toBeLessThan(2);
+      expect(previous.x).toBeCloseTo(full.x, 9);
+      expect(previous.y).toBeCloseTo(full.y, 9);
     });
   });
 
@@ -646,11 +659,11 @@ describe('all-8 beams (arrival and departure)', () => {
     expect(recorder.lineBetweenCount).toBeLessThanOrEqual(base + (8 * BEAM_STREAM_MAX_DASHES));
     expect(Math.max(...recorder.lineWidths)).toBe(BEAM_BLOOM_OUTER_PX);
     expect(Math.min(...recorder.lineWidths)).toBe(1);
-    expect(recorder.lineColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
+    expect(recorder.lineColors.every((color) => color === START_COLOUR || color === HOT)).toBe(true);
     // lineColors has one entry per lineStyle call: 2 bloom widths + one per body layer and the contact ripple ring in the player colour, one hot stream style.
-    expect(recorder.lineColors.filter((color) => color === PLAYER_COLOR).length).toBe(8 * (2 + BEAM_BODY_LAYERS + 1));
+    expect(recorder.lineColors.filter((color) => color === START_COLOUR).length).toBe(8 * (2 + BEAM_BODY_LAYERS + 1));
     expect(recorder.lineColors.filter((color) => color === HOT).length).toBe(8);
-    expect(recorder.fillColors.every((color) => color === PLAYER_COLOR || color === HOT)).toBe(true);
+    expect(recorder.fillColors.every((color) => color === START_COLOUR || color === HOT)).toBe(true);
     expect(recorder.circles).toHaveLength(24);
   });
 
@@ -882,8 +895,9 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     const fullRecorder = makeRecorder();
     drawEdgeMarkers(fullRecorder, stations, full);
     expect(fullRecorder.calls.filter((call) => call === 'fillPath')).toHaveLength(8);
-    expect(fullRecorder.fillColors).toEqual(Array.from({ length: 8 }, () => PLAYER_COLOR));
     const border = resolveTrailPaletteBorderColor(0, 0, false);
+    // The inside of the star is the player colour: the same colour as the border (the shifting rainbow today), not a fixed green.
+    expect(fullRecorder.fillColors).toEqual(Array.from({ length: 8 }, () => border));
     expect(fullRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
     const rest = resolveEdgeMarkerStates({ reducedMotion: false, fills: resolveEdgeRingFills(null), timeMs: 0 });
     const restRecorder = makeRecorder();
@@ -1097,8 +1111,8 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     expect(inward.beams).toHaveLength(8);
     stations.forEach((station, index) => {
       // The diamond end is the inner tip of the moving diamond at its current size (a polygon vertex of that kite).
-      const inScale = resolveHeldEdgeDiamondScale('inward', 200, index);
-      const outScale = resolveHeldEdgeDiamondScale('outward', 200, index);
+      const inScale = resolveEdgeStarScale(resolveBeamFillAt('inward', 200, index));
+      const outScale = resolveEdgeStarScale(resolveBeamFillAt('outward', 200, index));
       expect(inward.beams[index]?.from).toEqual(resolveEdgeInnerTip(station, inScale));
       expect(outward.beams[index]?.to).toEqual(resolveEdgeInnerTip(station, outScale));
       expect(isOnPolygonEdge(resolveEdgeMarkerVertices(anchorStationToOuterTip(station, inScale), inScale), inward.beams[index]?.from as { x: number; y: number })).toBe(true);
@@ -1159,10 +1173,15 @@ function makeRecorder(): Recorder {
   return recorder;
 }
 
-describe('colour contract: border = live trail colour, inside = player colour (one source, trailPalette.ts)', () => {
+/** Fill of star `index` at laser clock `clockMs` for a ring that is full before the beams (inward) / empty (outward). */
+const resolveBeamFillAt = (direction: 'inward' | 'outward', clockMs: number, index: number): number => (
+  resolveEdgeRingFills({ direction, clockMs, ringFill: direction === 'inward' ? 1 : 0 })[index] as number
+);
+
+describe('colour contract: border = inside = beams = the player colour (one source, playerColour.ts)', () => {
   const stations = resolveEdgeStations({ width: 390, height: 844 });
 
-  test('the player colour is one token: the player marker, the diamond fill and the beams all read PLAYER_COLOR', () => {
+  test('the static player token still matches the board material (the rainbow replaced it for lasers and star fills)', () => {
     expect(PLAYER_COLOR).toBe(cyberArcadeMaterial.signal.player);
     expect(boardMaterial.player).toBe(PLAYER_COLOR);
   });
@@ -1215,7 +1234,7 @@ describe('colour contract: border = live trail colour, inside = player colour (o
     const source = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
     expect(source).not.toMatch(/rail\.(mint|cyan)/);
     expect(source).not.toMatch(/0x[0-9a-fA-F]{6}/);
-    expect(source).toContain("from './trailPalette'");
+    expect(source).toContain("from './playerColour'");
   });
 
   test('the scene feeds the diamonds the trail head sample the trail itself recorded (same palette, same clock)', () => {
@@ -1293,23 +1312,29 @@ describe('diamond size (outer-tip anchored) and inner-tip attachment (MAZER-VIS-
     }
   });
 
-  test('resolveEdgeRingScales: 50% at rest and in the reduced-motion crossfade; held at 100% for the whole full-motion teardown + rebuild (no growth, no drain shrink)', () => {
-    const full = Array.from({ length: 8 }, () => EDGE_RING_HELD_SCALE);
-    expect(EDGE_RING_HELD_SCALE).toBe(1);
-    expect(resolveEdgeRingScales(null)).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+  test('resolveEdgeRingScales: 50% at rest and in the reduced-motion crossfade; otherwise the size follows each star fill (grow while it fills, full while full, shrink while it drains)', () => {
+    const rest = Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE);
+    expect(resolveEdgeRingScales(null)).toEqual(rest);
     for (const ringFill of [0, 0.3, 1]) {
       for (const direction of ['outward', 'inward'] as const) {
-        expect(resolveEdgeRingScales({ direction, clockMs: 250, ringFill, crossfade: true })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
+        expect(resolveEdgeRingScales({ direction, clockMs: 250, ringFill, crossfade: true })).toEqual(rest);
       }
     }
-    // Departure: full from the first frame to the last.
-    for (const clockMs of [0, 100, 200, resolveOutroTotalMs(300)]) {
-      expect(resolveEdgeRingScales({ direction: 'outward', clockMs, ringFill: 0 })).toEqual(full);
-    }
-    // Rebuild: full through the build and through the spawn beams, including after the drain (the old VIS-038 shrink).
-    for (const ms of [0, 1000, resolveIntroRevealEndMs(300) - 1, resolveIntroLaserStartMs(300) + 100, resolveIntroLaserStartMs(300) + 760]) {
-      const intro = resolveIntro(ms, { ...FULL, digitAlreadyVisible: true });
-      expect(resolveEdgeRingScales({ direction: 'inward', clockMs: intro.laserClockMs, ringFill: intro.ringFill })).toEqual(full);
+    // Departure: the first frame is the rest size (no pop), the last is full.
+    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: -1, ringFill: 0 })).toEqual(rest);
+    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: resolveOutroTotalMs(300), ringFill: 0 })).toEqual(Array.from({ length: 8 }, () => 1));
+    // Rebuild: full while the ring is full (through the build, until each beam leaves), back to rest once drained.
+    const fullIntro = resolveIntro(1000, { ...FULL, digitAlreadyVisible: true });
+    expect(resolveEdgeRingScales({ direction: 'inward', clockMs: fullIntro.laserClockMs, ringFill: fullIntro.ringFill })).toEqual(Array.from({ length: 8 }, () => 1));
+    const drained = resolveIntro(resolveIntroLaserStartMs(300) + 760, { ...FULL, digitAlreadyVisible: true });
+    expect(resolveEdgeRingScales({ direction: 'inward', clockMs: drained.laserClockMs, ringFill: drained.ringFill })).toEqual(rest);
+    // Every scale is exactly resolveEdgeStarScale of that star fill.
+    for (const direction of ['outward', 'inward'] as const) {
+      for (let clockMs = -50; clockMs <= 700; clockMs += 25) {
+        const lifecycle = { direction, clockMs, ringFill: direction === 'inward' ? 1 : 0 };
+        const fills = resolveEdgeRingFills(lifecycle);
+        expect(resolveEdgeRingScales(lifecycle)).toEqual(fills.map((fill) => resolveEdgeStarScale(fill)));
+      }
     }
   });
 
@@ -1330,7 +1355,7 @@ describe('diamond size (outer-tip anchored) and inner-tip attachment (MAZER-VIS-
     expect(scene).toContain('scales: resolveEdgeRingScales(this.edgeRing.lifecycle),');
   });
 
-  test('the full-size inner tip is an exact vertex at every orbit phase too (the ring orbits at full size)', () => {
+  test('the full-size inner tip is an exact vertex at every orbit phase too', () => {
     const viewport = { width: 390, height: 844 };
     for (const phase of [0.3, 1.1, 2.7, 4.4, 5.9]) {
       for (const station of resolveOrbitingEdgeStations(viewport, phase)) {
