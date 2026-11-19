@@ -4559,6 +4559,242 @@
       "verify": [],
       "lane": null,
       "filesHint": []
+    },
+    "MAZER-VIS-058": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 650,
+            "mergedSha": "b1ab4b187c8262e27246f98b191f0b1bb20eddde"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-059": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 647,
+            "mergedSha": "f8eaab8af4189af059200b731a46a31a85ed0c99"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-060": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 638,
+            "mergedSha": "c65a6d5fc4fa5b31ff328b3f317b37f786512b39"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 643,
+            "mergedSha": "7d8fdfd3f7cc04cfe6a1b842399ca391629d1930"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CbmMpGpP"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-091": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 649,
+            "mergedSha": "451dd5cad1f973e424340a53f6ceff1001f9da13"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-092": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 640,
+            "mergedSha": "301d030a6bed3df199a94a98afb862498744bab6"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CbmMpGpP"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-012": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 639,
+            "mergedSha": "0ec265a23ada3b50bf356a15df594503cbffa405"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CbmMpGpP"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-045": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 641,
+            "mergedSha": "a2870bb5d90092d85d2ba38ac785933148b9c8bc"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CbmMpGpP"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-046": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 645,
+            "mergedSha": "fa8248aa3a11b6fb55adbf3117de712aa6e75b66"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PROG-022": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 644,
+            "mergedSha": "5f9f103f76bafb62a1abc49787ca1938e56ff499"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-022": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 642,
+            "mergedSha": "fd9b55f09707fc728d8fec768dde062d339c9fee"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 646,
+            "mergedSha": "f6adc52b94cd983f37edd6506798fbb02cc41363"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-023": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 648,
+            "mergedSha": "244741fd4b078a06a5c05951e31171e004dc8f68"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-Dzf78yJ-"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-024": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-QA-012": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-DOCS-002": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ECON-004": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
     }
   }
 }

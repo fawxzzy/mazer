@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_1d6f78ee291f",
+  "export_id": "pbe_mazer_owner_registry_51330c6bb28b",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:1d6f78ee291fc1551ccc54e850243ae1bf8910011c6365adeecaf04e741948a6",
-  "generated_at": "2026-11-16T14:57:32.000Z",
+  "source_revision": "sha256:51330c6bb28b20958b3d61ec1a71cedd82a3fc7ffeecb93c1f7901060ed8dab5",
+  "generated_at": "2026-11-19T06:02:44.032Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:822edb4ca3ef3e7d60e0f48f72593e6d469392e208a6e9366427241c34db35aa",
-      "observed_at": "2026-11-16T14:57:32.000Z"
+      "revision": "sha256:ec4d835d2a2c5a31104ff75871ded14ccb185c69d7e03781f4cb1726a3fdb566",
+      "observed_at": "2026-11-19T06:02:44.032Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:a67753ce27c71dbfb2582900208e7e00de72cc64dcbd0fcb71de2ead073b30a1",
-      "observed_at": "2026-11-16T14:57:32.000Z"
+      "observed_at": "2026-11-19T06:02:44.032Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-16T14:57:32.000Z"
+      "observed_at": "2026-11-19T06:02:44.032Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-16T14:57:32.000Z"
+      "observed_at": "2026-11-19T06:02:44.032Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-16T14:57:32.000Z"
+      "observed_at": "2026-11-19T06:02:44.032Z"
     }
   ],
   "cards": [
@@ -2418,6 +2418,108 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-acct-045_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-045",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Bounded boot read of the sign-in session",
+        "description": "Owner reported tap-anywhere not starting the game. The boot read of the stored session is now bounded and falls back to signed out.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-045",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-045",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner reported tap-anywhere not starting the game. The boot read of the stored session is now bounded and falls back to signed out.",
+        "objective": "Owner reported tap-anywhere not starting the game. The boot read of the stored session is now bounded and falls back to signed out.",
+        "acceptance_criteria": [
+          "The boot sign-in session read gives up after a fixed time and continues signed out.",
+          "Tap anywhere starts the game even when the session read is slow.",
+          "A late session result still applies once it arrives."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-acct-046_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ACCT-046",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Profile icon sign-in continues to the account page",
+        "description": "Owner chose that host sign-in started from the profile icon should continue to the account page. The host only allows returns to its authorize path, so the continuation is handled inside Mazer and no change to the portal was needed.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-046",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-046",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner chose that host sign-in started from the profile icon should continue to the account page. The host only allows returns to its authorize path, so the continuation is handled inside Mazer and no change to the portal was needed.",
+        "objective": "Owner chose that host sign-in started from the profile icon should continue to the account page. The host only allows returns to its authorize path, so the continuation is handled inside Mazer and no change to the portal was needed.",
+        "acceptance_criteria": [
+          "Sign-in started from the profile icon returns to the account page.",
+          "The continuation works with the host's allowed return path only.",
+          "Sign-in started from other places keeps its current behaviour."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-ai-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -3459,6 +3561,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-docs-002_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-DOCS-002",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Refresh the current truth document for the new menu and demo",
+        "description": "Update the current truth document for the Menu dropdown, the signed-in menu demo, bleed gates and the new tile, player and trail skins.",
+        "card_type": "documentation",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOCS-002",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOCS-002",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Update the current truth document for the Menu dropdown, the signed-in menu demo, bleed gates and the new tile, player and trail skins.",
+        "objective": "Update the current truth document for the Menu dropdown, the signed-in menu demo, bleed gates and the new tile, player and trail skins.",
+        "acceptance_criteria": [
+          "The document describes the Menu button and its panel.",
+          "The document describes the signed-in menu demo and bleed gates.",
+          "The document names the default tile, player and trail skins."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-econ-001_v1",
       "record_kind": "project-work",
       "record_status": "candidate",
@@ -3601,6 +3754,59 @@
           "The owner signs the entitlement contract",
           "Provider and policy decisions are recorded",
           "No checkout code before approval"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-econ-004_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-ECON-004",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Offer the saved skin designs as shop unlockables",
+        "description": "Owner wants the designs that were not picked kept for the customization shop. The registries already hold them as non-selectable entries. This card tracks making them unlockable once the shop exists.",
+        "card_type": "feature",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ECON-002"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ECON-004",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ECON-004",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner wants the designs that were not picked kept for the customization shop. The registries already hold them as non-selectable entries. This card tracks making them unlockable once the shop exists.",
+        "objective": "Owner wants the designs that were not picked kept for the customization shop. The registries already hold them as non-selectable entries. This card tracks making them unlockable once the shop exists.",
+        "acceptance_criteria": [
+          "Each saved skin has an unlock rule in the catalog.",
+          "A player can pick an unlocked skin and the choice is remembered.",
+          "Locked skins stay non-selectable."
         ],
         "discoveries": [],
         "next_actions": [],
@@ -5001,6 +5207,159 @@
           "A tuning plan combines the existing generator features to fix them, with measured gauges (route length, dead-end depth, branching, decision points) before and after.",
           "Changes ship behind the felt-plus-density ladder slice with tests, and no player level or leaderboard entry is reset.",
           "Headless phone screenshots of before and after mazes are looked at and described."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-022_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-022",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Limit bleed path shortcuts and make least-saving the default",
+        "description": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-022",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-022",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+        "objective": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+        "acceptance_criteria": [
+          "Bleed paths are measured and limited so a wrap cannot skip most of the route.",
+          "Least-saving placement is the ladder default and the ladder fingerprints are re-pinned deliberately.",
+          "Felt difficulty windows hold and maze build time does not rise."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-023_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-023",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Bleed gates: a Pulse ring tile that opens a wrap",
+        "description": "Owner picked Gate D (Pulse ring) and asked for gate tiles to be placed far from the path they open, so it feels like a puzzle. The chance rises from 0.3 to 0.7 by level 100 with one gate per maze. The menu demo walks to the gate first.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-023",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-023",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner picked Gate D (Pulse ring) and asked for gate tiles to be placed far from the path they open, so it feels like a puzzle. The chance rises from 0.3 to 0.7 by level 100 with one gate per maze. The menu demo walks to the gate first.",
+        "objective": "Owner picked Gate D (Pulse ring) and asked for gate tiles to be placed far from the path they open, so it feels like a puzzle. The chance rises from 0.3 to 0.7 by level 100 with one gate per maze. The menu demo walks to the gate first.",
+        "acceptance_criteria": [
+          "A gated wrap stays closed until the player walks over its ring, then draws in at both board edges, and resets every attempt.",
+          "The ring sits at least 8 steps or 15 percent of the route from its wrap and is never adjacent.",
+          "The solver, AI and menu demo treat a gated wrap as closed until lit, and ladder fingerprints for ungated levels do not change."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-gen-024_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-GEN-024",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Weigh bleed gates in the felt tuner",
+        "description": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-024",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-024",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+        "objective": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+        "acceptance_criteria": [
+          "The felt tuner treats a gated wrap as closed until its ring is lit.",
+          "Gated levels land inside their difficulty window.",
+          "Ladder fingerprints are re-pinned on purpose with a before and after measurement."
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7668,6 +8027,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-perf-012_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-012",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Cheaper menu: no backdrop fill and slower star redraw",
+        "description": "Owner reported lag on the menu. The full backdrop fill is gone and the menu stars redraw at half the rate.",
+        "card_type": "technical-debt",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-012",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-012",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner reported lag on the menu. The full backdrop fill is gone and the menu stars redraw at half the rate.",
+        "objective": "Owner reported lag on the menu. The full backdrop fill is gone and the menu stars redraw at half the rate.",
+        "acceptance_criteria": [
+          "The menu backdrop is no longer filled every frame.",
+          "The menu star redraw rate is halved.",
+          "Menu render tests pass and the look is unchanged at normal speed."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-prog-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -8770,6 +9180,57 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-prog-022_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PROG-022",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Menu demo starts at the signed-in player's level",
+        "description": "Owner asked for the menu AI to follow the player's level. The demo reads the level, clamps it between 8 and 400, climbs per demo run in memory, and never writes to the account.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-022",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PROG-022",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner asked for the menu AI to follow the player's level. The demo reads the level, clamps it between 8 and 400, climbs per demo run in memory, and never writes to the account.",
+        "objective": "Owner asked for the menu AI to follow the player's level. The demo reads the level, clamps it between 8 and 400, climbs per demo run in memory, and never writes to the account.",
+        "acceptance_criteria": [
+          "A signed-in player's menu demo starts at that player's level, clamped between 8 and 400.",
+          "The demo climbs in memory only and writes nothing to the account.",
+          "Signed-out players and the level preview keep today's demo."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-pwa-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -9693,6 +10154,57 @@
           "The change is covered by a test or a verify script",
           "Checked in Chromium and WebKit phone emulation",
           "Nothing else in the menu or game changes"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-qa-012_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-QA-012",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Point QA scripts at the Menu button instead of the old icons",
+        "description": "Two older QA checks, the world identity evidence capture and the standalone first visible home readiness check, still target the retired corner icons.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-012",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-QA-012",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Two older QA checks, the world identity evidence capture and the standalone first visible home readiness check, still target the retired corner icons.",
+        "objective": "Two older QA checks, the world identity evidence capture and the standalone first visible home readiness check, still target the retired corner icons.",
+        "acceptance_criteria": [
+          "The world identity evidence capture opens the Menu button before looking for Settings and Profile.",
+          "The standalone first visible home readiness check no longer expects the old icons.",
+          "Both checks pass on main."
         ],
         "discoveries": [],
         "next_actions": [],
@@ -12037,6 +12549,108 @@
           "Guide text covers hazards and menu tap-anywhere",
           "Guide icons match current visuals",
           "Guide changes ship in the same release as the behavior"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-091_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-091",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Dropdown Menu button replaces the menu corner icons",
+        "description": "Owner picked Menu A (Dropdown) from the live options page. The corner icons are replaced by one Menu button with a glass dropdown panel. The in-app guide has a Menu row.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-091",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-091",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner picked Menu A (Dropdown) from the live options page. The corner icons are replaced by one Menu button with a glass dropdown panel. The in-app guide has a Menu row.",
+        "objective": "Owner picked Menu A (Dropdown) from the live options page. The corner icons are replaced by one Menu button with a glass dropdown panel. The in-app guide has a Menu row.",
+        "acceptance_criteria": [
+          "A three-line Menu button turns into an X and opens a glass panel with Settings, Profile and Leaderboard rows at least 44 px tall.",
+          "A tap outside the panel or on the X closes it and never starts a game, while a tap elsewhere still starts play.",
+          "During play only the settings cog is shown, and the guide describes the Menu button."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-092_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-092",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Menu cleanup: remove LEVEL, You and time labels",
+        "description": "Owner asked for the extra labels on the menu to go. The level announcer fade moved into its own module.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-092",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-092",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner asked for the extra labels on the menu to go. The level announcer fade moved into its own module.",
+        "objective": "Owner asked for the extra labels on the menu to go. The level announcer fade moved into its own module.",
+        "acceptance_criteria": [
+          "The menu shows no LEVEL, You or time labels.",
+          "The level announcer fades out without leaving a label behind.",
+          "Menu layout tests pass with the labels removed."
         ],
         "discoveries": [],
         "next_actions": [],
@@ -14781,6 +15395,159 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-vis-058_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-058",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Spark player and Star dust trail with a skin registry",
+        "description": "Owner picked the Spark player and the Star dust trail from the live options page. A skin registry makes them the defaults and keeps the other designs saved, not selectable, for a future customization shop. The guide text and icons were updated.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-058",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-058",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner picked the Spark player and the Star dust trail from the live options page. A skin registry makes them the defaults and keeps the other designs saved, not selectable, for a future customization shop. The guide text and icons were updated.",
+        "objective": "Owner picked the Spark player and the Star dust trail from the live options page. A skin registry makes them the defaults and keeps the other designs saved, not selectable, for a future customization shop. The guide text and icons were updated.",
+        "acceptance_criteria": [
+          "The player is a Spark kite that turns to face its travel direction, with a kite-shaped ping and the trail's shifting colour.",
+          "The trail is Star dust: small twinkling four-point sparkles in the current trail colours.",
+          "A skin registry lists Spark and Star dust as defaults and holds the unpicked designs as non-selectable entries, with the guide updated."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-059_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-059",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Seed spiral start tile and Twin stars end tile",
+        "description": "Owner picked Start C (Seed spiral) and End I (Twin stars) from the live options page. A tile skin registry holds the picks as defaults and keeps the other start and end designs saved for a future customization shop.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-059",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-059",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner picked Start C (Seed spiral) and End I (Twin stars) from the live options page. A tile skin registry holds the picks as defaults and keeps the other start and end designs saved for a future customization shop.",
+        "objective": "Owner picked Start C (Seed spiral) and End I (Twin stars) from the live options page. A tile skin registry holds the picks as defaults and keeps the other start and end designs saved for a future customization shop.",
+        "acceptance_criteria": [
+          "The start tile is a beaded green spiral that turns and breathes, drawn inside its tile.",
+          "The end tile is an outline star and a solid star turning in opposite directions, with a five-point star ping at the existing ping size.",
+          "The picks are registry defaults and the unpicked start and end designs stay saved and not selectable."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-vis-060_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-VIS-060",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Edge stars travel with the ring and stay full size",
+        "description": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-19T06:02:44.032Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-060",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-060",
+        "source_status": "current",
+        "source_updated_at": "2026-11-19T06:02:44.032Z"
+      },
+      "content": {
+        "summary": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+        "objective": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+        "acceptance_criteria": [
+          "Edge stars move with the ring yo-yo motion.",
+          "Edge stars stay at full size through the intro and the spawn beam.",
+          "Bottom-corner stars are not cut off on a phone screen."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-world-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -14836,9 +15603,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 283,
-    "exported_public_card_count": 283,
-    "exported_open_card_count": 67,
+    "stable_identity_count": 298,
+    "exported_public_card_count": 298,
+    "exported_open_card_count": 82,
     "exported_completed_card_count": 122,
     "exported_deferred_card_count": 26,
     "exported_archived_card_count": 68,

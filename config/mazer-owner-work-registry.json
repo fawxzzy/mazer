@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-16T14:57:32.000Z",
+  "updatedAt": "2026-11-19T06:02:44.032Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 283,
+    "stableIdentityCount": 298,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 67,
+    "openCardCount": 82,
     "completedCardCount": 122,
     "deferredCardCount": 26,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-16T14:57:32.000Z",
-      "appliedEventCount": 404,
-      "lastEventId": "df31bb2edc90"
+      "at": "2026-11-19T06:02:44.032Z",
+      "appliedEventCount": 419,
+      "lastEventId": "ebb3b0a38ab4"
     },
     "archivedCardCount": 68
   },
@@ -5183,6 +5183,263 @@
         "Guide text covers hazards and menu tap-anywhere",
         "Guide icons match current visuals",
         "Guide changes ship in the same release as the behavior"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-058",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-058",
+      "title": "Spark player and Star dust trail with a skin registry",
+      "description": "Owner picked the Spark player and the Star dust trail from the live options page. A skin registry makes them the defaults and keeps the other designs saved, not selectable, for a future customization shop. The guide text and icons were updated.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The player is a Spark kite that turns to face its travel direction, with a kite-shaped ping and the trail's shifting colour.",
+        "The trail is Star dust: small twinkling four-point sparkles in the current trail colours.",
+        "A skin registry lists Spark and Star dust as defaults and holds the unpicked designs as non-selectable entries, with the guide updated."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-059",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-059",
+      "title": "Seed spiral start tile and Twin stars end tile",
+      "description": "Owner picked Start C (Seed spiral) and End I (Twin stars) from the live options page. A tile skin registry holds the picks as defaults and keeps the other start and end designs saved for a future customization shop.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The start tile is a beaded green spiral that turns and breathes, drawn inside its tile.",
+        "The end tile is an outline star and a solid star turning in opposite directions, with a five-point star ping at the existing ping size.",
+        "The picks are registry defaults and the unpicked start and end designs stay saved and not selectable."
+      ]
+    },
+    {
+      "id": "MAZER-VIS-060",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-060",
+      "title": "Edge stars travel with the ring and stay full size",
+      "description": "Owner reported the bottom-corner stars looking cut off and shrinking every time. The stars now follow the ring yo-yo motion and hold full size through the whole intro, replacing the earlier drain to half size.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Edge stars move with the ring yo-yo motion.",
+        "Edge stars stay at full size through the intro and the spawn beam.",
+        "Bottom-corner stars are not cut off on a phone screen."
+      ]
+    },
+    {
+      "id": "MAZER-UI-091",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-091",
+      "title": "Dropdown Menu button replaces the menu corner icons",
+      "description": "Owner picked Menu A (Dropdown) from the live options page. The corner icons are replaced by one Menu button with a glass dropdown panel. The in-app guide has a Menu row.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A three-line Menu button turns into an X and opens a glass panel with Settings, Profile and Leaderboard rows at least 44 px tall.",
+        "A tap outside the panel or on the X closes it and never starts a game, while a tap elsewhere still starts play.",
+        "During play only the settings cog is shown, and the guide describes the Menu button."
+      ]
+    },
+    {
+      "id": "MAZER-UI-092",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-092",
+      "title": "Menu cleanup: remove LEVEL, You and time labels",
+      "description": "Owner asked for the extra labels on the menu to go. The level announcer fade moved into its own module.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The menu shows no LEVEL, You or time labels.",
+        "The level announcer fades out without leaving a label behind.",
+        "Menu layout tests pass with the labels removed."
+      ]
+    },
+    {
+      "id": "MAZER-PERF-012",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-012",
+      "title": "Cheaper menu: no backdrop fill and slower star redraw",
+      "description": "Owner reported lag on the menu. The full backdrop fill is gone and the menu stars redraw at half the rate.",
+      "cardType": "technical-debt",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The menu backdrop is no longer filled every frame.",
+        "The menu star redraw rate is halved.",
+        "Menu render tests pass and the look is unchanged at normal speed."
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-045",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-045",
+      "title": "Bounded boot read of the sign-in session",
+      "description": "Owner reported tap-anywhere not starting the game. The boot read of the stored session is now bounded and falls back to signed out.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The boot sign-in session read gives up after a fixed time and continues signed out.",
+        "Tap anywhere starts the game even when the session read is slow.",
+        "A late session result still applies once it arrives."
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-046",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-046",
+      "title": "Profile icon sign-in continues to the account page",
+      "description": "Owner chose that host sign-in started from the profile icon should continue to the account page. The host only allows returns to its authorize path, so the continuation is handled inside Mazer and no change to the portal was needed.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Sign-in started from the profile icon returns to the account page.",
+        "The continuation works with the host's allowed return path only.",
+        "Sign-in started from other places keeps its current behaviour."
+      ]
+    },
+    {
+      "id": "MAZER-PROG-022",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PROG-022",
+      "title": "Menu demo starts at the signed-in player's level",
+      "description": "Owner asked for the menu AI to follow the player's level. The demo reads the level, clamps it between 8 and 400, climbs per demo run in memory, and never writes to the account.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A signed-in player's menu demo starts at that player's level, clamped between 8 and 400.",
+        "The demo climbs in memory only and writes nothing to the account.",
+        "Signed-out players and the level preview keep today's demo."
+      ]
+    },
+    {
+      "id": "MAZER-GEN-022",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-022",
+      "title": "Limit bleed path shortcuts and make least-saving the default",
+      "description": "A measured study of bleed paths led to limits on how much route a wrap can save and a least-saving placement mode, which is now the ladder default. Ladder fingerprints were re-pinned on purpose for levels with wraps.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Bleed paths are measured and limited so a wrap cannot skip most of the route.",
+        "Least-saving placement is the ladder default and the ladder fingerprints are re-pinned deliberately.",
+        "Felt difficulty windows hold and maze build time does not rise."
+      ]
+    },
+    {
+      "id": "MAZER-GEN-023",
+      "status": "review",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-023",
+      "title": "Bleed gates: a Pulse ring tile that opens a wrap",
+      "description": "Owner picked Gate D (Pulse ring) and asked for gate tiles to be placed far from the path they open, so it feels like a puzzle. The chance rises from 0.3 to 0.7 by level 100 with one gate per maze. The menu demo walks to the gate first.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A gated wrap stays closed until the player walks over its ring, then draws in at both board edges, and resets every attempt.",
+        "The ring sits at least 8 steps or 15 percent of the route from its wrap and is never adjacent.",
+        "The solver, AI and menu demo treat a gated wrap as closed until lit, and ladder fingerprints for ungated levels do not change."
+      ]
+    },
+    {
+      "id": "MAZER-GEN-024",
+      "status": "planning",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-024",
+      "title": "Weigh bleed gates in the felt tuner",
+      "description": "The felt tuner measures wraps as always open, so gated levels land harder than their slot. Teach the tuner to treat a gated wrap as closed until lit.",
+      "cardType": "technical-debt",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The felt tuner treats a gated wrap as closed until its ring is lit.",
+        "Gated levels land inside their difficulty window.",
+        "Ladder fingerprints are re-pinned on purpose with a before and after measurement."
+      ]
+    },
+    {
+      "id": "MAZER-QA-012",
+      "status": "planning",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-QA-012",
+      "title": "Point QA scripts at the Menu button instead of the old icons",
+      "description": "Two older QA checks, the world identity evidence capture and the standalone first visible home readiness check, still target the retired corner icons.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The world identity evidence capture opens the Menu button before looking for Settings and Profile.",
+        "The standalone first visible home readiness check no longer expects the old icons.",
+        "Both checks pass on main."
+      ]
+    },
+    {
+      "id": "MAZER-DOCS-002",
+      "status": "planning",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DOCS-002",
+      "title": "Refresh the current truth document for the new menu and demo",
+      "description": "Update the current truth document for the Menu dropdown, the signed-in menu demo, bleed gates and the new tile, player and trail skins.",
+      "cardType": "documentation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The document describes the Menu button and its panel.",
+        "The document describes the signed-in menu demo and bleed gates.",
+        "The document names the default tile, player and trail skins."
+      ]
+    },
+    {
+      "id": "MAZER-ECON-004",
+      "status": "planning",
+      "updatedAt": "2026-11-19T06:02:44.032Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ECON-004",
+      "title": "Offer the saved skin designs as shop unlockables",
+      "description": "Owner wants the designs that were not picked kept for the customization shop. The registries already hold them as non-selectable entries. This card tracks making them unlockable once the shop exists.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-ECON-002"
+      ],
+      "acceptanceCriteria": [
+        "Each saved skin has an unlock rule in the catalog.",
+        "A player can pick an unlocked skin and the choice is remembered.",
+        "Locked skins stay non-selectable."
       ]
     }
   ]

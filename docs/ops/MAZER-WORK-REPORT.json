@@ -3,25 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-16T14:57:32.000Z",
+    "registryUpdatedAt": "2026-11-19T06:02:44.032Z",
     "boardSync": {
-      "at": "2026-11-16T14:57:32.000Z",
-      "appliedEventCount": 404,
-      "lastEventId": "df31bb2edc90"
+      "at": "2026-11-19T06:02:44.032Z",
+      "appliedEventCount": 419,
+      "lastEventId": "ebb3b0a38ab4"
     }
   },
   "counters": {
-    "total": 283,
-    "open": 67,
+    "total": 298,
+    "open": 82,
     "completed": 122,
     "deferred": 26,
     "buckets": {
       "needs-you": 33,
-      "in-review": 17,
+      "in-review": 28,
       "blocked": 7,
       "ready": 10,
       "in-progress": 1,
-      "unclassified": 67,
+      "unclassified": 71,
       "deferred": 26,
       "completed": 122
     },
@@ -2126,6 +2126,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-ACCT-045",
+      "title": "Bounded boot read of the sign-in session",
+      "status": "review",
+      "priority": "high",
+      "prs": "#641",
+      "note": ""
+    },
+    {
       "id": "MAZER-GEN-021",
       "title": "Make generated mazes feel like a real maze",
       "status": "review",
@@ -2166,12 +2174,36 @@
       "note": ""
     },
     {
+      "id": "MAZER-ACCT-046",
+      "title": "Profile icon sign-in continues to the account page",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#645",
+      "note": ""
+    },
+    {
       "id": "MAZER-GEN-007",
       "title": "Straighter ladder mazes, ladder to 288: PR #484 merged and live, owner look pending",
       "status": "review",
       "priority": "medium",
       "prs": "#484",
       "note": "PR #484 open, not merged; density fill added at head 316acd0a."
+    },
+    {
+      "id": "MAZER-GEN-022",
+      "title": "Limit bleed path shortcuts and make least-saving the default",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#642, #646",
+      "note": ""
+    },
+    {
+      "id": "MAZER-GEN-023",
+      "title": "Bleed gates: a Pulse ring tile that opens a wrap",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#648",
+      "note": ""
     },
     {
       "id": "MAZER-MOTION-004",
@@ -2182,12 +2214,28 @@
       "note": "Merged and deployed; kept in review for the open crossfade criterion (MAZER-MOTION-005) and the two judgement calls. Headless only."
     },
     {
+      "id": "MAZER-PERF-012",
+      "title": "Cheaper menu: no backdrop fill and slower star redraw",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#639",
+      "note": ""
+    },
+    {
       "id": "MAZER-UI-013",
       "title": "Off-theme colour ratchet landed: new stray colour literals now fail, no source edits",
       "status": "review",
       "priority": "medium",
       "prs": "#481",
       "note": "PR #481 merged: ratchet only. Migration of existing colours not started."
+    },
+    {
+      "id": "MAZER-UI-091",
+      "title": "Dropdown Menu button replaces the menu corner icons",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#649",
+      "note": ""
     },
     {
       "id": "MAZER-VIS-030",
@@ -2203,6 +2251,30 @@
       "status": "review",
       "priority": "medium",
       "prs": "#536",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-058",
+      "title": "Spark player and Star dust trail with a skin registry",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#650",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-059",
+      "title": "Seed spiral start tile and Twin stars end tile",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#647",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-060",
+      "title": "Edge stars travel with the ring and stay full size",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#638, #643",
       "note": ""
     },
     {
@@ -2252,6 +2324,22 @@
       "priority": "low",
       "prs": "#488",
       "note": "PR #488 open for review, not merged."
+    },
+    {
+      "id": "MAZER-PROG-022",
+      "title": "Menu demo starts at the signed-in player's level",
+      "status": "review",
+      "priority": "low",
+      "prs": "#644",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-092",
+      "title": "Menu cleanup: remove LEVEL, You and time labels",
+      "status": "review",
+      "priority": "low",
+      "prs": "#640",
+      "note": ""
     }
   ],
   "blocked": {
@@ -2799,6 +2887,13 @@
       "lane": null
     },
     {
+      "id": "MAZER-GEN-024",
+      "title": "Weigh bleed gates in the felt tuner",
+      "status": "planning",
+      "priority": "medium",
+      "lane": null
+    },
+    {
       "id": "MAZER-GOV-010",
       "title": "Board updates by event log and milestone fold, not per PR",
       "status": "archived",
@@ -2967,6 +3062,20 @@
       "lane": null
     },
     {
+      "id": "MAZER-DOCS-002",
+      "title": "Refresh the current truth document for the new menu and demo",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-ECON-004",
+      "title": "Offer the saved skin designs as shop unlockables",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
       "id": "MAZER-FLOW-019",
       "title": "Show the build stamp in Settings",
       "status": "planning",
@@ -3033,6 +3142,13 @@
       "id": "MAZER-QA-011",
       "title": "Player-reachable route to levels 60, 100 and 190 for checks",
       "status": "archived",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-QA-012",
+      "title": "Point QA scripts at the Menu button instead of the old icons",
+      "status": "planning",
       "priority": "low",
       "lane": null
     },
@@ -4293,6 +4409,66 @@
       "sub": null
     },
     "MAZER-UI-090": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-058": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-059": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-VIS-060": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-091": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-092": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PERF-012": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-045": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-ACCT-046": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PROG-022": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GEN-022": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GEN-023": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GEN-024": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-QA-012": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-DOCS-002": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-ECON-004": {
       "bucket": "unclassified",
       "sub": null
     }
