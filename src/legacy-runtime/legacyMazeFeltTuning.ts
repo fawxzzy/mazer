@@ -64,6 +64,8 @@ import {
   type LegacyLoopRecord
 } from './legacyMazeLoops';
 
+import type { LegacyBleedGate } from './legacyBleedGateState';
+
 export interface FeltTuningMaze {
   readonly width: number;
   readonly height: number;
@@ -105,6 +107,15 @@ export interface FeltTuningOptions {
   // like a loop saving. Omit or 0: wraps are not priced (the tuner of the first ladders,
   // byte-identical); the ladder passes FELT_WRAP_PRICE_PERCENT.
   readonly wrapPricePercent?: number;
+  // MAZER-GEN-024: steps a bleed gate takes back from the wrap saving, read off the grid the
+  // wrap is priced on (legacyBleedGates.ts, measureLegacyBleedGateWrapPenalty). A gated wrap is
+  // closed until its ring is lit, so the player saves less than the wrap saving by the detour to
+  // the gate. Priced like the wrap (wrapPricePercent), never more than the priced wrap saving, and
+  // it lowers the raw target the same amount. Omit: no gate, byte-identical to the tuner without it.
+  // It also returns the gate it priced, handed back in pricedBleedGate so the finished maze carries that gate.
+  // Given a hint it prices that gate only (penalty 0 and no gate when it is no longer valid): a later
+  // switchback bump is taken only while the hinted gate's price holds.
+  readonly bleedGatePrice?: (grid: boolean[][], hint?: LegacyBleedGate | null) => { readonly penalty: number; readonly gate: LegacyBleedGate | null };
   // Fringe (lever 3): exactly this many cells of zero-felt-cost side stubs (1..FELT_VISION_CELLS
   // cells, hanging off corridor or junction cells) are added AFTER the felt value has landed,
   // each kept only when the re-run explorer's step count is unchanged. A maze that cannot hold
@@ -167,6 +178,9 @@ export interface FeltTuningResult {
   // with the wrap links severed (and loop connectors closed) minus the shortest route with
   // them (loop connectors closed). Measured on every tune; priced only with wrapPricePercent.
   readonly wrapSaving: number;
+  // MAZER-GEN-024: steps the level's bleed gate takes back from wrapSaving (0 on a level without a gate).
+  readonly gatePenalty: number;
+  readonly pricedBleedGate: LegacyBleedGate | null;
   // The schedule target before the priced savings; target is baseTarget + priced savings.
   readonly baseTarget: number;
   readonly loopDiagnostics: { attempts: number; rejected: LegacyLoopCarveResult['rejected'] } | null;
@@ -491,7 +505,18 @@ const tuneOnce = (
     };
   };
   const priced = (saving: number, percent: number): number => Math.floor((saving * percent) / 100);
-  const total = (): number => priced(loopSaving, FELT_LOOP_PRICE_PERCENT) + priced(wrapSaving, wrapPercent);
+  let gatePenalty = 0;
+  const currentGrid = (): boolean[][] => {
+    const rows: boolean[][] = [];
+    for (let y = 0; y < height; y += 1) {
+      const row: boolean[] = [];
+      for (let x = 0; x < width; x += 1) { row.push(open[(y * width) + x] === 1); }
+      rows.push(row);
+    }
+    return rows;
+  };
+  let pricedBleedGate: LegacyBleedGate | null = null;
+  const total = (): number => priced(loopSaving, FELT_LOOP_PRICE_PERCENT) + priced(wrapSaving, wrapPercent) - gatePenalty;
   ({ loop: loopSaving, wrap: wrapSaving } = measureSavings());
   {
     let dropped = false;
@@ -521,6 +546,11 @@ const tuneOnce = (
       run = evaluate();
     }
     overCeiling = options.feltCeiling !== undefined && priced(wrapSaving, wrapPercent) > 0 && baseTarget + total() > options.feltCeiling;
+    if (options.bleedGatePrice !== undefined && wrapPercent > 0 && wrapSaving > 0) {
+      const gatePrice = options.bleedGatePrice(currentGrid());
+      gatePenalty = Math.min(priced(wrapSaving, wrapPercent), Math.max(0, priced(Math.trunc(gatePrice.penalty), wrapPercent)));
+      pricedBleedGate = gatePrice.gate;
+    }
     if (loopRecords.length > 0 || wrapPercent > 0) { target = baseTarget + total(); }
   }
   // True while the maze's savings are still the ones the target was priced with. A switchback
@@ -529,6 +559,10 @@ const tuneOnce = (
   // recorded saving, and so the priced value of the finished maze, wrong by the difference.
   const pricedSavingsHold = (): boolean => {
     if (loopRecords.length === 0 && wrapPercent <= 0) { return true; }
+    if (pricedBleedGate !== null && options.bleedGatePrice !== undefined) {
+      const same = options.bleedGatePrice(currentGrid(), pricedBleedGate);
+      if (Math.min(priced(wrapSaving, wrapPercent), priced(Math.trunc(same.penalty), wrapPercent)) !== gatePenalty) { return false; }
+    }
     const now = measureSavings();
     return now.loop === loopSaving && (wrapPercent <= 0 || now.wrap === wrapSaving);
   };
@@ -1083,17 +1117,18 @@ const tuneOnce = (
   // Last resort of the floor-island rule: nothing above leaves floor the start cannot reach (expected 0).
   const islandCellsForced = fillUnreachableCells(open, explorer.neighbors, startCell).length;
 
-  const grid: boolean[][] = [];
-  for (let y = 0; y < height; y += 1) {
-    const row: boolean[] = [];
-    for (let x = 0; x < width; x += 1) { row.push(open[(y * width) + x] === 1); }
-    grid.push(row);
-  }
+  const grid: boolean[][] = currentGrid();
+  // MAZER-GEN-024: the priced gate must still cost what it was priced at on the finished grid (a lever that
+  // moves a route after pricing would otherwise leave the landed number off). A miss counts as window
+  // distance, so the restarts and then the next base are tried.
+  const gateShortfall = pricedBleedGate !== null && options.bleedGatePrice !== undefined
+    ? Math.abs(Math.min(priced(wrapSaving, wrapPercent), priced(Math.trunc(options.bleedGatePrice(grid, pricedBleedGate).penalty), wrapPercent)) - gatePenalty)
+    : 0;
   return {
     grid,
     felt,
     target,
-    onTarget: windowGap(felt) === 0 && fringeShortfall === 0 && reverseShortfall === 0 && stubRemaining === 0,
+    onTarget: windowGap(felt) === 0 && gateShortfall === 0 && fringeShortfall === 0 && reverseShortfall === 0 && stubRemaining === 0,
     routeLength,
     bumps,
     branchesAdded,
@@ -1104,6 +1139,8 @@ const tuneOnce = (
     loops: loopRecords,
     loopSaving,
     wrapSaving,
+    gatePenalty,
+    pricedBleedGate,
     baseTarget,
     loopDiagnostics,
     // Connector cells still open at the end (a later switchback bump can close one).
@@ -1122,7 +1159,7 @@ const tuneOnce = (
     stretchRemovedTiles,
     capacityExhausted,
     evals,
-    windowDistance: windowGap(felt) + fringeShortfall + reverseShortfall + stubRemaining,
+    windowDistance: windowGap(felt) + gateShortfall + fringeShortfall + reverseShortfall + stubRemaining,
     tieDeviationPercent: run.reachedGoal ? measureTieDeviationPercent(explorer, open, startCell, goalCell, felt) : 0,
     hopeless
   };

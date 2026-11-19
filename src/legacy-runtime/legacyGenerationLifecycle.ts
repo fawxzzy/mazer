@@ -9,7 +9,8 @@ import {
   type LegacyPoint
 } from './legacyMaze';
 import { timeLegacyMazeGeneration } from './legacyGenerationTiming';
-import { resolveLegacyBleedGatesForLevel } from './legacyBleedGates';
+import type { LegacyBleedGate } from './legacyBleedGateState';
+import { isBleedGateLevel, measureLegacyBleedGateWrapPenalty, placeLegacyBleedGateWithHint, resolveLegacyBleedGatesForLevel } from './legacyBleedGates';
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
@@ -670,6 +671,9 @@ const selectLegacyGeometryBudgetMaze = (
     Math.max(0, Math.trunc(selectionOptions.wrapRungs ?? resolveGeometryBudgetWrapRungs(feltLevel, seed)))
   );
   const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
+  // MAZER-GEN-024: a gate level's wrap is closed until lit, so the tuner prices the gate's detour (the gate is
+  // placed after tuning, on the same cadence, attachLegacyBleedGates). Other levels pass nothing: unchanged.
+  const gateLevel = isBleedGateLevel(budgetLevel);
   const profileWithRungs = (rungs: number): LegacyMazeGenerationProfile => (
     rungs === profileRungs
       ? generationProfile
@@ -708,11 +712,14 @@ const selectLegacyGeometryBudgetMaze = (
       const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
         ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(feltLevel, seed, base.width * base.height))
         : LEGACY_EMPTY_LOOP_PLAN;
+      const bleedGatePrice = gateLevel
+        ? (grid: boolean[][], hint?: LegacyBleedGate | null) => measureLegacyBleedGateWrapPenalty({ width: grid[0]?.length ?? 0, height: grid.length, grid, start: base.start, goal: base.goal }, hint)
+        : undefined;
       tuned = tuneMazeFeltToTarget(
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor: resolveGeometryBudgetBoardFillFloor(fillFloor, base.width * base.height), reverseFloor }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, bleedGatePrice, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor: resolveGeometryBudgetBoardFillFloor(fillFloor, base.width * base.height), reverseFloor }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that
@@ -728,7 +735,7 @@ const selectLegacyGeometryBudgetMaze = (
     if (selectedMaze === null || rank < selectedRank) {
       // Only a maze that becomes the selection is assembled (route, wrap diagnostics): a base that
       // missed its window or floor is discarded for the price of the tuning alone.
-      selectedMaze = tuned === null ? base : assembleTunedMaze(base, tuned, baseProfile, reverseFloor);
+      selectedMaze = tuned === null ? base : assembleTunedMaze(base, tuned, baseProfile, reverseFloor, gateLevel);
       selectedProfile = baseProfile;
       selectedDistance = distance;
       selectedRank = rank;
@@ -780,7 +787,8 @@ const assembleTunedMaze = (
   base: Omit<LegacyMazeSnapshot, 'generation'>,
   tuned: ReturnType<typeof tuneMazeFeltToTarget>,
   generationProfile: LegacyMazeGenerationProfile,
-  reverseFloor: number
+  reverseFloor: number,
+  gateLevel = false
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
   const routed = tuned.bumps > 0 || tuned.loops.length > 0 || tuned.cyclesBroken > 0
     ? resolveLegacyShortestPath(tuned.grid, base.start, base.goal, 'direct-floor')
@@ -813,7 +821,8 @@ const assembleTunedMaze = (
   const wraps = (generationProfile.requiredOppositeBorderConnections.vertical ? 1 : 0)
     + (generationProfile.requiredOppositeBorderConnections.horizontal ? 1 : 0);
   if (wraps > 0 || tuned.wrapSaving > 0) {
-    next.wrapStats = { rungs: wraps, saved: tuned.wrapSaving };
+    // MAZER-GEN-024: a gated wrap is closed until lit, so what it saves is net of the detour to the gate.
+    next.wrapStats = { rungs: wraps, saved: Math.max(0, tuned.wrapSaving - tuned.gatePenalty) };
   }
   // Zero-felt-cost side stubs of the levels past the felt saturation (legacyMazeFeltTuning.ts, lever 3).
   if (tuned.fringeTiles.length > 0) {
@@ -840,12 +849,26 @@ const assembleTunedMaze = (
       decoyPrunedTiles: [...tuned.stretchRemovedTiles, ...tuned.trimmedTiles, ...tuned.stubRemoved, ...forcedStubs].map((point) => ({ ...point }))
     };
   }
+  // MAZER-GEN-024: a tuned gate level carries exactly the gate its price was built on (it goes on the finished
+  // maze when still valid there), or none: a gate that first appears on the finished grid (the tuner's side
+  // branches can create the far tile it needs) would be a gate the level was not priced for.
+  if (gateLevel) {
+    gateDecidedMazes.add(next);
+    if (tuned.pricedBleedGate !== null) {
+      const placement = placeLegacyBleedGateWithHint(next, tuned.pricedBleedGate);
+      if (placement !== null) { next.bleedGates = [placement.gate]; }
+    }
+  }
   return next;
 };
+
+// MAZER-GEN-024: tuned gate-level mazes whose gate (or lack of one) the tuner's price already decided.
+const gateDecidedMazes = new WeakSet<object>();
 
 // MAZER-L10: a ladder level's bleed gates, placed on the finished maze (the grid is not changed, so the
 // level's golden fingerprint holds). Keyed on the level, see legacyBleedGates.ts for the cadence.
 const attachLegacyBleedGates = <T extends { maze: Omit<LegacyMazeSnapshot, 'generation'> }>(result: T, level: number): T => {
+  if (gateDecidedMazes.has(result.maze)) { return result; }
   const bleedGates = resolveLegacyBleedGatesForLevel(level, result.maze);
   return bleedGates.length > 0 ? { ...result, maze: { ...result.maze, bleedGates } } : result;
 };
