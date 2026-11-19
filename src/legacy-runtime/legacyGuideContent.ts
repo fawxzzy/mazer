@@ -30,6 +30,7 @@ export type LegacyGuideGlyph =
   | 'touch-stick'
   | 'trail-swatch'
   | 'edge-marker'
+  | 'bleed-gate'
   | 'level-numeral'
   | 'online-count'
   | 'sound-speaker'
@@ -67,7 +68,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'levels' | 'online' | 'sound' | LegacyGuideHazardRowId;
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'sound' | LegacyGuideHazardRowId;
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -180,6 +181,21 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     },
     id: 'wrap',
     text: 'Some mazes wrap around open edges. Trail-coloured edge stars fill as beams hit.'
+  },
+  {
+    // MAZER-L10: the bleed gate (Gate D "Pulse ring"). The icon is the board's own gate draw, lit and still.
+    heading: 'Wrap gate',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/render/bleedGateRenderer.ts', symbol: 'drawBleedGatePlan' },
+      chipDraw: null,
+      glyph: 'bleed-gate',
+      lane: null,
+      reasonId: 'bleed-gate-legend-calls-board-gate-draw',
+      status: 'shared-with-board'
+    },
+    id: 'bleed-gate',
+    text: 'Later mazes hide a wrap behind a dashed ring. Walk over the ring to open it.'
   },
   {
     heading: 'Levels',
