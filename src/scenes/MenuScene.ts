@@ -371,6 +371,7 @@ import {
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
 import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
 import { PresenceCounterView } from '../render/presenceCounterView';
+import { resolveBoardWallFillRect } from '../render/boardWallFill';
 import { designTokens } from '../theme/tokens';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
@@ -7974,11 +7975,19 @@ export class MenuScene extends Phaser.Scene {
     // the starfield -- skip it entirely in menu mode. Play mode's gameplay
     // wall rendering is untouched.
     if (!isMenuMode) {
-      for (let y = 0; y < this.maze.height; y += 1) {
-        for (let x = 0; x < this.maze.width; x += 1) {
-          const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
-          this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
-          this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+      // The cells abut on shared integer edges, so one rect over their union paints the identical pixels (see
+      // src/render/boardWallFill.ts); ~2750 per-cell fillRect calls were replayed on every Phaser render.
+      const wallFillRect = resolveBoardWallFillRect(mazeLeft, mazeTop, tileSize, this.maze.width, this.maze.height);
+      if (wallFillRect !== null) {
+        this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
+        this.boardStaticGraphics.fillRect(wallFillRect.left, wallFillRect.top, wallFillRect.width, wallFillRect.height);
+      } else {
+        for (let y = 0; y < this.maze.height; y += 1) {
+          for (let x = 0; x < this.maze.width; x += 1) {
+            const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
+            this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
+            this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+          }
         }
       }
     }
