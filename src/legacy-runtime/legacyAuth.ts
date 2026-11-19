@@ -23,6 +23,7 @@ import {
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 import { LEGACY_AUTH_FAILURE_CODES, type LegacyAuthFailureCode } from './legacyAuthFailureCodes';
 import { createMazerAuthFetch } from './legacyOAuthRefresh';
+import { raceLegacyAuthSessionRead, shouldUseStoredLegacyAuthSession } from './legacyAuthBootResolution';
 import {
   classifyLegacyAuthRecheckResponse,
   deriveLegacyAuthSessionKey,
@@ -715,12 +716,46 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   }
 
   let sessionResult: Awaited<ReturnType<LegacyAuthClient['auth']['getSession']>>;
+  // L1 (profile / tap-anywhere dead on a phone): the read can stall about 30 s on a stale token while the radio wakes
+  // (legacyAuthBootResolution.ts). A stored session that is still there stands in for a stalled or transient-failed read.
+  const bootStorage = typeof window === 'undefined' ? undefined : window.localStorage;
+  const standInSnapshot = (): LegacyAuthSessionSnapshot | null => {
+    const stored = readLegacyPersistedAuthSessionSnapshot(bootStorage);
+    if (stored === null || stored.status !== 'authenticated' || isMazerOAuthSessionQuarantined()) {
+      return null;
+    }
+    syncLegacyRememberedIdentityFromAuthenticatedSession(bootStorage, stored);
+    return oauthBootResult.status === 'connected' ? { ...stored, info: 'Account connected.' } : stored;
+  };
   try {
-    sessionResult = await client.auth.getSession();
+    const read = client.auth.getSession();
+    const raced = await raceLegacyAuthSessionRead(read);
+    if (raced.status === 'timed-out') {
+      const stored = shouldUseStoredLegacyAuthSession({ kind: 'timed-out' }, readLegacyPersistedAuthSessionSnapshot(bootStorage) !== null)
+        ? standInSnapshot()
+        : null;
+      if (stored !== null) {
+        return stored;
+      }
+      sessionResult = await read;
+    } else {
+      sessionResult = raced.value;
+    }
   } catch {
     return createBootFailureSnapshot(LEGACY_AUTH_FAILURE_CODES.sessionReadFailed);
   }
   const { data, error } = sessionResult;
+  if (
+    shouldUseStoredLegacyAuthSession(
+      { kind: 'read', hasSession: data.session !== null, error },
+      readLegacyPersistedAuthSessionSnapshot(bootStorage) !== null
+    )
+  ) {
+    const stored = standInSnapshot();
+    if (stored !== null) {
+      return stored;
+    }
+  }
   if (isMazerOAuthSessionQuarantined()) {
     return createBootFailureSnapshot(LEGACY_AUTH_FAILURE_CODES.sessionQuarantined);
   }
