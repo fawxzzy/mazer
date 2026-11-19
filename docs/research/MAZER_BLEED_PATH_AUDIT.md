@@ -25,8 +25,9 @@ Conclusions:
 - The damage is placement. The carve-cost pick of the mandatory line routinely lands a wrap that removes
   half to four fifths of the shortest route (mean route left: 59-79%, worst 17%). The felt-difficulty
   tuner prices the wrap saving, so levels still land on target, but the wrap is the dominant shortcut.
-- Band profiles (menu demo, default profile) carry many openings by design (MAZER-VIS-052) and are not part
-  of gameplay; they are left unchanged.
+- The default profile carries many openings by design and is not part of gameplay; it is left unchanged. (The
+  menu demo used to be in this group via the MAZER-VIS-052 band profile; since MAZER-MENU-BLEED it reads the
+  ladder profile, so the same limits, placement and gates apply to it.)
 
 ## What shipped
 
@@ -48,8 +49,8 @@ Conclusions:
 
 Owner pick (2026-11-19): `bleedPlacement: 'least-saving'` is now part of the budget-ladder base profile
 (`legacyGeometryBudget.ts`, `BASE_PROFILE`), so every ladder level picks its wrap line by trial. The menu demo
-keeps the old seeded pick (its levels 10-13 borrow the ladder profile and drop the key; levels 14+ use the band
-profile, which never had it), and the band/default profiles are unchanged (MAZER-VIS-052).
+used to keep the old seeded pick; since MAZER-MENU-BLEED (2026-11-19) it reads the same ladder profile as play
+on every level, and only the default profile is unchanged.
 
 Before / after, measured with `npx vite-node scripts/analysis/measure-bleed-paths.ts <seeds> seeded|shipped <levels>`
 (`seeded` forces the old carve-cost pick, `shipped` is the new default), both frozen boards:

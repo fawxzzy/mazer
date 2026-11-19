@@ -3242,8 +3242,8 @@ export const createLegacyMaze = (
   normalizeLegacyAdjacentBorderOpenings(grid, seed ^ 0x4cf5ad43);
   // MAZER-L8: cap bleed-off paths per axis, keep two on one axis far apart, and reject any that cuts the
   // route below the floor (a required axis always keeps its least harmful path).
-  // Gameplay profiles only (the budget ladder, or a profile that opts in with bleedPlacement): the main-menu
-  // demo and the default profile show many openings by design (MAZER-VIS-052) and keep their old output.
+  // Gameplay profiles only (the budget ladder, or a profile that opts in with bleedPlacement). The main-menu demo
+  // reads the ladder profile too (MAZER-MENU-BLEED); only the default profile keeps its many openings.
   const bleedLimitClosedTiles = (profile.geometryBudgetLevel !== undefined || profile.bleedPlacement !== undefined)
     ? enforceBleedPathLimits(grid, start, goal, {
     capPerAxis: {

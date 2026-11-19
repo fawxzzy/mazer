@@ -3,12 +3,15 @@
  * ring: corridors that run off the screen edge / edge-wrap docks) do the menu demo
  * mazes carry, per ai-runner level?  Headless, no browser: it generates the same
  * runtime maze the menu does (mode 'menu', ai-runner track profile + scale).
+ * Also reports bleed PATHS (an opening pair that wraps a whole line, legacyBleedPaths.ts),
+ * how many mazes carry a bleed gate, and the mean build time per maze.
  *
  *   npx vite-node scripts/analysis/menu-demo-bleed-rate.ts -- --seeds=20 --levels=1,2,5,10,30,60,100,140
  *   npx vite-node scripts/analysis/menu-demo-bleed-rate.ts -- --src=./.old/src   (measure another checkout's src)
  */
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 
 const arg = (name: string, fallback: string): string => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -45,9 +48,10 @@ export const countBoardBleed = (grid: boolean[][]): BleedSample => {
 const main = async () => {
   const prog = await load('legacy-runtime/legacyProgression.ts');
   const life = await load('legacy-runtime/legacyGenerationLifecycle.ts');
+  const paths = await load('legacy-runtime/legacyBleedPaths.ts');
   const base = prog.createEmptyLegacyProgressionState().tracks['ai-runner'];
   console.log(`src=${srcRoot} seeds=${seeds}`);
-  console.log('level | scale | mean openings | mean wrap pairs | % mazes >=1 opening | % mazes >=1 wrap pair');
+  console.log('level | scale | mean openings | mean wrap pairs | % mazes >=1 opening | % mazes >=1 wrap pair | mean bleed paths | mean gates | % mazes with a gate | mean build ms');
   for (const level of levels) {
     const targetComplexity = Math.min(prog.LEGACY_PROGRESSION_MAX_COMPLEXITY, prog.LEGACY_PROGRESSION_MIN_COMPLEXITY + ((Math.min(level, 99) - 1) * 4));
     const track = { ...base, level: String(level), targetComplexity };
@@ -57,13 +61,18 @@ const main = async () => {
       ? prog.resolveLegacyMazeGenerationProfileForProgression
       : prog.resolveLegacyMenuDemoMazeGenerationProfileForProgression;
     const profile = resolveProfile(track, { fraction });
-    let op = 0; let wp = 0; let anyOp = 0; let anyWp = 0;
+    let op = 0; let wp = 0; let anyOp = 0; let anyWp = 0; let pathSum = 0; let gateSum = 0; let anyGate = 0; let ms = 0;
     for (let s = 0; s < seeds; s += 1) {
+      const t0 = performance.now();
       const maze = life.createLegacyRuntimeMazeForMode('menu', scale, 1000 + (s * 7919), profile, { targetComplexity }, 1);
+      ms += performance.now() - t0;
+      pathSum += paths.listBleedPaths(maze.grid).length;
+      const gates = maze.bleedGates?.length ?? 0;
+      gateSum += gates; anyGate += gates > 0 ? 1 : 0;
       const b = countBoardBleed(maze.grid);
       op += b.openings; wp += b.wrapPairs; anyOp += b.openings > 0 ? 1 : 0; anyWp += b.wrapPairs > 0 ? 1 : 0;
     }
-    console.log(`${level} | ${scale} | ${(op / seeds).toFixed(2)} | ${(wp / seeds).toFixed(2)} | ${Math.round((100 * anyOp) / seeds)} | ${Math.round((100 * anyWp) / seeds)}`);
+    console.log(`${level} | ${scale} | ${(op / seeds).toFixed(2)} | ${(wp / seeds).toFixed(2)} | ${Math.round((100 * anyOp) / seeds)} | ${Math.round((100 * anyWp) / seeds)} | ${(pathSum / seeds).toFixed(2)} | ${(gateSum / seeds).toFixed(2)} | ${Math.round((100 * anyGate) / seeds)} | ${(ms / seeds).toFixed(0)}`);
   }
 };
 
