@@ -470,6 +470,14 @@ import {
   type LegacyOverlayToggleFieldId
 } from '../legacy-runtime/legacyOverlayToggleFields';
 import {
+  createFloatingAnchorController,
+  resolveFloatingAnchorConfig
+} from '../legacy-runtime/legacyFloatingAnchor';
+import {
+  readLegacyFloatingAnchorPreference,
+  writeLegacyFloatingAnchorPreference
+} from '../legacy-runtime/legacyFloatingAnchorPreference';
+import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
   migrateLegacyGameToggleSettingsToGuestScope,
   readLegacyGameToggleSettings,
@@ -1925,6 +1933,13 @@ export class MenuScene extends Phaser.Scene {
   // handleLegacyPlayTouchControl) instead of a fixed on-screen position, so
   // the board never has to reserve permanent space for a control widget.
   private playFloatingStickOrigin: { x: number; y: number } | null = null;
+  // MAZER-L9: device-local Settings > Floating anchor (default off). When on, the controller drags
+  // playFloatingStickOrigin behind a far finger (src/legacy-runtime/legacyFloatingAnchor.ts).
+  private floatingAnchorEnabled = false;
+  private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
+    coarsePointer: true,
+    devicePixelRatio: 3
+  }));
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleGraphics!: Phaser.GameObjects.Graphics;
   // Board layers share one untransformed container for stable draw ordering.
@@ -2437,6 +2452,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.loadPersistedLegacyAuthSnapshot();
     this.loadPersistedLegacyGameToggleSettings();
+    this.floatingAnchorEnabled = readLegacyFloatingAnchorPreference(this.resolveBrowserLocalStorage());
     this.loadPersistedMazeCycleTelemetryHistory();
     this.loadPersistedLegacyProgressionState();
     this.applyBootstrappedLegacyAccountState();
@@ -3305,6 +3321,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public update(time: number, delta: number): void {
+    if (this.floatingAnchor?.active === true) {
+      this.advanceLegacyFloatingAnchor(time);
+    }
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
       // Real, confirmed regression (found while restoring a broken visual
@@ -5020,7 +5039,50 @@ export class MenuScene extends Phaser.Scene {
     return this.handleLegacyPlayTouchControlMove(point.x, point.y, pointer.id);
   }
 
+  // MAZER-L9: refresh the controller's inch-based leash from the live display (called at touch-down).
+  private configureLegacyFloatingAnchor(): void {
+    let coarsePointer = true;
+    let canvasCssWidth = this.layout.width;
+    try {
+      coarsePointer = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(pointer: coarse)').matches
+        : true;
+      canvasCssWidth = this.game.canvas.getBoundingClientRect().width || this.layout.width;
+    } catch {
+      // keep the phone-class defaults
+    }
+    this.floatingAnchor.setConfig(resolveFloatingAnchorConfig({
+      coarsePointer,
+      devicePixelRatio: typeof window === 'undefined' ? 1 : window.devicePixelRatio,
+      logicalPerCssPx: this.layout.width / Math.max(1, canvasCssWidth)
+    }));
+  }
+
+  // Per-frame: a finger held still beyond the leash keeps the anchor easing toward it.
+  private advanceLegacyFloatingAnchor(time: number): void {
+    if (!this.floatingAnchor.active || this.playTouchStickPointerId === null) {
+      return;
+    }
+    const before = this.floatingAnchor.anchor;
+    const after = this.floatingAnchor.tick(time);
+    const finger = this.floatingAnchor.finger;
+    if (finger !== null && after !== null && after !== before) {
+      // The anchor moved while the finger rested: recompute the pull from the new centre.
+      this.handleLegacyPlayTouchControlMove(finger.x, finger.y, this.playTouchStickPointerId, time);
+    }
+  }
+
+  private toggleLegacyFloatingAnchor(): void {
+    this.floatingAnchorEnabled = writeLegacyFloatingAnchorPreference(
+      this.resolveBrowserLocalStorage(),
+      !this.floatingAnchorEnabled
+    );
+    this.floatingAnchor.up();
+    this.uiDirty = true;
+  }
+
   private clearLegacyPlayFloatingStick(): void {
+    this.floatingAnchor.up();
     this.playTouchStickPointerId = null;
     this.playTouchStickPull = null;
     this.playFloatingStickOrigin = null;
@@ -5093,6 +5155,12 @@ export class MenuScene extends Phaser.Scene {
     this.playTouchArrowPointerId = null;
     this.playTouchStickPointerId = normalizedPointerId;
     this.playFloatingStickOrigin = { x, y };
+    if (this.floatingAnchorEnabled) {
+      this.configureLegacyFloatingAnchor();
+      this.floatingAnchor.down({ x, y }, this.time.now);
+    } else {
+      this.floatingAnchor.up();
+    }
     this.playHeldTouchMoves = [];
     this.clearLegacyPlayHeldTouchRepeat();
     this.playTouchStickPull = null;
@@ -5101,7 +5169,12 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
-  private handleLegacyPlayTouchControlMove(x: number, y: number, pointerId: number | null = null): boolean {
+  private handleLegacyPlayTouchControlMove(
+    x: number,
+    y: number,
+    pointerId: number | null = null,
+    timeMs: number = this.time.now
+  ): boolean {
     if (this.mode !== 'play' || this.overlay !== 'none' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return false;
     }
@@ -5111,6 +5184,13 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    if (this.floatingAnchor.active) {
+      // MAZER-L9: the anchor trails a far finger; the stick below is centred on it.
+      const anchor = this.floatingAnchor.move({ x, y }, timeMs);
+      if (anchor !== null) {
+        this.playFloatingStickOrigin = { x: anchor.x, y: anchor.y };
+      }
+    }
     const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
     const pullVector = resolveStickPullVector(stick, x, y, {
       allowBeyondOuter: true
@@ -11824,6 +11904,17 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(this.createLegacySheetDisclosureButton(rect, model.label, run, 'right'));
         return;
       case 'toggle': {
+        if (model.settingKey === 'floatingAnchorControls') {
+          this.uiButtons.push(this.createToggleSwitchRow({
+            checked: this.floatingAnchorEnabled,
+            item,
+            label: model.label,
+            onClick: () => this.toggleLegacyFloatingAnchor(),
+            rect,
+            stateText: (this.floatingAnchorEnabled ? model.onLabel : model.offLabel) ?? ''
+          }));
+          return;
+        }
         const fieldId = model.settingKey as LegacyOverlayToggleFieldId;
         const checked = resolveLegacyOverlayToggleSwitchIsOn(fieldId, this.settings);
         this.uiButtons.push(this.createToggleSwitchRow({
@@ -12668,6 +12759,10 @@ export class MenuScene extends Phaser.Scene {
       'primary'
     ));
 
+    if (plan.modeTabs !== null) {
+      this.paintLegacyLeaderboardModeTabs(plan.modeTabs);
+    }
+
     const list = plan.list;
     const scrollMetrics = this.applyLegacySheetScroll(
       list?.railViewport ?? plan.card,
@@ -12690,6 +12785,19 @@ export class MenuScene extends Phaser.Scene {
     }
     if (plan.stateBlock !== null) {
       this.paintLegacyLeaderboardState(plan.stateBlock);
+    }
+  }
+
+  // Per-mode tab strip (lane L11): display-only chips, one per registered mode (Endless today).
+  private paintLegacyLeaderboardModeTabs(tabs: NonNullable<LegacyLeaderboardOverlayPlan['modeTabs']>): void {
+    const material = cyberArcadeMaterial;
+    for (const tab of tabs) {
+      const color = tab.selected ? material.rail.mint : material.rail.muted;
+      this.overlayGraphics.fillStyle(color, tab.selected ? 0.14 : 0.06);
+      this.overlayGraphics.fillRoundedRect(tab.left, tab.top, tab.width, tab.height, tab.height / 2);
+      this.overlayGraphics.lineStyle(1, color, tab.selected ? 0.7 : 0.3);
+      this.overlayGraphics.strokeRoundedRect(tab.left + 0.5, tab.top + 0.5, tab.width - 1, tab.height - 1, (tab.height - 1) / 2);
+      this.addLegacyLeaderboardText(tab.left + (tab.width / 2), tab.top + (tab.height / 2), tab.label, color, 13, 0.5, tab.width - 8, { bold: tab.selected });
     }
   }
 

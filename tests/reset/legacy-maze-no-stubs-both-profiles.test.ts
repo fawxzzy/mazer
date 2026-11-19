@@ -11,7 +11,7 @@ import {
 
 // MAZER-GEN-006: the one-tile nub (a floor cell whose only open neighbour is a junction, the start and goal
 // included) is gone from every generated maze, in the REAL game profile (budget ladder, play) and in the
-// MAIN MENU demo profile (VIS-052, which never reaches the felt tuner and used to carry 9-20 nubs a maze).
+// MAIN MENU demo profile (VIS-052 gave it a band profile that skipped the felt tuner and carried 9-20 nubs a maze; since MAZER-MENU-BLEED it reads the same ladder profile as play, and the check stays as the menu-mode guard).
 // The mazes are built exactly as MenuScene builds them: the viewport's scale and feeder fraction, the
 // profile of the mode, the board's aspect ratio, the track's target complexity.
 const LEVELS = [1, 10, 20, 40, 60, 100, 140, 200, 300] as const;

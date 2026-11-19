@@ -47,6 +47,10 @@ import {
   REDUCED_MOTION_SETTING_ON_LABEL
 } from '../render/reducedMotion';
 import { designTokens } from '../theme/tokens';
+import {
+  LEGACY_FLOATING_ANCHOR_DESCRIPTION,
+  LEGACY_FLOATING_ANCHOR_LABEL
+} from './legacyFloatingAnchorPreference';
 import { LEGACY_ROTATE_PROMPT_LABEL } from './legacyOrientationFlip';
 import { LEGACY_QUIT_CONFIRM_ARMED_LABEL } from './legacyQuitConfirm';
 import {
@@ -62,7 +66,9 @@ export type LegacySettingsContext = 'menu' | 'pause';
 export type LegacySettingsToggleKey =
   | 'toggleReducedMotion'
   | 'hapticsEnabled'
-  | 'soundEnabled';
+  | 'soundEnabled'
+  // MAZER-L9: device-local (legacyFloatingAnchorPreference), not a LegacySettings key.
+  | 'floatingAnchorControls';
 
 export type LegacySettingsRowId =
   | 'rotate-notice'
@@ -73,6 +79,7 @@ export type LegacySettingsRowId =
   | 'reduce-motion'
   | 'haptics'
   | 'sound'
+  | 'floating-anchor'
   | 'account-heading'
   | 'reset-progress'
   | 'sign-out'
@@ -286,6 +293,12 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     offLabel: 'Off',
     onLabel: 'On',
     settingKey: 'soundEnabled'
+  }),
+  // MAZER-L9: experimental touch feel, default off, this device only (legacyFloatingAnchor.ts).
+  settingRow('floating-anchor', 'toggle', LEGACY_FLOATING_ANCHOR_LABEL, LEGACY_FLOATING_ANCHOR_DESCRIPTION, {
+    offLabel: 'Off',
+    onLabel: 'On',
+    settingKey: 'floatingAnchorControls'
   })
 ]);
 

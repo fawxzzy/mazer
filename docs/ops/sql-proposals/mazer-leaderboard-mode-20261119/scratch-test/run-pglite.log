@@ -1,0 +1,34 @@
+PGlite 0.5.13 (PostgreSQL 17 wasm), in-memory
+apply    sha256 (LF): b597fc5b57662d054a39bbcfc7b792fa83d193dceb70d2312526c3f9be529644
+rollback sha256 (LF): 38530b2fedc8081e1269003bc4bc0efcfd490a06d94d76cf10a3e52495162443
+hide-QA  sha256 (LF): 0fe2aca3560f731144296ed7bb344e0733655c5d36f88028e2c139cd5c17d2fd
+post-hide-QA md5 page/self (pinned in apply file): 15a7b4655d7cb4cfe8778eb3379220bc 1289597dc20bcebf6594ce19c21acd5b
+PASS  baseline (post hide-QA): 6 visible accounts  [MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110,someplayer]
+PASS  baseline: live-pin md5 matches the repo post-hide-QA bodies
+PASS  page identical before and after apply (same rows, ranks, order)
+PASS  self_rank identical before and after apply for all 10 accounts
+PASS  backfill: every existing row is endless  [[{"mode":"endless","c":10}]]
+PASS  column is text not null default endless  [{"is_nullable":"NO","column_default":"'endless'::text","data_type":"text"}]
+PASS  function ACL, owner, security definer, config, comments, return types unchanged by apply
+PASS  function bodies changed (md5 differs) for the two leaderboard functions only
+PASS  table ACL unchanged (no new grant)
+PASS  index mode_level_idx exists  [["mazer_progression_states_mode_level_idx","mazer_progression_states_pkey","mazer_progression_states_player_level_idx"]]
+PASS  planner can use the new index for the endless ordering (seqscan disabled)
+PASS  a row created by a completion function without naming mode is endless
+PASS  the new endless row appears at rank 1 (level 60)
+PASS  authenticated cannot update the mode column (no write grant)
+PASS  shape check rejects a malformed mode
+PASS  null mode rejected
+PASS  a non-endless row is excluded from the page  [newplayer,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110,someplayer]
+PASS  and has no endless self rank (zero rows)  [[]]
+PASS  re-apply is a no-op (catalog unchanged)
+PASS  catalog after rollback equals catalog before apply (functions, columns, indexes, constraints, ACL)
+PASS  after rollback the page shows the same accounts as post-hide-QA plus the new player  [newplayer,MazerMaster,fawxzzy,cudding_muisc,cuddlingmuisc,Mazer-269110,someplayer]
+PASS  apply after rollback succeeds
+PASS  drifted page body aborts MAZER_LB_MODE_PREIMAGE_DRIFT_PAGE
+PASS  abort leaves the database unchanged
+PASS  pre-hide-QA function bodies abort (hide-QA must be applied first)
+PASS  missing leaderboard_hidden column aborts MAZER_LB_MODE_PREIMAGE_HIDE_QA_NOT_APPLIED
+PASS  missing self_rank function aborts the apply
+
+27 passed, 0 failed

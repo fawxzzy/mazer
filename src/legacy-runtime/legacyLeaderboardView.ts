@@ -21,6 +21,10 @@ import type {
   LegacyLeaderboardSelfRank
 } from './legacyLeaderboard';
 import {
+  buildLegacyLeaderboardModeTabs,
+  type LegacyLeaderboardModeTabsModel
+} from './legacyLeaderboardModeTabs';
+import {
   formatLegacyProgressionOrdinal,
   normalizeLegacyProgressionOrdinal
 } from './legacyProgression';
@@ -301,6 +305,8 @@ export interface LegacyLeaderboardViewModel {
   skeletonRowCount: number;
   /** The designed state block (replaces the list), or null while rows are shown. */
   state: LegacyLeaderboardStateModel | null;
+  /** Per-mode tab strip (lane L11): one Endless tab today; null for the signed-out and username-gate bodies. */
+  modeTabs: LegacyLeaderboardModeTabsModel | null;
 }
 
 const RETRY_USERNAME: LegacyLeaderboardAction = Object.freeze({ id: 'retry-username', label: LEGACY_LEADERBOARD_COPY.retry });
@@ -315,6 +321,7 @@ const base = (
   columns: null,
   exit: { label: LEGACY_LEADERBOARD_COPY.exit },
   header: { title: LEGACY_LEADERBOARD_TITLE },
+  modeTabs: null,
   overlayId: LEGACY_LEADERBOARD_OVERLAY_ID,
   phase,
   rows: [],
@@ -368,33 +375,38 @@ export const buildLegacyLeaderboardViewModel = (
   }
 
   const usernameMaxChars = options.usernameMaxChars ?? LEGACY_LEADERBOARD_USERNAME_MAX_CHARS;
+  const modeTabs = buildLegacyLeaderboardModeTabs();
+  const boardBase = (
+    phase: LegacyLeaderboardPhase,
+    patch: Partial<LegacyLeaderboardViewModel>
+  ): LegacyLeaderboardViewModel => base(phase, { modeTabs, ...patch });
   const loaded = state.entries.slice(0, LEGACY_LEADERBOARD_TOP_N);
   const loadedKeys = new Set(loaded.map((entry) => normalizeLegacyProgressionOrdinal(entry.rank)));
   const selfRow = buildSelfRow(state.selfRank, state.selfUsername, loadedKeys, usernameMaxChars);
 
   if (state.status === 'idle' || state.status === 'loading') {
-    return base('loading', { skeletonRowCount: LEGACY_LEADERBOARD_SKELETON_ROWS });
+    return boardBase('loading', { skeletonRowCount: LEGACY_LEADERBOARD_SKELETON_ROWS });
   }
 
   if (state.status === 'error' || state.status === 'unavailable') {
     if (!state.online) {
-      return base('offline', { state: STATES.offline });
+      return boardBase('offline', { state: STATES.offline });
     }
     const message = state.errorMessage?.trim() ?? '';
     if (message === SOURCE_NETWORK_ERROR) {
-      return base('error', { state: STATES.unreachable });
+      return boardBase('error', { state: STATES.unreachable });
     }
     if (message === SOURCE_NOT_SET_UP_ERROR) {
-      return base('error', { state: STATES.notSetUp });
+      return boardBase('error', { state: STATES.notSetUp });
     }
-    return base('error', { state: STATES.error });
+    return boardBase('error', { state: STATES.error });
   }
 
   if (loaded.length === 0) {
-    return base('empty', { state: state.selfUsername.trim().length > 0 ? STATES.emptyNamed : STATES.empty });
+    return boardBase('empty', { state: state.selfUsername.trim().length > 0 ? STATES.emptyNamed : STATES.empty });
   }
 
-  return base('ready', {
+  return boardBase('ready', {
     columns: { level: COPY.columnLevel, player: COPY.columnPlayer, rank: COPY.columnRank },
     rows: loaded.map((entry) => buildRow(entry, usernameMaxChars)),
     selfRow

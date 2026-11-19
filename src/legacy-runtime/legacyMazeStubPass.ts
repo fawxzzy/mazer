@@ -1,9 +1,9 @@
 // One-tile stub rule for the mazes that do NOT go through the felt tuner (MAZER-GEN-006).
 //
 // The budget ladder (play, levels 2+) clears its stubs inside the felt tuner (legacyMazeFeltTuning.ts,
-// lever 5), where every edit is verified against the landed felt number. The MAIN MENU demo reads the band
-// profile with no geometryBudgetLevel (MAZER-VIS-052), so it never reaches the tuner and used to show 9-20
-// one-tile nubs per maze. This is the same rule as a plain post-pass: there is no felt target to protect,
+// lever 5), where every edit is verified against the landed felt number. The MAIN MENU demo used to read a band
+// profile with no geometryBudgetLevel (MAZER-VIS-052), so it never reached the tuner and showed 9-20
+// one-tile nubs per maze; it now reads the ladder profile (MAZER-MENU-BLEED), and the default profile still lands here. This is the same rule as a plain post-pass: there is no felt target to protect,
 // so an edit only has to keep the maze connected (a stub is a leaf, so it always does).
 //
 // Deterministic (seeded by the maze seed, row-major candidate order), a no-op returning the SAME object
