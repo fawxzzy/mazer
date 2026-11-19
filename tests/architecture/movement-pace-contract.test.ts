@@ -11,11 +11,11 @@ describe('movement pace architecture contract', () => {
     expect(contract).toContain('`legacy-movement-pace-v2`');
     expect(contract).toContain('The persisted Move Speed value is the player\'s only speed input.');
     expect(contract).toContain('Level and pace never change the speed.');
-    expect(contract).toContain('0.92');
+    expect(contract).toContain('0.85');
     expect(contract).toContain('No input path may reimplement the pace formula.');
     expect(contract).toContain('does not write progression, telemetry, settings, account data, or remote state');
     expect(source).toContain("export const LEGACY_MOVEMENT_PACE_PROFILE_VERSION = 'legacy-movement-pace-v2';");
-    expect(source).toContain('export const LEGACY_MOVEMENT_STEP_RATE_FACTOR = 0.92;');
+    expect(source).toContain('export const LEGACY_MOVEMENT_STEP_RATE_FACTOR = 0.85;');
     expect(source).not.toContain('levelAdjustment');
     expect(source).not.toContain('paceAdjustment');
     expect(menuScene).toContain('private resolveLegacyPlayMovementSpeedProfile()');

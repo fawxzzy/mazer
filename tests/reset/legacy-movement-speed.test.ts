@@ -32,30 +32,30 @@ describe('legacy movement speed profile', () => {
     const defaultSpeed = resolveLegacyMovementSpeedProfile(0.3);
     const fast = resolveLegacyMovementSpeedProfile(1);
 
-    // Old formula values (132/112/78 repeat, 316/258/160 initial) divided by the 0.92 step-rate factor.
+    // Old formula values (132/112/78 repeat, 316/258/160 initial) divided by the 0.85 step-rate factor.
     expect(slow).toEqual({
       baseSpeed: 0,
       effectiveSpeed: 0,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 343,
-      repeatIntervalMs: 143,
-      turnDelayMs: 389
+      initialDelayMs: 372,
+      repeatIntervalMs: 155,
+      turnDelayMs: 418
     });
     expect(defaultSpeed).toEqual({
       baseSpeed: 0.3,
       effectiveSpeed: 0.3,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 280,
-      repeatIntervalMs: 122,
-      turnDelayMs: 322
+      initialDelayMs: 304,
+      repeatIntervalMs: 132,
+      turnDelayMs: 346
     });
     expect(fast).toEqual({
       baseSpeed: 1,
       effectiveSpeed: 1,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
-      initialDelayMs: 174,
-      repeatIntervalMs: 85,
-      turnDelayMs: 208
+      initialDelayMs: 188,
+      repeatIntervalMs: 92,
+      turnDelayMs: 222
     });
     expect(slow.repeatIntervalMs).toBeGreaterThan(defaultSpeed.repeatIntervalMs);
     expect(defaultSpeed.repeatIntervalMs).toBeGreaterThan(fast.repeatIntervalMs);
@@ -63,15 +63,31 @@ describe('legacy movement speed profile', () => {
     expect(defaultSpeed.turnDelayMs).toBeGreaterThan(defaultSpeed.initialDelayMs);
   });
 
-  test('is 8 percent slower than the previous default timing (owner request 2026-11-12)', () => {
-    expect(LEGACY_MOVEMENT_STEP_RATE_FACTOR).toBe(0.92);
+  test('step rate is 0.85 of the unscaled timing: one constant, applied once (owner requests 2026-11-12 and 2026-11-19)', () => {
+    expect(LEGACY_MOVEMENT_STEP_RATE_FACTOR).toBe(0.85);
     const profile = resolveLegacyMovementSpeedProfile(LEGACY_MOVEMENT_SPEED_DEFAULT);
     const oldRepeat = Math.round(132 - (Math.pow(LEGACY_MOVEMENT_SPEED_DEFAULT, 0.82) * 54));
     const oldInitial = Math.round(316 - (Math.pow(LEGACY_MOVEMENT_SPEED_DEFAULT, 0.82) * 156));
     expect(oldRepeat).toBe(128);
-    expect(profile.repeatIntervalMs).toBe(Math.round(oldRepeat / 0.92));
-    expect(profile.initialDelayMs).toBe(Math.round(oldInitial / 0.92));
-    expect(scaleLegacyMovementDelayMs(104)).toBe(113);
+    expect(profile.repeatIntervalMs).toBe(Math.round(oldRepeat / 0.85));
+    expect(profile.initialDelayMs).toBe(Math.round(oldInitial / 0.85));
+    // Resolved values at the default speed and the two touch-stick caps, in whole ms.
+    expect(profile.repeatIntervalMs).toBe(151);
+    expect(profile.initialDelayMs).toBe(359);
+    expect(scaleLegacyMovementDelayMs(104)).toBe(122);
+    expect(scaleLegacyMovementDelayMs(144)).toBe(169);
+  });
+
+  test('real step periods vs the 2026-11-19 baseline: the stick is 5 percent slower than the 116.7 ms the frame grid really gave it', () => {
+    const previousStickRealMs = 7 * (1000 / 60); // 113 ms nominal landed on 7 frames at 60 Hz and on 14 frames at 120 Hz
+    const nextStickMs = scaleLegacyMovementDelayMs(104);
+    expect(nextStickMs / previousStickRealMs).toBeGreaterThan(1.04);
+    expect(nextStickMs / previousStickRealMs).toBeLessThan(1.06);
+    // The d-pad / hold repeat: equal to its old 60 Hz real period (9 frames = 150 ms), slower than its 120 Hz one (141.7 ms).
+    const dpadMs = resolveLegacyMovementSpeedProfile(LEGACY_MOVEMENT_SPEED_DEFAULT).repeatIntervalMs;
+    expect(dpadMs / 150).toBeGreaterThan(0.99);
+    expect(dpadMs / 150).toBeLessThan(1.02);
+    expect(dpadMs / (17 * (1000 / 120))).toBeGreaterThan(1.05);
   });
 
   test('speed is constant: it depends on the setting only, never on level or pace', () => {
@@ -97,6 +113,6 @@ describe('legacy movement speed profile', () => {
       expect(next.turnDelayMs).toBeGreaterThan(next.initialDelayMs);
       previous = next;
     }
-    expect(previous.repeatIntervalMs).toBe(85);
+    expect(previous.repeatIntervalMs).toBe(92);
   });
 });

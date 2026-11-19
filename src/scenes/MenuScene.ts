@@ -371,6 +371,7 @@ import {
 import { LegacyPresenceController } from '../legacy-runtime/legacyPresenceController';
 import { formatOnline } from '../legacy-runtime/legacyPresenceContract';
 import { PresenceCounterView } from '../render/presenceCounterView';
+import { resolveBoardWallFillRect } from '../render/boardWallFill';
 import { designTokens } from '../theme/tokens';
 import { resolveLegacyPresenceCounterPlacement } from '../legacy-runtime/legacyPresenceCounterLayout';
 import {
@@ -690,6 +691,7 @@ import {
   resolveLegacyMovementSpeedProfile,
   scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
+import { resolveDriftCorrectedRepeatWaitMs } from '../legacy-runtime/legacyRepeatCadence';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -1924,6 +1926,8 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playHeldTouchRepeatDueAtMs: number | null = null;
+  // When the repeat that is running now was due (see scheduleLegacyPlayHeldTouchRepeat).
+  private playHeldTouchRepeatFiredDueAtMs: number | null = null;
   private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
@@ -5350,12 +5354,17 @@ export class MenuScene extends Phaser.Scene {
     this.playHeldTouchRepeatDueAtMs = null;
   }
 
-  private scheduleLegacyPlayHeldTouchRepeat(delayMs: number): void {
+  // `anchorDueAtMs`: when the step that just fired was DUE. A chained repeat passes it so the average step period is the
+  // requested delay at any refresh rate (src/legacy-runtime/legacyRepeatCadence.ts); a fresh press passes nothing.
+  private scheduleLegacyPlayHeldTouchRepeat(delayMs: number, anchorDueAtMs: number | null = null): void {
     this.clearLegacyPlayHeldTouchRepeat();
-    const normalizedDelayMs = Math.max(0, Math.round(delayMs));
+    const normalizedDelayMs = anchorDueAtMs === null
+      ? Math.max(0, Math.round(delayMs))
+      : resolveDriftCorrectedRepeatWaitMs(anchorDueAtMs, this.time.now, delayMs);
     this.playHeldTouchRepeatDueAtMs = this.time.now + normalizedDelayMs;
     this.playHeldTouchRepeatTimer = this.time.delayedCall(normalizedDelayMs, () => {
       this.playHeldTouchRepeatTimer = null;
+      this.playHeldTouchRepeatFiredDueAtMs = this.playHeldTouchRepeatDueAtMs;
       this.playHeldTouchRepeatDueAtMs = null;
       this.repeatLegacyPlayHeldTouchMove();
     });
@@ -5404,10 +5413,12 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    const firedDueAtMs = this.playHeldTouchRepeatFiredDueAtMs;
+    this.playHeldTouchRepeatFiredDueAtMs = null;
     const moved = this.performLegacyPlayHeldTouchMove();
     if (!moved) {
       if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {
-        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'), firedDueAtMs);
         this.publishInteractionDiagnostics();
         return;
       }
@@ -5420,7 +5431,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+    this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'), firedDueAtMs);
     this.publishInteractionDiagnostics();
   }
 
@@ -7974,11 +7985,19 @@ export class MenuScene extends Phaser.Scene {
     // the starfield -- skip it entirely in menu mode. Play mode's gameplay
     // wall rendering is untouched.
     if (!isMenuMode) {
-      for (let y = 0; y < this.maze.height; y += 1) {
-        for (let x = 0; x < this.maze.width; x += 1) {
-          const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
-          this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
-          this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+      // The cells abut on shared integer edges, so one rect over their union paints the identical pixels (see
+      // src/render/boardWallFill.ts); ~2750 per-cell fillRect calls were replayed on every Phaser render.
+      const wallFillRect = resolveBoardWallFillRect(mazeLeft, mazeTop, tileSize, this.maze.width, this.maze.height);
+      if (wallFillRect !== null) {
+        this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
+        this.boardStaticGraphics.fillRect(wallFillRect.left, wallFillRect.top, wallFillRect.width, wallFillRect.height);
+      } else {
+        for (let y = 0; y < this.maze.height; y += 1) {
+          for (let x = 0; x < this.maze.width; x += 1) {
+            const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
+            this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
+            this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+          }
         }
       }
     }
