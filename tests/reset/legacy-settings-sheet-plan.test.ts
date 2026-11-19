@@ -53,7 +53,7 @@ describe('settings sheet model', () => {
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
     expect(pauseGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound']);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'floating-anchor']);
   });
 
   test('titles, overlay ids and collapse behaviour per context', () => {
@@ -135,7 +135,8 @@ describe('settings sheet model', () => {
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
       ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off'],
-      ['Sound effects', 'On', 'Off']
+      ['Sound effects', 'On', 'Off'],
+      ['Floating anchor', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
       expect(toggle.label).not.toContain(':');
@@ -304,6 +305,7 @@ describe('settings sheet plan specifics', () => {
       'reduce-motion',
       'haptics',
       'sound',
+      'floating-anchor',
       'quit-to-menu'
     ]);
   });
@@ -317,6 +319,7 @@ describe('settings sheet plan specifics', () => {
       'reduce-motion',
       'haptics',
       'sound',
+      'floating-anchor',
       'account-heading',
       'reset-progress',
       'sign-out'
@@ -411,10 +414,11 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
         }
       }
     }
-    // Removing three toggle rows more than pays for the description lines: the signed-in menu sheet fits
-    // 390x844 and 412x915 without a rail; the short 360x740 and 320x568 phones scroll it.
-    expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
-    expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(false);
+    // MAZER-L9: the experimental Floating anchor row (device-local, default off) adds one toggle plus its
+    // description (835 px of content), so the signed-in menu sheet now scrolls a short rail on 390x844 (body 734)
+    // and 412x915 (body 805) as well as on the short 360x740 and 320x568 phones. Before the row it fit the first two.
+    expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(true);
+    expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(true);
     expect(plan('menu', { height: 740, width: 360 }).scrollable).toBe(true);
   });
 
@@ -499,7 +503,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
       expect(rows.map((r) => r.label)).not.toContain(retired);
     }
     expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
-      .toEqual(['hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
+      .toEqual(['floatingAnchorControls', 'hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
   });
 
   test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {
