@@ -528,3 +528,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Design decisions (delegated): rest 50% -> full via smootherstep (zero slope at both ends, so no kink at fill start/full/drain end); beam contact follows the star's current size; the existing zero-speed-start orbit timeline is unchanged.
 - Follow-ups (not in this PR): the orbit's speed steps about 2x at screen corners (path parameter is per side, not arc length); the player locator ring/glow (boardMaterial.player, playerLocator.ts) is still green; the orbit still starts after the fills (720 ms) instead of overlapping them.
 - Status: headless (tsc, unit tests incl. 1 ms continuity sweeps at 390x844, 360x780, 1280x720 across fill start, full, drain start, drain end, ring teardown/rebuild, level change; Playwright 390x844 DPR3); not checked on a real phone.
+
+## 2026-11-19 MAZER-UI-090: Guide copy synced to shipped features
+- WHAT changed: three Guide rows in src/legacy-runtime/legacyGuideContent.ts. Goal now says "twin stars" (the icon already drew them through drawBoardMarkers), Wrap says edge stars fill with your colour (the shifting rainbow, not trail-coloured), Levels opens with "Endless mode:" (the game modes shell, PR #655, has the one mode Endless). Start, You, Trail, Wrap gate and Menu rows already matched Seed spiral, Spark, Star dust, Pulse ring and the dropdown and are unchanged. tests/reset/legacy-guide-content-drift.test.ts pins the new copy to the registry defaults (twin-stars end skin, Endless label).
+- WHY: standing rule that the Guide changes in the same PR as the UI. No hazard, enemy or obstacle copy: those are gated and not built. Layout and icons unchanged (icons are drawn by the same board functions). The menu-demo-follows-play-rules change has no row: no free line in the 90-char row budget and it is not a player action.
+- Status: headless 390x844 look at the open sheet, nothing overflows; not checked at DPR 3 or on a real phone.
+
