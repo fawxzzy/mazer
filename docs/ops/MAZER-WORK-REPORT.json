@@ -3,25 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-19T16:37:40.000Z",
+    "registryUpdatedAt": "2026-11-19T19:08:01.000Z",
     "boardSync": {
-      "at": "2026-11-19T16:37:40.000Z",
-      "appliedEventCount": 477,
-      "lastEventId": "4834e0cad3b0"
+      "at": "2026-11-19T19:08:01.000Z",
+      "appliedEventCount": 491,
+      "lastEventId": "4b859d1f3e49"
     }
   },
   "counters": {
-    "total": 301,
-    "open": 84,
+    "total": 308,
+    "open": 91,
     "completed": 192,
     "deferred": 25,
     "buckets": {
       "needs-you": 33,
-      "in-review": 32,
+      "in-review": 36,
       "blocked": 8,
       "ready": 0,
       "in-progress": 1,
-      "unclassified": 10,
+      "unclassified": 13,
       "deferred": 25,
       "completed": 192
     },
@@ -2965,7 +2965,7 @@
       "title": "Floating touch anchor for the controls, off by default",
       "status": "review",
       "priority": "medium",
-      "prs": "#656",
+      "prs": "#656, #665",
       "note": ""
     },
     {
@@ -2993,6 +2993,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-GEN-024",
+      "title": "Weigh bleed gates in the felt tuner",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#663",
+      "note": ""
+    },
+    {
       "id": "MAZER-MODE-001",
       "title": "Game modes shell with Endless and a leaderboard tab per mode",
       "status": "review",
@@ -3014,6 +3022,22 @@
       "status": "review",
       "priority": "medium",
       "prs": "#639",
+      "note": ""
+    },
+    {
+      "id": "MAZER-PERF-014",
+      "title": "Cut the star field draw cost, still about 4.5 ms per frame",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#667",
+      "note": ""
+    },
+    {
+      "id": "MAZER-PERF-015",
+      "title": "Find why steps slow as the trail grows late in a level",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#669",
       "note": ""
     },
     {
@@ -3070,6 +3094,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#638, #643, #660",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-063",
+      "title": "Make idle gate tiles easy to see: darker floor plus corner brackets, keeping the ring",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#668",
       "note": ""
     },
     {
@@ -3159,7 +3191,7 @@
       {
         "id": "MAZER-CTRL-003",
         "title": "Revisit and rework the controls",
-        "status": "in_progress",
+        "status": "review",
         "priority": "medium",
         "kind": "deferred-by-owner",
         "ask": "Say when Phase 2 (obstacles and enemies) starts.",
@@ -3444,8 +3476,8 @@
   ],
   "unclassified": [
     {
-      "id": "MAZER-GEN-024",
-      "title": "Weigh bleed gates in the felt tuner",
+      "id": "MAZER-CTRL-005",
+      "title": "Make stick and keyboard step at the same speed at every Move Speed",
       "status": "planning",
       "priority": "medium",
       "lane": null
@@ -3507,8 +3539,29 @@
       "lane": null
     },
     {
+      "id": "MAZER-UI-093",
+      "title": "Check whether the Arrows setting does anything",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
       "id": "MAZER-VIS-057",
       "title": "Bottom corner stars in landscape and iPads",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-VIS-061",
+      "title": "Smooth the edge star orbit speed at screen corners",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-VIS-062",
+      "title": "Make the player locator ring and glow follow the player colour",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4692,7 +4745,7 @@
       "sub": null
     },
     "MAZER-GEN-024": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-QA-012": {
@@ -4716,6 +4769,34 @@
       "sub": null
     },
     "MAZER-PERF-013": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PERF-014": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PERF-015": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-CTRL-005": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-061": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-062": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-UI-093": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-VIS-063": {
       "bucket": "in-review",
       "sub": null
     }
