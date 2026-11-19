@@ -60,6 +60,8 @@ describe('shouldFrontDoorTapAnywhereStartRun gating', () => {
     ['play mode', { mode: 'play' }],
     ['object under pointer', { objectsUnderPointer: 1 }],
     ['no start button', { hasStartButton: false }],
+    // L6: an open (or still closing) menu dropdown swallows the tap, even on empty space far from any button.
+    ['menu dropdown open', { menuOpen: true }],
     ['inside another button margin', { point: { x: 320, y: 70 } }]
   ])('does not start: %s', (_name, override) => {
     expect(shouldFrontDoorTapAnywhereStartRun({ ...ok, ...override })).toBe(false);

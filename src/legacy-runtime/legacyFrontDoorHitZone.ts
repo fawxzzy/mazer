@@ -36,7 +36,7 @@ export const isPointInLegacyFrontDoorHitZone = (zone: LegacyHitRect, x: number, 
 
 /**
  * Tap-anywhere start: on the front door a tap almost anywhere starts a run, except within
- * this margin of any other UI button (settings, leaderboard, ...).
+ * this margin of any other UI button (the header menu button, ...).
  */
 export const FRONT_DOOR_TAP_ANYWHERE_EXCLUSION_MARGIN_PX = 28;
 
@@ -60,6 +60,8 @@ export const isFrontDoorTapAnywhereStart = (
 export interface FrontDoorTapAnywhereContext {
   hasStartButton: boolean;
   levelPreviewActive: boolean;
+  /** L6: the header menu dropdown is open or still closing; no tap may start a run through it. */
+  menuOpen?: boolean;
   mode: string;
   objectsUnderPointer: number;
   otherButtonBounds: ReadonlyArray<{ left: number; top: number; width: number; height: number }>;
@@ -75,6 +77,7 @@ export const shouldFrontDoorTapAnywhereStartRun = (ctx: FrontDoorTapAnywhereCont
   && ctx.overlay === 'none'
   && ctx.objectsUnderPointer <= 0
   && !ctx.levelPreviewActive
+  && ctx.menuOpen !== true
   && ctx.playAccess
   && ctx.hasStartButton
   && isFrontDoorTapAnywhereStart(ctx.point, ctx.otherButtonBounds, ctx.viewport)
