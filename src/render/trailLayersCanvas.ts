@@ -98,7 +98,7 @@ const strokeChunk = (
 const drawBloomDownscaled = (
   ctx: CanvasRenderingContext2D,
   chunks: readonly (readonly TrailCanvasSegment[])[],
-  options: TrailLayersOptions
+  options: TrailBloomOptions
 ): boolean => {
   const factor = options.glowBlurPx > 0 ? resolveBloomDownscale(options.glowBlurPx) : 1;
   const target = ctx.canvas as { width?: number; height?: number } | undefined;
@@ -134,20 +134,17 @@ const drawBloomDownscaled = (
   return true;
 };
 
-export const drawTrailLayersToCanvasContext = (
-  ctx: CanvasRenderingContext2D,
-  segments: readonly TrailLayerSegment[],
-  options: TrailLayersOptions
-): void => {
-  if (segments.length === 0) {
-    return;
-  }
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+export type TrailBloomOptions = Pick<TrailLayersOptions, 'originX' | 'originY' | 'glowWidth' | 'glowAlphaRatio' | 'glowBlurPx'>;
 
-  // 1. Bloom: blurred glow in each segment's own base colour.
-  const chunks = chunkTrailSegments(segments);
+/**
+ * The bloom layer alone (downscaled blur when it can, in-place shadowBlur otherwise), in each chunk's own glow colour.
+ * Shared by the neon-tube layering below and the star-dust trail (starDustTrailCanvas.ts). Caller sets lineJoin/lineCap.
+ */
+export const drawTrailBloomChunks = (
+  ctx: CanvasRenderingContext2D,
+  chunks: readonly (readonly TrailCanvasSegment[])[],
+  options: TrailBloomOptions
+): void => {
   if (!drawBloomDownscaled(ctx, chunks, options)) {
     if (options.glowBlurPx > 0) {
       ctx.shadowBlur = options.glowBlurPx;
@@ -163,6 +160,23 @@ export const drawTrailLayersToCanvasContext = (
     ctx.shadowBlur = 0;
     ctx.shadowColor = 'transparent';
   }
+};
+
+export const drawTrailLayersToCanvasContext = (
+  ctx: CanvasRenderingContext2D,
+  segments: readonly TrailLayerSegment[],
+  options: TrailLayersOptions
+): void => {
+  if (segments.length === 0) {
+    return;
+  }
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // 1. Bloom: blurred glow in each segment's own base colour.
+  const chunks = chunkTrailSegments(segments);
+  drawTrailBloomChunks(ctx, chunks, options);
 
   // 2. Dark underlay: one colour, so it chunks into few strokes.
   const underlaySegments = segments.map((segment) => ({

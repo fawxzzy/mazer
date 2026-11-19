@@ -76,15 +76,15 @@ describe('player locator wiring in MenuScene', () => {
     expect(body).not.toMatch(/this\.mode\b/);
     expect(body).not.toContain('showLocatorTicks');
     expect(body).not.toContain('fillRect(');
-    // the glow canvas, then the shared draw (locator first, then the block fill and the accent stroke, inside drawPlayerMarker)
+    // the glow canvas, then the shared Spark draw (L7: kite ping first, then the keyline and the facet fills, inside drawSparkPlayer)
     const glow = body.indexOf('this.drawPlayerGlowCanvas(frame');
-    const marker = body.indexOf('drawPlayerMarker(this.boardDynamicGraphics, frame, {');
+    const marker = body.indexOf('drawSparkPlayer(this.boardDynamicGraphics, frame, {');
     expect(glow).toBeGreaterThan(-1);
     expect(marker).toBeGreaterThan(glow);
-    const shared = readFileSync(resolve(process.cwd(), 'src/render/playerMarker.ts'), 'utf8').replace(/\r\n?/g, '\n');
-    const draw = shared.slice(shared.indexOf('export const drawPlayerMarker'));
-    expect(draw.indexOf('drawPlayerLocator(')).toBeGreaterThan(-1);
-    expect(draw.indexOf('g.fillRoundedRect(')).toBeGreaterThan(draw.indexOf('drawPlayerLocator('));
+    const shared = readFileSync(resolve(process.cwd(), 'src/render/sparkPlayerSkin.ts'), 'utf8').replace(/\r\n?/g, '\n');
+    const draw = shared.slice(shared.indexOf('export const drawSparkPlayer'));
+    expect(draw.indexOf('pingKitePath(')).toBeGreaterThan(-1);
+    expect(draw.indexOf('facet(g,')).toBeGreaterThan(draw.indexOf('pingKitePath('));
   });
 
   test('the ping only forces dynamic redraws through needsRedraw, and reduced motion is passed through', () => {

@@ -55,7 +55,7 @@ describe('end marker layering (MAZER-VIS-041): the goal star never disappears un
       expect(goalAt).toBeGreaterThan(scene.indexOf('private drawDynamicBoard('));
       // both are painted into boardDynamicGraphics (one Graphics: call order is z order)
       expect(markerFn).toContain('new PhaserGraphicsTileContext(this.boardDynamicGraphics)');
-      expect(scene).toContain('drawPlayerMarker(this.boardDynamicGraphics, frame, {');
+      expect(scene).toContain('drawSparkPlayer(this.boardDynamicGraphics, frame, {');
     });
 
     test('nothing gates the goal draw on a goal-reached state', () => {
