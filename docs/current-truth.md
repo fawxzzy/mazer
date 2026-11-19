@@ -66,6 +66,17 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 
 ## Current implementation truth
 
+### Menu, skins, wraps and gates — 2026-11-19
+
+This section overrides older prose below where they disagree. Deployed to production from main `451dd5ca` (build `main-Dzf78yJ-`); checked in headless Chromium only, not on a phone.
+
+- Main menu header: the online counter at the top left, the title, and one Menu button at the top right (three lines that turn into an X). It drops a glass panel with Settings, Profile and Leaderboard rows. A tap outside the panel or on the X closes it and never starts a game; a tap elsewhere still starts play. During play only the settings cog is shown. The old separate corner icons are retired. The menu no longer shows LEVEL, You or time labels.
+- Menu demo: a signed-in player's demo starts at that player's level (clamped 8 to 400), climbs in memory only and writes nothing to the account. Signed-out players and `?previewLevel=` keep the unchanged demo.
+- Default skins, from a registry that also holds the unpicked designs as non-selectable entries for a future customization shop: start tile Seed spiral (green), end tile Twin stars with a five-point star ping, player Spark (a kite that points the way it moves and takes the trail's shifting colour), trail Star dust. Edge stars stay full size through the intro.
+- Wraps (bleed paths): least-saving placement is the ladder default, so a wrap cannot skip most of the route (with every wrap open a maze keeps about 87 percent of its route on average). Measurements live in the bleed path audit document under `docs/research/`.
+- Bleed gates: from level 20 a maze can hide one wrap behind a dashed Pulse ring (chance 0.3 rising to 0.7 by level 100, at most one per maze, only on mazes with one or two wraps per axis). Walking over the ring lights it and the wrap draws in at both board edges; Reduce Motion opens it instantly. The ring sits at least max(8, 15 percent of the route) steps from its wrap and is never adjacent. Gates reset every attempt; the solver, AI and menu demo treat a gated wrap as closed until lit. The felt tuner does not weigh gates yet, so gated levels play somewhat harder than their slot.
+- Profile icon: sign-in started from the profile icon continues to the account page.
+
 ### Menu demo Auth resolution boundary — 2026-10-13
 
 The initial menu placeholder stays inert while the real Auth check is pending
