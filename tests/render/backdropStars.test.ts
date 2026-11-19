@@ -11,6 +11,7 @@ import {
   resolveBackdropTwinkleSize
 } from '../../src/render/backdropStars';
 import { createLegacyMenuBackdropStars } from '../../src/legacy-runtime/legacyMenuBackdrop';
+import { BackdropStarDrawList } from '../../src/render/backdropStarBatch';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
 vi.mock('phaser', () => ({
@@ -85,6 +86,7 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
       layout: { width: 390, height: 844 },
       cameras: { main: mainCamera },
       backdropGraphics: graphics,
+      backdropStarList: new BackdropStarDrawList(),
       settings: { darkMode: true, toggleAnimatedBackdrop: motion },
       prefersLegacyReducedMotion: () => false,
       time: { now: 1234 },
@@ -94,7 +96,9 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
 
     (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
 
-    const allowed = new Set(['clear', 'fillStyle', 'fillCircle']);
+    // MAZER-PERF-014: the circles go to the star draw list (src/render/backdropStarBatch.ts, which pins them circle for
+    // circle against the old fillStyle/fillCircle pairs); the Graphics itself is only cleared.
+    const allowed = new Set(['clear']);
     expect(calls.filter((name) => !allowed.has(name))).toEqual([]);
     // MAZER-PERF-010: no full-screen Graphics rect (it was ~40% of a menu frame); the opaque field is the camera
     // background, set once. No tail pixels, no shard/rune/sigil strokes (those were lineStyle + paths).
@@ -103,7 +107,7 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
     // A second draw with the same field colour must not touch the camera again.
     (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
     expect(cameraBackgrounds).toHaveLength(1);
-    expect(calls.filter((name) => name === 'fillCircle').length).toBeGreaterThanOrEqual(fakeScene.stars.length);
+    expect(fakeScene.backdropStarList.count).toBeGreaterThanOrEqual(fakeScene.stars.length);
     expect(fakeScene.backdropDirty).toBe(false);
   });
 });
