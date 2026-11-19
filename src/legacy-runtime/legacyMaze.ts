@@ -7,6 +7,7 @@ import {
   measureBleedShortestSteps,
   resolveBleedAxisCap
 } from './legacyBleedPaths';
+import { isLegacyBleedGateCellHidden, type LegacyBleedGate } from './legacyBleedGateState';
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL } from './legacyGeometryBudget';
 import { fillFloorIslands } from './legacyMazeIslands';
@@ -202,6 +203,10 @@ export interface LegacyMazeSnapshot {
     rungs: number;
     saved: number;
   };
+  // MAZER-L10: bleed gates (legacyBleedGates.ts). Each hides one bleed-off path until the player passes
+  // over its gate tile; the grid keeps the path open (the runtime hides it, legacyBleedGateState.ts).
+  // Absent on a level without a gate.
+  bleedGates?: LegacyBleedGate[];
   // Zero-felt-cost side-stub cells of a level past the felt saturation (legacyGeometryBudget.ts,
   // fringe): the second, strictly ordered half of the ladder there. Absent below it.
   fringeStats?: {
@@ -3392,8 +3397,9 @@ export const isWalkableTile = (maze: Pick<LegacyMazeSnapshot, 'grid'>, point: Le
   maze.grid[point.y]?.[point.x] === true
 );
 
+// A gated bleed-off path's border cells are closed (wall) until its gate is lit (MAZER-L10).
 export const resolveLegacyNavigationTarget = (
-  maze: Pick<LegacyMazeSnapshot, 'grid'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid'> & Partial<Pick<LegacyMazeSnapshot, 'bleedGates' | 'width' | 'height'>>,
   point: LegacyPoint,
   deltaX: number,
   deltaY: number
@@ -3403,11 +3409,11 @@ export const resolveLegacyNavigationTarget = (
     y: point.y + Math.sign(deltaY)
   };
   if (isWalkableTile(maze, target)) {
-    return target;
+    return isLegacyBleedGateCellHidden(maze, target.x, target.y) ? null : target;
   }
 
   const wrapped = resolveWrappedGridPoint(maze.grid, target);
-  return wrapped && isWalkableTile(maze, wrapped) ? wrapped : null;
+  return wrapped && isWalkableTile(maze, wrapped) && !isLegacyBleedGateCellHidden(maze, wrapped.x, wrapped.y) ? wrapped : null;
 };
 
 export const isLegacyWrappedStepTransition = (from: LegacyPoint, to: LegacyPoint): boolean => (
