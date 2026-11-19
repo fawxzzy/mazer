@@ -9,6 +9,7 @@ import {
   type LegacyPoint
 } from './legacyMaze';
 import { timeLegacyMazeGeneration } from './legacyGenerationTiming';
+import { resolveLegacyBleedGatesForLevel } from './legacyBleedGates';
 import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
@@ -842,6 +843,13 @@ const assembleTunedMaze = (
   return next;
 };
 
+// MAZER-L10: a ladder level's bleed gates, placed on the finished maze (the grid is not changed, so the
+// level's golden fingerprint holds). Keyed on the level, see legacyBleedGates.ts for the cadence.
+const attachLegacyBleedGates = <T extends { maze: Omit<LegacyMazeSnapshot, 'generation'> }>(result: T, level: number): T => {
+  const bleedGates = resolveLegacyBleedGatesForLevel(level, result.maze);
+  return bleedGates.length > 0 ? { ...result, maze: { ...result.maze, bleedGates } } : result;
+};
+
 const selectLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
@@ -858,14 +866,17 @@ const selectLegacyRuntimeMazeForMode = (
 } => {
   const budgetProfile = normalizeLegacyMazeGenerationProfile(generationProfile);
   if (budgetProfile.geometryBudgetLevel !== undefined) {
-    return selectLegacyGeometryBudgetMaze(
-      mode,
-      scale,
-      seed,
-      budgetProfile,
-      budgetProfile.geometryBudgetLevel,
-      selectionOptions,
-      aspectRatio
+    return attachLegacyBleedGates(
+      selectLegacyGeometryBudgetMaze(
+        mode,
+        scale,
+        seed,
+        budgetProfile,
+        budgetProfile.geometryBudgetLevel,
+        selectionOptions,
+        aspectRatio
+      ),
+      budgetProfile.geometryBudgetLevel
     );
   }
   const targetComplexity = selectionOptions.targetComplexity;
