@@ -14,7 +14,7 @@ Fact (function and constant names from `src/scenes/MenuScene.ts`, `src/input-hum
 |---|---|---|
 | Input shape | Every touch in play starts a floating stick centred where the finger landed (`handleLegacyPlayTouchControl`); only the pause cog is exempt. Direction comes from the angle of finger minus anchor (`resolveStickPullVector`). | no angular bucket, continuous projection |
 | Dead zone | `deadzoneRadius = max(12, 12% of the outer ring)`; outer ring = `clamp(24% of the short side, 92..160)`. | 12 px at 390x844 |
-| Full pull | `STICK_MAX_PULL_REACH_RATIO = 0.6`: full pull at 33 px from the anchor at 390 wide. Pull distance only moves the drawn knob; it does not change speed. | 33 px, speed unaffected |
+| Full pull | `STICK_MAX_PULL_REACH_RATIO = 0.6`: full pull at 33 px from the anchor at 390 wide. Pull distance only moves the drawn nub (Halo ring, CTRL-006); it does not change speed. | 33 px, speed unaffected |
 | Anchor | Fixed at touch-down for the whole drag. Dragging past the ring is allowed (`allowBeyondOuter`). A reversal needs the finger to travel back through the anchor. | open PR #656 adds a follower (default off) |
 | First step | After the pull leaves the dead zone the first step is scheduled `LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32` ms later; a direction change reschedules within 32 + 16 ms. | about 32 ms (2 frames) |
 | Step speed | `legacy-movement-pace-v2` (FLOW-014): keyboard and held arrows repeat every 139 ms at the default Move Speed (332 ms hold-start). The stick is capped lower: `min(profile, 113 ms)` repeat, 157 ms initial and turn. | stick 113 ms vs keyboard 139 ms |
@@ -43,7 +43,7 @@ Keyboard on desktop (1280x720): held repeat 139 ms, hold-start 332 ms, repeats m
 3. **Anchor:** reversing must cost no more than about 0.4 inch of thumb travel. Anchor behaviour is a Settings choice with the current behaviour as the default until the owner picks otherwise.
 4. **Speed:** one default speed per input family, and the same speed for keyboard and touch at the same Move Speed setting (fixes problem 1). Any analog speed is opt-in and bounded by the FLOW-014 default as its fast end unless the owner chooses faster.
 5. **Precision:** one exact single-tile step must be available (tap or short flick), and stopping on a gate tile must be possible without release-timing luck.
-6. **Accessibility:** colour never carries meaning alone; reduced motion keeps silencing haptic pulses and anchor orbit (MOTION-004 rule: colour keeps shifting); no input may require two fingers or a held second finger; Arrows (or another large fixed target mode) must remain reachable for players who cannot drag; every fixed control is at least 44x44 CSS px (the stick has none).
+6. **Accessibility:** colour never carries meaning alone; reduced motion keeps silencing haptic pulses and the Halo ring fade and nub glow, while the lit direction still shows (CTRL-006; MOTION-004 rule: colour keeps shifting); no input may require two fingers or a held second finger; Arrows (or another large fixed target mode) must remain reachable for players who cannot drag; every fixed control is at least 44x44 CSS px (the stick has none).
 7. **Frozen, untouched:** board size and zoom, tile style B Chip, dark neon look, hazards behind `?lab=hazards`. The hazard contract line "d-pad covers the board, swipe-to-run cannot stop at a gate, tap-to-path removes the skill" stays; Option E below is a tap-step addition, not tap-to-path.
 
 ## 3. Options the owner chooses between

@@ -1245,8 +1245,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay(\'repeat\'));');
     expect(menuSceneSource).toContain('if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
-    expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');
-    expect(menuSceneSource).toContain('const travel = stick.travelRadius;');
+    // MAZER-CTRL-006: the stick draws the Halo ring (baked images moved per frame), centred on the stick anchor.
+    expect(menuSceneSource).toContain('{ x: stick.outer.centerX, y: stick.outer.centerY },');
+    expect(menuSceneSource).toContain('this.controllerHalo.update({');
+    expect(menuSceneSource).toContain('engaged: pullVector !== null,');
     // Stripped down to just the knob -- no stationary outer ring, spokes,
     // hub, deadzone ring, or glow halo, per feedback that the "huge green
     // circle" wasn't wanted, only the small knob that tracks the touch.
