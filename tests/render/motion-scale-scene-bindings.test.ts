@@ -51,7 +51,6 @@ describe('scene motion constants on the motion scale (before == after)', () => {
       LEGACY_MENU_TITLE_TRAIL_SWEEP_FILL_MS: '2200',
       LEGACY_MENU_TITLE_TRAIL_SWEEP_HOLD_MS: '340',
       LEGACY_MENU_TITLE_TRAIL_SWEEP_REVERT_MS: '1500',
-      LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS: '3200',
       LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS: '1150',
       LEGACY_GOAL_STAR_RING_SPIN_PERIOD_MS: '5200',
       LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS: '500',
@@ -61,5 +60,7 @@ describe('scene motion constants on the motion scale (before == after)', () => {
     for (const [name, value] of Object.entries(expected)) {
       expect({ name, value: readConst(name) }).toEqual({ name, value });
     }
+    // MAZER-CTRL-006: the Halo ring replaced the stick's orbiting anchor tick, so its 3200 ms loop is gone with it.
+    expect(menuSource).not.toContain('LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS');
   });
 });
