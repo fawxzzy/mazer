@@ -17,7 +17,7 @@
  * setup step -- already covered independently elsewhere by
  * hasVisualButton(surfaces.menu, 'Settings', {iconOnly:true}). Every other
  * step here (scrolling to the bottom, clicking Account from Options,
- * clicking the main-menu profile icon, asserting Options has no Account
+ * clicking the main-menu Profile row (Menu button first, L6), asserting Options has no Account
  * icon (retired 2026-11-06), clicking Account inside the
  * resulting Account overlay, and closing back out) is a real mouse
  * click/drag against bounds the app itself reports.
@@ -49,10 +49,10 @@ import { DEFAULT_BASE_URL, DEFAULT_PREVIEW_TIMEOUT_MS, REPO_ROOT, normalizeBaseU
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
 import {
   clickPoint,
-  getVisualButtonPoint,
   hasTextLabels,
   openOptionsOverlayViaQa,
   readDiagnostics,
+  revealMenuDropdownActionPoint,
   scrollOverlayToBottom,
   waitForAuthenticatedFixtureReady,
   waitForSurface
@@ -188,18 +188,15 @@ const verifyAccountNavigationFromEntryPoint = async ({
 };
 
 const verifyLayout = async ({ baseUrl, browser, viewportLabel, viewport, isMobile }) => {
-  // Entry point 1: the main menu's own profile/Account icon, reached
-  // directly with no overlay open first.
+  // Entry point 1: the main menu's Profile row (semanticAction 'Account'),
+  // reached with a real click on the one Menu button first (L6, Menu A).
   await verifyAccountNavigationFromEntryPoint({
     baseUrl,
     browser,
     isMobile,
     label: `${viewportLabel}-main-menu`,
     viewport,
-    reachEntryPoint: async (page) => {
-      const diagnostics = await readDiagnostics(page);
-      return getVisualButtonPoint(diagnostics.visual, 'Account');
-    }
+    reachEntryPoint: async (page) => revealMenuDropdownActionPoint(page, 'Account', { timeoutMs: DEFAULT_TIMEOUT_MS })
   });
 
   // Entry point 2 (retired 2026-11-06): the Options header no longer carries
@@ -218,8 +215,7 @@ const verifyLayout = async ({ baseUrl, browser, viewportLabel, viewport, isMobil
     const targetUrl = `${baseUrl}/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated&mazeSeed=3749&v=options-account-reachability-${viewportLabel}-options-${Date.now()}`;
     await page.goto(targetUrl, { timeout: DEFAULT_TIMEOUT_MS, waitUntil: 'networkidle' });
     await waitForAuthenticatedFixtureReady(page, { timeoutMs: DEFAULT_TIMEOUT_MS });
-    const menuDiagnostics = await readDiagnostics(page);
-    const settingsPoint = getVisualButtonPoint(menuDiagnostics.visual, 'Settings');
+    const settingsPoint = await revealMenuDropdownActionPoint(page, 'Settings', { timeoutMs: DEFAULT_TIMEOUT_MS });
     await clickPoint(page, settingsPoint, 'Settings');
     await waitForSurface(page, { mode: 'menu', overlay: 'options', timeoutMs: DEFAULT_TIMEOUT_MS });
     const optionsTopSurface = surfaceFromDiagnostics(await readDiagnostics(page));
