@@ -1,5 +1,7 @@
 # Edge diamonds: beams on the inner tip, a 50% / 100% size cycle, beams that stay connected (MAZER-VIS-038)
 
+Update 2026-11-19: SUPERSEDED for drawing. The ring stars are now held at full size for the whole full-motion cycle (`src/render/edgeRingScaleHold.ts`, owner choice): no outro growth and no drain shrink; beam contact uses the same held size. The curve below remains in `edgeBeamTimeline.ts` as pure code. Rest (no lifecycle) and the reduced-motion crossfade keep 50%.
+
 Status: implemented 2026-11-13 on branch `claude/vis-038-20261113`, on top of MAZER-VIS-030 (`docs/ui/MAZER-EDGE-BEAMS-DIAMOND-FILL-2026-11-12.md`) and MAZER-VIS-033 (`docs/ui/MAZER-EDGE-DIAMOND-ONE-FILL-2026-11-13.md`). Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 
 Owner request (verbatim): "lasers need to connect to the inner most corner/point of the diamonds to the maze and shoot out from there too, we could have them smoothly shrink to half their size while the maze is running, then when player hits the end tile have them smoothly grow back to normal size just before the lasers shoot out and connect and fill them then right after the lasers shoot out and the inner color is all drained shrink them. also make sure the lasers continue to shoot into and out of the diamonds until they are fully drained or filled."

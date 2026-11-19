@@ -81,9 +81,9 @@ import {
   resolveBeamHeadFromMaster,
   resolveBeamTimes,
   resolveEdgeBeamPulse,
-  resolveEdgeDiamondScale,
   type EdgeBeamDirection
 } from './edgeBeamTimeline';
+import { resolveHeldEdgeDiamondScale } from './edgeRingScaleHold';
 import {
   drawBeamPulse,
   drawContactRipple,
@@ -827,7 +827,8 @@ export const resolveEdgeRingFills = (
 });
 
 /**
- * Per-station size 0..1 (index = station id): the MAZER-VIS-038 size cycle (edgeBeamTimeline.ts `resolveEdgeDiamondScale`).
+ * Per-station size 0..1 (index = station id): held at full size for any full-motion lifecycle (edgeRingScaleHold.ts; the MAZER-VIS-038
+ * size cycle, edgeBeamTimeline.ts `resolveEdgeDiamondScale`, is no longer drawn).
  * Null lifecycle (at rest, the maze is running) and the reduced-motion crossfade lifecycle both give the fixed rest size
  * EDGE_DIAMOND_REST_SCALE: reduced motion keeps the diamonds static at 50% (the same size the maze runs at) and only
  * crossfades the interior colour.
@@ -838,7 +839,7 @@ export const resolveEdgeRingScales = (
 ): ReadonlyArray<number> => Array.from({ length: count }, (_, index) => (
   lifecycle === null || lifecycle.crossfade === true
     ? EDGE_DIAMOND_REST_SCALE
-    : resolveEdgeDiamondScale(lifecycle.direction, lifecycle.clockMs, index, count, clampUnit(lifecycle.ringFill))
+    : resolveHeldEdgeDiamondScale(lifecycle.direction, lifecycle.clockMs, index, count, clampUnit(lifecycle.ringFill))
 ));
 
 export interface SpawnSparkle {
@@ -920,7 +921,7 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const count = input.stations.length;
   const beams = input.stations.map((station, index): EdgeBeam => {
     // The diamond grows/shrinks about its OUTER tip, so the inner tip moves: follow the diamond's current size every frame.
-    const scale = Math.min(resolveEdgeDiamondScale(input.direction, clockMs, index, count), station.maxScale ?? 1);
+    const scale = Math.min(resolveHeldEdgeDiamondScale(input.direction, clockMs, index, count), station.maxScale ?? 1);
     const contact = resolveEdgeInnerTip(station, scale);
     const from = input.direction === 'inward' ? contact : input.focus;
     const to = input.direction === 'inward' ? input.focus : contact;

@@ -1,5 +1,7 @@
 # Edge diamonds: outer tip on the screen edge at every size, corners clear of rounded displays (MAZER-VIS-043)
 
+Update 2026-11-19: SUPERSEDED for drawing. The ring stars are now held at full size for the whole full-motion cycle (`src/render/edgeRingScaleHold.ts`, owner choice): no outro growth and no drain shrink; beam contact uses the same held size. The curve below remains in `edgeBeamTimeline.ts` as pure code. Rest (no lifecycle) and the reduced-motion crossfade keep 50%.
+
 Status: implemented 2026-11-14 on branch `claude/vis-043-20261114`, on top of MAZER-VIS-038 (`docs/ui/MAZER-EDGE-INNER-TIP-SIZE-CYCLE-2026-11-13.md`, PR #512, live). Source, unit, pixel and headless-Chromium evidence only; NOT checked on a real phone.
 
 Owner request (verbatim): "the diamonds on the bottom corners are clipping off screen ensure all diamonds are tip touching the edge of the screen in any position, also when they shrink move them to always be touching edge of screen". This confirms the earlier hypothesis (MAZER-VIS-033 section 3) that the bottom corner diamonds are cut by the rounded display corners, and it SUPERSEDES the VIS-038 rule "scale about the inner tip".

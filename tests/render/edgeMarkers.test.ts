@@ -1,5 +1,6 @@
 import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerTipInset } from '../../src/render/edgeCornerAnchor';
 import { describe, expect, test } from 'vitest';
+import { EDGE_RING_HELD_SCALE, resolveHeldEdgeDiamondScale } from '../../src/render/edgeRingScaleHold';
 import { resolveLegacyMenuPathTitleOrbitPose } from '../../src/legacy-runtime/legacyMenuTitle';
 import {
   EDGE_MARKER_IDLE_ALPHA_MAX,
@@ -71,7 +72,6 @@ import {
   EDGE_BEAM_PULSE_MS,
   EDGE_BEAM_RETRACT_MS,
   EDGE_DIAMOND_REST_SCALE,
-  resolveEdgeDiamondScale,
   resolveBeamHead,
   resolveBeamTimes,
   resolveDiamondDrainFromOutgoing,
@@ -576,15 +576,15 @@ describe('all-8 beams (arrival and departure)', () => {
     const outward = resolveEdgeBeams({ direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations });
     stations.forEach((station, index) => {
       const clock = 200; // laserProgress 0.5 on the master laser clock
-      const inScale = resolveEdgeDiamondScale('inward', clock, index);
-      const outScale = resolveEdgeDiamondScale('outward', clock, index);
+      const inScale = resolveHeldEdgeDiamondScale('inward', clock, index);
+      const outScale = resolveHeldEdgeDiamondScale('outward', clock, index);
       const inContact = inward.beams[index]?.contact as { x: number; y: number };
       const outContact = outward.beams[index]?.contact as { x: number; y: number };
       // The diamond end of the path is the INNERMOST point of the diamond at its CURRENT size (it grows / shrinks about its OUTER tip,
       // so the inner tip moves), in both directions, not an outline-crossing point and not the centre.
       expect(inContact).toEqual(resolveEdgeInnerTip(station, inScale));
       expect(outContact).toEqual(resolveEdgeInnerTip(station, outScale));
-      expect(outScale).toBeLessThan(1); // the departure diamond is still growing 200 ms in: the tip has NOT reached the full-size point yet
+      expect(outScale).toBe(1); // held full size: the tip is on the full-size point from the first frame (no growth)
       const outer = resolveEdgeMarkerVertices(station, 1)[2] as { x: number; y: number };
       const vertices = resolveEdgeMarkerVertices(anchorStationToOuterTip(station, outScale), outScale);
       expect(vertices[2]?.x).toBeCloseTo(outer.x, 9);
@@ -1097,8 +1097,8 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     expect(inward.beams).toHaveLength(8);
     stations.forEach((station, index) => {
       // The diamond end is the inner tip of the moving diamond at its current size (a polygon vertex of that kite).
-      const inScale = resolveEdgeDiamondScale('inward', 200, index);
-      const outScale = resolveEdgeDiamondScale('outward', 200, index);
+      const inScale = resolveHeldEdgeDiamondScale('inward', 200, index);
+      const outScale = resolveHeldEdgeDiamondScale('outward', 200, index);
       expect(inward.beams[index]?.from).toEqual(resolveEdgeInnerTip(station, inScale));
       expect(outward.beams[index]?.to).toEqual(resolveEdgeInnerTip(station, outScale));
       expect(isOnPolygonEdge(resolveEdgeMarkerVertices(anchorStationToOuterTip(station, inScale), inScale), inward.beams[index]?.from as { x: number; y: number })).toBe(true);
@@ -1293,31 +1293,24 @@ describe('diamond size (outer-tip anchored) and inner-tip attachment (MAZER-VIS-
     }
   });
 
-  test('resolveEdgeRingScales: 50% at rest and in the reduced-motion crossfade (fixed size, no size animation); grows on departure, holds 100% through the build, shrinks per diamond after the drain', () => {
+  test('resolveEdgeRingScales: 50% at rest and in the reduced-motion crossfade; held at 100% for the whole full-motion teardown + rebuild (no growth, no drain shrink)', () => {
+    const full = Array.from({ length: 8 }, () => EDGE_RING_HELD_SCALE);
+    expect(EDGE_RING_HELD_SCALE).toBe(1);
     expect(resolveEdgeRingScales(null)).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
-    // Reduced motion: whatever the clock or the crossfade level, every diamond stays at 50%.
     for (const ringFill of [0, 0.3, 1]) {
       for (const direction of ['outward', 'inward'] as const) {
         expect(resolveEdgeRingScales({ direction, clockMs: 250, ringFill, crossfade: true })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
       }
     }
-    // Full motion departure: from 50% at the goal to 100% at each diamond's own contact.
-    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: 0, ringFill: 0 })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
-    for (let index = 0; index < 8; index += 1) {
-      const times = resolveBeamTimes(index);
-      expect(resolveEdgeRingScales({ direction: 'outward', clockMs: times.contactMs, ringFill: 0 })[index]).toBe(1);
-      expect(resolveEdgeRingScales({ direction: 'outward', clockMs: times.contactMs / 2, ringFill: 0 })[index]).toBeCloseTo(0.75, 9);
+    // Departure: full from the first frame to the last.
+    for (const clockMs of [0, 100, 200, resolveOutroTotalMs(300)]) {
+      expect(resolveEdgeRingScales({ direction: 'outward', clockMs, ringFill: 0 })).toEqual(full);
     }
-    // The whole deconstruct after the beams: 100%, to the last frame; the whole build before the beams: 100%.
-    const outroEnd = resolveOutroTotalMs(300);
-    expect(resolveEdgeRingScales({ direction: 'outward', clockMs: outroEnd, ringFill: 0 })).toEqual(Array.from({ length: 8 }, () => 1));
-    for (const ms of [0, 1000, resolveIntroRevealEndMs(300) - 1]) {
+    // Rebuild: full through the build and through the spawn beams, including after the drain (the old VIS-038 shrink).
+    for (const ms of [0, 1000, resolveIntroRevealEndMs(300) - 1, resolveIntroLaserStartMs(300) + 100, resolveIntroLaserStartMs(300) + 760]) {
       const intro = resolveIntro(ms, { ...FULL, digitAlreadyVisible: true });
-      expect(resolveEdgeRingScales({ direction: 'inward', clockMs: intro.laserClockMs, ringFill: intro.ringFill })).toEqual(Array.from({ length: 8 }, () => 1));
+      expect(resolveEdgeRingScales({ direction: 'inward', clockMs: intro.laserClockMs, ringFill: intro.ringFill })).toEqual(full);
     }
-    // After the beams left: per diamond, back to 50% once that diamond is empty plus the shrink.
-    const doneIntro = resolveIntro(resolveIntroLaserStartMs(300) + 760, { ...FULL, digitAlreadyVisible: true });
-    expect(resolveEdgeRingScales({ direction: 'inward', clockMs: doneIntro.laserClockMs, ringFill: doneIntro.ringFill })).toEqual(Array.from({ length: 8 }, () => EDGE_DIAMOND_REST_SCALE));
   });
 
   test('markers drawn at 50% are anchored on the outer tip, carry the scale in their state, and the default (no scales) stays full size for standalone icons', () => {
