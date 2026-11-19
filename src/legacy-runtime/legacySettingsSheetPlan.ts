@@ -294,7 +294,7 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     onLabel: 'On',
     settingKey: 'soundEnabled'
   }),
-  // MAZER-L9: experimental touch feel, default off, this device only (legacyFloatingAnchor.ts).
+  // MAZER-L9 / CTRL-003 option B: the anchor follows a far finger, default on, this device only (legacyFloatingAnchor.ts).
   settingRow('floating-anchor', 'toggle', LEGACY_FLOATING_ANCHOR_LABEL, LEGACY_FLOATING_ANCHOR_DESCRIPTION, {
     offLabel: 'Off',
     onLabel: 'On',

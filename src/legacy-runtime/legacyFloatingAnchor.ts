@@ -3,7 +3,7 @@
  *
  * Today's floating stick plants its centre (the "anchor") where the thumb lands and never moves it, so a long drag
  * leaves the hand far from the anchor and a reversal needs the finger to travel all the way back. This controller
- * keeps the same anchor-at-touch-down, but once the finger is farther than the LEASH (about one inch on the glass)
+ * keeps the same anchor-at-touch-down, but once the finger is farther than the LEASH (about 90 CSS px on a phone)
  * the anchor is dragged along behind the finger:
  *
  *   excess = max(0, distance(anchor, finger) - leash)
@@ -14,8 +14,9 @@
  * feeding `finger - anchor` to the existing stick pull maths, so direction picking, deadzone and the stick drawing
  * are unchanged. Lift-and-replace is `up()` then `down()`.
  *
- * Shipped behind a device-local Settings toggle, default OFF (see legacyFloatingAnchorPreference.ts), until the feel
- * has been tuned on a real phone. Tune with `npx vite-node scripts/legacy/floating-anchor-harness.ts` (prints trajectories for scripted paths).
+ * MAZER-CTRL-003 option B (Zac picked it 2026-11-19, docs/ops/MAZER-CONTROLS-OPTIONS-2026-11-19.html): this is now the
+ * default stick. The device-local Settings toggle stays (see legacyFloatingAnchorPreference.ts) so a player can switch
+ * back to the fixed anchor; the leash is the options page's B default (90 px), still unfelt on a real phone. Tune with `npx vite-node scripts/legacy/floating-anchor-harness.ts` (prints trajectories for scripted paths).
  */
 
 export interface FloatingAnchorPoint {
@@ -32,8 +33,12 @@ export interface FloatingAnchorConfig {
   maxStepMs: number;
 }
 
-/** About one inch, per the lane brief. Kept as a named constant so the harness and tests can vary it. */
-export const FLOATING_ANCHOR_LEASH_INCHES = 1;
+/**
+ * Option B's 90 px leash, as inches on a phone-class screen (90 / 160 CSS px per inch, about 0.56 in): close to the
+ * contract's "a reversal costs no more than about 0.4 inch" goal while a normal one-tile drag never moves the anchor.
+ * Kept as a named constant so the harness and tests can vary it.
+ */
+export const FLOATING_ANCHOR_LEASH_INCHES = 90 / 160;
 export const FLOATING_ANCHOR_EASE_MS = 140;
 export const FLOATING_ANCHOR_MAX_STEP_MS = 100;
 

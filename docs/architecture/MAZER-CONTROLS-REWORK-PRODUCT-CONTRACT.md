@@ -1,6 +1,8 @@
 # Mazer Controls Rework Product Contract (MAZER-CTRL-003)
 
-Status: DRAFT for the owner. Docs and a standalone options page only. It changes no gameplay input code, enables nothing and signs nothing. The owner un-parked MAZER-CTRL-003 on 2026-11-19 ("i want controls rework to be started"). The card's own order applies: audit, written proposal the owner chooses between, only then a build.
+Status: OPTION B CHOSEN (owner, 2026-11-19). Built in the CTRL-003 lane: the floating anchor is now the default stick (see section 5). The audit and options below are kept as written for the record; their numbers are from the commit named in the labels line, not today's.
+
+Original status: DRAFT for the owner. Docs and a standalone options page only. It changes no gameplay input code, enables nothing and signs nothing. The owner un-parked MAZER-CTRL-003 on 2026-11-19 ("i want controls rework to be started"). The card's own order applies: audit, written proposal the owner chooses between, only then a build.
 
 Labels: **Fact** = read in source on origin/main `e2273d0d`. **Estimate** = computed from source numbers, not measured on a device. **Decision** = what this contract proposes. **UNKNOWN** = needs a real phone.
 
@@ -62,3 +64,10 @@ The options are not exclusive in the build: B, C, D, E change different things a
 - Whatever ships updates the in-app Guide copy and Settings (a card criterion; `tests/reset/legacy-guide-content-drift.test.ts` enforces drift).
 - Measure at 390x844 and 1280x720 headless first, then a real-phone pass is owed by the owner: **no phone check has happened for any control number in this document.**
 - Not covered here: gamepad, accounts, server changes, deploy.
+
+## 5. Chosen: option B (owner, 2026-11-19)
+
+- **Decision.** The floating anchor (PR #656 controller, `src/legacy-runtime/legacyFloatingAnchor.ts`) is the default stick. Settings > Floating anchor stays, so a player can switch back to the fixed anchor; it is still device-local and still not synced. Only a stored `off` gives the fixed anchor; an absent key now means on.
+- **Numbers.** Leash 90 CSS px on a phone (the options page B default; 90/160 = 0.5625 in, scaled to the canvas), catch-up 140 ms (unchanged). Dead zone, first step, turn delay and step time are the live ones (`legacy-movement-pace-v2` + PR #661), not the options page's 113 ms. **UNKNOWN:** the owner's own tuned numbers from the options page "Copy my pick" were not supplied; defaults were used.
+- **Speed bug fixed in the same lane.** Turning and going round corners stepped early: a change of the stick's direction pair re-armed the next step 32 ms out (keyboard: a turn press stepped 50 ms after the press), so a turn tile came as soon as 32 ms after the last step instead of one repeat interval (deterministic sim: every turn 83 ms against 122 ms). `src/legacy-runtime/legacyHeldStepCadence.ts` now keeps every fresh step at least one repeat interval after the last accepted step; from rest the quick first answer is unchanged. Pinned by `tests/legacy-runtime/legacyHeldStepCadence.test.ts` (turn gaps equal straight gaps within one frame, with and without thumb wobble). Second cause: the PR #661 drift-corrected repeat made up a late step of up to a whole interval, so a hitch was followed by a short step; `legacyRepeatCadence.ts` now makes up at most one frame + 4 ms and re-anchors beyond that (pinned in `tests/legacy-runtime/legacyRepeatCadence.test.ts`).
+- **Not done here.** Problem 1 (stick 122 ms vs keyboard 151 ms at the default Move Speed) is unchanged; C, D and E are not built. No real phone has felt the 90 px leash or the speed fix.

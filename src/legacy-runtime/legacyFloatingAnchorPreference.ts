@@ -1,25 +1,26 @@
 /**
  * MAZER-L9: the Settings > Floating anchor switch. A device-local preference, deliberately NOT part of the synced
- * game-toggle blob: it is an experiment about how a thumb feels on one phone, and it must not travel with the
- * account (or change the account sync fingerprint) until it has been tuned and Zac has chosen it as a default.
- * Default OFF: with the key absent or unreadable the stick behaves exactly as before.
+ * game-toggle blob: it is about how a thumb feels on one phone, so it does not travel with the account (or change the
+ * account sync fingerprint).
+ * MAZER-CTRL-003 option B (Zac, 2026-11-19): default ON. With the key absent or unreadable the anchor follows; only a
+ * stored 'off' (the player switched it off) gives the old fixed anchor.
  */
 export const LEGACY_FLOATING_ANCHOR_STORAGE_KEY = 'mazer.floating-anchor.v1';
 
 export const LEGACY_FLOATING_ANCHOR_LABEL = 'Floating anchor';
 export const LEGACY_FLOATING_ANCHOR_DESCRIPTION =
-  'Experimental. When you drag far, your touch point follows your finger. This device only.';
+  'When you drag far, your touch point follows your finger, so turning back is short. This device only.';
 
 export const readLegacyFloatingAnchorPreference = (
   storage: Pick<Storage, 'getItem'> | undefined
 ): boolean => {
   if (!storage) {
-    return false;
+    return true;
   }
   try {
-    return storage.getItem(LEGACY_FLOATING_ANCHOR_STORAGE_KEY) === 'on';
+    return storage.getItem(LEGACY_FLOATING_ANCHOR_STORAGE_KEY) !== 'off';
   } catch {
-    return false;
+    return true;
   }
 };
 
