@@ -39,6 +39,7 @@ import { resolveEndpointCentre } from './endpointOpticalCentre';
 import { resolveEndpointTile, type EndpointTileRect } from './endpointTiles';
 import { cssRgb, cssRgba, snapLineWidth } from './boardTileStyle';
 import { GOAL_STAR_SPIN } from './goalStarSpin';
+import { SEED_SPIRAL_GREEN } from './palette';
 
 const TAU = Math.PI * 2;
 
@@ -218,7 +219,7 @@ export const SEED_SPIRAL = Object.freeze({
    * Bead colour, skin-local: the green (#6DFF7C) the owner saw and picked on the options page. It is deliberately NOT
    * `boardMaterial.start` (the gold the retired pinwheel and other start art still use), so the board palette is untouched.
    */
-  color: 0x6dff7c,
+  color: SEED_SPIRAL_GREEN,
   beads: 26,
   /** Turns the arm winds from the centre bead to the rim bead. */
   turns: 3.4,

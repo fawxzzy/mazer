@@ -848,3 +848,6 @@ export const MIDNIGHT_RAINBOW_STOPS = [
 
 /** HAZ-004 slice H3: Pulse Gate identity magenta (src/render/hazardGateLayer.ts). Floor contrast comes from its keyline. */
 export const HAZARD_GATE_MAGENTA = 0xff4fd8;
+
+/** L5: Seed spiral start-tile bead green, the owner's options-page pick (src/render/endpointTileSkins.ts). Floor contrast comes from its keyline. */
+export const SEED_SPIRAL_GREEN = 0x6dff7c;
