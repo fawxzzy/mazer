@@ -254,10 +254,11 @@ describe('boot continuation', () => {
 describe('wiring', () => {
   const read = (path: string) => readFileSync(resolve(__dirname, '../..', path), 'utf8');
 
-  test('only the menu profile icon asks to continue to the account page', () => {
+  test('only the menu Profile entry asks to continue to the account page', () => {
     const menu = read('src/scenes/MenuScene.ts');
     expect(menu.match(/withMazerSignInContinuation\(/g)).toHaveLength(1);
-    expect(menu).toMatch(/createLegacyMenuProfileButton\(\s*\(\) => withMazerSignInContinuation\('account'/);
+    // L6: the Profile row of the menu dropdown replaced the profile corner icon; its select branch carries the intent.
+    expect(menu).toMatch(/\} else \{\s*\/\/ Signed out, a Profile-row sign-in[^\n]*\s*withMazerSignInContinuation\('account'/);
     expect(menu).toContain('beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() })');
   });
 

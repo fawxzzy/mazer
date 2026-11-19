@@ -352,7 +352,10 @@ import {
   type LegacyPathVisualStyle
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
-import { LEGACY_HEADER_ICON_GLYPH_SCALE, resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
+import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
+import { LEGACY_MENU_DROPDOWN_ITEMS, type LegacyMenuDropdownItemId } from '../legacy-runtime/legacyMenuDropdown';
+import { LegacyMenuDropdownController } from '../render/menuDropdownButtons';
+import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
 import { resolveLegacyFrontDoorHitZone, shouldFrontDoorTapAnywhereStartRun } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
@@ -1440,26 +1443,6 @@ const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Slowed way down from an initial 900ms -- per feedback that pace read as
 // too fast/flickery for a deliberate classic-menu blink.
 const LEGACY_MENU_BLINK_PULSE_MS = MOTION_LOOP_MS.blink;
-// Shared by the Options/Pause overlay's Account ring (drawLegacyProfileIcon)
-// and its own Home button's ring (the Home button is gone; Pause is now a card)
-// -- previously two independently hand-copied formulas that could silently
-// drift apart despite existing specifically to make those two icons read as
-// a matched pair. Restrained consistency pass (owner-directed refinement,
-// not a reversal of the original ring-vs-no-ring split): the menu header's
-// own bare-glyph treatment and the overlay's ringed treatment are both kept
-// -- the compact 3-icon menu row and the paired Account/Home overlay row
-// have different real layout needs -- but the ring itself was bold enough
-// (a wide, near-opaque stroke) to read as a genuinely different icon family
-// rather than a restrained accent on the same glyph, which is what drove
-// the "not the same... set up" report. Toned down (thinner stroke, softer
-// alpha) so the glyph/color/texture stay the visually dominant, consistent
-// element across Menu/Options/Pause, and the ring reads as a light halo
-// tying Account+Home together rather than a competing badge outline. The
-// ring carries no state of its own (confirmed: it's the same idle pulse
-// regardless of auth/session status) -- there is no meaning to preserve
-// beyond the pairing itself, which this keeps.
-const LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO = 0.06;
-const LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR = 0.5;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -1819,8 +1802,8 @@ export class MenuScene extends Phaser.Scene {
   // True only when the gate was raised because a session is being resolved
   // (see legacyAuthGateResolution.ts); drives the loading-cover copy.
   private authGateHasSessionEvidence = false;
-  private menuLeaderboardActive = false;
-  private menuProfileActive = false;
+  // L6 main-menu dropdown (one three-line button for Settings / Profile / Leaderboard; src/render/menuDropdownButtons.ts).
+  private menuDropdown!: LegacyMenuDropdownController;
   // Pause card: the collapsible Settings section (collapsed on every open).
   private pauseSettingsExpanded = false;
   // Level Preview (dev/QA route ?previewLevel=N; see legacyLevelPreview.ts).
@@ -2048,7 +2031,6 @@ export class MenuScene extends Phaser.Scene {
   private menuAiProgressionBadgeLabelBounds: VisualRect | null = null;
   private menuAiProgressionBadgeTextBounds: VisualRect | null = null;
   private menuAiProgressionBadgeTextFits = false;
-  private menuSettingsCogActive = false;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
@@ -2065,18 +2047,7 @@ export class MenuScene extends Phaser.Scene {
   private boardTileDockMaze: LegacyMazeSnapshot | null = null;
   private boardTileDocks: BoardTileDock[] = [];
   private boardTileDockOwners: Uint8Array | null = null;
-  // Real HUD icon art (see docs/assets/mazer-vfx-source-provenance.md) for
-  // the two menu-header icons drawn every frame into the permanent
-  // boardDynamicGraphics/boardZoomContainer space -- one persistent Image
-  // each, same lifetime as boardDynamicGraphics itself. The profile icon's
-  // own Image(s) are NOT scene-level fields: that glyph is drawn from
-  // per-button closure (createLegacyMenuProfileButton) whose
-  // graphics/background/label are
-  // already created and destroyed alongside each button instance, so its
-  // Image lives and dies with that same closure instead.
-  private headerSettingsIconImage!: Phaser.GameObjects.Image;
-  private headerLeaderboardIconImage!: Phaser.GameObjects.Image;
-  // Same real settings icon as the menu header, for active play's own pause/
+  // Real settings icon (docs/assets/mazer-vfx-source-provenance.md) for active play's own pause/
   // settings touch control (drawLegacySettingsCogControl) -- top-level, not
   // boardZoomContainer, matching hudGraphics' own coordinate space.
   private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
@@ -2522,8 +2493,6 @@ export class MenuScene extends Phaser.Scene {
     this.presenceView = null;
     this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
-    this.headerSettingsIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
-    this.headerLeaderboardIconImage = this.add.image(0, 0, MAZER_HUD_LEADERBOARD_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.boardZoomContainer.add([
       // First child = lowest depth: the diamonds sit under the board, the title,
       // the header icons and every other menu element.
@@ -2542,19 +2511,12 @@ export class MenuScene extends Phaser.Scene {
       // Pulse Gate layer (slice H3): its own canvas over the trail and glow, under the crisp cast. Flag on only.
       ...(this.hazardGateImage ? [this.hazardGateImage] : []),
       this.boardDynamicGraphics,
-      // Same boardZoomContainer/boardDynamicGraphics-relative coordinate
-      // space the settings-cog/leaderboard header icons were previously
-      // drawn straight into (this replaces those procedural draws with the
-      // real HUD icon art) -- must stay in this container so the header
-      // frame math (screen-fixed coordinates, computed the same way
-      // whether or not the board is currently zoomed) keeps landing right.
-      this.headerSettingsIconImage,
-      this.headerLeaderboardIconImage,
       this.titleGraphics
     ]);
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
     this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
+    this.menuDropdown = this.createLegacyMenuDropdown();
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
@@ -3585,7 +3547,8 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicDirty = true;
     }
     this.playerSpawnBurstWasActiveForRedraw = spawnBurstActiveNow;
-    // Menu mode's settings cog (drawLegacyMenuSettingsCog) has the exact
+    // L6: the menu settings cog this was written for is now the dropdown button (its own per-frame update); the
+    // presence counter and the START / Login rainbow still draw here. Original note: menu mode's settings cog had the exact
     // same time-driven blink as play mode's, but it's drawn inside
     // drawBoardPaths, gated by boardPathDirty -- a flag neither of the two
     // play-mode fixes above ever re-arms. The menu demo AI's own movement
@@ -4510,7 +4473,10 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Escape') {
       event.preventDefault();
-      this.handleBackAction();
+      // The open menu dropdown is the topmost surface: Esc closes it before anything else.
+      if (!this.menuDropdown.close()) {
+        this.handleBackAction();
+      }
       return true;
     }
 
@@ -4533,7 +4499,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
-      if (this.hasLegacyPlayAccess()) {
+      if (this.hasLegacyPlayAccess() && !this.menuDropdown.isShown()) {
         this.startPlayMode();
       }
       return true;
@@ -5020,6 +4986,7 @@ export class MenuScene extends Phaser.Scene {
     if (!shouldFrontDoorTapAnywhereStartRun({
       hasStartButton: start !== undefined,
       levelPreviewActive: this.levelPreviewLevel !== null,
+      menuOpen: this.menuDropdown.isShown(),
       mode: this.mode,
       objectsUnderPointer,
       otherButtonBounds: this.uiButtons.filter((button) => button !== start).map((button) => button.bounds),
@@ -9483,16 +9450,7 @@ export class MenuScene extends Phaser.Scene {
     // the master timeline (introTimeline.ts).
     this.drawLegacyEdgeLasers(time, mazeLeft, mazeTop, mazeTileSize, renderedPlayerPoint, playerSpawnBurst);
 
-    // Drawn last, after the trail/board content above -- the bleed-off dock
-    // corridors reach the true screen edge (including the corners these
-    // icons occupy), so the player's trail can visibly reach the exact same
-    // pixels the settings cog and leaderboard icon sit on. Both are drawn
-    // to this same boardDynamicGraphics layer (see their own comments for
-    // why -- no separate depth-ordered GameObject for either), so draw
-    // ORDER is what keeps them on top instead of getting painted over by
-    // trail that reaches that corner, not a z-index.
-    this.drawLegacyMenuSettingsCog(time);
-    this.drawLegacyMenuLeaderboardIcon(time);
+    // The header menu button (L6 dropdown) is its own depth-3 GameObject above the board, so the trail can never paint over it.
     this.drawLegacyMenuPresenceCounter(time);
     this.boardDynamicDirty = false;
   }
@@ -9964,80 +9922,6 @@ export class MenuScene extends Phaser.Scene {
       // of these paths ran.
       this.levelAnnouncerNumberGlyphPool.forEach((image) => image.setVisible(false));
     }
-  }
-
-  private drawLegacyMenuSettingsCog(time: number): void {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
-      this.headerSettingsIconImage.setVisible(false);
-      return;
-    }
-
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const frame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'trailing',
-      safeArea: this.layout.headerSafeInset,
-      sizeScale: this.layout.headerIconScale,
-      width: this.layout.width
-    });
-    // Same classic blink/grow-shrink pulse the procedural gear had (and the
-    // Start/Login glyphs share) -- applied to the real settings icon
-    // (MAZER_HUD_SETTINGS_TEXTURE_KEY) via applyLegacyHudIconFrame instead
-    // of the hand-drawn thin-line gear this replaced.
-    const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
-    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuSettingsCogActive ? 0.08 : 0), 0.14, 1);
-    const blinkScale = 0.92 + (phase * 0.08) + (this.menuSettingsCogActive ? 0.02 : 0);
-    // 1.15x, not 0.68x (the old gear's own outer-diameter ratio) -- the real
-    // icon reads noticeably smaller than the equivalent-diameter procedural
-    // gear at the same bounding size (reported "icons are too small"), so
-    // this is deliberately bigger than the old shape's own footprint.
-    const desiredSize = Math.min(frame.width, frame.height) * LEGACY_HEADER_ICON_GLYPH_SCALE * blinkScale;
-    this.applyLegacyHudIconFrame(
-      this.headerSettingsIconImage,
-      MAZER_HUD_SETTINGS_ICON_METRICS,
-      frame.centerX,
-      frame.centerY,
-      desiredSize,
-      blinkAlpha
-    );
-  }
-
-  // MAZER-UI-024: the leaderboard icon holds the LEADING header slot (top-left) and the profile icon
-  // sits beside the settings cog on the trailing side (slot 1); they used to be the other way round.
-  private drawLegacyMenuLeaderboardIcon(time: number): void {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
-      this.headerLeaderboardIconImage.setVisible(false);
-      return;
-    }
-
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const frame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'leading',
-      safeArea: this.layout.headerSafeInset,
-      sizeScale: this.layout.headerIconScale,
-      width: this.layout.width
-    });
-    // Same blink/grow-shrink pulse the procedural bar-chart glyph had --
-    // applied to the real leaderboard icon (MAZER_HUD_LEADERBOARD_TEXTURE_KEY)
-    // via applyLegacyHudIconFrame instead of the three hand-drawn bars this
-    // replaced.
-    const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
-    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuLeaderboardActive ? 0.08 : 0), 0.14, 1);
-    const blinkScale = 0.92 + (phase * 0.08) + (this.menuLeaderboardActive ? 0.02 : 0);
-    const desiredSize = Math.min(frame.width, frame.height) * 1.15 * blinkScale;
-    this.applyLegacyHudIconFrame(
-      this.headerLeaderboardIconImage,
-      MAZER_HUD_LEADERBOARD_ICON_METRICS,
-      frame.centerX,
-      frame.centerY,
-      desiredSize,
-      blinkAlpha
-    );
   }
 
   // MAZER-UI-024: presence runs only while signed in (menu or play); the counter redraws only on change.
@@ -11546,6 +11430,7 @@ export class MenuScene extends Phaser.Scene {
     this.uiRebuiltAtFrame = this.game.getFrame();
     this.overlayGraphics.clear();
     this.clearUi();
+    this.menuDropdown.syncVisibility(this.overlay === 'none' && this.mode === 'menu');
     this.overlayScrimCloseBounds = null;
     this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
@@ -11605,18 +11490,8 @@ export class MenuScene extends Phaser.Scene {
             )
           );
         }
-        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(
-          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'))
-        ));
-        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(
-          () => this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'))
-        ));
-        // Signed out, a profile-icon sign-in continues to the account page (legacySignInContinuation.ts).
-        this.uiButtons.push(this.createLegacyMenuProfileButton(
-          () => withMazerSignInContinuation('account', () => (
-            this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
-          ))
-        ));
+        // L6: one three-line menu button (trailing slot) replaces the settings / profile / leaderboard corner icons.
+        this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());
       }
 
       this.uiDirty = false;
@@ -12284,6 +12159,7 @@ export class MenuScene extends Phaser.Scene {
         case 'bleed-gate': return BLEED_GATE_LIT;
         case 'level-numeral': return playerPalette.playerCoreColor;
         case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
+        case 'menu-burger': return MENU_DROPDOWN_ACCENT;
         case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
         case 'hazard-gate':
         case 'hazard-sentry':
@@ -12503,6 +12379,10 @@ export class MenuScene extends Phaser.Scene {
         this.drawLegacyPresenceGlyphWord(graphics, '12', centerX, centerY, cellSize, 1, true);
         return;
       }
+      case 'menu-burger':
+        // The header menu button's own three-line draw (src/render/menuDropdownArt.ts), closed.
+        drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_DROPDOWN_FOREGROUND);
+        return;
       case 'sound-speaker':
         drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);
         return;
@@ -14260,229 +14140,89 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton {
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const pauseRect = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'trailing',
-      safeArea: this.layout.headerSafeInset,
-      sizeScale: this.layout.headerIconScale,
-      width: this.layout.width
-    });
-    // Visual glyph stays 32-40px; the interactive zone is grown to the 44px
-    // touch-target floor (see legacyHitTarget.ts).
-    const hit = resolveLegacyMinHitRect(pauseRect, this.layout);
-    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
-    this.menuSettingsCogActive = false;
-
-    const background = this.add.rectangle(
-      hit.centerX,
-      hit.centerY,
-      hit.width,
-      hit.height,
-      0x000000,
-      0.001
-    );
-    background.setInteractive({ useHandCursor: true });
-    // The front-door Login/Start hit zone (see createButton's explicitHitZone) can
-    // overlap the gear -- a higher depth keeps this smaller, precise hit rectangle
-    // topmost so settings still opens instead of falling through to login.
-    background.setDepth(3);
-    const label = this.add.text(pauseRect.centerX, pauseRect.centerY, '', {
+  // L6 "Menu A: Dropdown panel" (owner pick 2026-11-19). The controller owns the toggle, panel, rows and scrim; the
+  // scene only supplies textures, fonts and the three destinations (src/render/menuDropdownButtons.ts).
+  private createLegacyMenuDropdown(): LegacyMenuDropdownController {
+    const iconMetrics: Record<LegacyMenuDropdownItemId, LegacyHudIconSourceMetrics> = {
+      leaderboard: MAZER_HUD_LEADERBOARD_ICON_METRICS,
+      profile: MAZER_HUD_PROFILE_ICON_METRICS,
+      settings: MAZER_HUD_SETTINGS_ICON_METRICS
+    };
+    const textures: Record<LegacyMenuDropdownItemId, string> = {
+      leaderboard: MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
+      profile: MAZER_HUD_PROFILE_TEXTURE_KEY,
+      settings: MAZER_HUD_SETTINGS_TEXTURE_KEY
+    };
+    let profileShown = true;
+    return new LegacyMenuDropdownController({
+      blinkAlpha: (time, active) => clamp(
+        0.22 + (resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion()) * 0.78) + (active ? 0.08 : 0),
+        0.14,
+        1
+      ),
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '18px'
-    }).setOrigin(0.5).setVisible(false);
-    const setActive = (active: boolean): void => {
-      if (this.menuSettingsCogActive === active) {
-        return;
-      }
-      this.menuSettingsCogActive = active;
-      this.boardDynamicDirty = true;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    return {
-      background,
-      bounds: hitBounds,
-      iconOnly: true,
-      label,
-      semanticAction: 'Settings',
-      setActive,
-      text: 'Settings',
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
-  private createLegacyMenuLeaderboardButton(onClick: () => void): UiButton {
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const rect = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'leading',
-      safeArea: this.layout.headerSafeInset,
-      sizeScale: this.layout.headerIconScale,
-      width: this.layout.width
-    });
-    const hit = resolveLegacyMinHitRect(rect, this.layout);
-    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
-    this.menuLeaderboardActive = false;
-
-    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    const label = this.add.text(rect.centerX, rect.centerY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '18px'
-    }).setOrigin(0.5).setVisible(false);
-    const setActive = (active: boolean): void => {
-      if (this.menuLeaderboardActive === active) {
-        return;
-      }
-      this.menuLeaderboardActive = active;
-      this.boardDynamicDirty = true;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    return {
-      background,
-      bounds: hitBounds,
-      iconOnly: true,
-      label,
-      semanticAction: 'Leaderboard',
-      setActive,
-      text: 'Leaderboard',
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
-  // Main-menu account entry: the old username text is intentionally gone.
-  // The control now occupies the same leading header slot, on the same row
-  // as the title, but renders only the inner Mazer-green profile glyph. The
-  // transparent square remains the complete touch target; no outer visual
-  // circle or panel is drawn. Its pulse and hover response use the exact
-  // settings-cog envelope so the two header actions feel like one family.
-  private createLegacyMenuProfileButton(onClick: () => void): UiButton {
-    const graphics = this.add.graphics();
-    const iconImage = this.add.image(0, 0, MAZER_HUD_PROFILE_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const frame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'trailing',
-      safeArea: this.layout.headerSafeInset,
-      sizeScale: this.layout.headerIconScale,
-      slot: 1,
-      width: this.layout.width
-    });
-    const hit = resolveLegacyMinHitRect(frame, this.layout);
-    const hitBounds = createVisualRect(hit.left, hit.top, hit.width, hit.height);
-    const background = this.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.setDepth(3);
-    this.menuProfileActive = false;
-
-    const setActive = (active: boolean): void => {
-      this.menuProfileActive = active;
-    };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
-
-    const label = this.add.text(frame.centerX, frame.centerY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '1px'
-    }).setOrigin(0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    return {
-      background,
-      bounds: hitBounds,
-      iconOnly: true,
-      label,
-      semanticAction: 'Account',
-      setActive,
-      text: 'Account',
-      updateFrame: (time: number) => {
-        if (
-          this.mode !== 'menu'
-          || this.overlay !== 'none'
-          || this.authSnapshot.status === 'unavailable'
-        ) {
-          graphics.clear();
-          background.setVisible(false);
-          iconImage.setVisible(false);
-          return;
+      now: () => this.time.now,
+      placeIcon: (image, id, centerX, centerY, size, alpha) => {
+        this.applyLegacyHudIconFrame(image, iconMetrics[id], centerX, centerY, size, alpha);
+      },
+      prepareText: (text) => {
+        this.applyLegacyUiTextCrispness(text);
+      },
+      reducedMotion: () => this.prefersLegacyReducedMotion(),
+      requestRebuild: () => {
+        this.uiDirty = true;
+      },
+      scene: this,
+      select: (id) => {
+        if (id === 'settings') {
+          this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));
+        } else if (id === 'leaderboard') {
+          this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'));
+        } else {
+          // Signed out, a Profile-row sign-in continues to the account page (legacySignInContinuation.ts).
+          withMazerSignInContinuation('account', () => (
+            this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+          ));
         }
+      },
+      textureKey: (id) => textures[id],
+      // Per-frame side effects the retired profile corner button owned: warm the username, and drop/restore the
+      // Profile row when the account service goes unavailable/comes back.
+      tick: () => {
         if (this.authSnapshot.status === 'authenticated') {
           this.loadAccountUsernameIfNeeded();
         }
-        background.setVisible(true);
-        const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
-        const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);
-        const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);
-        const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.9));
-        this.drawLegacyProfileIcon(
-          graphics,
-          iconImage,
-          frame.centerX,
-          frame.centerY,
-          iconSize,
-          time,
-          blinkAlpha,
-          blinkScale,
-          false
-        );
-      },
-      destroy: () => {
-        graphics.destroy();
-        iconImage.destroy();
-        background.destroy();
-        label.destroy();
+        const shown = this.authSnapshot.status !== 'unavailable';
+        if (shown !== profileShown) {
+          profileShown = shown;
+          this.uiDirty = true;
+        }
       }
-    };
+    });
   }
 
-  // Shared by the overlay and main-menu profile buttons. Overlay callers
-  // retain the rainbow ring (still procedural, drawn into `graphics`); the
-  // menu caller explicitly suppresses it. The glyph itself is now the real
-  // MAZER_HUD_PROFILE_TEXTURE_KEY icon (via applyLegacyHudIconFrame)
-  // instead of the hand-drawn head-and-shoulders outline this replaced --
-  // `image` is owned by the caller (created/destroyed alongside its own
-  // `graphics`), not a shared scene-level field, since both callers are
-  // independently creatable/destroyable UI button instances.
-  private drawLegacyProfileIcon(
-    graphics: Phaser.GameObjects.Graphics,
-    image: Phaser.GameObjects.Image,
-    centerX: number,
-    centerY: number,
-    iconSize: number,
-    time: number,
-    alpha: number,
-    scale: number,
-    showOuterRing = true
-  ): void {
-    graphics.clear();
-    if (showOuterRing) {
-      const ringRadius = (iconSize * 0.62) + 8;
-      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.2, iconSize * LEGACY_OVERLAY_ICON_RING_WIDTH_RATIO), ringColor, alpha * LEGACY_OVERLAY_ICON_RING_ALPHA_FACTOR);
-      graphics.strokeCircle(centerX, centerY, ringRadius * scale);
-    }
-    this.applyLegacyHudIconFrame(image, MAZER_HUD_PROFILE_ICON_METRICS, centerX, centerY, iconSize * scale, alpha);
+  private buildLegacyMenuDropdownButtons(): UiButton[] {
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: this.layout.lanes.hud?.top ?? 0,
+      placement: 'trailing',
+      safeArea: this.layout.headerSafeInset,
+      sizeScale: this.layout.headerIconScale,
+      width: this.layout.width
+    });
+    // Visual glyph stays 32-40px; the touch target is grown to the 44px floor (legacyHitTarget.ts).
+    const hit = resolveLegacyMinHitRect(frame, this.layout);
+    const items = this.authSnapshot.status === 'unavailable'
+      ? LEGACY_MENU_DROPDOWN_ITEMS.filter((item) => item.id !== 'profile')
+      : LEGACY_MENU_DROPDOWN_ITEMS;
+    return this.menuDropdown.buildButtons({
+      items,
+      safeArea: this.layout.headerSafeInset,
+      toggleFrame: frame,
+      toggleHit: createVisualRect(hit.left, hit.top, hit.width, hit.height),
+      viewport: { height: this.layout.height, width: this.layout.width }
+    });
   }
 
   private clearUi(): void {

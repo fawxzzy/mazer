@@ -33,6 +33,7 @@ export type LegacyGuideGlyph =
   | 'bleed-gate'
   | 'level-numeral'
   | 'online-count'
+  | 'menu-burger'
   | 'sound-speaker'
   | 'hazard-gate'
   | 'hazard-sentry'
@@ -68,7 +69,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'sound' | LegacyGuideHazardRowId;
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'menu' | 'sound' | LegacyGuideHazardRowId;
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -223,7 +224,21 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'online',
-    text: 'The dot and number by the top-left icon show how many players are online right now.'
+    text: 'The dot and number at the top left show how many players are online right now.'
+  },
+  {
+    heading: 'Menu',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/render/menuDropdownArt.ts', symbol: 'drawMenuBurgerGlyph' },
+      chipDraw: null,
+      glyph: 'menu-burger',
+      lane: null,
+      reasonId: 'menu-legend-calls-header-burger-draw',
+      status: 'shared-with-board'
+    },
+    id: 'menu',
+    text: 'Tap the three lines at the top right for Settings, Profile and the Leaderboard.'
   },
   {
     heading: 'Sound',

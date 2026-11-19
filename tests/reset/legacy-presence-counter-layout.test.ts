@@ -28,7 +28,7 @@ const VIEWPORTS = [
 const COUNTS = [1, 7, 42, 999, 1234, 12345];
 
 describe('MAZER-UI-033 presence counter layout (copy of the website header counter)', () => {
-  test('never overlaps the leading icon or the title and never leaves the viewport, at every width and count', () => {
+  test('starts at the leading header slot, never overlaps the title and never leaves the viewport, at every width and count', () => {
     for (const viewport of VIEWPORTS) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
       const leading = resolveLegacyHeaderControlFrame({
@@ -43,7 +43,8 @@ describe('MAZER-UI-033 presence counter layout (copy of the website header count
       for (const count of [null, ...COUNTS]) {
         const placement = resolveLegacyPresenceCounterPlacement({ countText: formatOnline(count), layout, measure });
         const label = `${viewport.width}x${viewport.height} n=${count}`;
-        expect(placement.slotLeft, label).toBe(leading.right + LEGACY_PRESENCE_ICON_GAP_PX);
+        // L6: the leaderboard corner icon is gone (menu dropdown), so the counter starts at the leading slot edge.
+        expect(placement.slotLeft, label).toBe(leading.left);
         if (!placement.visible) {
           continue;
         }

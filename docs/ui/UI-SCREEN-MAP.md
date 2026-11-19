@@ -15,7 +15,7 @@ HUD chrome), and a handful of standalone top-level Graphics/Image objects
 |---|---|---|---|---|
 | Boot/loading | app start | `BootScene.ts` (separate scene) | n/a | nothing |
 | Auth-resolution boot blocker | automatic while `authGateAwaitingResolution` is true; `overlay` stays `'none'` throughout | `syncLegacyAuthGateLoadingScreen` — a full-screen, max-depth interactive rectangle plus a pulsing loading glyph, independent of `overlay` | top-level (own max-depth blocker, above everything) | nothing — no `LegacyOverlayKind` covers this state; see `UI-AUDIT.md` §1's correction |
-| Main Menu | `mode='menu'`, `overlay='none'` | `rebuildUi()`'s `overlay==='none'` branch, `drawLegacyMenuSettingsCog`, `drawLegacyMenuLeaderboardIcon`, `createLegacyMenuProfileButton`, `drawLegacyMenuPathTitle` | `boardZoomContainer` (title/icons), top-level buttons | Active Play (shares the whole board/backdrop/title rendering pipeline) |
+| Main Menu | `mode='menu'`, `overlay='none'` | `rebuildUi()`'s `overlay==='none'` branch, `buildLegacyMenuDropdownButtons` (L6 menu dropdown: `src/render/menuDropdownButtons.ts`, art `src/render/menuDropdownArt.ts`, geometry `src/legacy-runtime/legacyMenuDropdown.ts`), `drawLegacyMenuPathTitle` | `boardZoomContainer` (title), top-level buttons (menu toggle, dropdown scrim + rows) | Active Play (shares the whole board/backdrop/title rendering pipeline) |
 | Active Play | `mode='play'` | `drawDynamicBoard`, `drawHud`, `drawLegacyPlayTouchControls` | `boardZoomContainer` + `hudGraphics` | Main Menu (board pipeline); Pause (touch cog uses the same real settings icon as the menu header) |
 | Settings | `openOverlay('options')` (menu only — there is no route from Pause into this overlay) | `buildOptionsOverlay` -> `createLegacyOptionsInfoSection` (Guide) + `createFeatureControlRows` | `overlayGraphics` + `uiButtons` | **Pause** (Pause calls the same two builder functions directly, not by navigating here — see below) |
 | Pause | `openOverlay('pause')` from play (a distinct overlay kind, not reached through Settings) | `buildPauseOverlay` -> the *same* `createLegacyOptionsInfoSection` + `createFeatureControlRows` calls Settings makes, inlined directly, plus `createLegacyOverlayHomeButton` | `overlayGraphics` + `uiButtons` | **Settings** (see `UI-AUDIT.md` §2 — this is direct content duplication between two independent overlay kinds, not a navigation relationship) |
@@ -142,10 +142,11 @@ boundary only — it does not redesign the Auth screen.
 4. `boardBleedPathImages` (real bleed-path asset, pooled)
 5. `boardDynamicGraphics` (trail color fill, start/goal/player markers, endpoint glow — all one Graphics object)
 6. `playerTrailImages` (real trail asset overlay, pooled) — **above** `boardDynamicGraphics`, so it can't render under the player/start/goal markers without also being excluded from those specific cells (it is, via the same exclusion the color-fill loop uses)
-7. `headerSettingsIconImage`, `headerLeaderboardIconImage` (real HUD icons)
-8. `titleGraphics` (title text)
-9. `titleOrbitDiamondImages` (orbit diamond sigils/twinkles)
-10. `titleTileFontImagePool` (the tile-font wordmark glyph pool)
+7. `titleGraphics` (title text)
+8. `titleOrbitDiamondImages` (orbit diamond sigils/twinkles)
+9. `titleTileFontImagePool` (the tile-font wordmark glyph pool)
+
+(L6, 2026-11-19: the menu header icons `headerSettingsIconImage` / `headerLeaderboardIconImage` left this container; the one menu dropdown button is a scene-level UI button now.)
 
 **Correction:** an earlier version of this list ended at `titleGraphics`
 and separately, incorrectly, called `titleOrbitDiamondImages` top-level.

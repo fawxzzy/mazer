@@ -38,6 +38,8 @@ const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({
 });
 const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
+// L6: semanticAction/text of the one main-menu button (LEGACY_MENU_DROPDOWN_TOGGLE_ACTION in legacyMenuDropdown.ts).
+export const MENU_DROPDOWN_TOGGLE_ACTION = 'Menu';
 // These numeric values are the live Phaser aliases for the Precision Arcade
 // registry. Keep this proof independent of stylesheet-only tokens so it
 // validates the actual canvas material players see.
@@ -528,7 +530,9 @@ const findAuthenticatedFixtureAction = (buttons, semanticAction, fallbackText) =
 export const evaluateAuthenticatedFixtureReadiness = ({ runtime = null, visual = null } = {}) => {
   const buttons = Array.isArray(visual?.buttons) ? visual.buttons : [];
   const start = findAuthenticatedFixtureAction(buttons, 'Start', 'Start');
-  const settings = findAuthenticatedFixtureAction(buttons, 'Settings', 'Settings');
+  // L6 (Menu A): on the main menu Settings lives in the dropdown, so the one Menu button stands in for it.
+  const settings = findAuthenticatedFixtureAction(buttons, 'Settings', 'Settings')
+    ?? findAuthenticatedFixtureAction(buttons, MENU_DROPDOWN_TOGGLE_ACTION, MENU_DROPDOWN_TOGGLE_ACTION);
   const startState = summarizeAuthenticatedFixtureButton(start);
   const settingsState = summarizeAuthenticatedFixtureButton(settings);
   const clauses = {
@@ -1257,6 +1261,34 @@ export const getVisualButtonPoint = (visual, text) => {
   };
 };
 
+// L6 (Menu A): the main menu's Settings / Profile (semanticAction 'Account') / Leaderboard entries are rows of
+// the dropdown behind the one Menu button. Returns the row's centre, opening the dropdown with a real click
+// first when the row is not on screen yet. Anything already visible (e.g. the in-play Settings cog) is used as is.
+export const revealMenuDropdownActionPoint = async (page, semanticAction, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
+  const findPoint = (visual) => {
+    const button = (visual?.buttons ?? []).find((entry) => (
+      (entry?.semanticAction === semanticAction || entry?.text === semanticAction)
+      && entry?.active !== false
+      && isFiniteBounds(entry?.bounds)
+    ));
+    return button ? { x: Math.round(button.bounds.centerX), y: Math.round(button.bounds.centerY) } : null;
+  };
+  let point = findPoint((await readDiagnostics(page)).visual);
+  if (point) {
+    return point;
+  }
+  const togglePoint = getVisualButtonPoint((await readDiagnostics(page)).visual, MENU_DROPDOWN_TOGGLE_ACTION);
+  await clickPoint(page, togglePoint, MENU_DROPDOWN_TOGGLE_ACTION);
+  const deadline = Date.now() + timeoutMs;
+  while (!point && Date.now() < deadline) {
+    point = findPoint((await readDiagnostics(page)).visual);
+    if (!point) {
+      await page.waitForTimeout(100);
+    }
+  }
+  return point;
+};
+
 const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (
   (surface?.buttons ?? []).some((button) => (
     button?.text === text
@@ -1359,6 +1391,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Wrap gate',
   'Levels',
   'Online',
+  'Menu',
   'Sound',
   'Got it'
 ]);

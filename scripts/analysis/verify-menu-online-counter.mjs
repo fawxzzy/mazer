@@ -4,13 +4,13 @@
  * is gone from the header (the online counter took its spot). For each layout, on the real rendered
  * canvas with the synthetic authenticated QA fixture (no network, no live account):
  *   1. no "Welcome" text and no `header-identity` label exists;
- *   2. icon order: Leaderboard is left of the title, Account (profile) is right of the title and left of
- *      Settings (the profile and leaderboard icons are swapped relative to before);
- *   3. with `__MAZER_QA__.setPresenceCount(7)` the counter is PAINTED in the slot between the leaderboard
- *      icon and the title: a differential measurement (the slot is rendered with the count and again with
+ *   2. header controls (L6, Menu A): the one Menu button sits right of the title, and the retired settings,
+ *      profile and leaderboard corner icons are not built while the dropdown is closed;
+ *   3. with `__MAZER_QA__.setPresenceCount(7)` the counter is PAINTED in the leading slot between the left
+ *      edge and the title: a differential measurement (the slot is rendered with the count and again with
  *      the count released, from the same settled scene state) must show counter ink only when the count is
- *      set, the ink must sit inside the slot (right of the leaderboard icon, left of the title, in the header
- *      band) and overlap no header control;
+ *      set, the ink must sit inside the slot (left of the title, in the header band) and overlap no header
+ *      control;
  *   4. with the count released (null/unknown) nothing is painted in the slot (no "0", no dash).
  * Negative control: released vs released is measured identically and must be exactly 0 ink.
  * Run after building, or pass --skip-build. Pass --base-url=http://localhost:PORT for a running dev server.
@@ -49,9 +49,8 @@ const readHeader = (page) => page.evaluate(() => {
   return {
     welcome: scene.uiTexts.filter((text) => text.active && text.visible && /welcome/i.test(text.text)).map((text) => text.text),
     identityLabel: scene.uiTexts.some((text) => text.active && text.name === 'header-identity'),
-    leaderboard: byAction('Leaderboard'),
-    account: byAction('Account'),
-    settings: byAction('Settings'),
+    menu: byAction('Menu'),
+    retired: ['Leaderboard', 'Account', 'Settings'].filter((action) => byAction(action) !== null),
     title: rect(diagnostics.title.bounds)
   };
 });
@@ -141,19 +140,34 @@ const measureSeries = async (page, slot, floor) => {
     await waitSettled(page);
     await settle(page, 300);
     await armSettledWatch(page);
-    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
-    await settle(page, 300);
-    const hiddenA = await measureStable(page, slot, floor);
-    await settle(page, 300);
-    const hiddenB = await measureStable(page, slot, floor);
-    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(7));
-    await settle(page, 700);
-    const shown = await measureStable(page, slot, floor);
-    await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
-    await settle(page, 700);
-    const hiddenAfter = await measureStable(page, slot, floor);
-    if (await stayedSettled(page)) {
-      return { hiddenA, hiddenB, shown, hiddenAfter };
+    let series = null;
+    try {
+      await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
+      await settle(page, 300);
+      const hiddenA = await measureStable(page, slot, floor);
+      await settle(page, 300);
+      const hiddenB = await measureStable(page, slot, floor);
+      await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(7));
+      await settle(page, 700);
+      const shown = await measureStable(page, slot, floor);
+      await page.evaluate(() => window.__MAZER_QA__.setPresenceCount(undefined));
+      await settle(page, 700);
+      const hiddenAfter = await measureStable(page, slot, floor);
+      series = { hiddenA, hiddenB, shown, hiddenAfter };
+    } catch (error) {
+      // L6: the counter slot now starts at the leading edge, where the demo maze build can pass through the
+      // header band; a read that never stabilises is the same backdrop cycle, so re-run the whole series.
+      if (attempt === MAX_SERIES_ATTEMPTS || !/never stabilised/.test(error.message)) {
+        throw error;
+      }
+      continue;
+    }
+    // L6: the slot now reaches the leading edge, where a faint backdrop sparkle can move a few pixels between two
+    // released reads even inside a settled cycle. Re-run such a series; the last attempt is returned as is, so the
+    // exact-0 control assertion below still fails loudly when the slot never holds still.
+    const controlHeld = series.hiddenB.ink === series.hiddenA.ink;
+    if (await stayedSettled(page) && (controlHeld || attempt === MAX_SERIES_ATTEMPTS)) {
+      return series;
     }
   }
   throw new Error(`the menu demo backdrop never held still for a whole measurement series in ${MAX_SERIES_ATTEMPTS} attempts`);
@@ -193,25 +207,23 @@ const main = async () => {
 
         assert.deepEqual(header.welcome, [], `${name}: a Welcome label is rendered: ${JSON.stringify(header.welcome)}`);
         assert.equal(header.identityLabel, false, `${name}: the retired header-identity username label is still built`);
-        assert(header.leaderboard && header.account && header.settings, `${name}: a header control is missing: ${JSON.stringify(header)}`);
-        // Hit rectangles are grown to the 44 px touch floor and may touch neighbours, so order by centre.
+        assert(header.menu, `${name}: the Menu button is missing: ${JSON.stringify(header)}`);
+        assert.deepEqual(header.retired, [], `${name}: a retired corner icon is still built while the dropdown is closed`);
+        // Hit rectangles are grown to the 44 px touch floor, so place by centre.
         const centre = (r) => (r.left + r.right) / 2;
-        assert(centre(header.leaderboard) < header.title.left, `${name}: Leaderboard is not left of the title`);
-        assert(centre(header.account) > header.title.right, `${name}: Account (profile) is not right of the title`);
-        assert(centre(header.account) < centre(header.settings), `${name}: Account (profile) is not left of Settings`);
-        assert(centre(header.leaderboard) < centre(header.account), `${name}: icon order is not leaderboard-first`);
+        assert(centre(header.menu) > header.title.right, `${name}: the Menu button is not right of the title`);
 
-        const slot = { left: header.leaderboard.right, right: header.title.left, top: 0, bottom: Math.max(header.leaderboard.bottom, 64) };
+        // The counter is ~85 px wide at the leading edge. Cap the slot at 200 px so a wide desktop slot does not
+        // pull in extra backdrop (a 1280 px slot from the edge to the title read a -5 px control delta once).
+        const slot = { left: 0, right: Math.min(header.title.left, 200), top: 0, bottom: Math.max(header.menu.bottom, 64) };
         const { hiddenA, hiddenB, shown, hiddenAfter } = await measureSeries(page, slot, INK_FLOOR);
         const delta = shown.ink - hiddenA.ink;
         assert(delta >= MIN_COUNTER_DELTA_PIXELS, `${name}: the counter is not painted (ink ${shown.ink} shown vs ${hiddenA.ink} released, need delta >= ${MIN_COUNTER_DELTA_PIXELS})`);
         assert(shown.bounds, `${name}: no counter ink bounds`);
-        assert(shown.bounds.left >= header.leaderboard.right, `${name}: counter starts left of the leaderboard icon right edge`);
+        assert(shown.bounds.left >= 0, `${name}: counter starts off the left edge`);
         assert(shown.bounds.right <= header.title.left, `${name}: counter runs into the title (${shown.bounds.right} > ${header.title.left})`);
         assert(shown.bounds.top >= 0 && shown.bounds.bottom <= 64, `${name}: counter is not inside the header band: ${JSON.stringify(shown.bounds)}`);
-        for (const control of [header.leaderboard, header.account, header.settings]) {
-          assert(!overlaps(shown.bounds, control), `${name}: counter overlaps a header control`);
-        }
+        assert(!overlaps(shown.bounds, header.menu), `${name}: counter overlaps the Menu button`);
         // Unknown again: the slot is empty again (no "0", no dash); measured inside the same settled series.
         assert(hiddenAfter.ink <= hiddenA.ink + 5, `${name}: ink remains in the slot after the count is released (${hiddenAfter.ink} vs ${hiddenA.ink})`);
         // Negative control: released vs released is exactly 0 ink difference, and fails the paint assertion.
@@ -220,7 +232,7 @@ const main = async () => {
         assert(controlDelta < MIN_COUNTER_DELTA_PIXELS, `${name}: paint assertion would accept an empty slot`);
         await page.screenshot({ path: join(output, `${name}.png`) });
         report.checks.push({ name, delta, shownInk: shown.ink, releasedInk: hiddenA.ink, bounds: shown.bounds, passed: true });
-        process.stdout.write(`PASS ${name}: icon order leaderboard | title | profile, settings; counter ink delta ${delta} inside the slot, released slot empty, control delta ${controlDelta}\n`);
+        process.stdout.write(`PASS ${name}: header counter | title | menu button; counter ink delta ${delta} inside the slot, released slot empty, control delta ${controlDelta}\n`);
       } finally { await context.close(); }
     }
     report.passed = true;

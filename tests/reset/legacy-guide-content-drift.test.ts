@@ -36,6 +36,8 @@ import {
 } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 import * as boardTileBake from '../../src/render/boardTileBake';
 import * as edgeMarkers from '../../src/render/edgeMarkers';
+import * as menuDropdownArt from '../../src/render/menuDropdownArt';
+import { LEGACY_MENU_DROPDOWN_ITEMS } from '../../src/legacy-runtime/legacyMenuDropdown';
 import * as sparkPlayerSkin from '../../src/render/sparkPlayerSkin';
 
 /**
@@ -59,13 +61,14 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
   if (module === 'src/render/boardTileBake.ts') return boardTileBake as Record<string, unknown>;
   if (module === 'src/render/edgeMarkers.ts') return edgeMarkers as Record<string, unknown>;
   if (module === 'src/render/sparkPlayerSkin.ts') return sparkPlayerSkin as Record<string, unknown>;
+  if (module === 'src/render/menuDropdownArt.ts') return menuDropdownArt as Record<string, unknown>;
   if (module === 'src/render/bleedGateRenderer.ts') return bleedGateRenderer as Record<string, unknown>;
   return null;
 };
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'sound']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'sound']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -132,6 +135,16 @@ describe('guide copy only names things that exist', () => {
     expect(LEGACY_GUIDE_CLOSE_LABEL).toBe('Got it');
     // The scene no longer paints a Close pill, so the copy cannot be pointing at one.
     expect(MENU_SCENE).not.toContain('createOverlayClosePill');
+  });
+
+  test('Menu row (L6): names every dropdown destination by its visible label, and the corner icons it replaced are gone', () => {
+    for (const item of LEGACY_MENU_DROPDOWN_ITEMS) {
+      expect(row('menu').text, item.id).toContain(item.label);
+    }
+    expect(row('menu').text).toMatch(/three lines at the top right/);
+    expect(row('online').text).not.toMatch(/icon/);
+    expect(MENU_SCENE).not.toContain('createLegacyMenuLeaderboardButton');
+    expect(MENU_SCENE).not.toContain('createLegacyMenuProfileButton');
   });
 
   test('Start row: Chip draws the start end marker (a gold spiral that turns slowly in step with the end star, MAZER-VIS-053) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
@@ -363,9 +376,9 @@ describe('guide icons are tied to the draw functions the board uses', () => {
     }
   });
 
-  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, bleed-gate, levels and online share a board draw; move and sound are guide-local', () => {
+  test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, bleed-gate, levels, online and menu share a board draw; move and sound are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
     expect(byStatus('guide-local')).toEqual(['move', 'sound']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
@@ -390,7 +403,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('private drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
@@ -416,6 +429,10 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('drawSparkPlayer(graphics, frame, {');
     expect(method('private drawLegacyOptionsGuidePlayerGlyph(')).toContain('resolveSparkFrame(');
     expect(method('private fillLegacyPlayerMarkerTile(')).toContain('drawSparkPlayer(this.boardDynamicGraphics, frame, {');
+    // menu (L6): the header menu button's own three-line draw, the same export the toggle paints with.
+    expect(icon).toContain('drawMenuBurgerGlyph(graphics, centerX, centerY,');
+    expect(read('src/render/menuDropdownButtons.ts')).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress,');
+    expect(method('private rebuildUi(): void')).toContain('this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());');
     // move mirrors the stick.
     expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
     expect(icon).toContain('this.progressionState.tracks.player.level');

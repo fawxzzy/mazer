@@ -244,10 +244,9 @@ serve:
 `drawLegacyPlayerTransferEnergy`, `drawLegacyPlayerSpawnBurst`.
 
 **HUD chrome (menu header + play touch controls):**
-`drawLegacyMenuSettingsCog`, `drawLegacyMenuLeaderboardIcon`,
-`drawLegacySettingsCogControl`, `drawLegacyPlayTouchControls`,
-`drawLegacyPlayTouchStick`, `createLegacyMenuSettingsCogButton`,
-`createLegacyMenuLeaderboardButton`, `createLegacyMenuProfileButton`.
+`buildLegacyMenuDropdownButtons` (L6: the one menu dropdown button replaced the settings / leaderboard / profile
+corner icons; `src/render/menuDropdownButtons.ts`), `drawLegacySettingsCogControl`, `drawLegacyPlayTouchControls`,
+`drawLegacyPlayTouchStick`.
 
 **Trail / markers / level announcer:**
 `drawLegacyTrailBorder`, `drawLegacyPlayerTrailTileOverlay`,

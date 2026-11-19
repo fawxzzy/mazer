@@ -194,7 +194,9 @@ describe('header edge padding (Wave 5C)', () => {
       readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
     );
     const frameCalls = source.match(/resolveLegacyHeaderControlFrame\(\{[^}]*\}\)/g) ?? [];
-    expect(frameCalls.length).toBeGreaterThanOrEqual(5);
+    // L6: the menu header is one dropdown button now (the leaderboard / profile / settings corner frames are gone).
+    expect(frameCalls.length).toBeGreaterThanOrEqual(1);
+    expect(readFileSync(resolve(process.cwd(), 'src/render/menuDropdownButtons.ts'), 'utf8')).not.toContain('resolveLegacyHeaderControlFrame');
     for (const call of frameCalls) {
       expect(call).toContain('safeArea: this.layout.headerSafeInset');
     }
