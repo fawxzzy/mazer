@@ -8,7 +8,8 @@
 
 - The persisted Move Speed value is the player's only speed input. It is never rewritten by progression.
 - Level and pace never change the speed. (v1 added up to `+0.10` for level and `+-0.05` for pace after the first completed cycle; owner request 2026-11-12 removed both so the step rate is constant.)
-- Owner request 2026-11-12: the player is 8% slower overall. `LEGACY_MOVEMENT_STEP_RATE_FACTOR = 0.92` is applied once: repeat interval, hold-start delay and the touch-stick caps are divided by `0.92` and rounded to whole ms. Turn delay keeps its formula on the scaled hold-start delay.
+- Owner request 2026-11-12: the player is 8% slower overall; owner request 2026-11-19: about 5% slower again (measured against what the phone really did, see the constant's comment). `LEGACY_MOVEMENT_STEP_RATE_FACTOR = 0.85` is applied once: repeat interval, hold-start delay and the touch-stick caps are divided by `0.85` and rounded to whole ms. Turn delay keeps its formula on the scaled hold-start delay.
+- Held-touch steps are timed off the previous step's due time (`legacyRepeatCadence.ts`) and the loop is capped at 60 fps (`frameRateCap.ts`), so a step takes the same time on a 60 Hz and a 120 Hz screen.
 - The effective speed is deterministic and clamped to `0..1`; it is the single source for initial hold delay, repeat interval, and turn delay.
 
 ## Runtime ownership

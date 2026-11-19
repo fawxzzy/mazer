@@ -189,7 +189,8 @@ describe('guide copy only names things that exist', () => {
   });
 
   test('Goal is a star: the Chip marker module draws a star path and the scene calls it for the board and the Guide', () => {
-    expect(row('goal').text).toMatch(/star/);
+    expect(row('goal').text).toMatch(/twin stars/);
+    expect(read('src/render/endpointTileSkins.ts')).toContain("DEFAULT_END_TILE_SKIN: DrawableEndTileSkinId = 'twin-stars'");
     expect(MENU_SCENE).not.toMatch(/drawLegacyGoalStarMarker/);
     expect(MENU_SCENE).toMatch(/drawBoardMarkers\(/);
     expect(read('src/render/boardTileBake.ts')).toMatch(/const starPath = /);
@@ -234,7 +235,7 @@ describe('guide copy only names things that exist', () => {
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
     expect(row('wrap').text).toMatch(/^Some mazes wrap /);
-    expect(row('wrap').text).toMatch(/Trail-coloured edge stars fill as beams hit/);
+    expect(row('wrap').text).toMatch(/Edge stars fill with your colour as beams hit/);
   });
 
   test('Wrap gate (MAZER-L10): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
@@ -288,6 +289,8 @@ describe('guide copy only names things that exist', () => {
     // The copy says harder mazes can have shortcuts and loops: generation really plans them
     // (never in the early levels, for some seeds late, and never for every seed).
     expect(row('levels').text).toMatch(/shortcuts and loops/);
+    expect(row('levels').text).toMatch(/^Endless mode:/);
+    expect(read('src/legacy-runtime/legacyGameModes.ts')).toContain("label: 'Endless'");
     const seeds = Array.from({ length: 200 }, (_, index) => 1337 + (index * 104729));
     const plans = (level: number) => seeds.map((seed) => resolveGeometryBudgetLoopPlan(level, seed, 1275));
     expect(plans(5).every((plan) => legacyLoopPlanSize(plan) === 0)).toBe(true);

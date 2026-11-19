@@ -21,6 +21,16 @@
 
 /** The long-standing gap between time-only trail rebuilds. */
 export const TRAIL_REDRAW_MIN_GAP_MS = 33;
+/**
+ * While the head glides between tiles (MAZER-PERF, 2026-11-19) the only thing that changes frame to frame is its
+ * fractional position. That used to rebuild the whole trail canvas every frame (5-10 ms under 4x CPU throttle, doubled on
+ * a 120 Hz screen). A head-only change now waits this long since the last rebuild, so the trail's growing end trails the
+ * marker by at most ~33 ms (about a quarter tile at the 139 ms step, under the marker drawn on top) and the rebuild rate
+ * during a glide is the 30 Hz colour cadence at any refresh rate. Anything else changing (route, previous tile, geometry,
+ * fade, style) still rebuilds at once, so a step commit never shows a stale route.
+ */
+export const TRAIL_HEAD_ONLY_MIN_GAP_MS = 33;
+
 /** Never let colour drift fall below 4 redraws a second, however slow the rebuild (the head still redraws as it moves). */
 export const TRAIL_REDRAW_MAX_GAP_MS = 250;
 /** Gap = this many rebuild-costs, so the trail's own share of the main thread stays near 1 / TRAIL_REDRAW_COST_MULTIPLE. */
@@ -87,16 +97,18 @@ export const observeTrailFrameCost = (record: TrailDrawRecord, nowMs: number): v
   }
 };
 
-const sameStamp = (a: TrailDrawStamp, b: TrailDrawStamp): boolean => (
+const sameStampExceptHead = (a: TrailDrawStamp, b: TrailDrawStamp): boolean => (
   a.routeRevision === b.routeRevision
   && a.previousTileKey === b.previousTileKey
-  && a.headX === b.headX
-  && a.headY === b.headY
   && a.originX === b.originX
   && a.originY === b.originY
   && a.tileSize === b.tileSize
   && a.alphaMultiplier === b.alphaMultiplier
   && a.styleKey === b.styleKey
+);
+
+const sameStamp = (a: TrailDrawStamp, b: TrailDrawStamp): boolean => (
+  a.headX === b.headX && a.headY === b.headY && sameStampExceptHead(a, b)
 );
 
 /**
@@ -114,7 +126,9 @@ export const shouldRebuildTrail = (
     return true;
   }
   if (!sameStamp(previous.stamp, next)) {
-    return true;
+    // Head-only change (a glide): throttle to TRAIL_HEAD_ONLY_MIN_GAP_MS; a backwards clock rebuilds (safe side).
+    const sinceDraw = nowMs - previous.drawnAtMs;
+    return !(sameStampExceptHead(previous.stamp, next) && sinceDraw >= 0 && sinceDraw < TRAIL_HEAD_ONLY_MIN_GAP_MS);
   }
   if (!timeDriven) {
     return false;

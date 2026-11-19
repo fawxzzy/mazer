@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   TRAIL_FRAME_COST_OBSERVE_MAX_MS,
+  TRAIL_HEAD_ONLY_MIN_GAP_MS,
   TRAIL_REDRAW_MAX_GAP_MS,
   TRAIL_REDRAW_MIN_GAP_MS,
   observeTrailFrameCost,
@@ -80,8 +81,9 @@ describe('trail rebuild gate (MAZER-PERF-002)', () => {
 
   it('rebuilds at once for every kind of picture change, however recently it drew', () => {
     const record: TrailDrawRecord = { stamp: stamp(), drawnAtMs: 100, totalLength: 500, costMs: 5 };
+    // (A head-only change is throttled instead: see the glide tests below.)
     const changes: Partial<TrailDrawStamp>[] = [
-      { routeRevision: 2 }, { previousTileKey: '4,4' }, { headX: 5.5 }, { headY: 6.25 }, { originX: 11 },
+      { routeRevision: 2 }, { previousTileKey: '4,4' }, { originX: 11 },
       { originY: 21 }, { tileSize: 15 }, { alphaMultiplier: 0.5 }, { styleKey: 'chip|2|2|0|1|1' }
     ];
     for (const change of changes) {
@@ -126,15 +128,32 @@ describe('trail rebuild gate (MAZER-PERF-002)', () => {
     expect(skipped).toBeGreaterThan(rebuilds);
   });
 
-  it('while the head glides (it changes every frame) every frame still rebuilds: growth stays visible', () => {
-    const { rebuilds, skipped } = simulate({
-      frameMs: 1000 / 60,
-      durationMs: 1000,
-      costMs: 25,
-      stampAt: (time) => stamp({ headX: time / 100 })
-    });
-    expect(skipped).toBe(0);
-    expect(rebuilds).toBeGreaterThanOrEqual(60);
+  it('while the head glides (it changes every frame) the trail rebuilds at the 30 Hz cadence, not on every frame, at any refresh rate', () => {
+    for (const frameMs of [1000 / 30, 1000 / 60, 1000 / 120]) {
+      const { rebuilds } = simulate({
+        frameMs,
+        durationMs: 1000,
+        costMs: 25,
+        stampAt: (time) => stamp({ headX: time / 100 })
+      });
+      expect(rebuilds, `${frameMs.toFixed(1)} ms frames`).toBeGreaterThanOrEqual(25);
+      expect(rebuilds, `${frameMs.toFixed(1)} ms frames`).toBeLessThanOrEqual(31);
+    }
+  });
+
+  it('a head-only change inside the glide gap is skipped, then rebuilt once the gap has passed (the end of a glide catches up)', () => {
+    const record: TrailDrawRecord = { stamp: stamp(), drawnAtMs: 100, totalLength: 500, costMs: 5 };
+    const moved = stamp({ headX: 5.4, headY: 6.1 });
+    expect(shouldRebuildTrail(record, moved, 100 + TRAIL_HEAD_ONLY_MIN_GAP_MS - 1, false)).toBe(false);
+    expect(shouldRebuildTrail(record, moved, 100 + TRAIL_HEAD_ONLY_MIN_GAP_MS, false)).toBe(true);
+    expect(shouldRebuildTrail(record, moved, 50, false)).toBe(true);
+  });
+
+  it('a head change that comes with any other change (a step commit, zoom, fade) is never throttled', () => {
+    const record: TrailDrawRecord = { stamp: stamp(), drawnAtMs: 100, totalLength: 500, costMs: 5 };
+    for (const change of [{ routeRevision: 2 }, { previousTileKey: '4,4' }, { tileSize: 15 }, { alphaMultiplier: 0.5 }, { styleKey: 'x' }]) {
+      expect(shouldRebuildTrail(record, stamp({ headX: 5.4, ...change }), 101, false), JSON.stringify(change)).toBe(true);
+    }
   });
 
   it('with colour drift off, a still trail is rebuilt exactly once over a minute of frames', () => {
