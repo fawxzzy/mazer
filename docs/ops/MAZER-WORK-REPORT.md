@@ -8,20 +8,20 @@ Last board sync: 2026-11-19 (461 board events applied in total). Work that lande
 
 ## At a glance
 
-- **298 cards**: 84 completed, 80 open, 26 deferred.
-- **Needs you now: 34** (6 decisions, 28 phone or device checks).
-- Completed by proof: 0 verified on a device, 33 headless-only, 33 tests or capture frames only, 18 with no device surface, 0 with no evidence recorded.
+- **298 cards**: 192 completed, 80 open, 26 deferred.
+- **Needs you now: 33** (6 decisions, 27 phone or device checks).
+- Completed by proof: 3 verified on a device, 100 headless-only, 35 tests or capture frames only, 54 with no device surface, 0 with no evidence recorded.
 
 | Bucket | Cards |
 | --- | ---: |
-| 1. Needs you now | 34 |
-| 2. Completed | 84 |
+| 1. Needs you now | 33 |
+| 2. Completed | 192 |
 | 3. In review | 28 |
-| 4. Blocked | 10 |
-| 5. Ready to build | 17 |
-| 6. In progress | 5 |
+| 4. Blocked | 7 |
+| 5. Ready to build | 0 |
+| 6. In progress | 1 |
 | 7. Deferred | 26 |
-| 8. Unclassified | 94 |
+| 8. Unclassified | 11 |
 
 ## 1. Needs you now
 
@@ -47,7 +47,7 @@ Last board sync: 2026-11-19 (461 board events applied in total). Work that lande
   - Ask: Flip the pair_extension_recorded flag in file 05 and approve its hash.
   - Recommendation: Oldest account wins; the others keep email sign-in.
 
-### Phone and device checks (28)
+### Phone and device checks (27)
 
 - [ ] `MAZER-ACCT-013` Confirm where sign-in lands on the installed Android app (high)
   - Ask: On an Android phone with Mazer installed from Chrome, run the three sign-in steps below and report what you see.
@@ -127,10 +127,6 @@ Last board sync: 2026-11-19 (461 board events applied in total). Work that lande
   - Recommendation: If Reduce Motion is on or Trail Shine is off, that explains it: set Reduce Motion off and Trail Shine on and look again; if it still looks static, send the phone model.
   - [ ] (phone) Note iOS Settings > Accessibility > Motion > Reduce Motion (on or off) and Mazer Settings > Trail Shine (on or off). Expect: Both settings are written down.
   - [ ] (phone) With Reduce Motion off and Trail Shine on, walk a level and watch the trail. Expect: The trail colour visibly shifts over time; if it stays static, report both settings and the phone model.
-- [ ] `MAZER-WORLD-001` Complete the World Identity visual maintenance lane (medium)
-  - Ask: 
-  - Recommendation: 
-  - [ ] (installed-app) On the iPhone installed app, open the menu and play on the current build; watch the backdrop stars, end markers and trail for 30 seconds. Expect: No strobing recolour, no image or vector misalignment, the end star is centred and the trail does not shake (PR #416 fixes).
 - [ ] `MAZER-ACCT-014` Record a failure code on every sign-in boot failure: deployed, device check pending (low, in review, #453, #454)
   - Ask: On your phone, make a sign-in fail once and tell me whether the failure line stays until you try again (the code itself is only visible in runtime diagnostics).
   - Recommendation: Do it once together with the other sign-in checks on MAZER-ACCT-015; no separate run is needed.
@@ -192,16 +188,85 @@ Last board sync: 2026-11-19 (461 board events applied in total). Work that lande
   - Recommendation: Accept if the trail end moves with the marker; note whether the 2 px skew on a sideways bump is visible.
   - [ ] (phone) Walk into a wall and watch the trail end next to the marker. Expect: The trail end follows the marker nudge with no sliver beside it; a bump perpendicular to the last segment may skew it by up to 2 px for a moment.
 
-66 shipped cards (section 2) have no phone proof; the combined phone pass for them is the MAZER-QA-001 checklist above.
+135 shipped cards (section 2) have no phone proof; the combined phone pass for them is the MAZER-QA-001 checklist above.
 
 ## 2. Completed
 
-### Verified on a device (0)
+### Verified on a device (3)
 
-None yet: no completed card records a real-device check.
+- `MAZER-FLOW-018` Menu demo starts at player level; tap anywhere to play (2026-11-16, #626, deployed fawxzzy-mazer-pakov2avo)
+- `MAZER-VIS-056` Bottom corner stars clear the real display corner (2026-11-16, #631, deployed fawxzzy-mazer-pakov2avo)
+- `MAZER-VIS-053` Spiral start marker synced with the end star; polish start and end tiles (2026-11-16, #617, #627, deployed fawxzzy-mazer-pakov2avo)
 
-### Shipped, headless-only (needs a phone check) (33)
+### Shipped, headless-only (needs a phone check) (100)
 
+- `MAZER-ACCT-007` Give accounts made on the account site a Mazer profile (2026-11-19, #446, #447, deployed 8f757c76)
+- `MAZER-ACCT-008` Widen the sign-in window to 15 minutes and name each sign-in failure (2026-11-19, #444, #445, deployed 8f757c76)
+- `MAZER-ACCT-011` Add a leaderboard username editor (Edit name): merged and deployed (2026-11-19, #450, deployed f8c16c72)
+- `MAZER-ACCT-012` Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending (2026-11-19, #485, #486, deployed fawxzzy-mazer-dq6f32ysl)
+- `MAZER-FLOW-014` Make player speed constant and 8% slower: merged and deployed (2026-11-19, #449, deployed f8c16c72)
+- `MAZER-GEN-005` Unreachable floor islands appear in about 6% of generated mazes (2026-11-19, #499, deployed fawxzzy-mazer-1n3xcc1qg)
+- `MAZER-PROG-015` Double lure on levels 2-268 and the mastery tier removed (ladder v2): merged and deployed (2026-11-19, #420, deployed b640f1da)
+- `MAZER-PWA-002` Add PWA screenshots, iOS launch art and icon cleanup (2026-11-19, #438, deployed 24e15cc1)
+- `MAZER-VIS-022` AI player and play player share one marker drawn like the end tiles (2026-11-19, #442, deployed 24e15cc1)
+- `MAZER-VIS-054` Corner diamonds fully visible on rounded displays (2026-11-19, #593, deployed hbvh1xpuf)
+- `MAZER-WORLD-001` Complete the World Identity visual maintenance lane (2026-11-19, #411, #416, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-AUDIO-004` Gentler step sound and Sound on by default (2026-11-16, #605, deployed 5g35npa39)
+- `MAZER-UI-056` Online counter readability on the menu (2026-11-16, #604, deployed 5g35npa39)
+- `MAZER-VIS-055` Edge marker redesign (2026-11-16, #602, deployed 5023dd2a)
+- `MAZER-UI-050` Touch up the Start, Mazer title and Level text designs (2026-11-16, #598, deployed 5023dd2a)
+- `MAZER-VIS-052` Main menu: restore bleed-off paths that run off the screen edge (2026-11-16, #587, deployed none)
+- `MAZER-VIS-051` Make trail colours bolder and more arcade, less pastel (2026-11-16, #588, #591, #613, deployed none)
+- `MAZER-VIS-050` Remove the thin white pre-draw line and the centre dot on every maze tile (2026-11-16, #586, #590, deployed none)
+- `MAZER-MOTION-020` Replace the maze fade in and out with a smooth build and tear-down (2026-11-16, #590, #607, #616, deployed none)
+- `MAZER-PERF-011` Drop the 934 KB app icon from the service worker precache (2026-11-16, #572, deployed none)
+- `MAZER-UI-035` Move the settings gear off the top-right corner diamond at 390 wide (2026-11-16, #573, #584, deployed none)
+- `MAZER-UI-034` Smaller font for the sign-in failure code line (2026-11-16, #573, deployed none)
+- `MAZER-VIS-044` Keep the four corner edge diamonds anchored in the screen corners (2026-11-16, #560, deployed none)
+- `MAZER-UI-033` Shrink the menu online counter to username text size and add an Online label (2026-11-16, #556, deployed none)
+- `MAZER-QA-009` One ordered phone check list that closes several cards (2026-11-16, #554, deployed none)
+- `MAZER-UI-032` Finish the wave 1C diagnostics type cleanup (2026-11-16, #546, deployed none)
+- `MAZER-UI-031` Migrate stray colour literals to theme values in slices (2026-11-16, #555, #563, #549, #580, #582, deployed none)
+- `MAZER-MOTION-011` Rise and stagger entrance for overlays and controls (2026-11-16, #562, deployed none)
+- `MAZER-FLOW-017` Touch-first level 1 hint that follows the input in use (2026-11-16, #557, deployed none)
+- `MAZER-UI-030` Show the offline cache update warning in the message toast (2026-11-16, #552, deployed none)
+- `MAZER-AUDIO-003` Add small synthesized sound effects with a Settings toggle, default off (2026-11-16, #548, deployed none)
+- `MAZER-FLOW-016` Keep the same maze after quit or reload (2026-11-16, #543, deployed none)
+- `MAZER-VIS-042` Mirror the Fitness loader hardening in the Mazer loader (2026-11-16, #540, deployed none)
+- `MAZER-PWA-007` Install gate always on for browser access (2026-11-16, #518, deployed fawxzzy-mazer-d6in8php0)
+- `MAZER-ACCT-041` Account pages never scroll, host sign-out endpoint, reset ends other sessions (2026-11-16, FawxzzyWeb#156, deployed fawxzzyweb-geuv4lbht)
+- `MAZER-VIS-041` End star spins slowly and stays visible under the player (2026-11-16, #515, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-VIS-040` Smooth maze build-in and build-out (2026-11-16, #523, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-UI-026` Settings: three rows removed and a description line required on every row (2026-11-16, #525, deployed fawxzzy-mazer-d6in8php0)
+- `MAZER-UI-025` Privacy text names the live Mazer online count (2026-11-16, FawxzzyWeb#158, deployed fawxzzyweb-geuv4lbht)
+- `MAZER-UI-024` Online counter in the main menu, profile and leaderboard icons swapped (2026-11-16, #520, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-ACCT-043` No Mazer account screens: only account.fawxzzy.com screens (2026-11-16, #522, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-VIS-038` Edge diamonds: beams on the inner tip, half size while playing, continuous beams (2026-11-16, #512, deployed fawxzzy-mazer-1hf3yrduh)
+- `MAZER-ACCT-040` Load straight into the account sign-in instead of the Mazer sign-in screen (2026-11-16, #510, deployed fawxzzy-mazer-ddyiq4ttb)
+- `MAZER-VIS-039` One smooth loader and the website app image everywhere (2026-11-16, #511, deployed fawxzzy-mazer-ddyiq4ttb)
+- `MAZER-ACCT-039` Test the account reset flow end to end (2026-11-16, FawxzzyWeb#150, deployed fawxzzyweb-r73je21xy)
+- `MAZER-PERF-010` Investigate an intermittent slow boot seen by the QA sign-in test (2026-11-16, #509, deployed fawxzzy-mazer-ddyiq4ttb)
+- `MAZER-PERF-009` Prefetch or time-slice the first maze of a session (2026-11-16, #524, deployed fawxzzy-mazer-d6in8php0)
+- `MAZER-VIS-037` Bound the trail canvas colour step at the sheen crossing (2026-11-16, #541, deployed none)
+- `MAZER-PWA-006` Trim dev pages from the precache and decide update behaviour on deploy (2026-11-16, #544, deployed none)
+- `MAZER-VIS-036` Centre the start arrow by its painted centroid (2026-11-16, #502, deployed fawxzzy-mazer-o9hufd7kf)
+- `MAZER-VIS-035` Keep a few background stars rainbow-coloured (2026-11-16, #498, #573, deployed none)
+- `MAZER-VIS-034` Centre the goal star by its centre of mass in the tile (2026-11-16, #496, deployed fawxzzy-mazer-5dfftudqq)
+- `MAZER-VIS-033` Edge diamonds: one fill only, fill inner to outer, drain outer to inner (2026-11-16, #497, deployed fawxzzy-mazer-5dfftudqq)
+- `MAZER-FLOW-015` Show the level clear time above the level number between levels (2026-11-16, #494, deployed fawxzzy-mazer-5dfftudqq)
+- `MAZER-MOTION-010` Delete or bind the unused tuning value menu.status.pulseDurationMs (2026-11-16, #519, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-ACCT-038` Retire the remaining dead sign-in form helpers and sign-up sentinels (2026-11-16, #516, #517, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-UI-023` Narrow the menu diagnostics form mode to login only (wave 1C) (2026-11-16, #521, deployed fawxzzy-mazer-dfh38rip1)
+- `MAZER-GEN-006` No one-tile dead-end stubs in generated mazes (2026-11-16, #464, #603, deployed 5023dd2a)
+- `MAZER-ACCT-031` Show a failure code a player can read off a phone (2026-11-16, #545, deployed none)
+- `MAZER-PERF-008` Spread level-start maze generation across frames or a worker (2026-11-16, #503, deployed fawxzzy-mazer-1n3xcc1qg)
+- `MAZER-ACCT-009` Make the Create Account result honest (2026-11-16, FawxzzyWeb#121, deployed none)
+- `MAZER-MOTION-007` Decide off-scale loops and durations and sweep dead motion code (2026-11-16, #547, deployed none)
+- `MAZER-FLOW-001` Teach the controls and the goal on level 1 (2026-11-16, #542, deployed none)
+- `MAZER-MOTION-002` Animate overlays, controls and the Start and splash transitions (2026-11-16, #505, deployed fawxzzy-mazer-qbu403nwk)
+- `MAZER-UI-015` Build one shared button kit (2026-11-16, #553, #576, deployed none)
+- `MAZER-UI-010` Define one type scale and a second display typeface (2026-11-16, #550, #565, #566, #567, deployed none)
+- `MAZER-VIS-012` Unify the backdrop across boot, install gate and sign-in (2026-11-16, #561, deployed none)
 - `MAZER-CTRL-001` Add a haptics setting and test the vibration helper: merged and deployed (2026-11-11, #427, deployed b640f1da)
 - `MAZER-FLOW-004` Level/Rank display removed (owner decision): no rank letter, no Level N caption (2026-11-11, #419, deployed b640f1da)
 - `MAZER-FLOW-007` Menu demo is an independent attract loop on the ai-runner track: merged and deployed (2026-11-11, #433, deployed b640f1da)
@@ -236,8 +301,10 @@ None yet: no completed card records a real-device check.
 - `MAZER-NAV-001` Freeze Navigation Core v1 (2026-08-29)
 - `MAZER-TELEPORT-001` Freeze Teleport System v1 (2026-08-29)
 
-### Shipped on tests or capture frames only (no browser or phone proof recorded) (33)
+### Shipped on tests or capture frames only (no browser or phone proof recorded) (35)
 
+- `MAZER-UI-022` Move the offline-notice strings into the message module copy tables (2026-11-19, #436, deployed 24e15cc1)
+- `MAZER-VIS-017` Purge the disabled backdrop glyph drawing code and its pinned source-string tests (2026-11-19, #439, deployed 24e15cc1)
 - `MAZER-ACCT-017` Give account-site players the username they typed on the leaderboard: function v2 (2026-11-12)
 - `MAZER-GEN-004` Fade wrap corridors out between levels 100 and 140 and price them (2026-11-10, #404)
 - `MAZER-PROG-003` Make maze geometry follow the displayed level (2026-11-10, #400)
@@ -272,10 +339,46 @@ None yet: no completed card records a real-device check.
 - `MAZER-PROG-010` Make board scale ceiling and feeder count device-relative (2026-08-28, #301, #304)
 - `MAZER-PWA-001` Harden PWA installability and delivery assets (2026-08-28)
 
-### No device surface (tooling, governance, data, docs) (18)
+### No device surface (tooling, governance, data, docs) (54)
 
 - `MAZER-DOCS-002` Refresh the current truth document for the new menu and demo (2026-11-19, #651)
 - `MAZER-QA-012` Point QA scripts at the Menu button instead of the old icons (2026-11-19, #653)
+- `MAZER-ACCT-002` Finish the atomic sign-up username flow (blocked on provider) (2026-11-19, #280, #281)
+- `MAZER-AI-001` AI runner calibration: per-band thresholds and checker landed, retention not built (2026-11-19, #479)
+- `MAZER-AUDIO-001` Decide whether the game has sound (2026-11-19, #530)
+- `MAZER-DOCS-001` Multi-target deployment architecture doc (2026-11-19, #405)
+- `MAZER-FLOW-006` Decide: resume the same maze after quit or reload (2026-11-19, #530)
+- `MAZER-FLOW-011` Decide when input unlocks during the level intro (2026-11-19, #530)
+- `MAZER-GOV-004` Retire the previous project board and refresh this one from all prior discussion (2026-11-19, #434)
+- `MAZER-GOV-005` Visual proof discipline: PR template line and repo pointer landed (2026-11-19, #474)
+- `MAZER-GOV-007` Generated work report and work ledger (2026-11-19, #440, deployed 24e15cc1)
+- `MAZER-GOV-008` Run the brand tests in CI (2026-11-19, #437, deployed 24e15cc1)
+- `MAZER-HAZ-007` Turn-synchronous simulation: phase status table landed, only the player phase is live (2026-11-19, #472)
+- `MAZER-MOTION-001` Adopt one motion scale for durations, loops and easing (2026-11-19, #441, deployed 24e15cc1)
+- `MAZER-MOTION-006` Scene motion constants read the motion scale, values unchanged: merged and live (2026-11-19, #471, deployed 62f36472)
+- `MAZER-MOTION-009` The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live (2026-11-19, #475, deployed 62f36472)
+- `MAZER-PROG-006` Decide a minimum tile size for very large boards (2026-11-19, #530)
+- `MAZER-PROG-016` Touch sprint diagnostics now live in the progression section: merged and live, review (2026-11-19, #469, #473, deployed 62f36472)
+- `MAZER-PROG-017` Every sign-in failure code is pinned to the class map by a test: merged and live, review (2026-11-19, #469, deployed 62f36472)
+- `MAZER-PROG-018` Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged (2026-11-19, #491)
+- `MAZER-QA-007` The level preview jump list now offers 218 instead of 268: merged and live, review (2026-11-19, #469, deployed 62f36472)
+- `MAZER-QA-008` Add ladder-end checkpoints 283 and 288 to the level preview (2026-11-19, #502, deployed fawxzzy-mazer-o9hufd7kf)
+- `MAZER-UI-020` Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD (2026-11-19, #530)
+- `MAZER-UI-021` Route auth, sync, username and boot errors into the message toast (2026-11-19, #530)
+- `MAZER-VIS-024` Make the marker diagnostics report the real block size: deployed (2026-11-19, #458, deployed 476c4789)
+- `MAZER-VIS-026` Decide dense-board player prominence after the tile-sized ring (2026-11-19, #530)
+- `MAZER-VIS-027` Unused backdrop shard, glass shard and rune generators deleted: merged and live (2026-11-19, #477, deployed 62f36472)
+- `MAZER-VIS-032` Start the outro ring orbit from the master laser clock, not a fixed 600 ms (2026-11-19, #500, deployed fawxzzy-mazer-1n3xcc1qg)
+- `MAZER-UI-019` UI rework migration: wave status report landed, umbrella to split pending the owner (2026-11-19, #482)
+- `MAZER-QA-011` Player-reachable route to levels 60, 100 and 190 for checks (2026-11-16, #571, deployed none)
+- `MAZER-GOV-014` Capture owed for wave 3A and a Wave 0C capture script (2026-11-16, #571, deployed none)
+- `MAZER-QA-010` Make the online counter measurement check stable (2026-11-16, #571, deployed none)
+- `MAZER-DEBT-002` Stop publishing constant formMode and invalidFields in menu diagnostics (2026-11-16, #575, #579, #581, deployed none)
+- `MAZER-GOV-011` Run the owner export checks inside board apply (2026-11-16, #537, #570, deployed none)
+- `MAZER-UI-028` Give every UI rework wave a visual proof surface (Wave 6) (2026-11-16, #559, deployed none)
+- `MAZER-GOV-010` Board updates by event log and milestone fold, not per PR (2026-11-16, #495, #569, deployed none)
+- `MAZER-ACCT-020` Fix the four account-site usernames longer than 15 characters (2026-11-16, #558, deployed none)
+- `MAZER-VIS-011` Regenerate the HUD icons as one matched set and atlas (2026-11-16, #564, #568, #574, deployed none)
 - `MAZER-GOV-009` Stabilise load-sensitive tests: PR #489 merged (2026-11-13, #489)
 - `MAZER-ACCT-010` Decide the Create Account non-enumeration trade-off: accepted, auto-confirm kept (2026-11-12)
 - `MAZER-GOV-006` Run the message-inventory guard in CI (2026-11-11, #432, deployed b640f1da)
@@ -332,7 +435,7 @@ Review cards that wait on you are listed in section 1; these are the rest (28).
 
 ## 4. Blocked
 
-Grouped by who unblocks (10 cards). Cards that only need your answer or a phone check are in section 1.
+Grouped by who unblocks (7 cards). Cards that only need your answer or a phone check are in section 1.
 
 ### Zac (an approval or a sign-off on a gated change) (1)
 
@@ -342,50 +445,25 @@ Grouped by who unblocks (10 cards). Cards that only need your answer or a phone 
 
 - `MAZER-ACCT-003` Prove installed-app sign-in and progress end to end (high): Needs a real-phone run with a throwaway account covering installed-app sign-in, refresh, recovery, isolation and standalone handoff.
 
-### Another card (waits on a card that is not finished) (8)
+### Another card (waits on a card that is not finished) (5)
 
 - `MAZER-HAZ-004` Add obstacles, traps and puzzles (covered by the hazard phases) (medium): Waits on MAZER-HAZ-002.
 - `MAZER-HAZ-005` Make the pursuing enemy playable (covered by the hazard phases) (medium): Waits on MAZER-HAZ-002.
 - `MAZER-PROG-008` Decide which maze features unlock at which level and content band (medium): Waits on MAZER-HAZ-002 and MAZER-ECON-001.
 - `MAZER-PROG-019` Revisit ladder length after the no-stub rule: another cost-free lever or hazards (medium): Waits on MAZER-HAZ-002 (review).
 - `MAZER-HAZ-008` Plan hazard introduction and contact moments (low): Waits on MAZER-HAZ-002.
-- `MAZER-MOTION-006` Scene motion constants read the motion scale, values unchanged: merged and live (low): Waits on MAZER-MOTION-004 (review).
-- `MAZER-MOTION-009` The teleport transfer reads the shared 200 ms crossfade, alias deleted: merged and live (low): Waits on MAZER-MOTION-005 (review).
-- `MAZER-PROG-017` Every sign-in failure code is pinned to the class map by a test: merged and live, review (low): Waits on MAZER-ACCT-014 (review).
 
 ## 5. Ready to build
 
-Agent-buildable with no open dependency, highest priority first (17 cards). Hint files are for conflict planning only.
+Agent-buildable with no open dependency, highest priority first (0 cards). Hint files are for conflict planning only.
 
-> Hot file: `src/scenes/MenuScene.ts` (Wave 5C) is touched by MAZER-FLOW-001, MAZER-MOTION-002, MAZER-UI-010, MAZER-UI-015, MAZER-VIS-011. Run at most 2 of them in one batch and merge them one at a time.
-
-1. `MAZER-FLOW-001` Teach the controls and the goal on level 1 (high)
-2. `MAZER-GEN-005` Unreachable floor islands appear in about 6% of generated mazes (medium)
-3. `MAZER-MOTION-002` Animate overlays, controls and the Start and splash transitions (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts
-4. `MAZER-PROG-018` Test every database change on a scratch Postgres 17, pin the live hash: PR #491 merged (medium)
-5. `MAZER-UI-010` Define one type scale and a second display typeface (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-MOTION-002 on src/theme/tokens.ts, src/scenes/MenuScene.ts
-6. `MAZER-UI-015` Build one shared button kit (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-MOTION-002 on src/scenes/MenuScene.ts; overlaps MAZER-UI-010 on src/scenes/MenuScene.ts
-7. `MAZER-VIS-011` Regenerate the HUD icons as one matched set and atlas (medium) WARNING: overlaps MAZER-FLOW-001 on src/scenes/MenuScene.ts; overlaps MAZER-MOTION-002 on src/scenes/MenuScene.ts; overlaps MAZER-UI-010 on src/scenes/MenuScene.ts; overlaps MAZER-UI-015 on src/scenes/MenuScene.ts
-8. `MAZER-ACCT-012` Retire dead Mazer sign-up code: PRs #485 and #486 merged and live, review pending (low)
-9. `MAZER-ACCT-020` Fix the four account-site usernames longer than 15 characters (low)
-10. `MAZER-ACCT-038` Retire the remaining dead sign-in form helpers and sign-up sentinels (low)
-11. `MAZER-MOTION-010` Delete or bind the unused tuning value menu.status.pulseDurationMs (low)
-12. `MAZER-PERF-008` Spread level-start maze generation across frames or a worker (low)
-13. `MAZER-PROG-016` Touch sprint diagnostics now live in the progression section: merged and live, review (low)
-14. `MAZER-QA-007` The level preview jump list now offers 218 instead of 268: merged and live, review (low)
-15. `MAZER-UI-023` Narrow the menu diagnostics form mode to login only (wave 1C) (low) WARNING: overlaps MAZER-PROG-016 on src/scenes/menuRuntimeDiagnostics.ts
-16. `MAZER-VIS-024` Make the marker diagnostics report the real block size: deployed (low) WARNING: overlaps MAZER-PROG-016 on src/scenes/menuRuntimeDiagnostics.ts; overlaps MAZER-UI-023 on src/scenes/menuRuntimeDiagnostics.ts
-17. `MAZER-VIS-027` Unused backdrop shard, glass shard and rune generators deleted: merged and live (low)
+None.
 
 ## 6. In progress
 
 Long-running lanes. Audit the current state before assigning any of it to a worker.
 
 - `MAZER-2D-001` Maintain the mobile-clean 2D shipping baseline: evidence rule and stale reference fixed (high): PR #474 merged (docs). Ongoing baseline card.
-- `MAZER-UI-019` UI rework migration: wave status report landed, umbrella to split pending the owner (high): no audit note recorded
-- `MAZER-ACCT-002` Finish the atomic sign-up username flow (blocked on provider) (medium): no audit note recorded
-- `MAZER-HAZ-007` Turn-synchronous simulation: phase status table landed, only the player phase is live (medium): no audit note recorded
-- `MAZER-GOV-005` Visual proof discipline: PR template line and repo pointer landed (low): no audit note recorded
 
 ## 7. Deferred
 
@@ -420,97 +498,14 @@ Long-running lanes. Audit the current state before assigning any of it to a work
 
 Open cards the ledger cannot place from evidence. Nothing is dropped silently.
 
-- `MAZER-ACCT-007` Give accounts made on the account site a Mazer profile (high, archived)
-- `MAZER-ACCT-008` Widen the sign-in window to 15 minutes and name each sign-in failure (high, archived)
-- `MAZER-ACCT-009` Make the Create Account result honest (high, archived)
-- `MAZER-ACCT-040` Load straight into the account sign-in instead of the Mazer sign-in screen (high, archived)
-- `MAZER-ACCT-041` Account pages never scroll, host sign-out endpoint, reset ends other sessions (high, archived)
-- `MAZER-ACCT-043` No Mazer account screens: only account.fawxzzy.com screens (high, archived)
-- `MAZER-GEN-006` No one-tile dead-end stubs in generated mazes (high, archived)
-- `MAZER-GOV-004` Retire the previous project board and refresh this one from all prior discussion (high, archived)
-- `MAZER-MOTION-020` Replace the maze fade in and out with a smooth build and tear-down (high, archived)
-- `MAZER-PROG-015` Double lure on levels 2-268 and the mastery tier removed (ladder v2): merged and deployed (high, archived)
-- `MAZER-PWA-007` Install gate always on for browser access (high, archived)
-- `MAZER-UI-020` Decide the six design-board picks: font, quit confirm, start style, icons, backdrop, HUD (high, archived)
-- `MAZER-VIS-050` Remove the thin white pre-draw line and the centre dot on every maze tile (high, archived)
-- `MAZER-VIS-053` Spiral start marker synced with the end star; polish start and end tiles (high, archived)
-- `MAZER-VIS-054` Corner diamonds fully visible on rounded displays (high, archived)
-- `MAZER-ACCT-011` Add a leaderboard username editor (Edit name): merged and deployed (medium, archived)
-- `MAZER-ACCT-039` Test the account reset flow end to end (medium, archived)
-- `MAZER-AI-001` AI runner calibration: per-band thresholds and checker landed, retention not built (medium, archived)
-- `MAZER-AUDIO-001` Decide whether the game has sound (medium, archived)
-- `MAZER-AUDIO-004` Gentler step sound and Sound on by default (medium, archived)
-- `MAZER-FLOW-006` Decide: resume the same maze after quit or reload (medium, archived)
-- `MAZER-FLOW-011` Decide when input unlocks during the level intro (medium, archived)
-- `MAZER-FLOW-014` Make player speed constant and 8% slower: merged and deployed (medium, archived)
-- `MAZER-FLOW-015` Show the level clear time above the level number between levels (medium, archived)
-- `MAZER-FLOW-016` Keep the same maze after quit or reload (medium, archived)
-- `MAZER-FLOW-017` Touch-first level 1 hint that follows the input in use (medium, archived)
-- `MAZER-FLOW-018` Menu demo starts at player level; tap anywhere to play (medium, archived)
 - `MAZER-GEN-024` Weigh bleed gates in the felt tuner (medium, planning)
-- `MAZER-GOV-007` Generated work report and work ledger (medium, archived)
-- `MAZER-GOV-008` Run the brand tests in CI (medium, archived)
-- `MAZER-GOV-010` Board updates by event log and milestone fold, not per PR (medium, archived)
 - `MAZER-GOV-013` Dispatch the Board sync workflow once on GitHub and record the run (medium, planning)
-- `MAZER-GOV-014` Capture owed for wave 3A and a Wave 0C capture script (medium, archived)
-- `MAZER-MOTION-001` Adopt one motion scale for durations, loops and easing (medium, archived)
-- `MAZER-PERF-010` Investigate an intermittent slow boot seen by the QA sign-in test (medium, archived)
-- `MAZER-QA-009` One ordered phone check list that closes several cards (medium, archived)
-- `MAZER-QA-010` Make the online counter measurement check stable (medium, archived)
-- `MAZER-UI-024` Online counter in the main menu, profile and leaderboard icons swapped (medium, archived)
 - `MAZER-UI-027` Split the menu scene into smaller owned modules (medium, planning)
-- `MAZER-UI-033` Shrink the menu online counter to username text size and add an Online label (medium, archived)
-- `MAZER-UI-050` Touch up the Start, Mazer title and Level text designs (medium, archived)
-- `MAZER-UI-056` Online counter readability on the menu (medium, archived)
-- `MAZER-VIS-012` Unify the backdrop across boot, install gate and sign-in (medium, archived)
-- `MAZER-VIS-017` Purge the disabled backdrop glyph drawing code and its pinned source-string tests (medium, archived)
-- `MAZER-VIS-022` AI player and play player share one marker drawn like the end tiles (medium, archived)
-- `MAZER-VIS-033` Edge diamonds: one fill only, fill inner to outer, drain outer to inner (medium, archived)
-- `MAZER-VIS-038` Edge diamonds: beams on the inner tip, half size while playing, continuous beams (medium, archived)
-- `MAZER-VIS-039` One smooth loader and the website app image everywhere (medium, archived)
-- `MAZER-VIS-040` Smooth maze build-in and build-out (medium, archived)
-- `MAZER-VIS-044` Keep the four corner edge diamonds anchored in the screen corners (medium, archived)
-- `MAZER-VIS-051` Make trail colours bolder and more arcade, less pastel (medium, archived)
-- `MAZER-VIS-052` Main menu: restore bleed-off paths that run off the screen edge (medium, archived)
-- `MAZER-VIS-055` Edge marker redesign (medium, archived)
-- `MAZER-VIS-056` Bottom corner stars clear the real display corner (medium, archived)
-- `MAZER-ACCT-031` Show a failure code a player can read off a phone (low, archived)
-- `MAZER-AUDIO-003` Add small synthesized sound effects with a Settings toggle, default off (low, archived)
-- `MAZER-DEBT-002` Stop publishing constant formMode and invalidFields in menu diagnostics (low, archived)
-- `MAZER-DOCS-001` Multi-target deployment architecture doc (low, archived)
 - `MAZER-ECON-004` Offer the saved skin designs as shop unlockables (low, planning)
 - `MAZER-FLOW-019` Show the build stamp in Settings (low, planning)
-- `MAZER-GOV-011` Run the owner export checks inside board apply (low, archived)
 - `MAZER-HAZ-010` Unify H4 and H5 rewind into one path (low, planning)
 - `MAZER-HAZ-011` Wire Shards and Hunter into play behind the lab flag (low, planning)
-- `MAZER-MOTION-007` Decide off-scale loops and durations and sweep dead motion code (low, archived)
-- `MAZER-MOTION-011` Rise and stagger entrance for overlays and controls (low, archived)
-- `MAZER-PERF-009` Prefetch or time-slice the first maze of a session (low, archived)
-- `MAZER-PERF-011` Drop the 934 KB app icon from the service worker precache (low, archived)
-- `MAZER-PROG-006` Decide a minimum tile size for very large boards (low, archived)
-- `MAZER-PWA-002` Add PWA screenshots, iOS launch art and icon cleanup (low, archived)
-- `MAZER-PWA-006` Trim dev pages from the precache and decide update behaviour on deploy (low, archived)
-- `MAZER-QA-008` Add ladder-end checkpoints 283 and 288 to the level preview (low, archived)
-- `MAZER-QA-011` Player-reachable route to levels 60, 100 and 190 for checks (low, archived)
-- `MAZER-UI-021` Route auth, sync, username and boot errors into the message toast (low, archived)
-- `MAZER-UI-022` Move the offline-notice strings into the message module copy tables (low, archived)
-- `MAZER-UI-025` Privacy text names the live Mazer online count (low, archived)
-- `MAZER-UI-026` Settings: three rows removed and a description line required on every row (low, archived)
-- `MAZER-UI-028` Give every UI rework wave a visual proof surface (Wave 6) (low, archived)
 - `MAZER-UI-029` Retire the future-phaser path (low, planning)
-- `MAZER-UI-030` Show the offline cache update warning in the message toast (low, archived)
-- `MAZER-UI-031` Migrate stray colour literals to theme values in slices (low, archived)
-- `MAZER-UI-032` Finish the wave 1C diagnostics type cleanup (low, archived)
-- `MAZER-UI-034` Smaller font for the sign-in failure code line (low, archived)
-- `MAZER-UI-035` Move the settings gear off the top-right corner diamond at 390 wide (low, archived)
 - `MAZER-UI-036` Move remaining legacy font stacks to the shared type scale (low, planning)
 - `MAZER-UI-090` Update the in-app guide for hazards and menu changes (low, planning)
-- `MAZER-VIS-026` Decide dense-board player prominence after the tile-sized ring (low, archived)
-- `MAZER-VIS-032` Start the outro ring orbit from the master laser clock, not a fixed 600 ms (low, archived)
-- `MAZER-VIS-034` Centre the goal star by its centre of mass in the tile (low, archived)
-- `MAZER-VIS-035` Keep a few background stars rainbow-coloured (low, archived)
-- `MAZER-VIS-036` Centre the start arrow by its painted centroid (low, archived)
-- `MAZER-VIS-037` Bound the trail canvas colour step at the sheen crossing (low, archived)
-- `MAZER-VIS-041` End star spins slowly and stays visible under the player (low, archived)
-- `MAZER-VIS-042` Mirror the Fitness loader hardening in the Mazer loader (low, archived)
 - `MAZER-VIS-057` Bottom corner stars in landscape and iPads (low, planning)
