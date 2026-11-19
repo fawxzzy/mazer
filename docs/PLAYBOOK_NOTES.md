@@ -504,3 +504,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: scripts/analysis/capture-world-identity-ui-evidence.mjs readIconState no longer reads the retired corner Settings and Leaderboard icon fields; it reports menuDropdownShown and the touch Settings cog state instead.
 - WHY it changed: the corner icons are rows of the Menu dropdown now, so the old fields always read null and hid real state in the evidence output. Script only: no runtime change, no deploy.
 - Status: node --check ok; no assertion referenced the removed fields.
+## 2026-11-19 Work report counts archived cards
+- WHAT changed: scripts/analysis/work-report.mjs treats an archived card like a completed one (keeps its evidence tier) instead of falling through to the ledger buckets; regenerated docs/ops/MAZER-WORK-REPORT.md and .json.
+- WHY it changed: the 2026-11-19 board fold archived 40 completed cards; the report had no archived branch, so archived cards left the shipped list and one reappeared as an owner decision with no ask, failing tests/reset/work-report.test.ts on main.
+- Status: work-report tests 7/7 pass; check passes.

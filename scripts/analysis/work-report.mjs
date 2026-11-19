@@ -129,7 +129,8 @@ export function buildWorkReport(registry, ledger) {
     const verify = e.verify ?? [];
     const base = { prs: formatPrs(e.evidence?.prs), lane: e.lane ?? null };
 
-    if (card.status === "completed") {
+    // An archived card is a completed card that was closed out (board-sync `archive: true`): it keeps its evidence tier here.
+    if (card.status === "completed" || card.status === "archived") {
       const tier = completedTier(e.evidence);
       lists.completed[tier].push(assign(card, "completed", tier, {
         ...slim(card, e),
