@@ -21,6 +21,7 @@ const MEASURED_HEIGHTS = [
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
+  resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideKeyboardLineHeight(2)
 ];
 
@@ -53,7 +54,8 @@ describe('guide sheet plan', () => {
   );
 
   test('a tall desktop shows the whole guide; 320x568 scrolls and keeps Got it pinned', () => {
-    const wide = buildLegacyGuideSheetPlan({ height: 1100, itemHeights: MEASURED_HEIGHTS, width: 1280 });
+    // 1200 tall since the Wrap gate row (MAZER-L10): eleven rows scroll by 46 px at 1100.
+    const wide = buildLegacyGuideSheetPlan({ height: 1200, itemHeights: MEASURED_HEIGHTS, width: 1280 });
     expect(wide.scrollable).toBe(false);
     expect(wide.maxScrollOffset).toBe(0);
     const narrow = buildLegacyGuideSheetPlan({ height: 568, itemHeights: MEASURED_HEIGHTS, width: 320 });
