@@ -907,39 +907,42 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     expect(resolveOutroTotalMs(TILES)).toBe(OUTRO_TILES_START_MS + resolveOutroRemoveMs(TILES) + OUTRO_HANDOFF_MS);
   });
 
-  test('orbit phase: parked while the beams fly and are absorbed, then one full lap (build clockwise, deconstruct counter-clockwise), exactly 0 at both ends', () => {
+  test('orbit phase (yo-yo): parked while the beams fly, one lap counter-clockwise to the turnaround at the full deconstruct, then one lap clockwise from it, exactly 0 at the rest ends', () => {
     const introEnd = resolveIntroRevealEndMs(TILES);
     const outroEnd = resolveOutroTotalMs(TILES);
-    const cases = [
-      { label: 'intro', startMs: INTRO_BUILD_START_MS, end: introEnd, sign: 1, phaseAt: (ms: number) => resolveIntro(ms, FULL).ringSpinRad },
-      { label: 'outro', startMs: OUTRO_RING_ORBIT_START_MS, end: outroEnd, sign: -1, phaseAt: (ms: number) => resolveIntroDeconstruct(ms, FULL).ringSpinRad }
-    ];
+    const TAU = Math.PI * 2;
     void CYCLE;
-    // Derived from the master laser clock (MAZER-VIS-032), not pinned: see the derivation test below.
-    for (const { label, startMs, end, sign, phaseAt } of cases) {
-      // Parked (an exact 0 -> the rest layout) for the whole beam flight, so every beam fires from / lands on a rest station.
-      for (let ms = 0; ms <= startMs; ms += 1) {
-        expect(phaseAt(ms), `${label} t=${ms}`).toBe(0);
-      }
-      expect(phaseAt(end), label).toBe(0);
-      expect(phaseAt(end + 5000), label).toBe(0);
-      let previous = 0;
-      let peak = 0;
-      for (let ms = startMs + 1; ms < end; ms += 1) {
-        const phase = sign * phaseAt(ms);
-        expect(phase, `${label} t=${ms}`).toBeGreaterThan(previous - 1e-12);
-        expect(phase).toBeLessThanOrEqual((Math.PI * 2) + 1e-9);
-        previous = phase;
-        peak = Math.max(peak, phase);
-      }
-      // It travels a full lap by the end of the window and lands on a whole number of laps.
-      expect(peak).toBeGreaterThan(Math.PI * 2 * 0.99);
-      const viewport = { width: 390, height: 844 };
-      expect(resolveOrbitingEdgeStations(viewport, phaseAt(end))).toEqual(resolveEdgeStations(viewport));
-      // The window is the ~2-3.2 s reveal / ~2.1-3.3 s deconstruct.
-      expect(end - startMs).toBeGreaterThanOrEqual(2000);
-      expect(end - startMs).toBeLessThanOrEqual(3300);
+    // Outro: parked (exact 0) until the last beam has let go, then monotone counter-clockwise to -2 pi at the turnaround.
+    for (let ms = 0; ms <= OUTRO_RING_ORBIT_START_MS; ms += 1) {
+      expect(resolveIntroDeconstruct(ms, FULL).ringSpinRad, `outro t=${ms}`).toBe(0);
     }
+    let previous = 0;
+    for (let ms = OUTRO_RING_ORBIT_START_MS + 1; ms < outroEnd; ms += 1) {
+      const phase = resolveIntroDeconstruct(ms, FULL).ringSpinRad;
+      expect(phase, `outro t=${ms}`).toBeLessThanOrEqual(previous + 1e-12);
+      expect(phase).toBeGreaterThanOrEqual(-TAU - 1e-9);
+      previous = phase;
+    }
+    expect(previous).toBeLessThan(-TAU * 0.99);
+    expect(resolveIntroDeconstruct(outroEnd, FULL).ringSpinRad).toBe(0);
+    expect(resolveIntroDeconstruct(outroEnd + 5000, FULL).ringSpinRad).toBe(0);
+    // Intro: starts AT the turnaround (-2 pi, the rest layout) with no parked dwell, monotone clockwise, exactly 0 at the build end.
+    expect(resolveIntro(0, FULL).ringSpinRad).toBeCloseTo(-TAU, 9);
+    let last = -TAU - 1e-9;
+    for (let ms = 0; ms < introEnd; ms += 1) {
+      const phase = resolveIntro(ms, FULL).ringSpinRad;
+      expect(phase, `intro t=${ms}`).toBeGreaterThan(last - 1e-12);
+      expect(phase).toBeLessThanOrEqual(1e-9);
+      last = phase;
+    }
+    expect(resolveIntro(introEnd, FULL).ringSpinRad).toBe(0);
+    expect(resolveIntro(introEnd + 5000, FULL).ringSpinRad).toBe(0);
+    const viewport = { width: 390, height: 844 };
+    expect(resolveOrbitingEdgeStations(viewport, resolveIntro(0, FULL).ringSpinRad)).toEqual(resolveEdgeStations(viewport));
+    expect(resolveOrbitingEdgeStations(viewport, resolveIntro(introEnd, FULL).ringSpinRad)).toEqual(resolveEdgeStations(viewport));
+    // The windows are the ~2-3.3 s reveal / deconstruct.
+    expect(introEnd).toBeGreaterThanOrEqual(2000);
+    expect(outroEnd - OUTRO_RING_ORBIT_START_MS).toBeLessThanOrEqual(3300);
   });
 });
 
