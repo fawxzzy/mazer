@@ -85,6 +85,7 @@ jobs:
           tests/render/pixelAlignment.test.ts
           tests/render/bleedGlow.test.ts
           tests/render/backdropStars.test.ts
+          tests/render/trail-bloom-clip.test.ts
           tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
           --maxWorkers=1
