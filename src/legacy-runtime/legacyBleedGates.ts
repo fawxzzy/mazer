@@ -176,7 +176,27 @@ export interface LegacyBleedGatePlacement {
 // when one qualifies, and the one that pays the most for walking to it.
 // Returns null when no path can be gated (none saves a step, hiding it would cut the maze, or no tile is far
 // enough away and still pays for its detour).
-export const placeLegacyBleedGate = (maze: GateMaze): LegacyBleedGatePlacement | null => {
+// MAZER-GEN-024: `hint` is the gate the felt tuner priced on an earlier grid of the same maze (the tuner only adds
+// side branches after pricing, which never move a shortest route). When that tile is still a valid gate it is
+// the one placed, so the gate the player meets is the one the level was priced for; otherwise the normal pick.
+export type LegacyBleedGateHint = Pick<LegacyBleedGate, 'axis' | 'line' | 'x' | 'y'>;
+
+export const placeLegacyBleedGate = (maze: GateMaze, hint?: LegacyBleedGateHint | null): LegacyBleedGatePlacement | null => {
+  if (hint) {
+    const hinted = placeLegacyBleedGateWithin(maze, hint);
+    if (hinted !== null) {
+      return hinted;
+    }
+  }
+  return placeLegacyBleedGateWithin(maze, null);
+};
+
+// Only the hinted gate, or null when it is no longer a valid gate on this grid (no fallback pick).
+export const placeLegacyBleedGateWithHint = (maze: GateMaze, hint: LegacyBleedGateHint): LegacyBleedGatePlacement | null => (
+  placeLegacyBleedGateWithin(maze, hint)
+);
+
+const placeLegacyBleedGateWithin = (maze: GateMaze, only: LegacyBleedGateHint | null): LegacyBleedGatePlacement | null => {
   const { width, height, grid, start, goal } = maze;
   const paths = listBleedPaths(grid);
   if (paths.length === 0) {
@@ -191,6 +211,9 @@ export const placeLegacyBleedGate = (maze: GateMaze): LegacyBleedGatePlacement |
   const totalReached = countReached(allOpen);
   const candidates: { path: BleedPath; hidden: boolean[][]; hiddenFromStart: Int32Array; hiddenSteps: number }[] = [];
   for (const path of paths) {
+    if (only !== null && (path.axis !== only.axis || path.line !== only.line)) {
+      continue;
+    }
     const hidden = resolveLegacyBleedGateHiddenGrid(grid, [path]);
     const borders = resolveLegacyBleedGateBorderCells(path, width, height);
     if (borders.some((cell) => (cell.x === start.x && cell.y === start.y) || (cell.x === goal.x && cell.y === goal.y))) {
@@ -223,6 +246,9 @@ export const placeLegacyBleedGate = (maze: GateMaze): LegacyBleedGatePlacement |
       const x = index % width;
       const y = (index - x) / width;
       if (!hidden[y]![x] || (x === start.x && y === start.y) || (x === goal.x && y === goal.y)) {
+        continue;
+      }
+      if (only !== null && (x !== only.x || y !== only.y)) {
         continue;
       }
       const reach = hiddenFromStart[index]!;
@@ -279,6 +305,18 @@ export const resolveLegacyBleedGatesForLevel = (level: number, maze: GateMaze): 
   }
   const placement = placeLegacyBleedGate(maze);
   return placement ? [placement.gate] : [];
+};
+
+// MAZER-GEN-024: what the gate takes back from the felt tuner's wrap saving, in steps: the detour the player
+// walks to light the gate (gated route minus the open-wrap route). 0 when the maze would carry no gate.
+export const measureLegacyBleedGateWrapPenalty = (
+  maze: GateMaze,
+  hint?: LegacyBleedGateHint | null
+): { penalty: number; gate: LegacyBleedGate | null } => {
+  const placement = hint ? placeLegacyBleedGateWithHint(maze, hint) : placeLegacyBleedGate(maze);
+  return placement
+    ? { penalty: Math.max(0, placement.gatedRouteSteps - placement.openSteps), gate: placement.gate }
+    : { penalty: 0, gate: null };
 };
 
 // Gated wrap pricing: the steps the maze's wraps give back to a player who knows the map, with every unlit

@@ -163,13 +163,18 @@ describe('wrap fade: generated mazes follow the roll, are priced for their wraps
           const planar = routeLength(maze, false, true);
           const torus = routeLength(maze, true, true);
           expect(planar).toBeGreaterThan(0);
-          expect(maze.wrapStats?.saved ?? 0).toBe(Math.max(0, planar - torus));
+          // MAZER-GEN-024: a gated wrap is closed until lit, so a gated maze records its saving net of the
+          // detour to its gate (what the gate costs the player who knows the map).
+          const gate = maze.bleedGates?.[0];
+          const gateDetour = gate ? gate.ungatedSaving - gate.gatedSaving : 0;
+          const ungated = Math.max(0, planar - torus);
+          expect((maze.wrapStats?.saved ?? 0) + gateDetour).toBe(ungated);
           if ((maze.wrapStats?.saved ?? 0) > 0) { wrapped += 1; }
           // The two savings add up to the whole: everything optional closed (loop connectors closed,
           // wrap links severed) against the maze as built.
           const asBuilt = routeLength(maze, true, false);
           const whole = Math.max(0, planar - asBuilt);
-          expect((maze.loopStats?.saved ?? 0) + (maze.wrapStats?.saved ?? 0)).toBe(whole);
+          expect((maze.loopStats?.saved ?? 0) + (maze.wrapStats?.saved ?? 0) + gateDetour).toBe(whole);
           if (maze.loopStats !== undefined) { withLoops += 1; }
         }
       }
