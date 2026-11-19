@@ -510,3 +510,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: the menu and play must read one bleed profile; do not add a menu-only profile branch again. The one-tile-stub guard (legacy-maze-no-stubs-both-profiles) stays as the menu-mode check.
 - Docs: docs/current-truth.md is a guarded file and was not edited; it has no line naming the band profile, so nothing there is wrong. Audit note updated in docs/research/MAZER_BLEED_PATH_AUDIT.md.
 - Status: headless only (vitest, tsc, analysis script); nothing checked on a real phone.
+## 2026-11-19 Work report counts archived cards
+- WHAT changed: scripts/analysis/work-report.mjs treats an archived card like a completed one (keeps its evidence tier) instead of falling through to the ledger buckets; regenerated docs/ops/MAZER-WORK-REPORT.md and .json.
+- WHY it changed: the 2026-11-19 board fold archived 40 completed cards; the report had no archived branch, so archived cards left the shipped list and one reappeared as an owner decision with no ask, failing tests/reset/work-report.test.ts on main.
+- Status: work-report tests 7/7 pass; check passes.
