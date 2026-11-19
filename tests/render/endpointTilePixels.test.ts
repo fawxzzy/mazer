@@ -92,6 +92,8 @@ const render = (
   drawBoardMarkers(marked, {
     style: 'chip', tileSize, devicePixelRatio: dpr, originX: layout.originX, originY: layout.originY,
     [kind]: cell, [kind === 'goal' ? 'goalTile' : 'startTile']: tile,
+    // This suite pins the pre-L5 looks (still drawable as retired skins); the L5 defaults are pinned in endpointTileSkins.test.ts.
+    startTileSkin: 'pinwheel', endTileSkin: 'solid-star',
     ...(kind === 'start' ? { startSpiralRotation: rotation } : { goalStarRotation: rotation })
   });
   const x0 = Math.round((layout.originX + tile.left) * dpr);

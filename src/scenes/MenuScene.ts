@@ -10633,6 +10633,8 @@ export class MenuScene extends Phaser.Scene {
       // MAZER-VIS-053: the start spiral turns on the SAME clock and period as the star (in phase), and the star's border is
       // the shared border colour of the edge diamonds (same function, same trail head, same reduced-motion rule).
       startSpiralRotation: kind === 'start' ? resolveStartSpiralRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      // L5 (endpointTileSkins.ts): the default skins (Seed spiral, Twin stars) animate on the same scene clock.
+      endpointTimeMs: time ?? 0,
       endpointBorderColor: resolveSharedBorderColor(this.trailPaletteHead, time ?? 0, this.prefersLegacyReducedMotion())
     };
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail

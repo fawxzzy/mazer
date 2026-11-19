@@ -8,8 +8,20 @@
  *
  * Reduced motion: the halo is static (no pulse) and the ping is not drawn. Pure functions: the draw is a
  * function of (geometry, timeMs, reducedMotion) only, no Date/Math.random.
+ *
+ * Ping SHAPE (L5, endpointTileSkins.ts): it follows the end-tile skin. The default Twin stars skin pings a five-point star
+ * (outer tip radius = the ring radius it replaced, inner 0.45 of it, same timing, stroke, alpha and goal red), turning
+ * counter-clockwise on its own clock; the retired solid-star skin keeps the round ring.
  */
 import { centerOfCell, type TileBakeContext2D } from './boardTileBake';
+import {
+  resolveGoalPingShape,
+  resolveStarPoints,
+  resolveTwinStarsPingRotation,
+  TWIN_STARS,
+  type EndTileSkinId,
+  type GoalPingShape
+} from './endpointTileSkins';
 import { MOTION_LOOP_MS } from './motionScale';
 import {
   BOARD_MARKER_MIN_CSS,
@@ -48,7 +60,14 @@ export interface GoalBeaconSpec {
   readonly haloRadiusCss: number;
   /** Cumulative halo alpha at the badge edge for this instant. */
   readonly haloAlpha: number;
-  readonly ping: { readonly radiusCss: number; readonly alpha: number; readonly widthCss: number } | null;
+  readonly ping: {
+    readonly radiusCss: number;
+    readonly alpha: number;
+    readonly widthCss: number;
+    /** 'star5': a five-point star whose tips sit on `radiusCss`, turned `rotation` radians clockwise. */
+    readonly shape: GoalPingShape;
+    readonly rotation: number;
+  } | null;
 }
 
 export interface GoalBeaconInput {
@@ -56,6 +75,8 @@ export interface GoalBeaconInput {
   timeMs: number;
   reducedMotion: boolean;
   minBadgeDiameterCss?: number;
+  /** The end-tile skin (endpointTileSkins.ts); picks the ping shape. Default: the default skin (Twin stars, star ping). */
+  endTileSkin?: EndTileSkinId;
 }
 
 export const resolveGoalBeacon = (input: GoalBeaconInput): GoalBeaconSpec => {
@@ -77,7 +98,9 @@ export const resolveGoalBeacon = (input: GoalBeaconInput): GoalBeaconSpec => {
       ping = {
         radiusCss: badgeRadiusCss + ((haloRadiusCss * k.pingTravel) - badgeRadiusCss) * eased,
         alpha: k.pingPeakAlpha * (1 - t),
-        widthCss: k.pingStrokeCss
+        widthCss: k.pingStrokeCss,
+        shape: resolveGoalPingShape(input.endTileSkin),
+        rotation: resolveTwinStarsPingRotation(input.timeMs, input.reducedMotion)
       };
     }
   }
@@ -121,8 +144,19 @@ export const drawGoalBeacon = (ctx: TileBakeContext2D, input: GoalBeaconDrawInpu
     ctx.strokeStyle = cssRgba(boardMaterial.goal, spec.ping.alpha * opacity);
     ctx.lineWidth = spec.ping.widthCss;
     ctx.beginPath();
-    ctx.moveTo(cx + spec.ping.radiusCss, cy);
-    ctx.arc(cx, cy, spec.ping.radiusCss, 0, Math.PI * 2);
+    if (spec.ping.shape === 'star5') {
+      const r = spec.ping.radiusCss;
+      const pts = resolveStarPoints(cx, cy, r, r * TWIN_STARS.pingInnerShare, 5, spec.ping.rotation);
+      ctx.lineJoin = 'round';
+      ctx.moveTo(pts[0] as number, pts[1] as number);
+      for (let i = 2; i < pts.length; i += 2) {
+        ctx.lineTo(pts[i] as number, pts[i + 1] as number);
+      }
+      ctx.closePath();
+    } else {
+      ctx.moveTo(cx + spec.ping.radiusCss, cy);
+      ctx.arc(cx, cy, spec.ping.radiusCss, 0, Math.PI * 2);
+    }
     ctx.stroke();
   }
   ctx.restore();

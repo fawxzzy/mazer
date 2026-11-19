@@ -22,6 +22,7 @@ import {
   cssRgba,
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
+import { SEED_SPIRAL } from '../../src/render/endpointTileSkins';
 import { resolveSharedBorderColor } from '../../src/render/trailPalette';
 import {
   braidedMazeGrid,
@@ -432,7 +433,8 @@ describe('markers', () => {
   });
 
   test('chip goal: a keyline, a border in the shared border colour, then a star in the danger colour, directly on the tile (no pad, no disc, no ring)', () => {
-    const { rec } = draw({ start: undefined, player: undefined });
+    // the pre-L5 solid star, a retired skin that stays drawable (the L5 Twin stars are pinned in endpointTileSkins.test.ts)
+    const { rec } = draw({ start: undefined, player: undefined, endTileSkin: 'solid-star' });
     expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
       `set fillStyle=${cssRgb(boardMaterial.void)}`,
       `set fillStyle=${cssRgb(resolveSharedBorderColor(null, 0, true))}`,
@@ -453,7 +455,8 @@ describe('markers', () => {
   });
 
   test('chip start: a keyline then a gold two-arm spiral, directly on the tile (no pad, no disc, no ring)', () => {
-    const { rec } = draw({ goal: undefined, player: undefined });
+    // the pre-L5 two-arm spiral, a retired skin that stays drawable (the L5 Seed spiral is pinned in endpointTileSkins.test.ts)
+    const { rec } = draw({ goal: undefined, player: undefined, startTileSkin: 'pinwheel' });
     expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([]);
     expect(rec.log.filter((e) => e.startsWith('set strokeStyle='))).toEqual([
       `set strokeStyle=${cssRgb(boardMaterial.void)}`,
@@ -498,7 +501,7 @@ describe('markers', () => {
       const rec = createRecordingContext();
       drawBoardMarkers(rec.ctx, {
         style: 'chip', tileSize: 14.72, devicePixelRatio: 3, start: { x: 12, y: 0 }, startTile: direction ? { ...tile, direction } : tile,
-        startSpiralRotation: rotation
+        startSpiralRotation: rotation, startTileSkin: 'pinwheel'
       });
       return rec.log
         .filter((e) => e.startsWith('moveTo(') || e.startsWith('lineTo('))
@@ -533,8 +536,10 @@ describe('markers', () => {
   test('start marker is skipped while the player stands on it', () => {
     const on = draw({ player: { x: 1, y: 1 }, goal: undefined });
     const off = draw({ player: { x: 2, y: 1 }, goal: undefined });
-    expect(on.rec.log.some((e) => e.includes(cssRgb(boardMaterial.start)))).toBe(false);
-    expect(off.rec.log.some((e) => e.includes(cssRgb(boardMaterial.start)))).toBe(true);
+    // the default Seed spiral's bead colour (skin-local green, drawn as rgba()), by its channels
+    const beads = cssRgb(SEED_SPIRAL.color).slice('rgb('.length, -1);
+    expect(on.rec.log.some((e) => e.includes(beads))).toBe(false);
+    expect(off.rec.log.some((e) => e.includes(beads))).toBe(true);
   });
 
   test('reduced motion pins the phase: it is a no-op, while otherwise phase modulates the Trace goal ring (the Chip end markers are static)', () => {
@@ -560,7 +565,10 @@ describe('markers', () => {
       ['goal keyline', boardMaterial.void, chip],
       ['goal star on keyline', boardMaterial.goal, boardMaterial.void],
       ['start spiral keyline', boardMaterial.void, chip],
-      ['start spiral on keyline', boardMaterial.start, boardMaterial.void]
+      ['start spiral on keyline', boardMaterial.start, boardMaterial.void],
+      // the default Seed spiral's green beads (each over its own void keyline disc)
+      ['seed spiral beads', SEED_SPIRAL.color, chip],
+      ['seed spiral beads on keyline', SEED_SPIRAL.color, boardMaterial.void]
     ];
     console.info(`BOARD_TILE_CONTRAST ${rows.map(([n, f, b]) => `${n}: ${contrast(f, b).toFixed(2)}`).join(' | ')}`);
     for (const [name, fg, bg] of rows) {
