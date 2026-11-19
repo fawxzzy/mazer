@@ -1356,6 +1356,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Move',
   'Your trail',
   'Wrap',
+  'Wrap gate',
   'Levels',
   'Online',
   'Sound',
