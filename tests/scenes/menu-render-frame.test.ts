@@ -1141,9 +1141,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
-    // squash-and-stretch while gliding: the pose goes into the shared frame (playerMarker.ts holds the 0.1 stretch)
-    expect(menuSceneSource).toContain('motionAmount: motionPose.amount,');
-    expect(menuSceneSource).toContain('headingX: motionPose.headingX,');
+    // squash-and-stretch while gliding: the pose goes into the shared Spark frame (sparkPlayerSkin.ts holds the 0.1
+    // stretch), and the glide heading turns the kite (SparkHeading eases it through the turn)
+    expect(menuSceneSource).toMatch(/motionAmount: motionPose\.amount\r?\n/);
+    expect(menuSceneSource).toContain('motionPose.headingX,');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');

@@ -130,7 +130,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     heading: 'You',
     icon: {
       badge: 'square',
-      boardDraw: { module: 'src/render/playerMarker.ts', symbol: 'drawPlayerMarker' },
+      boardDraw: { module: 'src/render/sparkPlayerSkin.ts', symbol: 'drawSparkPlayer' },
       chipDraw: { marker: 'player', module: 'src/render/boardTileBake.ts', symbol: 'drawBoardMarkers' },
       glyph: 'player-block',
       lane: null,
@@ -138,7 +138,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'you',
-    text: 'You are the green rounded block inside a bright ring.'
+    text: 'You are the colour-shifting spark. It points the way you move.'
   },
   {
     heading: 'Move',
@@ -166,7 +166,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A shimmering, colour-shifting line is your route. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
+    text: `A trail of twinkling star dust marks your route. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
   },
   {
     heading: 'Wrap',
