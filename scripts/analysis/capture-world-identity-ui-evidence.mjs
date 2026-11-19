@@ -220,9 +220,9 @@ const readIconState = (page) => page.evaluate(() => {
   return {
     mode: s.mode,
     overlay: s.overlay,
-    headerSettingsIcon: iconState(s.headerSettingsIconImage),
+    // L6: the corner Settings / Profile / Leaderboard icons are retired; they are rows of the Menu dropdown now.
+    menuDropdownShown: s.menuDropdown ? s.menuDropdown.isShown() : null,
     touchSettingsCogIcon: iconState(s.touchSettingsCogIconImage),
-    headerLeaderboardIcon: iconState(s.headerLeaderboardIconImage),
     uiButtonCount: (s.uiButtons || []).length,
     uiButtonTexts: (s.uiButtons || []).map((b) => b.semanticAction || b.text)
   };
