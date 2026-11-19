@@ -358,6 +358,12 @@ import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderC
 import { LEGACY_MENU_DROPDOWN_ITEMS, type LegacyMenuDropdownItemId } from '../legacy-runtime/legacyMenuDropdown';
 import { LegacyMenuDropdownController } from '../render/menuDropdownButtons';
 import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
+import {
+  ensureMenuPlayLabelGlowTexture,
+  resolveMenuPlayLabelAttention,
+  resolveMenuPlayLabelGlowRect,
+  resolveMenuPlayLabelSweepMix
+} from '../render/menuPlayLabelAttention';
 import { resolveLegacyMinHitRect } from '../legacy-runtime/legacyHitTarget';
 import { resolveLegacyFrontDoorHitZone, shouldFrontDoorTapAnywhereStartRun } from '../legacy-runtime/legacyFrontDoorHitZone';
 import {
@@ -9766,7 +9772,8 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alpha: number,
     revealProgress: number = 1,
-    clearFirst: boolean = true
+    clearFirst: boolean = true,
+    sweepCenter: number | null = null
   ): void {
     if (clearFirst) {
       graphics.clear();
@@ -9793,19 +9800,15 @@ export class MenuScene extends Phaser.Scene {
         RAINBOW_UI_SATURATION,
         RAINBOW_UI_VALUE
       ).color;
-      drawChipCell(
-        graphics,
-        geometry,
-        layout.left,
-        layout.top,
-        cell.column,
-        cell.row,
-        {
-          rim: mixLegacyIridescentColor(cellColor, boardMaterial.white, LEGACY_WORDMARK_CHIP_RIM_LIGHTEN),
-          fill: mixLegacyIridescentColor(cellColor, boardMaterial.void, LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX)
-        },
-        alpha
-      );
+      let rim = mixLegacyIridescentColor(cellColor, boardMaterial.white, LEGACY_WORDMARK_CHIP_RIM_LIGHTEN);
+      let fill = mixLegacyIridescentColor(cellColor, boardMaterial.void, LEGACY_WORDMARK_CHIP_FILL_CANVAS_MIX);
+      // MAZER-UI-094: the play label's light sweep, a white mix on the chips under the band (0 off the band).
+      const sweepMix = resolveMenuPlayLabelSweepMix(cell.column, layout.columns, sweepCenter);
+      if (sweepMix > 0) {
+        rim = mixLegacyIridescentColor(rim, boardMaterial.white, sweepMix);
+        fill = mixLegacyIridescentColor(fill, boardMaterial.white, sweepMix);
+      }
+      drawChipCell(graphics, geometry, layout.left, layout.top, cell.column, cell.row, { rim, fill }, alpha);
     }
   }
 
@@ -11190,8 +11193,9 @@ export class MenuScene extends Phaser.Scene {
     graphics: Phaser.GameObjects.Graphics,
     layout: LegacyGlyphWordLayout,
     time: number,
-    active = false
-  ): void {
+    active = false,
+    sweepCenter: number | null = null
+  ): number {
     // drawLegacyGlyphWordTileBlock: same real corridor-tile material and
     // full-hue rainbow mirage every other tile-block word on screen uses
     // (see that method's own header comment) -- replaces this button's own
@@ -11200,7 +11204,7 @@ export class MenuScene extends Phaser.Scene {
     // third, visually distinct treatment.
     const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(layout.cells.length);
     const revealProgress = layout.cells.length > 0 ? visiblePieceCount / layout.cells.length : 1;
-    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, active ? 1 : 0.95, revealProgress);
+    this.drawLegacyGlyphWordTileBlock(graphics, layout, time, active ? 1 : 0.95, revealProgress, true, sweepCenter);
     this.drawLegacyWordmarkAmbientSparkles(
       graphics,
       layout.left + (layout.width / 2),
@@ -11210,6 +11214,7 @@ export class MenuScene extends Phaser.Scene {
       time,
       active ? 1 : 0.92
     );
+    return revealProgress;
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -14181,6 +14186,11 @@ export class MenuScene extends Phaser.Scene {
       })
       : null;
     const baseAlpha = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA, 0.38) : 0.54;
+    // MAZER-UI-094: TAP TO PLAY's breathing glow, added before `panel` so it draws under the word (hidden at alpha 0).
+    const playLabelGlowKey = isPrimaryFrontDoorButton && text === MAIN_MENU_BUTTONS[0] && isLegacyGlyphWordRenderable(text)
+      ? ensureMenuPlayLabelGlowTexture(this.textures)
+      : null;
+    const playLabelGlow = playLabelGlowKey !== null ? this.add.image(0, 0, playLabelGlowKey).setAlpha(0) : null;
     const panel = this.add.graphics();
     // Every other button keeps the filled/bordered cyber panel. The primary
     // Start button has neither -- it's just a pulsating white glow ring (see
@@ -14267,6 +14277,10 @@ export class MenuScene extends Phaser.Scene {
       panel.setPosition(x, y);
       glyphLayout = resolveLegacyGlyphWordLayout(text, 0, 0, glyphCellSize);
       this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
+      if (playLabelGlow) {
+        const glowRect = resolveMenuPlayLabelGlowRect(x, y, glyphLayout.width);
+        playLabelGlow.setPosition(glowRect.centerX, glowRect.centerY).setDisplaySize(glowRect.width, glowRect.height);
+      }
     }
 
     const setActive = (active: boolean): void => {
@@ -14299,10 +14313,21 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: glyphLayout
         ? (time: number) => {
-          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
+          if (!playLabelGlow) {
+            this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
+            return;
+          }
+          // MAZER-UI-094: breath (scale + glow) and light sweep; reduced motion = static (scale 1, no glow, no sweep).
+          const attention = resolveMenuPlayLabelAttention(time, this.prefersLegacyReducedMotion());
+          panel.setScale(attention.scale);
+          const revealProgress = this.drawLegacyMenuFrontDoorGlyphButton(
+            panel, glyphLayout!, time, primaryButtonActive, attention.sweepCenter
+          );
+          playLabelGlow.setAlpha(attention.glowAlpha * revealProgress);
         }
         : undefined,
       destroy: () => {
+        playLabelGlow?.destroy();
         panel.destroy();
         background.destroy();
         label.destroy();

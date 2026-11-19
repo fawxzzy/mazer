@@ -17,6 +17,7 @@
  *   - the blinking header and HUD icons (settings cog, leaderboard, account; held fully lit)
  *   - the bleed-dock glow's travelling band (held at its peak, colour still shifting)
  *   - backdrop star drift and twinkle, sparkles, the AI option-tile pulse, loading pulses, the touch-stick anchor orbit
+ *   - the TAP TO PLAY breath, glow swell and light sweep (MAZER-UI-094; the label is drawn exactly as before)
  *   - the intro/outro reveal, which becomes a short crossfade
  *   - the Start hand-off, overlay open/close and boot splash fade (MAZER-MOTION-002): one 200 ms crossfade, no outward drift;
  *     the loading pulse (splash dot, in-game "Signing you in" diamond) is held lit
