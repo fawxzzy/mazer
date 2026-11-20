@@ -1443,15 +1443,13 @@ const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
   'Haptics'
 ]);
 
-// Account section of the Settings sheet (menu context, signed in): Reset
-// progress and Sign out are plain rows at the end of the sheet body, reached by
-// scrolling only when the viewport is too short for the card. There is no docked
-// session action bar any more (it was replaced by the shared sheet, PR #386);
-// 'Account' lives in a different overlay (the profile/username icon button).
+// Bottom of the Settings sheet (menu context, signed in). MAZER-UI-100 moved Reset
+// progress and Sign out to the account page (reached from Profile), so the sheet
+// ends on the Settings group and fits without scrolling on every supported phone.
+// 'Haptics' is a Settings group row that is on screen at the bottom of the sheet.
 // Cross-checked against buildLegacySettingsSheetModel('menu', { signedIn: true }).
 const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
-  'Reset progress',
-  'Sign out'
+  'Haptics'
 ]);
 
 const isAuthGatedMenuSurface = (surface) => (

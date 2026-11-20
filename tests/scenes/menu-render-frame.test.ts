@@ -2568,7 +2568,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     ...overrides
   };
   const noops = [
-    'syncLegacyAuthGateLoadingScreen', 'syncLegacyAuthOpeningTimeout', 'recordRuntimeFrame',
+    'syncLegacyAuthGateLoadingScreen', 'syncLegacyAuthOpeningTimeout', 'recordRuntimeFrame', 'consumePendingMazerAccountAction',
     'expireLegacyPlayerMessages', 'drawLegacyPlayerMessageToast', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
     'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',

@@ -788,12 +788,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
     expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
     expect(source).toContain('const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain("  'Sign out'\n]);");
-    // createLegacyOptionsSessionActionBar (MenuScene.ts) only ever renders a
-    // single 'Sign out' action at the bottom of the authenticated Options
-    // overlay -- 'Account' lives in a separate overlay reached via the
-    // profile/username icon, not at the bottom of Options. Asserting the
-    // absence of the old value keeps this contract from silently reverting.
+    // MAZER-UI-100: Reset progress and Sign out left the Settings sheet for the
+    // account page, so neither is expected at the bottom of Settings any more.
+    expect(source).not.toContain("  'Sign out'\n]);");
+    expect(source).not.toContain("  'Reset progress',\n");
+    // 'Account' lives in a separate surface reached via Profile, never at the
+    // bottom of Options. Asserting the absence of the old value keeps this
+    // contract from silently reverting.
     expect(source).not.toContain("const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([\n  'Account'\n]);");
     expect(source).not.toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).not.toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
@@ -1124,14 +1125,17 @@ describe('capture label expectations stay tied to the Settings and Guide plan mo
     }
   });
 
-  test('OPTIONS_BOTTOM_EXPECTED_LABELS are all signed-in Account rows, and Sign out only exists when signed in', () => {
+  test('OPTIONS_BOTTOM_EXPECTED_LABELS are signed-in Settings rows; Sign out and Reset progress are on no Settings sheet (MAZER-UI-100)', () => {
     const labels = readLabels('OPTIONS_BOTTOM_EXPECTED_LABELS');
-    expect(labels).toContain('Sign out');
+    expect(labels.length).toBeGreaterThan(0);
     const signedInRows = settingsRowLabels(true);
     for (const label of labels) {
       expect(signedInRows, `${label} is not a signed-in Settings sheet row`).toContain(label);
     }
-    expect(settingsRowLabels(false)).not.toContain('Sign out');
+    for (const signedIn of [true, false]) {
+      expect(settingsRowLabels(signedIn)).not.toContain('Sign out');
+      expect(settingsRowLabels(signedIn)).not.toContain('Reset progress');
+    }
   });
 
   test('the Guide entry label is the main-menu dropdown Guide row; the Settings sheet no longer opens the Guide', () => {

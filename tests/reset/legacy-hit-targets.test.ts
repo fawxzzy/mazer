@@ -168,9 +168,7 @@ describe('legacy hit targets (Wave 5C)', () => {
       'settings-row-floating-anchor',
       'settings-row-haptics',
       'settings-row-reduce-motion',
-      'settings-row-reset-progress',
-      'settings-row-resume',
-      'settings-row-sign-out'
+      'settings-row-resume'
     ]);
   });
 });

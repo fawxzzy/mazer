@@ -77,40 +77,25 @@ describe('settings sheet model', () => {
     expect(pauseSettings.title).toBeNull();
   });
 
-  test('Account section (Reset progress, Sign out) exists in menu only; pause keeps Resume, its Quit, Guide and Sound moved to the Menu', () => {
+  test('MAZER-UI-100: neither sheet has Reset progress or Sign out (they live on the account page); pause keeps Resume, its Quit, Guide and Sound moved to the Menu', () => {
+    for (const signedIn of [true, false]) {
+      const menuIds = buildLegacySettingsSheetModel('menu', { signedIn }).sections.flatMap((s) => s.rows.map((r) => r.id));
+      expect(menuIds).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor']);
+      expect(buildLegacySettingsSheetModel('menu', { signedIn }).sections.map((s) => s.id)).not.toContain('account');
+    }
     const menuIds = buildLegacySettingsSheetModel('menu', { signedIn: true }).sections.flatMap((s) => s.rows.map((r) => r.id));
     const pauseIds = buildLegacySettingsSheetModel('pause').sections.flatMap((s) => s.rows.map((r) => r.id));
-    expect(menuIds).toContain('reset-progress');
-    expect(menuIds).toContain('sign-out');
     expect(menuIds).not.toContain('resume');
     expect(menuIds).not.toContain('quit-to-menu');
     // The menu's primary exit is its own row, never the pause Resume row.
     expect(menuIds).toContain('back-to-menu');
     expect(pauseIds).not.toContain('back-to-menu');
     expect(pauseIds).toContain('resume');
-    for (const moved of ['quit-to-menu', 'how-to-play', 'sound', 'settings-disclosure']) {
+    for (const moved of ['quit-to-menu', 'how-to-play', 'sound', 'settings-disclosure', 'reset-progress', 'sign-out', 'account-heading']) {
       expect(pauseIds, moved).not.toContain(moved);
+      if (moved !== 'quit-to-menu') expect(menuIds, moved).not.toContain(moved);
     }
-    expect(pauseIds).not.toContain('reset-progress');
-    expect(pauseIds).not.toContain('sign-out');
   });
-
-  test('Sign out only when signed in; Reset progress is always offered and ordered before it', () => {
-    const guest = buildLegacySettingsSheetModel('menu', { signedIn: false }).sections.flatMap((s) => s.rows.map((r) => r.id));
-    expect(guest).toContain('reset-progress');
-    expect(guest).not.toContain('sign-out');
-    const signed = buildLegacySettingsSheetModel('menu', { signedIn: true }).sections.flatMap((s) => s.rows.map((r) => r.id));
-    expect(signed.indexOf('reset-progress')).toBeLessThan(signed.indexOf('sign-out'));
-  });
-
-  test('Reset progress opens the confirm flow (never resets directly) and is danger-outline, Sign out is danger', () => {
-    const rows = buildLegacySettingsSheetModel('menu', { signedIn: true }).sections.flatMap((s) => s.rows);
-    const reset = rows.find((r) => r.id === 'reset-progress')!;
-    expect(reset.command).toEqual({ type: 'BEGIN_RESET_PROGRESS' });
-    expect(reset.emphasis).toBe('danger-outline');
-    expect(rows.find((r) => r.id === 'sign-out')!.emphasis).toBe('danger');
-  });
-
   test('no Close pill, X or back arrow: the primary top row is the exit in both contexts', () => {
     for (const context of ['menu', 'pause'] as const) {
       const model = buildLegacySettingsSheetModel(context, { signedIn: true });
@@ -258,17 +243,12 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       expect(isLegacySettingsItemFullyVisible(p, last, p.maxScrollOffset), 'last item reachable at max scroll').toBe(true);
     });
 
-    test('Reset progress is separated from Sign out by the danger separation token and both are tappable apart', () => {
+    test('MAZER-UI-100: no danger rows; the menu sheet ends on its last setting', () => {
       const p = plan('menu', viewport);
-      const reset = p.items.find((i) => i.model.id === 'reset-progress')!;
-      const signOut = p.items.find((i) => i.model.id === 'sign-out')!;
-      // Reset progress carries a description under it, so the gap is measured from the end of that block.
-      const gap = signOut.rect.top - (reset.description!.rect.top + reset.description!.rect.height);
-      expect(LEGACY_SETTINGS_DANGER_SEPARATION).toBeGreaterThanOrEqual(24);
+      expect(p.items.some((i) => i.model.emphasis === 'danger' || i.model.emphasis === 'danger-outline')).toBe(false);
+      expect(p.items.at(-1)!.model.id).toBe('floating-anchor');
+      // The token stays on the scale for any future destructive row.
       expect(designTokens.spacingPx).toContain(LEGACY_SETTINGS_DANGER_SEPARATION);
-      expect(gap).toBeGreaterThanOrEqual(LEGACY_SETTINGS_DANGER_SEPARATION);
-      // Sign out is the last row, Reset progress is not the bottom-most control.
-      expect(p.items.at(-1)!.model.id).toBe('sign-out');
     });
 
     test('same row geometry in menu and pause context (shared Settings group)', () => {
@@ -308,22 +288,14 @@ describe('settings sheet plan specifics', () => {
     expect(p.scrollable).toBe(false);
   });
 
-  test('menu is always open: Back to Menu, group rows, then Account heading, Reset progress, Sign out', () => {
+  test('menu is always open: Back to Menu, then the three settings (MAZER-UI-100: no Account section)', () => {
     const p = plan('menu', { height: 844, width: 390 });
     expect(p.settingsExpanded).toBe(true);
-    expect(p.items.map((i) => i.model.id)).toEqual([
-      'back-to-menu',
-      'reduce-motion',
-      'haptics',
-      'floating-anchor',
-      'account-heading',
-      'reset-progress',
-      'sign-out'
-    ]);
+    expect(p.items.map((i) => i.model.id)).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor']);
   });
 
-  test('320x568 menu needs scrolling but 1280x720 shows the whole sheet; titles come from the model', () => {
-    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
+  test('the small menu sheet fits without scrolling even at 320x568; titles come from the model', () => {
+    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(false);
     const wide = plan('menu', { height: 720, width: 1280 });
     expect(wide.title.text).toBe('Settings');
     expect(plan('pause', { height: 720, width: 1280 }).title.text).toBe('Settings');
@@ -410,12 +382,11 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
         }
       }
     }
-    // MAZER-UI-096: How to play and Sound left the main-menu sheet for the Menu dropdown, so the signed-in sheet
-    // fits again on 390x844 and 412x915 (the Floating anchor row had made both scroll, MAZER-L9). The short
-    // 320x568 phone still scrolls a short rail.
+    // MAZER-UI-096: How to play and Sound left the main-menu sheet for the Menu dropdown, and MAZER-UI-100 moved
+    // Reset progress and Sign out to the account page, so the sheet fits on every phone, 320x568 included.
     expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
     expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(false);
-    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
+    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(false);
   });
 
   test('at 320 wide the Reduce Motion label column still holds its widest word and the state column holds "System"', () => {
@@ -438,8 +409,10 @@ describe('settings row description rule (MAZER-UI-026)', () => {
     .filter((section) => section.id === 'settings' || section.id === 'account')
     .flatMap((section) => section.rows);
 
-  test('the Settings group and the Account section have rows (so the checks below are not vacuous)', () => {
-    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['reduce-motion', 'haptics', 'floating-anchor', 'reset-progress', 'sign-out']));
+  test('the Settings group has rows (so the checks below are not vacuous); MAZER-UI-100 removed the Account section', () => {
+    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['reduce-motion', 'haptics', 'floating-anchor']));
+    expect(settingRows.map((r) => r.id)).not.toContain('reset-progress');
+    expect(settingRows.map((r) => r.id)).not.toContain('sign-out');
     // MAZER-UI-095/096: Guide and Sound are Menu dropdown rows now, on no sheet in any context.
     expect(settingRows.map((r) => r.id)).not.toContain('how-to-play');
     expect(settingRows.map((r) => r.id)).not.toContain('sound');

@@ -379,6 +379,11 @@ import {
   type LegacyPlayMenuView
 } from '../legacy-runtime/legacyPlayMenu';
 import { MENU_ROW_ICON_SOURCES, drawMenuRowVectorIcon } from '../render/menuRowIcons';
+import {
+  clearMazerPendingAccountAction,
+  peekMazerPendingAccountAction,
+  resolveMazerAccountActionStep
+} from '../legacy-runtime/legacyAccountActionHandoff';
 import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
 import {
   ensureMenuPlayLabelGlowTexture,
@@ -3442,6 +3447,7 @@ export class MenuScene extends Phaser.Scene {
         this.rebuildUi();
       }
     }
+    this.consumePendingMazerAccountAction();
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
@@ -15176,6 +15182,22 @@ export class MenuScene extends Phaser.Scene {
     // constructed -- optional chaining makes that a safe no-op, and the
     // bridge's own constructor projects the (by-then-current) auth state.
     this.uiBridge?.refreshProjection('auth-change');
+  }
+
+  // MAZER-UI-100: Reset progress lives on the account page; its hand-back opens the same confirmation here.
+  private consumePendingMazerAccountAction(): void {
+    const step = resolveMazerAccountActionStep({
+      authResolved: !this.authGateAwaitingResolution,
+      pending: peekMazerPendingAccountAction(),
+      signedIn: this.authSnapshot.status === 'authenticated'
+    });
+    // Signed in, the gate's status screen closes on the next transition; wait for it rather than stack on it.
+    if (step === 'drop' || (step === 'open-reset-confirmation' && this.overlay !== 'auth')) {
+      clearMazerPendingAccountAction();
+      if (step === 'open-reset-confirmation') {
+        this.openOverlay('confirm-progression-reset');
+      }
+    }
   }
 
   private hasLegacyPlayAccess(): boolean {

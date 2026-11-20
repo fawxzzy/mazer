@@ -6,8 +6,9 @@
  * module is that structure: one row vocabulary, one set of sizes, one layout
  * routine. The two contexts differ only in
  *   - the context actions       (pause: Resume above; menu: Back to Menu
- *                                above, Account section with Reset progress
- *                                and Sign out),
+ *                                above. MAZER-UI-100: no Account section;
+ *                                Reset progress and Sign out live only on the
+ *                                account page, reached from Menu > Profile),
  *   - the exit                  (pause: the primary Resume row; menu: the
  *                                primary Back to Menu row in the same slot).
  *                                Neither sheet draws a Close pill, an X or a
@@ -23,7 +24,9 @@
  * toggle), always open. MAZER-UI-096: the main menu's dropdown got the same
  * Guide and Sound rows (one row model, legacyMenuRows.ts), so the main-menu
  * sheet lost How to play and Sound too: both sheets show the same three
- * settings (the main menu adds its Account section).
+ * settings. MAZER-UI-100 then moved the main menu's Account section (Reset
+ * progress, Sign out) to the account page, so the sheets differ only in their
+ * exit row.
  *
  * DESCRIPTION RULE (MAZER-UI-026): every SETTING row (each row of the Settings
  * group and of the Account section) is {label, control, description}. The
@@ -186,7 +189,7 @@ export interface LegacySettingsLevelPreviewOptions {
 }
 
 export interface LegacySettingsModelOptions {
-  /** Menu only: whether a signed-in account exists (Sign out is shown only then). */
+  /** Menu only: whether a signed-in account exists. Accepted but unused since MAZER-UI-100 (no Sign out row). */
   signedIn?: boolean;
   /** Pause only: adds the Level Preview section (dev/QA route). Absent = default sheet, unchanged. */
   levelPreview?: LegacySettingsLevelPreviewOptions;
@@ -367,19 +370,6 @@ export const buildLegacySettingsSheetModel = (
     };
   }
 
-  const accountRows: LegacySettingsSettingRowModel[] = [
-    settingRow('reset-progress', 'action', 'Reset progress', LEGACY_SETTINGS_DESCRIPTIONS.resetProgress, {
-      command: { type: 'BEGIN_RESET_PROGRESS' },
-      emphasis: 'danger-outline'
-    })
-  ];
-  if (options.signedIn === true) {
-    accountRows.push(settingRow('sign-out', 'action', 'Sign out', LEGACY_SETTINGS_DESCRIPTIONS.signOut, {
-      command: { type: 'SIGN_OUT' },
-      emphasis: 'danger',
-      gapBefore: LEGACY_SETTINGS_DANGER_SEPARATION
-    }));
-  }
 
   return {
     context,
@@ -401,14 +391,8 @@ export const buildLegacySettingsSheetModel = (
         id: 'settings',
         rows: LEGACY_SETTINGS_GROUP_ROWS,
         title: null
-      },
-      {
-        collapsedByDefault: false,
-        collapsible: false,
-        id: 'account',
-        rows: accountRows,
-        title: 'Account'
       }
+      // MAZER-UI-100: no Account section. Sign out and Reset progress live only on the account page (Profile).
     ],
     title: 'Settings'
   };
@@ -643,8 +627,8 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
 /**
  * Flattened row list for a model. Pause: Resume, then the in-game Settings
  * rows (always open, MAZER-UI-095). Menu: Back to Menu (same slot
- * and size as Resume), the group rows (always open), then the Account heading
- * and its rows.
+ * and size as Resume), then the group rows (always open). A titled, non-
+ * collapsible section still gets a heading row; none exists since MAZER-UI-100.
  */
 const flattenRows = (
   model: LegacySettingsSheetModel,

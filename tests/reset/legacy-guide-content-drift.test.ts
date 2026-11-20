@@ -162,6 +162,13 @@ describe('guide copy only names things that exist', () => {
     expect(MENU_SCENE).not.toContain('createLegacyMenuProfileButton');
   });
 
+  test('MAZER-UI-100: the Guide never places Sign out or Reset progress in Settings (they live on the account page via Profile)', () => {
+    expect(allText).not.toMatch(/sign out|reset progress|log out/i);
+    for (const r of LEGACY_GUIDE_ROWS) {
+      expect(r.text.length, r.id).toBeLessThanOrEqual(90);
+    }
+  });
+
   test('Start row: Chip draws the start end marker (a gold spiral that turns slowly in step with the end star, MAZER-VIS-053) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
     expect(row('start').text).toMatch(/spiral on the first tile is where you set off/);
