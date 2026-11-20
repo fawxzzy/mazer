@@ -1,6 +1,7 @@
 import {
   createLegacyGeneratedMenuMaze,
   createLegacyMaze,
+  LEGACY_MIN_GRID_AXIS,
   normalizeLegacyMazeGenerationProfile,
   resolveLegacyShortestPath,
   resolveLegacyWrapTopologyDiagnostics,
@@ -40,7 +41,7 @@ import { applyStaircasePass, readLegacyStaircaseFlagFromLocation } from './legac
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
-import { resolveLegacyBoardDimensions } from './legacyBoardScale';
+import { LEGACY_BOARD_SIZE_RULE2_CAP_SCALE, resolveLegacyBoardDimensions } from './legacyBoardScale';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
 import { legacyTuning } from '../config/tuning';
 
@@ -202,6 +203,8 @@ export const LEGACY_GENERATION_ENTRY_STAGE_ID: LegacyGenerationEntryStageId = 0;
 export const LEGACY_LEVEL_BUILDING_DELAY_DURATION_MS: number | null = null;
 export const LEGACY_LEVEL_BUILDING_DELAY_DURATION_SOURCE: LegacyGenerationDelayDurationSource = 'legacy-variable-unrecovered';
 
+// MAZER-UI-098: the scale floor follows the board's grid-axis floor: 25 for every profile, 15 for a size-rule-2
+// play profile (minGridAxis), whose early levels sit below scale 25 (level 1 at 22).
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
 export const LEGACY_GENERATION_SELECTION_DEFAULT_CANDIDATES = 3;
@@ -215,8 +218,8 @@ const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 // MAZER-PROG-020: the scale may be fractional (the board grows smoothly with the level), so it is
 // clamped, not rounded to a whole number; whole-number scales behave exactly as before. Rounded to
 // 1e-4 so a scale that arrives as 38.00000000000001 and 38 are one key.
-const resolveLegacyGenerationScale = (scale: number): number => (
-  Math.max(LEGACY_MIN_SCALE, Math.min(LEGACY_MAX_SCALE, Math.round(scale * 10000) / 10000))
+const resolveLegacyGenerationScale = (scale: number, minScale: number = LEGACY_MIN_SCALE): number => (
+  Math.max(minScale, Math.min(LEGACY_MAX_SCALE, Math.round(scale * 10000) / 10000))
 );
 
 const resolveLegacyShortcutCountModifier = (mode: LegacyGenerationMode): number => (
@@ -243,10 +246,10 @@ export const resolveLegacyGenerationBudgetContract = (
   scale: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyGenerationBudgetContract => {
-  const normalizedScale = resolveLegacyGenerationScale(scale);
+  const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  const normalizedScale = resolveLegacyGenerationScale(scale, profile.minGridAxis ?? LEGACY_MIN_SCALE);
   const checkpointModifier = legacyTuning.board.checkPointModifier;
   const shortcutCountModifier = resolveLegacyShortcutCountModifier(mode);
-  const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const baseCheckpointCount = Math.trunc(normalizedScale + (normalizedScale * checkpointModifier));
   const shortcutCount = clampInteger(
     Math.trunc(resolveLegacyShortcutCount(mode, normalizedScale, shortcutCountModifier) * profile.shortcutCountMultiplier),
@@ -607,16 +610,18 @@ const createLegacyAdaptiveUnderTargetProfile = (
   });
 };
 
-const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
-  const normalizedScale = resolveLegacyGenerationScale(scale);
+export const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => {
+  const normalizedScale = resolveLegacyGenerationScale(scale, LEGACY_MIN_GRID_AXIS);
   if (normalizedScale >= LEGACY_MAX_SCALE) {
     return normalizedScale;
   }
 
+  // MAZER-UI-098: the retry never grows a board past the size cap (scale 88). A board already at or above it
+  // retries at its own scale. Rule-1 boards (38 to 40, retried at 44 to 46) are unaffected.
   return clampInteger(
     Math.max(normalizedScale + 2, Math.ceil(normalizedScale * 1.14)),
-    LEGACY_MIN_SCALE,
-    LEGACY_MAX_SCALE
+    LEGACY_MIN_GRID_AXIS,
+    Math.min(LEGACY_MAX_SCALE, Math.max(normalizedScale, LEGACY_BOARD_SIZE_RULE2_CAP_SCALE))
   );
 };
 

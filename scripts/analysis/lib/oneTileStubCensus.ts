@@ -33,7 +33,7 @@ export const generateStubCensusMaze = (
     surface: profile === 'play' ? 'play' : 'menu-demo',
     viewport: { ...viewport, useFloatingTouchControls: true } as never
   });
-  const scaleContext = { fraction: detail.fraction };
+  const scaleContext = { fraction: detail.fraction, sizeRule: detail.sizeRule };
   const generationProfile = profile === 'play'
     ? resolveLegacyMazeGenerationProfileForProgression(track, scaleContext)
     : resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, scaleContext);

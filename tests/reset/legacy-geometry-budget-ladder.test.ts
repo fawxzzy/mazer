@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { LEGACY_BOARD_BASE_SCALE, resolveLegacyBoardScaleForLevel } from '../../src/legacy-runtime/legacyBoardScale';
+import {
+  LEGACY_BOARD_BASE_SCALE,
+  LEGACY_BOARD_SIZE_RULE2_CAP_LEVEL,
+  LEGACY_BOARD_SIZE_RULE2_CAP_SCALE,
+  resolveLegacyBoardScaleForLevel,
+  resolveLegacyBoardScaleForLevelRule2
+} from '../../src/legacy-runtime/legacyBoardScale';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_TOP_TARGET,
@@ -26,6 +32,7 @@ import {
   resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionGenerationScale,
+  resolveLegacyProgressionScaleDetail,
   summarizeLegacyProgressionDiagnostics
 } from '../../src/legacy-runtime/legacyProgression';
 import { createMazeCycleTelemetryReceipt } from '../../src/legacy-runtime/mazeCycleTelemetry';
@@ -83,8 +90,20 @@ describe('geometry budget wiring (every bounded progression level 2..99)', () =>
     }
   });
 
-  test('board scale follows the level curve (38 toward 40) on phone, desktop and square viewports', () => {
-    for (const surface of ['play', 'menu'] as const) {
+  test('board scale follows the level curve on phone, desktop and square viewports: rule 2 for play, rule 1 (38 toward 40) for the menu', () => {
+    // MAZER-UI-098: the play board follows size rule 2 (22 at level 1, held at 88 from level 250); these viewports
+    // hold scale 88 above the 5.5 px floor, so it is exactly the curve.
+    for (const viewport of Object.values(VIEWPORTS)) {
+      for (const level of [...Array.from({ length: LAST_BUDGET_LEVEL }, (_, index) => index + 1), 1000]) {
+        const scale = resolveLegacyProgressionGenerationScale(50, trackForLevel(level), {
+          surface: 'play',
+          viewport: { width: viewport.width, height: viewport.height }
+        });
+        expect(scale).toBe(resolveLegacyBoardScaleForLevelRule2(level));
+        expect(scale).toBeLessThanOrEqual(LEGACY_BOARD_SIZE_RULE2_CAP_SCALE);
+      }
+    }
+    for (const surface of ['menu'] as const) {
       for (const viewport of Object.values(VIEWPORTS)) {
         for (const level of [...Array.from({ length: LAST_BUDGET_LEVEL }, (_, index) => index + 1), 100, 150, 1000]) {
           // MAZER-PROG-020 S2: a function of the level only; these viewports are far above the 10 px floor.
@@ -277,17 +296,23 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
       const realized: number[] = [];
       const proxies: number[] = [];
       const dimensions = new Set<string>();
+      const cappedDimensions = new Set<string>();
+      let previousWidth = 0;
+      let previousHeight = 0;
       for (const level of [...Array.from({ length: GEOMETRY_BUDGET_SATURATION_LEVEL - 1 }, (_, index) => index + 2), 1000]) {
         const track = trackForLevel(level);
-        const scale = resolveLegacyProgressionGenerationScale(50, track, {
+        // MAZER-UI-098: exactly what MenuScene does for a play board: the scale and the size rule from one detail,
+        // the rule carried on the profile (rule 2 lets the small early boards keep a short axis under 25).
+        const { scale, fraction, sizeRule } = resolveLegacyProgressionScaleDetail(50, track, {
           surface: 'play',
           viewport: { width: viewport.width, height: viewport.height }
         });
+        expect(sizeRule).toBe(2);
         const maze = createLegacyRuntimeMazeForMode(
           'play',
           scale,
           SEEDS[name] + level,
-          resolveLegacyMazeGenerationProfileForProgression(track),
+          resolveLegacyMazeGenerationProfileForProgression(track, { fraction, sizeRule }),
           { targetComplexity: track.targetComplexity },
           viewport.aspectRatio
         );
@@ -298,6 +323,12 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
         expect(maze.generation?.selection?.delivery).toBe('on-target');
         expect(maze.generation?.selection?.selectedDistance).toBe(0);
         dimensions.add(`${maze.width}x${maze.height}`);
+        // The board never shrinks as the level rises, on either axis, and is one fixed grid from the size cap on.
+        expect(maze.width).toBeGreaterThanOrEqual(previousWidth);
+        expect(maze.height).toBeGreaterThanOrEqual(previousHeight);
+        previousWidth = maze.width;
+        previousHeight = maze.height;
+        if (level >= LEGACY_BOARD_SIZE_RULE2_CAP_LEVEL) { cappedDimensions.add(`${maze.width}x${maze.height}`); }
         const target = resolveGeometryBudgetTarget(Math.min(level, LAST_BUDGET_LEVEL))!;
         expect(felt).toBeGreaterThanOrEqual(target);
         expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
@@ -311,9 +342,10 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
           expect(target).toBe(GEOMETRY_BUDGET_TOP_TARGET);
         }
       }
-      // MAZER-PROG-020 S2: the board grows slowly with the level (scale 38 toward 40), so the realized grid
-      // takes only a few distinct shapes across the whole ladder (it was exactly one at the frozen scale).
-      expect(dimensions.size).toBeLessThanOrEqual(4);
+      // MAZER-UI-098 (size rule 2): the board grows from about 15 x 33 (phone) to the scale-88 board, so the grid
+      // takes many shapes on the way up (it was at most 4 under rule 1) and exactly one from the cap level on.
+      expect(dimensions.size).toBeGreaterThan(10);
+      expect(cappedDimensions.size).toBe(1);
       expect(realized.length).toBe(GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1);
       for (let index = 1; index < realized.length; index += 1) {
         expect(realized[index]).toBeGreaterThan(realized[index - 1]!);

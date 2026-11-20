@@ -15197,15 +15197,15 @@ export class MenuScene extends Phaser.Scene {
     // not just a fixed per-band number that assumes some unconfigured
     // screen size. See resolveLegacyMazeGenerationProfileForProgression's
     // own comment on why only feeder count reads this so far.
-    const { fraction } = resolveLegacyProgressionScaleDetail(
+    const { fraction, sizeRule } = resolveLegacyProgressionScaleDetail(
       this.settings.scale,
       track,
       this.resolveLegacyProgressionScaleOptionsForMode(mode)
     );
     // MAZER-VIS-052: only the menu demo skips the budget ladder (more bleed-off paths).
     return mode === 'menu'
-      ? resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction })
-      : resolveLegacyMazeGenerationProfileForProgression(track, { fraction });
+      ? resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction, sizeRule })
+      : resolveLegacyMazeGenerationProfileForProgression(track, { fraction, sizeRule });
   }
 
   private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number {
