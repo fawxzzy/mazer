@@ -70,7 +70,12 @@
  * exclusively from the trail palette (trailPalette.ts) and cyberArcadeMaterial tokens.
  */
 import { isLegacyWrappedStepTransition } from '../legacy-runtime/legacyMaze';
-import { resolveEdgeCornerBottomTipInset, resolveEdgeCornerMaxScale, resolveEdgeCornerTipInset } from './edgeCornerAnchor';
+import {
+  resolveEdgeCornerBottomHiddenBand,
+  resolveEdgeCornerBottomTipInset,
+  resolveEdgeCornerMaxScale,
+  resolveEdgeCornerTipInset
+} from './edgeCornerAnchor';
 import { resolvePlayerColour, resolveSharedBorderColor, resolveTrailPaletteBorderColor } from './playerColour';
 import { MOTION_DURATION_MS, MOTION_LOOP_MS } from './motionScale';
 import {
@@ -233,6 +238,19 @@ export const resolveEdgeBottomCornerInset = (viewport?: EdgeViewport): number =>
 );
 
 /**
+ * MAZER-VIS-068: distance from the BOTTOM edge to the centre of a bottom corner star. The owner's iPhone 16 still cut the bottom
+ * corner stars off in portrait (rotating or still) after VIS-056 placed them by a display-corner model, which headless runs show as
+ * clear, so the model alone is not enough. The star's whole painted reach at any spin and its largest scale (EDGE_MARKER_MAX_EXTENT_PX
+ * around the centre) stays above the bottom band the page reports as possibly hidden (resolveEdgeCornerBottomHiddenBand: the bottom
+ * safe area, 0 when none is reported). With no band: the VIS-056 inset (resolveEdgeBottomCornerInset). The side inset is unchanged.
+ */
+export const resolveEdgeBottomCornerRise = (viewport?: EdgeViewport): number => {
+  const band = resolveEdgeCornerBottomHiddenBand(viewport);
+  const inset = resolveEdgeBottomCornerInset(viewport);
+  return band > 0 ? Math.max(inset, band + EDGE_MARKER_MAX_EXTENT_PX) : inset;
+};
+
+/**
  * The extent of a canvas axis that is actually painted, in world (css) px: the backing store is `round(css * dpr)` device px and the
  * context is scaled by `dpr`, so the last visible world coordinate is `round(css * dpr) / dpr`. Equal to `css` at dpr 1 (integer sizes).
  */
@@ -257,6 +275,8 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
   const bottom = Math.max(top, height - inset);
   // MAZER-VIS-056: the bottom corners have their own inset (rounded display corners); the midpoints keep the shared rectangle.
   const bottomInset = resolveEdgeBottomCornerInset(viewport);
+  // MAZER-VIS-068: and their own rise above the bottom edge (clear of a reported bottom safe area).
+  const bottomRise = resolveEdgeBottomCornerRise(viewport);
   return STATION_IDS.map((id) => {
     const along = resolveEdgeStationPosition(id, left, right, top, bottom);
     const side = STATION_SIDE[id];
@@ -266,7 +286,7 @@ export const resolveEdgeStations = (viewport: EdgeViewport, devicePixelRatio = 1
     const cornerMaxScale = isCorner ? resolveEdgeCornerMaxScale(viewport.width) : 1;
     // Corners sit ON the inset rectangle's corners (snug on the diagonal); midpoints are flush with their edge.
     const cornerX = isBottomCorner ? (along.x < width / 2 ? bottomInset : Math.max(bottomInset, width - bottomInset)) : along.x;
-    const cornerY = isBottomCorner ? Math.max(top, height - bottomInset) : along.y;
+    const cornerY = isBottomCorner ? Math.max(top, height - bottomRise) : along.y;
     const x = isCorner ? cornerX : side === 'left' ? extent : side === 'right' ? width - extent : along.x;
     const y = isCorner ? cornerY : side === 'top' ? extent : side === 'bottom' ? height - extent : along.y;
     return {

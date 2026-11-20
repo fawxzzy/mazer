@@ -192,12 +192,14 @@ describe('legacy signup username server authority', () => {
     expect(migrationSource).toContain('execute function public.mazer_claim_signup_username();');
   });
 
-  test('the client no longer carries an in-app sign-up path but keeps the authenticated rename helpers (MAZER-ACCT-012)', () => {
+  test('the client carries no in-app sign-up path and no in-app rename (MAZER-ACCT-012, MAZER-ACCT-047)', () => {
     expect(authSource).not.toContain('signUpLegacyAuth');
     expect(authSource).not.toContain('buildLegacySignUpMetadata');
     expect(authSource).not.toContain('resolveLegacySignUpInfo');
     expect(authSource).not.toContain('client.auth.signUp');
-    expect(authSource).toContain('export const checkLegacyUsernameAvailable = async (');
-    expect(authSource).toContain('export const saveLegacyAccountUsername = async (');
+    // Names are changed only on the account site (MAZER-ACCT-047).
+    expect(authSource).not.toContain('checkLegacyUsernameAvailable');
+    expect(authSource).not.toContain('saveLegacyAccountUsername');
+    expect(authSource).not.toContain("'mazer_set_username'");
   });
 });

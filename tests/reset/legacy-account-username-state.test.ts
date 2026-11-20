@@ -157,9 +157,9 @@ describe('MAZER-ACCT-033: the header keeps the saved name after a reload', () =>
 describe('scene wiring (source pins)', () => {
   const menu = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
-  test('MAZER-UI-024: the main-menu header no longer shows the name; a rename and every auth refresh are still patched into the auth snapshot the leaderboard and account surfaces read', () => {
+  test('MAZER-UI-024: the main-menu header no longer shows the name; every auth refresh is still patched with the profile name (no in-game rename since MAZER-ACCT-047)', () => {
     expect(menu).not.toContain('private createLegacyHeaderIdentityLabel(): void {');
-    expect(menu.split('this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);').length - 1).toBe(2);
+    expect(menu.split('this.authSnapshot = applyLegacyUsernameRenameToSnapshot(this.authSnapshot, this.accountUsernameRename);').length - 1).toBe(1);
   });
 
   test('the one-per-user profile read feeds the header (reload case, MAZER-ACCT-033)', () => {
@@ -170,10 +170,9 @@ describe('scene wiring (source pins)', () => {
     expect(block).toContain('applyLegacyUsernameRenameToSnapshot(this.authSnapshot, rename)');
   });
 
-  test('a saved rename updates the held name and repaints', () => {
-    const start = menu.indexOf('this.accountUsernameSavedValue = outcome.username;');
-    expect(start).toBeGreaterThan(0);
-    expect(menu.slice(start, start + 1500)).toContain('this.uiDirty = true;');
+  test('MAZER-ACCT-047: the scene has no in-game rename save any more', () => {
+    expect(menu).not.toContain('this.accountUsernameSavedValue = outcome.username;');
+    expect(menu).not.toContain('saveLegacyAccountUsername');
   });
 
   test('the sign-in bootstrap triggers the one re-read, and a user change resets it', () => {

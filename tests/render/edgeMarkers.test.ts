@@ -274,12 +274,13 @@ describe('edge marker stations', () => {
     }
   });
 
-  test('the scene feeds the stations the viewport plus the bottom safe area as a rounding SIGNAL only: no safe-area offset, no header-control avoidance', () => {
+  test('the scene feeds the stations the viewport plus the bottom safe area (rounding signal and bottom corner band, read only in edgeCornerAnchor.ts), no header-control avoidance', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const start = source.indexOf('private resolveLegacyEdgeStations()');
     const body = source.slice(start, source.indexOf('\n  }', start));
     // The viewport size plus the canvas resolution (which only decides where the backing store ends): MAZER-VIS-043. MAZER-VIS-056:
-    // the bottom safe area tells edgeCornerAnchor.ts the bottom corners are rounded display corners; it never offsets a station.
+    // the bottom safe area tells edgeCornerAnchor.ts the bottom corners are rounded display corners. MAZER-VIS-068: it also lifts the two
+    // bottom CORNER stars clear of that band (edgeCornerAnchor.ts resolveEdgeCornerBottomHiddenBand); it never moves any other station.
     expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height, safeAreaBottom: readMazerViewportGeometry().safeArea.bottom }, resolveMazerCanvasResolution());');
     expect(body).not.toMatch(/safeArea\.(top|left|right)/);
     expect(body).not.toContain('resolveHeaderControlRects');
