@@ -35,9 +35,12 @@ describe('World Identity background-star render contract', () => {
     // MAZER-VIS-066 (owner, 2026-11-19): real star shapes with the rainbow sweep. The scene passes the scene clock
     // (this.time.now) for the colour in every motion mode and the motion flag separately, so Reduce Motion / Still stop
     // the drift and twinkle but never the colour; the colour-only redraw gate keeps the sweep moving while still.
+    // The only other clock is the diagnostics-only QA hold (__MAZER_QA__.holdBackdropColour), null outside QA scripts.
     expect(menuSceneSource).toContain(
-      'fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.time.now, backdropMotionEnabled, palette.starAlphaScale);'
+      'fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.backdropColourHeldAtMs ?? this.time.now, backdropMotionEnabled, palette.starAlphaScale);'
     );
+    expect(menuSceneSource).toContain('this.backdropColourHeldAtMs = held ? this.time.now : null;');
+    expect(menuSceneSource.match(/this\.backdropColourHeldAtMs = /g)).toHaveLength(1);
     expect(menuSceneSource).toContain('installBackdropStarSpriteRenderer(this.backdropGraphics, this.backdropStarShapes);');
     expect(shapesSource).toContain('resolveBackdropStarHueStep(sceneTimeMs, pixelX, width)');
     expect(shapesSource).not.toContain('resolveBackdropStarHueStep(animationTime');
