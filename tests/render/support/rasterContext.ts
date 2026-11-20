@@ -8,7 +8,8 @@ import type { TileBakeContext2D } from '../../../src/render/boardTileBake';
  * device pixel at its centre (no anti-aliasing: a pixel is either inside or outside, which is exactly what an
  * edge-coincidence test wants). `stroke()` paints every pixel whose centre is within half the line width of any
  * path segment (round caps and joins, which is what the marker keyline uses); shadows and `clearRect` of partial
- * areas are not needed by these tests and are inert. Strokes only paint when `paintStrokes` is set. Colours are `rgb()` / `rgba()` strings, as boardTileBake emits; alpha blends source-over.
+ * areas are not needed by these tests and are inert. `clip()` keeps a pixel-centre mask (non-zero rule, intersected with any
+ * earlier clip) that `save()` / `restore()` carry. Strokes only paint when `paintStrokes` is set. Colours are `rgb()` / `rgba()` strings, as boardTileBake emits; alpha blends source-over.
  */
 export type Rgba = readonly [number, number, number, number];
 
@@ -27,6 +28,7 @@ interface State {
   d: number;
   e: number;
   f: number;
+  clip: Uint8Array | null;
 }
 
 type Point = readonly [number, number];
@@ -59,6 +61,7 @@ export class RasterContext implements TileBakeContext2D {
   private subpaths: Point[][] = [];
   private current: Point[] | null = null;
   private cursor: Point = [0, 0];
+  private clipMask: Uint8Array | null = null;
 
   constructor(readonly width: number, readonly height: number) {
     this.data = new Uint8ClampedArray(width * height * 4);
@@ -66,7 +69,7 @@ export class RasterContext implements TileBakeContext2D {
 
   save(): void {
     this.stack.push({
-      fill: parseRgba(this.fillStyle), alpha: this.globalAlpha, a: this.a, d: this.d, e: this.e, f: this.f
+      fill: parseRgba(this.fillStyle), alpha: this.globalAlpha, a: this.a, d: this.d, e: this.e, f: this.f, clip: this.clipMask
     });
   }
 
@@ -76,6 +79,7 @@ export class RasterContext implements TileBakeContext2D {
       this.fillStyle = `rgba(${s.fill[0]},${s.fill[1]},${s.fill[2]},${s.fill[3]})`;
       this.globalAlpha = s.alpha;
       this.a = s.a; this.d = s.d; this.e = s.e; this.f = s.f;
+      this.clipMask = s.clip;
     }
   }
 
@@ -183,6 +187,13 @@ export class RasterContext implements TileBakeContext2D {
     this.rasterise(this.subpaths);
   }
 
+  clip(): void {
+    const mask = new Uint8Array(this.width * this.height);
+    this.scan(this.subpaths, (px, py) => { mask[(py * this.width) + px] = 1; });
+    if (this.clipMask) for (let i = 0; i < mask.length; i += 1) mask[i] = mask[i]! & this.clipMask[i]!;
+    this.clipMask = mask;
+  }
+
   stroke(): void {
     if (!this.paintStrokes) return;
     const color = parseRgba(this.strokeStyle);
@@ -259,6 +270,7 @@ export class RasterContext implements TileBakeContext2D {
   }
 
   private blend(px: number, py: number, color: Rgba): void {
+    if (this.clipMask && this.clipMask[(py * this.width) + px] === 0) return;
     const i = ((py * this.width) + px) * 4;
     const sa = Math.max(0, Math.min(1, color[3] * this.globalAlpha));
     const da = this.data[i + 3]! / 255;
@@ -272,6 +284,11 @@ export class RasterContext implements TileBakeContext2D {
 
   private rasterise(paths: Point[][]): void {
     const color = parseRgba(this.fillStyle);
+    this.scan(paths, (px, py) => this.blend(px, py, color));
+  }
+
+  /** Visits every pixel whose centre is inside `paths` (non-zero winding). */
+  private scan(paths: Point[][], visit: (px: number, py: number) => void): void {
     const edges: Array<[number, number, number, number]> = [];
     for (const path of paths) {
       if (path.length < 2) continue;
@@ -303,7 +320,7 @@ export class RasterContext implements TileBakeContext2D {
         // pixel centres px + 0.5 in [xa, xb)
         const from = Math.max(0, Math.ceil(xa - 0.5));
         const to = Math.min(this.width - 1, Math.ceil(xb - 0.5) - 1);
-        for (let px = from; px <= to; px += 1) this.blend(px, py, color);
+        for (let px = from; px <= to; px += 1) visit(px, py);
       }
     }
   }
@@ -316,6 +333,7 @@ export class RasterContext implements TileBakeContext2D {
   clone(): RasterContext {
     const copy = new RasterContext(this.width, this.height);
     copy.data.set(this.data);
+    copy.clipMask = this.clipMask;
     return copy;
   }
 }

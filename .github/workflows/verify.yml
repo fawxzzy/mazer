@@ -76,6 +76,7 @@ jobs:
           tests/render/edgeMarkers.test.ts
           tests/render/boardTileBake.test.ts
           tests/render/boardTileStyle.test.ts
+          tests/render/starlitBevelBake.test.ts
           tests/render/endpointTilePixels.test.ts
           tests/render/endpointTileSkins.test.ts
           tests/render/startPinwheel.test.ts

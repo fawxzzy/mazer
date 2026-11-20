@@ -33,8 +33,7 @@ import {
   resolveOutroRemoveMs,
   resolveOutroTilesEndMs,
   resolveOutroTotalMs,
-  resolveSpawnLaser,
-  skipIntroElapsedMs
+  resolveSpawnLaser
 } from '../../src/render/introTimeline';
 
 const FULL = { reducedMotion: false } as const;
@@ -239,16 +238,17 @@ describe('introTimeline (time-driven intro)', () => {
     expect(resolveIntro(0, options).digitAlpha).toBe(0);
   });
 
-  test('skip jumps to the final state and never moves time backwards', () => {
+  // MAZER-CTRL-007 retired the input "skip" (it jumped this clock to its end): only elapsed time finishes the intro.
+  test('the final state is reached only at its own instant, never earlier', () => {
     const options = { ...FULL, tileCount: 500 };
-    const skipped = skipIntroElapsedMs(250, { ...FULL, tileCount: 500 });
-    expect(skipped).toBe(resolveIntroDoneMs(500));
-    const state = resolveIntro(skipped, options);
-    expect(state.done).toBe(true);
-    expect(state.inputUnlocked).toBe(true);
-    expect(state.tilesVisible).toBe(500);
-    expect(skipIntroElapsedMs(9000, { ...FULL, tileCount: 500 })).toBe(9000);
-    expect(skipIntroElapsedMs(100, { ...REDUCED, tileCount: 500 })).toBe(INTRO_REDUCED_MOTION_MS);
+    const done = resolveIntro(resolveIntroDoneMs(500), options);
+    expect(done.done).toBe(true);
+    expect(done.inputUnlocked).toBe(true);
+    expect(done.tilesVisible).toBe(500);
+    const midBuild = resolveIntro(250, options);
+    expect(midBuild.inputUnlocked).toBe(false);
+    expect(midBuild.tilesVisible).toBeLessThan(500);
+    expect(resolveIntroDurationMs(true, 500)).toBe(INTRO_REDUCED_MOTION_MS);
   });
 
   test('reduced motion: 200 ms crossfade, no laser, no sparkles, unlock at 200', () => {

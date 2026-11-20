@@ -6,7 +6,9 @@
  * the injected `factory`. The scene then blits that one canvas; nothing here runs per frame and no
  * gradient is created per tile. Two styles share the same layout analysis:
  *
- *   - 'chip'  (default): per-tile rounded chips merged into continuous ribbons, one thin lit edge.
+ *   - 'starlit' (default, MAZER-VIS-064 tile set H): the chip geometry with a crisp rim, a one-band bevel and
+ *     sparse wall specks.
+ *   - 'chip'  (alternate, the 2026-11-06 look): per-tile rounded chips merged into continuous ribbons, one thin lit edge.
  *   - 'trace' (alternate): one stroked circuit trace in a dark channel with three soft glow passes.
  *
  * Marker helpers (`drawBoardMarkers`, `drawStartMarker`, ...) draw the small dynamic overlay (start,
@@ -96,11 +98,16 @@ export interface TileBakeContext2D {
   fill(): void;
   stroke(): void;
   fillRect(x: number, y: number, w: number, h: number): void;
+  /**
+   * Clips to the current path (Starlit bevel bands stay inside the rounded tile faces). Optional here because the
+   * marker overlay also draws through Phaser Graphics, which cannot clip; every BAKE surface must have it.
+   */
+  clip?(): void;
 }
 
 export interface TileBakeSurface<TCanvas = unknown> {
   canvas: TCanvas;
-  ctx: TileBakeContext2D;
+  ctx: TileBakeContext2D & { clip(): void };
 }
 
 /** Creates a device-pixel-sized offscreen surface (e.g. a document canvas, an OffscreenCanvas, or a test fake). */
@@ -649,6 +656,7 @@ class Painter {
   }
   fill(): void { this.ctx.fill(); this.stats.paintOps += 1; }
   stroke(): void { this.ctx.stroke(); this.stats.paintOps += 1; }
+  clip(): void { this.ctx.clip?.(); this.stats.stateOps += 1; }
 
   /** Clockwise rounded rect (same winding as rect()), radii clamped to half the short side. */
   roundedRect(x: number, y: number, w: number, h: number, radii: CornerRadii): void {
@@ -803,6 +811,129 @@ const paintChipFloor = (
   if (patchOpen) {
     p.fill();
   }
+};
+
+/**
+ * Tile set H "Starlit Bevel" (MAZER-VIS-064): the options-page painter the owner picked, on the Chip geometry.
+ * Order: wall specks, crisp rim union (no glow), face union, bevel bands clipped to the faces (highlight on closed
+ * top/left edges, shade on closed bottom/right, gate tiles skipped), gate tiles (shade face, faint highlight strips
+ * bottom/right, the dark gate face inset by one band), concave rim patches. Baked once like Chip; nothing per frame.
+ */
+const paintStarlitFloor = (
+  p: Painter,
+  n: NormalizedInput,
+  layout: BoardTileLayout,
+  style: ResolvedBoardTileStyle,
+  tiles: readonly ChipTileGeometry[],
+  gateTiles: readonly ChipTileGeometry[]
+): void => {
+  if (tiles.length === 0) {
+    return;
+  }
+  const h = style.material.starlit;
+  const g = BOARD_TILE_GEOMETRY.starlit;
+  const band = style.starlit.bevel;
+  const isGate = new Set(gateTiles.map((t) => `${t.x},${t.y}`));
+  const faceUnion = (list: readonly ChipTileGeometry[]): void => {
+    p.begin();
+    for (const t of list) {
+      p.roundedRect(t.fill.left, t.fill.top, t.fill.width, t.fill.height, t.fillRadii);
+    }
+  };
+
+  // wall specks: about one wall cell in five (cell hash), a device-snapped square inside the cell, capped
+  const speck = style.starlit.speck;
+  p.fillStyle(cssRgba(h.rim, g.speckAlpha));
+  p.begin();
+  let specks = 0;
+  for (let y = 0; y < n.rows && specks < g.speckCap; y += 1) {
+    for (let x = 0; x < n.cols && specks < g.speckCap; x += 1) {
+      if (isFloor(n.grid, x, y)) continue;
+      const hash = (Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663)) >>> 0;
+      if (hash % g.speckEvery !== 0) continue;
+      const fx = ((hash >>> 8) % 100) / 100;
+      const fy = ((hash >>> 16) % 100) / 100;
+      const cx = layout.xs[x]! + (layout.xs[x + 1]! - layout.xs[x]!) * (0.2 + 0.6 * fx);
+      const cy = layout.ys[y]! + (layout.ys[y + 1]! - layout.ys[y]!) * (0.2 + 0.6 * fy);
+      p.rect(Math.round(cx * n.scale) / n.scale, Math.round(cy * n.scale) / n.scale, speck, speck);
+      specks += 1;
+    }
+  }
+  p.fill();
+
+  // crisp rim union, then the face union inset on exposed sides (joins abut exactly: no seam)
+  p.fillStyle(cssRgb(h.rim));
+  p.begin();
+  for (const t of tiles) {
+    p.roundedRect(t.left, t.top, t.width, t.height, t.radii);
+  }
+  p.fill();
+  p.fillStyle(cssRgb(h.floor));
+  faceUnion(tiles);
+  p.fill();
+
+  // bevel bands on closed edges, clipped to the faces so rounded corners stay round
+  p.save();
+  faceUnion(tiles);
+  p.clip();
+  const bands = (colour: number, lit: boolean): void => {
+    p.fillStyle(cssRgb(colour));
+    p.begin();
+    for (const t of tiles) {
+      if (isGate.has(`${t.x},${t.y}`)) continue;
+      const f = t.fill;
+      if (lit) {
+        if (!t.open.u) p.rect(f.left, f.top, f.width, band);
+        if (!t.open.l) p.rect(f.left, f.top, band, f.height);
+      } else {
+        if (!t.open.d) p.rect(f.left, f.top + f.height - band, f.width, band);
+        if (!t.open.r) p.rect(f.left + f.width - band, f.top, band, f.height);
+      }
+    }
+    p.fill();
+  };
+  bands(h.highlight, true);
+  bands(h.shade, false);
+  p.restore();
+
+  // gate tiles: a sunken shade ring with faint highlight strips bottom/right, the dark gate face inside it
+  if (gateTiles.length > 0) {
+    p.fillStyle(cssRgb(h.shade));
+    faceUnion(gateTiles);
+    p.fill();
+    p.fillStyle(cssRgba(h.highlight, g.gateHighlightAlpha));
+    p.begin();
+    for (const t of gateTiles) {
+      const f = t.fill;
+      p.rect(f.left, f.top + f.height - band, f.width, band);
+      p.rect(f.left + f.width - band, f.top, band, f.height);
+    }
+    p.fill();
+    p.fillStyle(cssRgb(h.gate));
+    p.begin();
+    for (const t of gateTiles) {
+      const f = t.fill;
+      p.roundedRect(
+        f.left + band, f.top + band, f.width - 2 * band, f.height - 2 * band,
+        t.fillRadii.map((r) => Math.max(0, r - band)) as CornerRadii
+      );
+    }
+    p.fill();
+  }
+
+  // concave rim patches (as Chip)
+  const rim = style.rimWidth;
+  p.fillStyle(cssRgb(h.rim));
+  p.begin();
+  for (const t of tiles) {
+    const right = t.left + t.width - rim;
+    const bottom = t.top + t.height - rim;
+    if (t.concave.tl) p.rect(t.left, t.top, rim, rim);
+    if (t.concave.tr) p.rect(right, t.top, rim, rim);
+    if (t.concave.br) p.rect(right, bottom, rim, rim);
+    if (t.concave.bl) p.rect(t.left, bottom, rim, rim);
+  }
+  p.fill();
 };
 
 const paintChipDocks = (
@@ -1072,7 +1203,13 @@ export function bakeBoardTiles<TCanvas = unknown>(
   if (n.style === 'trace') {
     paintTraceFloor(p, n, layout, style, base);
   } else {
-    paintChipFloor(p, style, base.map((tile) => chipGeometryOf(n, tile, style)), gates.map((entry) => entry.chip));
+    const chips = base.map((tile) => chipGeometryOf(n, tile, style));
+    const gateChips = gates.map((entry) => entry.chip);
+    if (n.style === 'starlit') {
+      paintStarlitFloor(p, n, layout, style, chips, gateChips);
+    } else {
+      paintChipFloor(p, style, chips, gateChips);
+    }
     paintChipDocks(p, layout, style);
   }
   paintGateBrackets(p, n, gates);
