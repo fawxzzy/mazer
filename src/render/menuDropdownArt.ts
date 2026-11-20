@@ -14,16 +14,14 @@ import {
  * drawMenuBurgerGlyph too, so the guide and the button cannot drift apart.
  */
 
-/** Closed toggle lines and row labels. */
+/** Toggle lines (closed and open, MAZER-UI-097) and row labels. */
 export const MENU_DROPDOWN_FOREGROUND = cyberArcadeMaterial.rail.white;
-/** Open toggle (the X), highlighted row and the panel keyline. */
+/** Highlighted row and the panel keyline. */
 export const MENU_DROPDOWN_ACCENT = cyberArcadeMaterial.rail.cyan;
 /** Panel fill: the dark control background, nearly opaque so labels stay readable over the trail. */
 export const MENU_DROPDOWN_PANEL_FILL = cyberArcadeMaterial.substrate.field;
 export const MENU_DROPDOWN_PANEL_FILL_ALPHA = 0.94;
 
-/** MAZER-UI-097: the closed toggle's line ink, C Star Dust's button ink (token line.active). */
-export const MENU_TOGGLE_INK = cssHexToNumber(BUTTON_ICON_PALETTE.ink);
 const MENU_TOGGLE_SPARK = cssHexToNumber(BUTTON_ICON_PALETTE.spark);
 const MENU_TOGGLE_PRESSED_INK = cssHexToNumber(BUTTON_ICON_PALETTE.inkPressed);
 const MENU_TOGGLE_PRESSED_SPARK = cssHexToNumber(BUTTON_ICON_PALETTE.sparkPressed);

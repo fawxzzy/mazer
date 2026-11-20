@@ -23,7 +23,6 @@ import {
   MENU_DROPDOWN_ACCENT,
   MENU_DROPDOWN_FOREGROUND,
   MENU_DROPDOWN_PANEL_FILL,
-  MENU_TOGGLE_INK,
   drawMenuBurgerGlyph,
   drawMenuDropdownPanel
 } from './menuDropdownArt';
@@ -218,7 +217,9 @@ export class LegacyMenuDropdownController {
       if (key !== drawnKey) {
         drawnKey = key;
         graphics.clear();
-        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, open ? MENU_DROPDOWN_ACCENT : MENU_TOGGLE_INK, 1, pressed);
+        // MAZER-UI-097: one ink for the lines in both states, like C (menu / menuOpen); the X is marked by its cyan dust
+        // dot. The ink stays the foreground the Guide's Menu row passes, so the guide and the button remain one draw.
+        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);
       }
       if (this.state.open) {
         graphics.setAlpha(1).setScale(1);

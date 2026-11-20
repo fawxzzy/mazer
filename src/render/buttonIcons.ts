@@ -1,4 +1,5 @@
 import { designTokens } from '../theme/tokens';
+import { resolveLegacyMenuBurgerMetrics } from '../legacy-runtime/legacyMenuDropdown';
 
 /**
  * MAZER-UI-097: the button icon set, "C Star Dust" (owner pick 2026-11-19). The ONE place the game's button icon
@@ -509,7 +510,7 @@ export const drawButtonIconGraphics = (
  * fades out as the lines cross, and the X gains C's centre dust dot as it forms.
  */
 export interface MenuToggleDust {
-  /** C line weight for a toggle frame of `size` css px (2 of 24 units on C's 0.68 button box). */
+  /** C line weight for a toggle frame of `size` css px (2 C units; see resolveMenuToggleDust for the unit). */
   readonly lineWidth: number;
   readonly sparkRadius: number;
   /** Distance from a line's left end to its spark centre, along the line. */
@@ -521,9 +522,15 @@ export interface MenuToggleDust {
 
 /** C draws a standalone button glyph on 0.68 of the button box. */
 export const BUTTON_ICON_BUTTON_BOX_RATIO = 0.68;
+/** C's menu glyph puts its three lines 5 units apart (y 7, 12, 17). */
+const MENU_LINE_PITCH_UNITS = 5;
 
+/**
+ * The toggle keeps the legacy line pitch (resolveLegacyMenuBurgerMetrics().gap), so one C unit is measured from that
+ * pitch: the dust then sits on the lines in C's proportions whatever the frame size.
+ */
 export const resolveMenuToggleDust = (size: number): MenuToggleDust => {
-  const unit = (size * BUTTON_ICON_BUTTON_BOX_RATIO) / BUTTON_ICON_VIEWBOX;
+  const unit = resolveLegacyMenuBurgerMetrics(size).gap / MENU_LINE_PITCH_UNITS;
   const menu = BUTTON_ICON_SOURCES.menu;
   const spark = menu.sparks[0]!;
   return {

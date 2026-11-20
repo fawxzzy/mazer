@@ -16,7 +16,7 @@ import {
   resolveMenuToggleDust
 } from '../../src/render/buttonIcons';
 import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../../src/render/hudIconAtlas';
-import { MENU_TOGGLE_INK, drawMenuBurgerGlyph, type MenuBurgerGraphics } from '../../src/render/menuDropdownArt';
+import { MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph, type MenuBurgerGraphics } from '../../src/render/menuDropdownArt';
 import { drawGuideSoundGlyph } from '../../src/render/guideSoundGlyph';
 import {
   CLOSED_LEGACY_MENU_DROPDOWN_STATE,
@@ -174,7 +174,7 @@ describe('menu toggle: the hamburger-to-X morph is unchanged, only its look is C
   const size = 44;
   const lineCalls = (progress: number, pressed = false): GraphicsCall[] => {
     const { calls, graphics } = recordingGraphics();
-    drawMenuBurgerGlyph(graphics, 100, 50, size, progress, MENU_TOGGLE_INK, 1, pressed);
+    drawMenuBurgerGlyph(graphics, 100, 50, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);
     return calls;
   };
 
@@ -222,7 +222,7 @@ describe('menu toggle: the hamburger-to-X morph is unchanged, only its look is C
   test('the toggle redraws only when progress, open or pressed changes (bake-once cost)', () => {
     const buttons = read('src/render/menuDropdownButtons.ts');
     expect(buttons).toContain('const key = `${progress.toFixed(3)}|${open}|${pressed}`;');
-    expect(buttons).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress, open ? MENU_DROPDOWN_ACCENT : MENU_TOGGLE_INK, 1, pressed);');
+    expect(buttons).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);');
   });
 });
 
@@ -236,7 +236,7 @@ describe('Guide icons follow the icon set', () => {
     expect(read('src/render/guideSoundGlyph.ts')).toContain("drawButtonIconGraphics(graphics, 'soundOn',");
   });
 
-  test('the Menu row uses the live toggle ink, so the guide and the button stay one draw', () => {
-    expect(read('src/scenes/MenuScene.ts')).toContain('drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_TOGGLE_INK);');
+  test('the Menu row passes the live toggle ink, so the guide and the button stay one draw', () => {
+    expect(read('src/scenes/MenuScene.ts')).toContain('drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_DROPDOWN_FOREGROUND);');
   });
 });
