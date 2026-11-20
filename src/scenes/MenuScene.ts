@@ -12672,7 +12672,7 @@ export class MenuScene extends Phaser.Scene {
     }
     // A named username is the only thing that puts a row on the public page
     // (mazer_leaderboard_page filters to it), so an unnamed player gets one
-    // clear reason plus the action that unlocks it instead of a list they can
+    // clear reason and where to choose a name (Profile) instead of a list they can
     // never appear in.
     if (usernameGate === 'ok' && this.accountUsernameSavedValue.length <= 0) {
       usernameGate = 'needs-username';
