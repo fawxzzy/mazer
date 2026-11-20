@@ -16,7 +16,7 @@ export interface RecordingContext {
 
 const METHODS = [
   'save', 'restore', 'setTransform', 'clearRect', 'beginPath', 'closePath', 'moveTo', 'lineTo',
-  'arcTo', 'arc', 'rect', 'fill', 'stroke', 'fillRect'
+  'arcTo', 'arc', 'rect', 'fill', 'stroke', 'fillRect', 'clip'
 ] as const;
 
 export const createRecordingContext = (): RecordingContext => {

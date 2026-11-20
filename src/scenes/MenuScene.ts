@@ -49,7 +49,7 @@ import {
   resolveBleedGlowRects
 } from '../render/bleedGlow';
 import { BleedGlowColourSmoother } from '../render/bleedGlowColourStep';
-import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, boardMaterial, type BoardTileStyleId } from '../render/boardTileStyle';
+import { BOARD_MARKER_MIN_CSS, BOARD_TILE_GEOMETRY, DEFAULT_BOARD_TILE_STYLE, boardMaterial, resolveBoardSwatchColors, type BoardTileStyleId } from '../render/boardTileStyle';
 import { drawGoalBeacon } from '../render/goalBeacon';
 import { MOTION_LOOP_MS } from '../render/motionScale';
 import {
@@ -2041,7 +2041,7 @@ export class MenuScene extends Phaser.Scene {
   // Z-order anchor for the board layer (edgeMarkers.test pins it). The board's tiles are NOT drawn
   // here any more: boardTileLayer.image (the baked Chip/Trace board) sits right after it.
   // Board tile style flag: Chip by default, ?tileStyle=trace for the alternate.
-  private boardTileStyle: BoardTileStyleId = 'chip';
+  private boardTileStyle: BoardTileStyleId = DEFAULT_BOARD_TILE_STYLE;
   private boardTileLayer!: BoardTileLayer;
   private boardTileLayerTextureKey: string | null = null;
   private boardTileRankOrder: LegacyPoint[] | null = null;
@@ -10646,8 +10646,8 @@ export class MenuScene extends Phaser.Scene {
         animated: starDust.animated,
         originAdvancePx: starDust.originAdvancePx
       });
-    } else if (this.boardTileStyle === 'chip') {
-      // Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
+    } else if (this.boardTileStyle !== 'trace') {
+      // Starlit (MAZER-VIS-064) keeps the Chip trail as is. Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
       // the trail sits on a dark underlay (bg.canvas, wider than the core: resolveTrailWidths). Layering,
       // bottom to top: neon bloom, dark underlay, crisp core (src/render/trailLayersCanvas.ts). Same path and
       // colours as the single compositor; the underlay follows the lifecycle fade only (underlayAlpha), the
@@ -12596,9 +12596,7 @@ export class MenuScene extends Phaser.Scene {
     cells: Array<{ column: number; row: number }>
   ): void {
     const geometry = resolveChipGridGeometry({ grid, columns, rows, left, top, cellSize });
-    const colors = this.boardTileStyle === 'trace'
-      ? { rim: boardMaterial.channelBorder, fill: boardMaterial.channel }
-      : { rim: boardMaterial.rim, fill: boardMaterial.chip };
+    const colors = resolveBoardSwatchColors(this.boardTileStyle);
     for (const cell of cells) {
       drawChipCell(graphics, geometry, left, top, cell.column, cell.row, colors, 1);
     }
