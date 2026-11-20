@@ -357,7 +357,7 @@ import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButto
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import { LEGACY_MENU_DROPDOWN_ITEMS, type LegacyMenuDropdownItemId } from '../legacy-runtime/legacyMenuDropdown';
 import { LegacyMenuDropdownController } from '../render/menuDropdownButtons';
-import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
+import { MENU_DROPDOWN_ACCENT, MENU_TOGGLE_INK, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
 import {
   ensureMenuPlayLabelGlowTexture,
   resolveMenuPlayLabelAttention,
@@ -12534,7 +12534,7 @@ export class MenuScene extends Phaser.Scene {
       }
       case 'menu-burger':
         // The header menu button's own three-line draw (src/render/menuDropdownArt.ts), closed.
-        drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_DROPDOWN_FOREGROUND);
+        drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_TOGGLE_INK);
         return;
       case 'sound-speaker':
         drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);

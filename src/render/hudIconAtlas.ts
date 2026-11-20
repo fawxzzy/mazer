@@ -3,6 +3,8 @@
 // three 1254 px bitmaps. The glyphs are white on transparent: BootScene tints a copy of the three the
 // menu draws (profile, leaderboard, settings) to a design token, and registers every glyph as a named
 // frame on the atlas texture for the surfaces that will use the rest (close, check, info, share, install).
+// MAZER-UI-097: the three menu icons are now baked from src/render/buttonIcons.ts (C Star Dust), not
+// from this atlas; the frames stay registered for the reserved surfaces.
 // tests/architecture/hud-icon-atlas.test.ts pins this layout to the build script and the shipped file.
 
 export const HUD_ICON_ATLAS_PUBLIC_URL = '/assets/hud/hud-icons.webp';
