@@ -230,7 +230,7 @@ describe('board bake: gate floor and idle brackets', () => {
   });
 
   test('chip style: the gate fill is painted dark and an idle gate gets four white brackets in one stroke', () => {
-    const { log } = bake(inputFor(grid, { gates: [gate] }));
+    const { log } = bake(inputFor(grid, { gates: [gate], style: 'chip' }));
     expect(log).toContain(darkFill);
     const white = log.indexOf(whiteStroke);
     expect(white).toBeGreaterThan(-1);
@@ -241,7 +241,7 @@ describe('board bake: gate floor and idle brackets', () => {
   });
 
   test('a lit gate keeps the dark floor but its brackets are left to the live layer', () => {
-    const { log } = bake(inputFor(grid, { gates: [{ ...gate, lit: true }] }));
+    const { log } = bake(inputFor(grid, { gates: [{ ...gate, lit: true }], style: 'chip' }));
     expect(log).toContain(darkFill);
     expect(log).not.toContain(whiteStroke);
   });

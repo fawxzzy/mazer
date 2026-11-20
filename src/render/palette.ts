@@ -857,3 +857,21 @@ export const BLEED_GATE_TILE_FLOOR = 0x1f3a38;
 
 /** MAZER-VIS-063: bleed gate idle corner brackets, the owner's options-page pick C (src/render/bleedGateTileLook.ts). */
 export const BLEED_GATE_TILE_BRACKET = 0xf2fbfa;
+
+/**
+ * MAZER-VIS-064: board tile set H "Starlit Bevel", the owner's options-page pick (2026-11-19, round 2), painted by
+ * src/render/boardTileBake.ts (style 'starlit'). Floor vs wall 4.18:1, gate vs floor 2.71:1, gate vs wall 1.54:1.
+ * Only the tile surfaces use these: the end/start tiles, markers, trail, gate ring and brackets keep their colours.
+ */
+export const STARLIT_BEVEL_TILE = Object.freeze({
+  /** Floor face. */
+  floor: 0x4c7a74,
+  /** Gate tile face (inside its own bevel). */
+  gate: 0x1b3532,
+  /** Crisp rim around the floor ribbon (no glow), and the wall speck colour. */
+  rim: 0xcdf5ec,
+  /** Bevel highlight on a tile's closed top and left edges. */
+  highlight: 0x9eddd0,
+  /** Bevel shade on a tile's closed bottom and right edges; also the gate tile's sunken ring. */
+  shade: 0x17312e
+});

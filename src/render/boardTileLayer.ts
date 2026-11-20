@@ -35,7 +35,6 @@ import {
   type BoardTileDock,
   type BoardTileGate,
   type BoardTileLayout,
-  type TileBakeContext2D,
   type TileBakeSurface
 } from './boardTileBake';
 import { resolveRevealMaskLength } from './boardRevealMask';
@@ -49,10 +48,10 @@ import {
   type BoardTileStyleId
 } from './boardTileStyle';
 
-/** URL parameter that selects the alternate style: `?tileStyle=trace`. Anything else is Chip. */
+/** URL parameter that selects an alternate style: `?tileStyle=chip` or `?tileStyle=trace`. Anything else is Starlit. */
 export const BOARD_TILE_STYLE_PARAM = 'tileStyle';
 
-/** Flag resolver: default Chip, `?tileStyle=trace` for the alternate. Never throws. */
+/** Flag resolver: default Starlit (MAZER-VIS-064), `?tileStyle=chip` / `?tileStyle=trace` for the alternates. Never throws. */
 export const resolveBoardTileStyleFromSearch = (search: string | null | undefined): BoardTileStyleId => {
   try {
     const raw = new URLSearchParams(search ?? '').get(BOARD_TILE_STYLE_PARAM);
@@ -484,7 +483,7 @@ const createDocumentSurface = (pixelWidth: number, pixelHeight: number): TileBak
   if (!ctx) {
     throw new Error('board tile layer: 2D canvas context unavailable');
   }
-  return { canvas, ctx: ctx as unknown as TileBakeContext2D };
+  return { canvas, ctx: ctx as unknown as TileBakeSurface<HTMLCanvasElement>['ctx'] };
 };
 
 /** The start and goal cells' chip geometry, board-local css px (null when absent or not a floor cell). */

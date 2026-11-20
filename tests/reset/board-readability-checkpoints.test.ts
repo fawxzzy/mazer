@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyIridescentPlayerCoreColor } from '../../src/legacy-runtime/legacyIridescentMaterial';
 import { BOARD_CHIP_FILL, boardMaterial } from '../../src/render/boardTileStyle';
-import { getContrastRatio, getPaletteReadabilityReport, getRelativeLuminance, palette } from '../../src/render/palette';
+import { getContrastRatio, getPaletteReadabilityReport, getRelativeLuminance, palette, STARLIT_BEVEL_TILE } from '../../src/render/palette';
 
 /**
  * Readability checkpoints that must not regress.
@@ -63,6 +63,27 @@ describe('shipped Chip board: real role colours against the real chip floor (non
 
   test('the chip itself separates from the board background (the void)', () => {
     expect(getContrastRatio(BOARD_CHIP_FILL, boardMaterial.void)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('shipped Starlit board (MAZER-VIS-064): real role colours against the Starlit floor (non-text, >= 3:1)', () => {
+  const floor = STARLIT_BEVEL_TILE.floor;
+  const playerCore = resolveLegacyIridescentPlayerCoreColor(0);
+
+  test.each([
+    ['player core', playerCore],
+    ['player ring (locator)', boardMaterial.player],
+    ['player ping (locator)', boardMaterial.playerEdge],
+    ['start marker', boardMaterial.start],
+    ['trail reference (cyan)', boardMaterial.trailReference],
+    ['lit rim', boardMaterial.rim]
+  ])('%s vs Starlit floor', (_name, color) => {
+    expect(getContrastRatio(color, floor)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('the Starlit floor separates from the board background (the void) by more than Chip did', () => {
+    expect(getContrastRatio(floor, boardMaterial.void)).toBeGreaterThanOrEqual(4);
+    expect(getContrastRatio(floor, boardMaterial.void)).toBeGreaterThan(getContrastRatio(BOARD_CHIP_FILL, boardMaterial.void));
   });
 });
 

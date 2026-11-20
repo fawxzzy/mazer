@@ -75,7 +75,7 @@ interface RenderOptions {
 
 const render = (tileSize: number, dpr: number, cell: BoardCell, options: RenderOptions = {}): Rendered => {
   const input: BoardTileBakeInput = {
-    grid: GRID, width: GRID[0]!.length, height: GRID.length, tileSize, devicePixelRatio: dpr, goal: { x: 1, y: 5 }
+    grid: GRID, width: GRID[0]!.length, height: GRID.length, tileSize, devicePixelRatio: dpr, goal: { x: 1, y: 5 }, style: 'chip'
   };
   const layout = computeBoardTileLayout(input);
   // the bake is the slow part and identical for every cell and option: bake once per tile size and DPR

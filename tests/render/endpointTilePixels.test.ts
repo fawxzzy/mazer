@@ -46,8 +46,9 @@ const DPRS = [1, 2, 3];
 const rgb = (color: number): Rgba => [(color >> 16) & 255, (color >> 8) & 255, color & 255, 255];
 const same = (a: Rgba, b: Rgba): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
 
+// Pinned to the Chip floor (a flat chip fill to read the glyph against); Starlit's own marker checks: starlitBevelBake.test.ts.
 const inputFor = (tileSize: number, devicePixelRatio: number, goal: BoardCell): BoardTileBakeInput => ({
-  grid: GRID, width: GRID[0]!.length, height: GRID.length, tileSize, devicePixelRatio, goal
+  grid: GRID, width: GRID[0]!.length, height: GRID.length, tileSize, devicePixelRatio, goal, style: 'chip'
 });
 
 /** One representative cell per distinct (kind, open sides, concave corners) so every tile shape is covered. */
