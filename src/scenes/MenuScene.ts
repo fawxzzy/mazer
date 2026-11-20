@@ -21,6 +21,7 @@ import {
   type BoardTileReveal,
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
+import { StartPinwheelLayer, usesStartPinwheelLayer } from '../render/startPinwheelLayer';
 import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../render/hudIconAtlas';
 import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
@@ -2036,6 +2037,8 @@ export class MenuScene extends Phaser.Scene {
   private boardTileStyle: BoardTileStyleId = DEFAULT_BOARD_TILE_STYLE;
   private boardTileLayer!: BoardTileLayer;
   private boardTileLayerTextureKey: string | null = null;
+  /** MAZER-VIS-065: the Pinwheel start mark, one baked strip (startPinwheelLayer.ts). */
+  private startPinwheelLayer: StartPinwheelLayer | null = null;
   private boardTileRankOrder: LegacyPoint[] | null = null;
   private boardTileRankGrid: Int32Array | null = null;
   // MAZER-VIS-040: the soft build / deconstruct front (mazeRevealTimeline.ts); null outside a full-motion reveal.
@@ -2490,6 +2493,7 @@ export class MenuScene extends Phaser.Scene {
     this.playerGlowCanvasTexture = this.textures.createCanvas(this.playerGlowCanvasTextureKey, 1, 1);
     this.playerGlowCanvasImage = this.add.image(0, 0, this.playerGlowCanvasTextureKey).setOrigin(0, 0).setVisible(false);
     this.createLegacyHazardGateCanvas();
+    this.startPinwheelLayer = new StartPinwheelLayer(this, `legacy-start-pinwheel-${nextMenuSceneInstanceId()}`);
     // Same real-2D-canvas approach as the player glow above, for the goal
     // star's own ambient halo -- see the field's own comment.
     this.boardDynamicGraphics = this.add.graphics();
@@ -2513,6 +2517,7 @@ export class MenuScene extends Phaser.Scene {
       this.playerGlowCanvasImage,
       // Pulse Gate layer (slice H3): its own canvas over the trail and glow, under the crisp cast. Flag on only.
       ...(this.hazardGateImage ? [this.hazardGateImage] : []),
+      this.startPinwheelLayer.image,
       this.boardDynamicGraphics,
       this.titleGraphics
     ]);
@@ -2705,6 +2710,8 @@ export class MenuScene extends Phaser.Scene {
         this.textures.remove(this.boardTileLayerTextureKey);
       }
       this.boardTileLayerTextureKey = null;
+      this.startPinwheelLayer?.destroy();
+      this.startPinwheelLayer = null;
       if (this.remoteSettingsSyncTimer !== null) {
         clearTimeout(this.remoteSettingsSyncTimer);
         this.remoteSettingsSyncTimer = null;
@@ -9363,6 +9370,7 @@ export class MenuScene extends Phaser.Scene {
     // checks further down, so there are real dirty frames where it never
     // runs at all.
     this.playerGlowCanvasImage?.setVisible(false);
+    this.startPinwheelLayer?.hide();
 
     // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
     // this.player -- the exact same shared fields the menu demo AI already
@@ -10677,6 +10685,21 @@ export class MenuScene extends Phaser.Scene {
       });
     }
     const endpointTiles = this.boardTileLayer.endpointTiles;
+    if (kind === 'start' && this.startPinwheelLayer && endpointTiles.start && usesStartPinwheelLayer(this.boardTileStyle)) {
+      this.startPinwheelLayer.show({
+        tile: endpointTiles.start,
+        originX: origin.x,
+        originY: origin.y,
+        boardImageX: this.boardTileLayer.image.x,
+        boardImageY: this.boardTileLayer.image.y,
+        backingScale,
+        style: this.boardTileStyle,
+        alpha: Math.min(1, alpha),
+        timeMs: time ?? 0,
+        reducedMotion: this.prefersLegacyReducedMotion()
+      });
+      return;
+    }
     const markerInput = {
       // Honoured by the Trace style only: the Chip end tile is drawn at exactly the tile's size.
       minimumMarkerSizes: BOARD_MARKER_MIN_CSS,

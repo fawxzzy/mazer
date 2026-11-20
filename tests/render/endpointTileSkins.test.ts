@@ -30,21 +30,22 @@ import {
 } from '../../src/render/endpointTileSkins';
 import { drawGoalBeacon, GOAL_BEACON } from '../../src/render/goalBeacon';
 import { resolveSharedBorderColor } from '../../src/render/trailPalette';
+import { START_PINWHEEL, START_PINWHEEL_PAINT_OPS, resolveStartPinwheelFadeAlphas } from '../../src/render/startPinwheel';
 import { RasterContext, type Rgba } from './support/rasterContext';
 import { createRecordingContext } from './support/boardTileFixtures';
 
 /**
- * L5 end-tile skins (endpointTileSkins.ts): Zac's picks (2026-11-19) are the defaults, START = Seed spiral (beaded
- * spiral, breathes as it turns, options-page green #6DFF7C), END = Twin stars (big outline star + solid star turning opposite ways, a
+ * L5 end-tile skins (endpointTileSkins.ts): Zac's picks (2026-11-19) are the defaults, START = Pinwheel (MAZER-VIS-065,
+ * startPinwheel.ts; it replaced L5's Seed spiral, now retired but drawable), END = Twin stars (big outline star + solid star turning opposite ways, a
  * five-point star ping). The pre-L5 looks stay drawable as retired skins (their own suites pin them); the other archive
  * designs are registered for a future shop and are neither selectable nor drawable.
  */
 
 describe('skin registry', () => {
   test('the picks are the defaults and the only selectable skins', () => {
-    expect(DEFAULT_START_TILE_SKIN).toBe('seed-spiral');
+    expect(DEFAULT_START_TILE_SKIN).toBe('blade-pinwheel');
     expect(DEFAULT_END_TILE_SKIN).toBe('twin-stars');
-    expect(selectableStartTileSkins().map((s) => s.id)).toEqual(['seed-spiral']);
+    expect(selectableStartTileSkins().map((s) => s.id)).toEqual(['blade-pinwheel']);
     expect(selectableEndTileSkins().map((s) => s.id)).toEqual(['twin-stars']);
   });
 
@@ -57,17 +58,20 @@ describe('skin registry', () => {
         expect(skin.name.length, skin.id).toBeGreaterThan(0);
       }
     }
-    expect(START_TILE_SKINS.filter((s) => s.status === 'retired').map((s) => s.id)).toEqual(['pinwheel']);
+    expect(START_TILE_SKINS.filter((s) => s.status === 'retired').map((s) => s.id)).toEqual(['seed-spiral', 'pinwheel']);
     expect(END_TILE_SKINS.filter((s) => s.status === 'retired').map((s) => s.id)).toEqual(['solid-star']);
-    expect(START_TILE_SKINS.filter((s) => s.status === 'archived')).toHaveLength(3);
+    // 3 from the L5 options page, 5 from the VIS-065 options page (designs A to E)
+    expect(START_TILE_SKINS.filter((s) => s.status === 'archived')).toHaveLength(8);
     expect(END_TILE_SKINS.filter((s) => s.status === 'archived')).toHaveLength(10);
   });
 
   test('resolution: missing, unknown and archived ids fall back to the default; retired ids are honoured', () => {
-    expect(resolveStartTileSkin()).toBe('seed-spiral');
-    expect(resolveStartTileSkin('nope')).toBe('seed-spiral');
-    expect(resolveStartTileSkin('portal-rings')).toBe('seed-spiral');
+    expect(resolveStartTileSkin()).toBe('blade-pinwheel');
+    expect(resolveStartTileSkin('nope')).toBe('blade-pinwheel');
+    expect(resolveStartTileSkin('portal-rings')).toBe('blade-pinwheel');
+    expect(resolveStartTileSkin('double-helix')).toBe('blade-pinwheel');
     expect(resolveStartTileSkin('pinwheel')).toBe('pinwheel');
+    expect(resolveStartTileSkin('seed-spiral')).toBe('seed-spiral');
     expect(resolveEndTileSkin()).toBe('twin-stars');
     expect(resolveEndTileSkin(null)).toBe('twin-stars');
     expect(resolveEndTileSkin('nova-burst')).toBe('twin-stars');
@@ -148,8 +152,21 @@ describe('drawBoardMarkers with the default skins (recorded calls)', () => {
     expect(boardMaterial.start).not.toBe(SEED_SPIRAL.color);
   });
 
-  test('start: one keyline fill for every bead, then one green fill per alpha band; no strokes', () => {
+  test('start (Pinwheel): keyline ring, hub keyline, the nested green fade fills, the pale hub; fills only, no circles', () => {
     const { rec } = draw({ start: { x: 1, y: 1 } });
+    expect(rec.log.filter((e) => e.startsWith('set fillStyle='))).toEqual([
+      `set fillStyle=${cssRgb(boardMaterial.void)}`,
+      `set fillStyle=${cssRgb(boardMaterial.void)}`,
+      ...resolveStartPinwheelFadeAlphas().map((a) => `set fillStyle=${cssRgba(START_PINWHEEL.color, a)}`),
+      `set fillStyle=${cssRgb(START_PINWHEEL.coreColor)}`
+    ]);
+    expect(rec.count('fill(')).toBe(START_PINWHEEL_PAINT_OPS);
+    expect(rec.count('stroke(')).toBe(0);
+    expect(rec.count('arc(')).toBe(0);
+  });
+
+  test('start (retired Seed spiral): one keyline fill for every bead, then one green fill per alpha band; no strokes', () => {
+    const { rec } = draw({ start: { x: 1, y: 1 }, startTileSkin: 'seed-spiral' });
     const fills = rec.log.filter((e) => e.startsWith('set fillStyle='));
     expect(fills[0]).toBe(`set fillStyle=${cssRgb(boardMaterial.void)}`);
     expect(fills.slice(1)).toEqual(
@@ -192,8 +209,8 @@ describe('drawBoardMarkers with the default skins (recorded calls)', () => {
 
   test('both default skins together stay a small, bounded draw', () => {
     const { rec, stats } = draw({ start: { x: 1, y: 1 }, goal: { x: 5, y: 5 }, endpointTimeMs: 900 });
-    // seed spiral 1 + 4 fills, twin stars 2 outline strokes + 5 solid-star ops
-    expect(stats.paintOps).toBeLessThanOrEqual(12);
+    // Pinwheel 9 fills (the play scene shows it as a baked strip instead), twin stars 2 outline strokes + 5 solid-star ops
+    expect(stats.paintOps).toBeLessThanOrEqual(START_PINWHEEL_PAINT_OPS + 7);
     expect(rec.log.some((e) => e.includes('Gradient') || e.startsWith('set shadowBlur'))).toBe(false);
   });
 });
