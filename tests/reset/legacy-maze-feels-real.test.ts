@@ -66,7 +66,11 @@ describe('generated mazes feel like a real maze (MAZER-GEN-021)', () => {
       const a = generateStubCensusMaze(1, board, seedForIndex(0), 'play');
       const b = generateStubCensusMaze(1, board, seedForIndex(0), 'play');
       expect(a.grid).toEqual(b.grid);
-      expect(measureMazeRealness(a).spanManhattan).toBeGreaterThanOrEqual(0.6);
+      // Start and goal sit at the two ends of the long axis (the whole run).
+      expect(Math.abs(a.goal.x - a.start.x) + Math.abs(a.goal.y - a.start.y)).toBe(Math.max(a.width, a.height) - 3);
+      // MAZER-UI-098: 0.55, was 0.6. Size rule 2 builds level 1 small (15 x 33 phone, 27 x 17 desktop); the share counts
+      // the cross axis too, so the same end-to-end run reads 0.57 on the 27 x 17 board (0.61 on the old 49 x 29).
+      expect(measureMazeRealness(a).spanManhattan).toBeGreaterThanOrEqual(0.55);
     }
     const c = generateStubCensusMaze(60, LADDER_BOARDS[0], seedForIndex(3), 'menu');
     const d = generateStubCensusMaze(60, LADDER_BOARDS[0], seedForIndex(3), 'menu');

@@ -1,4 +1,5 @@
 import { resolveLegacyAuthScopedStorageKey, type LegacyAuthSessionSnapshot } from './legacyAuth';
+import { LEGACY_BOARD_SIZE_RULE_LATEST, type LegacyBoardSizeRule } from './legacyBoardScale';
 
 // MAZER-FLOW-016: the maze seed of the current play attempt, so quitting or reloading mid-level resumes
 // the same maze instead of re-rolling it. Saved when a play maze is built, restored by the next Start only
@@ -16,6 +17,8 @@ export interface LegacyAttemptSeedContext {
   readonly aspectRatio: number;
   readonly completedCycles: number | string;
   readonly level: number | string;
+  // MAZER-UI-098: the board size rule the attempt is built under (default: the latest rule).
+  readonly sizeRule?: LegacyBoardSizeRule;
 }
 
 interface SavedAttempt {
@@ -23,7 +26,13 @@ interface SavedAttempt {
   readonly completedCycles: number | string;
   readonly level: number | string;
   readonly seed: number;
+  // MAZER-UI-098: absent on attempts saved before size rules existed, which were built under rule 1. The
+  // same seed under another rule is another maze (another board size), so an attempt is restored only
+  // under the rule it was saved with; otherwise the next Start rolls a new maze.
+  readonly sizeRule?: LegacyBoardSizeRule;
 }
+
+const resolveSavedSizeRule = (value: unknown): LegacyBoardSizeRule => (value === 2 ? 2 : 1);
 
 const roundAspect = (aspectRatio: number): number => Math.round(aspectRatio * 1000) / 1000;
 
@@ -40,7 +49,8 @@ export const writeLegacyAttemptSeed = (
     aspect: roundAspect(context.aspectRatio),
     completedCycles: context.completedCycles,
     level: context.level,
-    seed: Math.trunc(seed)
+    seed: Math.trunc(seed),
+    sizeRule: context.sizeRule ?? LEGACY_BOARD_SIZE_RULE_LATEST
   };
   try {
     storage.setItem(storageKey, JSON.stringify(saved));
@@ -72,6 +82,7 @@ export const readLegacyAttemptSeed = (
       && String(saved.level) === String(context.level)
       && String(saved.completedCycles) === String(context.completedCycles)
       && saved.aspect === roundAspect(context.aspectRatio)
+      && resolveSavedSizeRule(saved.sizeRule) === (context.sizeRule ?? LEGACY_BOARD_SIZE_RULE_LATEST)
     ) {
       return saved.seed;
     }

@@ -1,5 +1,10 @@
 import { resolveLegacyBoardFloorScale } from './legacyBoardPlan';
-import { LEGACY_BOARD_FLOOR_SCALE_STEP, resolveLegacyBoardScaleForLevel } from './legacyBoardScale';
+import {
+  LEGACY_BOARD_SIZE_RULE_LATEST,
+  resolveLegacyBoardScaleForRule,
+  resolveLegacyBoardSizeRuleSpec,
+  type LegacyBoardSizeRule
+} from './legacyBoardScale';
 import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL, resolveGeometryBudgetProfile } from './legacyGeometryBudget';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
@@ -214,9 +219,17 @@ export interface LegacyProgressionViewport {
 
 export interface LegacyProgressionGenerationScaleOptions {
   boardScale?: number;
+  // MAZER-UI-098: the board size rule (legacyBoardScale.ts). Default: the latest rule for the play surface,
+  // rule 1 for the menu demo (its board keeps the scale-38 look).
+  sizeRule?: LegacyBoardSizeRule;
   surface?: MazeCycleTelemetrySurface;
   viewport?: LegacyProgressionViewport | null;
 }
+
+// MAZER-UI-098: which board size rule a surface builds with when the caller does not pin one.
+export const resolveLegacyBoardSizeRuleForSurface = (
+  surface: MazeCycleTelemetrySurface | undefined
+): LegacyBoardSizeRule => (surface === 'play' ? LEGACY_BOARD_SIZE_RULE_LATEST : 1);
 
 export interface LegacyProgressionGenerationReview {
   delivery: 'under-target' | 'on-target' | 'over-target';
@@ -742,6 +755,9 @@ export interface LegacyMazeGenerationScaleContext {
   // 0..1 -- see LegacyProgressionScaleDetail.fraction. How close to THIS
   // device's own physical ceiling the level's board already sits.
   fraction: number;
+  // MAZER-UI-098: the board size rule the maze is built under. Rule 2 lets its small early boards keep a
+  // short axis under 25 (minGridAxis on the profile). Absent or 1: the profile is unchanged.
+  sizeRule?: LegacyBoardSizeRule;
 }
 
 const resolveLegacyMazeGenerationBaseProfileForProgression = (
@@ -989,10 +1005,18 @@ const applyLegacyMazeGenerationScaleContext = (
 export const resolveLegacyMazeGenerationProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number,
   scaleContext?: LegacyMazeGenerationScaleContext
-): LegacyMazeGenerationProfile => applyLegacyMazeGenerationScaleContext(
-  resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity),
-  scaleContext
-);
+): LegacyMazeGenerationProfile => {
+  const profile = applyLegacyMazeGenerationScaleContext(
+    resolveLegacyMazeGenerationBaseProfileForProgression(trackOrTargetComplexity),
+    scaleContext
+  );
+  if (scaleContext?.sizeRule === undefined || scaleContext.sizeRule === 1) {
+    return profile;
+  }
+  // Rule 2 also grows the felt targets with its late boards (legacyGeometryBudget.ts, board felt), so a board
+  // bigger than the one the ladder was calibrated on is filled, not left a small maze in an empty field.
+  return { ...profile, minGridAxis: resolveLegacyBoardSizeRuleSpec(scaleContext.sizeRule).minGridAxis, feltScalesWithBoard: true };
+};
 
 // MAZER-MENU-BLEED (2026-11-19, owner): the main-menu demo follows the SAME bleed rules as play. MAZER-VIS-052 gave
 // it a band profile (no geometryBudgetLevel, no bleedPlacement) so it showed many openings and never ran the bleed
@@ -1680,6 +1704,8 @@ export interface LegacyProgressionScaleDetail {
   // to actual room available on THIS device, instead of fixed absolute
   // per-band numbers that assume a screen size no one configured.
   fraction: number;
+  // MAZER-UI-098: the board size rule this scale was resolved under (pass it on to the generation profile).
+  sizeRule: LegacyBoardSizeRule;
 }
 
 // Split out from resolveLegacyProgressionGenerationScale (which still
@@ -1711,7 +1737,11 @@ export const resolveLegacyProgressionScaleDetail = (
   // old frozen 35 but LEGACY_BOARD_BASE_SCALE (38), so tiles are a little smaller and a few more
   // fit across and down. baseScale (the retired Board Zoom setting, fixed at 50) no longer blends
   // into the board's size; it only seeds the layout probes below.
-  const levelScale = resolveLegacyBoardScaleForLevel(resolveLegacyProgressionBoardLevel(track));
+  // MAZER-UI-098: the play board follows size rule 2 (starts zoomed in at scale 22, holds at 88 from level
+  // 250); the menu demo stays on rule 1 unless a caller pins a rule.
+  const sizeRule = options.sizeRule ?? resolveLegacyBoardSizeRuleForSurface(options.surface);
+  const sizeSpec = resolveLegacyBoardSizeRuleSpec(sizeRule);
+  const levelScale = resolveLegacyBoardScaleForRule(resolveLegacyProgressionBoardLevel(track), sizeRule);
   // The device's actual screen space (pixels -> the largest tile grid that
   // keeps a tile above a legible/tappable size) is now the real ceiling,
   // not a difficulty-derived formula. This used to be
@@ -1726,10 +1756,14 @@ export const resolveLegacyProgressionScaleDetail = (
     ...options,
     boardScale: baseScale
   });
-  const maxScale = Math.max(25, Math.min(LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE, deviceMaxScale));
-  const minScale = Math.min(25, maxScale);
+  const maxScale = Math.max(sizeSpec.minScale, Math.min(LEGACY_PROGRESSION_ABSOLUTE_MAX_SCALE, deviceMaxScale));
+  const minScale = Math.min(sizeSpec.minScale, maxScale);
   // Not rounded to a whole number: the level scale is fractional (S2), so the board grows smoothly.
-  const cappedScale = Math.max(minScale, Math.min(maxScale, levelScale));
+  // MAZER-UI-098: under rule 2 the device bound is the real-layout tile floor below (the same layout the
+  // board is drawn with), not this older probe, which runs its own inset model and stops a 390 px phone at
+  // about 83 and a 320 px phone at about 58 although both draw scale 88 / 78 above the 5.5 px floor.
+  const ceilingScale = sizeRule === 2 ? sizeSpec.maxScale : maxScale;
+  const cappedScale = Math.max(minScale, Math.min(ceilingScale, levelScale));
   // The 10 px tile floor, with the real layout. A no-op on every phone 320 px wide or more (the
   // board stays a function of the level); only a narrower box that cannot hold it at 10 px shrinks.
   const scale = options.viewport && isFiniteViewport(options.viewport)
@@ -1741,14 +1775,16 @@ export const resolveLegacyProgressionScaleDetail = (
       },
       cappedScale,
       options.surface === 'play' ? 'play' : 'menu',
-      LEGACY_BOARD_FLOOR_SCALE_STEP,
-      minScale
+      sizeSpec.floorStep,
+      minScale,
+      sizeRule
     )
     : cappedScale;
   return {
     scale,
     deviceMaxScale: maxScale,
-    fraction: maxScale > 0 ? Math.min(1, Math.max(0, scale / maxScale)) : 0
+    fraction: maxScale > 0 ? Math.min(1, Math.max(0, scale / maxScale)) : 0,
+    sizeRule
   };
 };
 

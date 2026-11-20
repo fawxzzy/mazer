@@ -34,6 +34,19 @@ describe('legacyAttemptSeed', () => {
     expect(readLegacyAttemptSeed(storage, KEY, { ...ctx, completedCycles: 3 })).toBeNull();
     expect(readLegacyAttemptSeed(storage, KEY, { ...ctx, aspectRatio: 2.04 })).toBeNull();
   });
+  it('MAZER-UI-098: an attempt is restored only under the board size rule it was saved with', () => {
+    const storage = makeStorage();
+    // Saved before size rules existed (no sizeRule field): built under rule 1, so a rule-2 Start rolls anew.
+    storage.setItem(KEY, JSON.stringify({ aspect: 0.49, completedCycles: 2, level: 5, seed: 777 }));
+    expect(readLegacyAttemptSeed(storage, KEY, ctx)).toBeNull();
+    expect(readLegacyAttemptSeed(storage, KEY, { ...ctx, sizeRule: 1 })).toBe(777);
+    // A new attempt records the latest rule (2) and restores under it, not under rule 1.
+    writeLegacyAttemptSeed(storage, KEY, ctx, 4242);
+    expect(JSON.parse(storage.getItem(KEY)!).sizeRule).toBe(2);
+    expect(readLegacyAttemptSeed(storage, KEY, ctx)).toBe(4242);
+    expect(readLegacyAttemptSeed(storage, KEY, { ...ctx, sizeRule: 2 })).toBe(4242);
+    expect(readLegacyAttemptSeed(storage, KEY, { ...ctx, sizeRule: 1 })).toBeNull();
+  });
   it('clear removes the attempt', () => {
     const storage = makeStorage();
     writeLegacyAttemptSeed(storage, KEY, ctx, 99);
