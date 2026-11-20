@@ -24,8 +24,9 @@ const preview = (level: number): LegacySettingsLevelPreviewOptions => ({
 describe('settings sheet: Level Preview section (pause only, opt-in)', () => {
   test('the default pause and menu sheets are unchanged without the option', () => {
     const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 844, settingsExpanded: true, width: 390 });
+    // MAZER-UI-095: Guide, Sound and Quit moved to the in-game Menu dropdown, so the settings group is always open.
     expect(pause.items.map((item) => item.model.id)).toEqual([
-      'resume', 'settings-disclosure', 'how-to-play', 'reduce-motion', 'haptics', 'sound', 'floating-anchor', 'quit-to-menu'
+      'resume', 'reduce-motion', 'haptics', 'floating-anchor'
     ]);
     const withIgnoredOption = buildLegacySettingsSheetPlan({
       context: 'menu', height: 844, levelPreview: preview(100), signedIn: true, width: 390
@@ -33,20 +34,20 @@ describe('settings sheet: Level Preview section (pause only, opt-in)', () => {
     expect(withIgnoredOption.items.some((item) => String(item.model.id).startsWith('preview'))).toBe(false);
   });
 
-  test('collapsed: Resume, preview heading, Next, Previous, Jump disclosure, Settings, Quit', () => {
+  test('collapsed: Resume, preview heading, Next, Previous, Jump disclosure, then the three settings', () => {
     const plan = buildLegacySettingsSheetPlan({
       context: 'pause', height: 844, levelPreview: preview(100), width: 390
     });
     expect(plan.items.map((item) => item.model.id)).toEqual([
       'resume', 'account-heading', 'preview-next', 'preview-prev', 'preview-jump-disclosure',
-      'settings-disclosure', 'quit-to-menu'
+      'reduce-motion', 'haptics', 'floating-anchor'
     ]);
     const labels = plan.items.map((item) => item.model.label);
     expect(labels).toContain('Level preview L100');
     expect(labels).toContain('Next level (L101)');
     expect(labels).toContain('Previous level (L99)');
-    // Quit to Menu stays last and is the way out.
-    expect(plan.items[plan.items.length - 1]?.model.id).toBe('quit-to-menu');
+    // MAZER-UI-095: the way out is Menu > Main menu in the dropdown; the sheet has no Quit row any more.
+    expect(plan.items.some((item) => item.model.id === 'quit-to-menu')).toBe(false);
   });
 
   test('level 1 has no Previous; the maximum level has no further Next', () => {

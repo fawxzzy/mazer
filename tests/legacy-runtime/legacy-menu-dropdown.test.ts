@@ -47,10 +47,10 @@ const layoutFor = (viewport: { height: number; width: number }, safeArea = { lef
 const isWhole = (value: number): boolean => Number.isInteger(value);
 
 describe('legacy menu dropdown layout (L6 Menu A)', () => {
-  it('lists Settings, Profile and Leaderboard in that order', () => {
-    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.label)).toEqual(['Settings', 'Profile', 'Leaderboard']);
+  it('lists Settings, Guide, Sound, Profile and Leaderboard in that order (MAZER-UI-096 shared rows)', () => {
+    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.label)).toEqual(['Settings', 'Guide', 'Sound', 'Profile', 'Leaderboard']);
     // QA harnesses find the destinations by the retired corner buttons' semantic names.
-    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.semanticAction)).toEqual(['Settings', 'Account', 'Leaderboard']);
+    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.semanticAction)).toEqual(['Settings', 'Guide', 'Sound', 'Account', 'Leaderboard']);
   });
 
   it.each(VIEWPORTS)('is whole px, 44 px rows, inside the viewport and under the toggle at %o', (viewport) => {
@@ -69,7 +69,7 @@ describe('legacy menu dropdown layout (L6 Menu A)', () => {
         Math.round(frame.left + frame.width),
         viewport.width - safeArea.right - LEGACY_MENU_DROPDOWN_EDGE_MARGIN_PX
       ));
-      expect(rows).toHaveLength(3);
+      expect(rows).toHaveLength(5);
       for (const row of rows) {
         expect(row.rect.height).toBeGreaterThanOrEqual(LEGACY_MIN_HIT_TARGET_PX);
         expect(row.rect.width).toBeGreaterThanOrEqual(LEGACY_MIN_HIT_TARGET_PX);
@@ -90,7 +90,7 @@ describe('legacy menu dropdown layout (L6 Menu A)', () => {
     const { frame, hit } = layoutFor(viewport);
     const items = LEGACY_MENU_DROPDOWN_ITEMS.filter((item) => item.id !== 'profile');
     const layout = resolveLegacyMenuDropdownLayout({ items, toggleFrame: frame, toggleHit: hit, viewport });
-    expect(layout.rows.map((row) => row.item.id)).toEqual(['settings', 'leaderboard']);
+    expect(layout.rows.map((row) => row.item.id)).toEqual(['settings', 'guide', 'sound', 'leaderboard']);
     expect(layout.panel.height).toBe(layoutFor(viewport).layout.panel.height - layout.rows[0]!.rect.height);
   });
 });

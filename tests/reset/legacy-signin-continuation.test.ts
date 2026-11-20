@@ -258,7 +258,7 @@ describe('wiring', () => {
     const menu = read('src/scenes/MenuScene.ts');
     expect(menu.match(/withMazerSignInContinuation\(/g)).toHaveLength(1);
     // L6: the Profile row of the menu dropdown replaced the profile corner icon; its select branch carries the intent.
-    expect(menu).toMatch(/\} else \{\s*\/\/ Signed out, a Profile-row sign-in[^\n]*\s*withMazerSignInContinuation\('account'/);
+    expect(menu).toMatch(/case 'profile':\s*\/\/ Signed out, a Profile-row sign-in[^\n]*\s*withMazerSignInContinuation\('account'/);
     expect(menu).toContain('beginMazerOAuthAuthorization(undefined, { continueTo: readMazerSignInContinuation() })');
   });
 

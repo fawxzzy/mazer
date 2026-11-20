@@ -3,9 +3,9 @@
  *
  * Standing rule (Zac, 2026-11-06): when the game or UI changes, the guide's
  * UI reflections change in the same PR. This module is the single place the
- * guide's rows, icon specs and copy live; the main-menu Settings sheet and
- * the in-game Pause Settings both open the same sheet from the same
- * `how-to-play` row (legacySettingsSheetPlan.ts), so they cannot disagree.
+ * guide's rows, icon specs and copy live; the Guide row of both Menu
+ * dropdowns (legacyMenuRows.ts, MAZER-UI-095/096: main menu and in-game)
+ * opens the same sheet, so they cannot disagree.
  *
  * Truthfulness: every row names only mechanics that exist today. The drift
  * test (tests/reset/legacy-guide-content-drift.test.ts) asserts each claim
@@ -238,7 +238,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'menu',
-    text: 'Tap the three lines at the top right for Settings, Profile and the Leaderboard.'
+    text: 'Three lines, top right: Settings, Guide, Sound, Profile, Leaderboard. Mid-game it pauses.'
   },
   {
     heading: 'Sound',
@@ -252,7 +252,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'guide-local'
     },
     id: 'sound',
-    text: 'Sound is on by default. Soft ticks play on steps, bumps and wins. Turn it off in Settings.'
+    text: 'Sound is on by default: soft ticks on steps, bumps and wins. Turn it off from the Menu.'
   }
 ]);
 
@@ -362,7 +362,7 @@ export const LEGACY_GUIDE_KEY_BINDINGS: readonly LegacyGuideKeyBinding[] = Objec
   { does: 'to move', expectedAction: 'move', keys: ['w', 'a', 's', 'd'], label: 'WASD' },
   { does: 'pauses', expectedAction: 'pause', keys: ['p'], label: 'P' },
   { does: 'goes back', expectedAction: null, keys: ['Escape'], label: 'Esc' },
-  { does: 'twice quits from Pause', expectedAction: 'quit', keys: ['q'], label: 'Q' }
+  { does: 'twice quits while paused', expectedAction: 'quit', keys: ['q'], label: 'Q' }
 ]);
 
 export const buildLegacyGuideKeyboardLine = (): string => {
@@ -376,7 +376,7 @@ export interface LegacyGuideSheetModel {
   rows: readonly LegacyGuideRow[];
   /** Null when the device has no keyboard. */
   keyboardLine: string | null;
-  /** Labelled footer button; closing returns to the Settings sheet it was opened from. */
+  /** Labelled footer button; closing returns to the Menu it was opened from. */
   closeLabel: typeof LEGACY_GUIDE_CLOSE_LABEL;
 }
 

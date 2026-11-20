@@ -10,6 +10,7 @@ import {
   LEGACY_GUIDE_TITLE
 } from '../../src/legacy-runtime/legacyGuideContent';
 import { buildLegacySettingsSheetModel } from '../../src/legacy-runtime/legacySettingsSheetPlan';
+import { buildLegacyMenuRows } from '../../src/legacy-runtime/legacyMenuRows';
 import {
   collectGuideTextContainmentIssues,
   collectMenuControlSpacingIssues,
@@ -787,12 +788,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
     expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
     expect(source).toContain('const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain("  'Sign out'\n]);");
-    // createLegacyOptionsSessionActionBar (MenuScene.ts) only ever renders a
-    // single 'Sign out' action at the bottom of the authenticated Options
-    // overlay -- 'Account' lives in a separate overlay reached via the
-    // profile/username icon, not at the bottom of Options. Asserting the
-    // absence of the old value keeps this contract from silently reverting.
+    // MAZER-UI-100: Reset progress and Sign out left the Settings sheet for the
+    // account page, so neither is expected at the bottom of Settings any more.
+    expect(source).not.toContain("  'Sign out'\n]);");
+    expect(source).not.toContain("  'Reset progress',\n");
+    // 'Account' lives in a separate surface reached via Profile, never at the
+    // bottom of Options. Asserting the absence of the old value keeps this
+    // contract from silently reverting.
     expect(source).not.toContain("const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([\n  'Account'\n]);");
     expect(source).not.toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).not.toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
@@ -847,7 +849,6 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("? []\n        : PAUSE_CARD_EXPECTED_LABELS");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -999,11 +1000,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    // Pause card: Resume / Settings / Quit to Menu with Settings collapsed on
-    // open; no Guide. The toggles are asserted after a real Settings click.
-    expect(source).toContain("const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([\n  'Paused',\n  'Resume',\n  'Settings',\n  'Quit to Menu'\n]);");
+    // MAZER-UI-095: pause opens the in-game Menu dropdown; its rows are the play rows of the shared row model
+    // (checked as dropdown buttons). The trimmed sheet's toggles are asserted after a real Settings click.
+    expect([...source.match(/const PAUSE_MENU_EXPECTED_ROWS = Object\.freeze\(\[([^\]]*)\]\);/)[1].matchAll(/'([^']*)'/g)].map((entry) => entry[1])).toEqual(buildLegacyMenuRows('play', { soundEnabled: true }).map((row) => row.label));
     expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Reduce Motion',\n  'Haptics'\n]);");
-    expect(source).toContain('hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)');
+    expect(source).toContain('hasMenuRowButtons(surfaces.pause, PAUSE_MENU_EXPECTED_ROWS)');
     expect(source).toContain("!hasLabels(surfaces.pause, ['GUIDE'])");
     expect(source).toContain('hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)');
     expect(source).toContain("getVisualButtonPoint(pause.diagnostics.visual, 'Settings')");
@@ -1124,21 +1125,28 @@ describe('capture label expectations stay tied to the Settings and Guide plan mo
     }
   });
 
-  test('OPTIONS_BOTTOM_EXPECTED_LABELS are all signed-in Account rows, and Sign out only exists when signed in', () => {
+  test('OPTIONS_BOTTOM_EXPECTED_LABELS are signed-in Settings rows; Sign out and Reset progress are on no Settings sheet (MAZER-UI-100)', () => {
     const labels = readLabels('OPTIONS_BOTTOM_EXPECTED_LABELS');
-    expect(labels).toContain('Sign out');
+    expect(labels.length).toBeGreaterThan(0);
     const signedInRows = settingsRowLabels(true);
     for (const label of labels) {
       expect(signedInRows, `${label} is not a signed-in Settings sheet row`).toContain(label);
     }
-    expect(settingsRowLabels(false)).not.toContain('Sign out');
+    for (const signedIn of [true, false]) {
+      expect(settingsRowLabels(signedIn)).not.toContain('Sign out');
+      expect(settingsRowLabels(signedIn)).not.toContain('Reset progress');
+    }
   });
 
-  test('the Guide entry row label is the Settings row that opens the Guide', () => {
-    const [openRow] = buildLegacySettingsSheetModel('menu').sections
+  test('the Guide entry label is the main-menu dropdown Guide row; the Settings sheet no longer opens the Guide', () => {
+    // MAZER-UI-096: Guide moved from the Settings sheet to the Menu dropdown.
+    const guideRow = buildLegacyMenuRows('main', { soundEnabled: true }).find((row) => row.id === 'guide');
+    expect(guideRow).toBeDefined();
+    expect(source).toContain(`const OPTIONS_GUIDE_OPEN_LABEL = '${guideRow.label}';`);
+    const sheetGuideRows = buildLegacySettingsSheetModel('menu').sections
       .flatMap((section) => section.rows)
       .filter((row) => row.command?.type === 'OPEN_GUIDE');
-    expect(source).toContain(`const OPTIONS_GUIDE_OPEN_LABEL = '${openRow.label}';`);
+    expect(sheetGuideRows).toEqual([]);
   });
 
   test('OPTIONS_GUIDE_EXPECTED_LABELS are exactly the Guide title, row headings and footer', () => {

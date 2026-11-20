@@ -38,6 +38,7 @@ import * as boardTileBake from '../../src/render/boardTileBake';
 import * as edgeMarkers from '../../src/render/edgeMarkers';
 import * as menuDropdownArt from '../../src/render/menuDropdownArt';
 import { LEGACY_MENU_DROPDOWN_ITEMS } from '../../src/legacy-runtime/legacyMenuDropdown';
+import { LEGACY_PLAY_MENU_LABELS, LEGACY_PLAY_MENU_ROW_IDS } from '../../src/legacy-runtime/legacyPlayMenu';
 import * as sparkPlayerSkin from '../../src/render/sparkPlayerSkin';
 
 /**
@@ -78,17 +79,31 @@ describe('guide structure', () => {
     expect(LEGACY_GUIDE_CLOSE_LABEL).toBe('Got it');
   });
 
-  test('both contexts get the same rows from one module, and both settings contexts open it from the same How to play row', () => {
+  test('both contexts get the same rows from one module, opened from the Guide row of either Menu dropdown (MAZER-UI-095/096)', () => {
     const menu = buildLegacyGuideSheetModel('menu', { hasKeyboard: true });
     const pause = buildLegacyGuideSheetModel('pause', { hasKeyboard: true });
     expect(menu.rows).toBe(pause.rows);
     expect(menu.keyboardLine).toBe(pause.keyboardLine);
     expect(buildLegacyGuideSheetModel('menu').keyboardLine).toBeNull();
+    // The Guide is its own Menu row on both screens (no longer a Settings row) and opens the same sheet.
     for (const context of ['menu', 'pause'] as const) {
       const rows = buildLegacySettingsSheetModel(context, { signedIn: true }).sections.flatMap((s) => s.rows);
-      const how = rows.find((r) => r.id === 'how-to-play')!;
-      expect(how.command).toEqual({ type: 'OPEN_GUIDE' });
+      expect(rows.some((r) => r.id === 'how-to-play'), context).toBe(false);
     }
+    expect(LEGACY_PLAY_MENU_ROW_IDS).toContain('guide');
+    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.id)).toContain('guide');
+    expect(sceneMethod('private selectLegacyPlayMenuRow(')).toMatch(/case 'guide':\n\s+this\.settingsGuideOpen = true;/);
+    expect(sceneMethod('private selectLegacyMainMenuRow(')).toMatch(/case 'guide':[\s\S]*?this\.settingsGuideOpen = true;/);
+  });
+
+  test('MAZER-UI-095/096: the Menu row says the button pauses a game, and the Sound row points at the Menu (both Menus have a Sound row)', () => {
+    expect(row('menu').text).toMatch(/Mid-game it pauses/);
+    expect(MENU_SCENE).toContain('this.drawLegacyPlayMenuControl(controls.pause, time);');
+    expect(row('sound').text).toMatch(/Turn it off from the Menu\.$/);
+    // Menu > Sound on both screens; no Settings sheet carries a Sound row any more.
+    expect(LEGACY_PLAY_MENU_LABELS.sound).toBe('Sound');
+    expect(LEGACY_MENU_DROPDOWN_ITEMS.find((item) => item.id === 'sound')?.label).toBe('Sound');
+    expect(LEGACY_SETTINGS_GROUP_ROWS.some((r) => r.id === 'sound')).toBe(false);
   });
 
   test('the pending auto-pause row names a behaviour the scene really has (so the row cannot go stale before it ships)', () => {
@@ -141,10 +156,17 @@ describe('guide copy only names things that exist', () => {
     for (const item of LEGACY_MENU_DROPDOWN_ITEMS) {
       expect(row('menu').text, item.id).toContain(item.label);
     }
-    expect(row('menu').text).toMatch(/three lines at the top right/);
+    expect(row('menu').text).toMatch(/three lines, top right/i);
     expect(row('online').text).not.toMatch(/icon/);
     expect(MENU_SCENE).not.toContain('createLegacyMenuLeaderboardButton');
     expect(MENU_SCENE).not.toContain('createLegacyMenuProfileButton');
+  });
+
+  test('MAZER-UI-100: the Guide never places Sign out or Reset progress in Settings (they live on the account page via Profile)', () => {
+    expect(allText).not.toMatch(/sign out|reset progress|log out/i);
+    for (const r of LEGACY_GUIDE_ROWS) {
+      expect(r.text.length, r.id).toBeLessThanOrEqual(90);
+    }
   });
 
   test('Start row: Chip draws the start end marker (a gold spiral that turns slowly in step with the end star, MAZER-VIS-053) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
@@ -333,7 +355,7 @@ describe('keyboard line resolves against the live input maps', () => {
   });
 
   test('the keyboard line is built from the bindings and reads as expected', () => {
-    expect(buildLegacyGuideKeyboardLine()).toBe('Arrow keys or WASD to move. P pauses. Esc goes back. Q twice quits from Pause.');
+    expect(buildLegacyGuideKeyboardLine()).toBe('Arrow keys or WASD to move. P pauses. Esc goes back. Q twice quits while paused.');
   });
 });
 

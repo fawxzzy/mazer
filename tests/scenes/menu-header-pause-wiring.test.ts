@@ -45,8 +45,9 @@ describe('MenuScene wiring: the header identity label is retired (MAZER-UI-024)'
     ]) {
       expect(scene).not.toContain(retired);
     }
-    // The panel only lives on the plain menu; a played game keeps just its settings (pause) icon.
+    // The main-menu panel only lives on the plain menu; a played game has its own instance (MAZER-UI-095 in-game Menu).
     expect(scene).toContain("this.menuDropdown.syncVisibility(this.overlay === 'none' && this.mode === 'menu');");
+    expect(scene).toContain('this.playMenu.syncVisibility(this.isLegacyPlayMenuDropdownView());');
   });
 });
 
@@ -72,12 +73,14 @@ describe('MenuScene wiring: pause card', () => {
     expect(resolveLegacyOverlayBackAction({ mode: 'play', overlay: 'pause', overlayReturn: 'none' }).kind).toBe('close-overlay');
   });
 
-  test('pause has exactly Resume / Settings / Quit to Menu and no Close pill; no account, reset or sign-out rows', () => {
+  test('the in-game Settings sheet has exactly Resume and the remaining settings, no Close pill; no account, reset, sign-out, Guide, Sound or Quit rows', () => {
     const model = buildLegacySettingsSheetModel('pause', { signedIn: true });
     const ids = model.sections.flatMap((section) => (
-      section.collapsible ? [section.title as string] : section.rows.map((row) => row.label)
+      section.collapsible ? [section.title as string] : section.rows.map((row) => row.id)
     ));
-    expect(ids).toEqual(['Resume', 'Settings', 'Quit to Menu']);
+    // MAZER-UI-095: Guide, Sound and Quit moved to the in-game Menu dropdown (legacyPlayMenu.ts).
+    expect(ids).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(model.title).toBe('Settings');
     // Close pill removed (Zac, 2026-11-06): Resume is the exit, so the painter draws no separate close control.
     expect('close' in model).toBe(false);
     expect(items.match(/createLegacyAuthActionButton\(/g)).toHaveLength(1);
@@ -102,17 +105,18 @@ describe('MenuScene wiring: pause card', () => {
     expect(scene).not.toContain('private createLegacyOverlayUsernameButton(');
   });
 
-  test('Resume and Quit use the existing bridge-then-lifecycle paths; Settings starts collapsed', () => {
+  test('Resume and Quit use the existing bridge-then-lifecycle paths; Pause opens on the in-game Menu dropdown', () => {
     expect(commands).toContain("{ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume')");
     // The Quit dispatch moved into the two-step quit confirm (legacyQuitConfirm.ts, PR #409), so it is no longer inside
     // runLegacySettingsCommand: it must still use the bridge-then-lifecycle path somewhere in the scene.
     expect(scene).toContain("{ type: 'RETURN_HOME' }, () => this.applyLegacyPauseCommand('return-menu')");
-    expect(scene).toContain('private pauseSettingsExpanded = false;');
-    expect(scene).toContain("if (kind === 'pause') {\n      this.pauseSettingsExpanded = false;");
-    // The Settings group is the same plan rows the main-menu sheet paints (no movement speed).
-    expect(sheet).toContain('settingsExpanded: this.pauseSettingsExpanded,');
+    // The collapsible pause Settings disclosure is gone (MAZER-UI-095); every Pause open starts on the dropdown.
+    expect(scene).not.toContain('pauseSettingsExpanded');
+    expect(sheet).not.toContain('settingsExpanded:');
+    expect(scene).toContain("if (kind === 'pause') {\n      this.playMenuView = resolveLegacyPlayMenuOpenView('menu');");
+    expect(pause).toContain('if (this.isLegacyPlayMenuDropdownView()) {\n      this.buildLegacyPlayMenuOverlay();');
     expect(buildLegacySettingsSheetPlan({ context: 'pause', height: 844, width: 390 }).items.map((item) => item.model.id))
-      .toEqual(['resume', 'settings-disclosure', 'quit-to-menu']);
+      .toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
   });
 
   test('uses existing tokens only (no new free hex colours) and 44 px minimum actions', () => {
@@ -128,7 +132,7 @@ describe('MenuScene wiring: pause card', () => {
     ] as const) {
       expect(resolveLegacyPauseMenuLayout(width, height, safeArea).actionHeight).toBeGreaterThanOrEqual(44);
       for (const context of ['menu', 'pause'] as const) {
-        const plan = buildLegacySettingsSheetPlan({ context, height, safeArea, settingsExpanded: true, signedIn: true, width });
+        const plan = buildLegacySettingsSheetPlan({ context, height, safeArea, signedIn: true, width });
         for (const item of plan.items.filter((entry) => entry.interactive)) {
           expect(item.rect.height).toBeGreaterThanOrEqual(44);
         }
