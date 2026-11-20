@@ -139,7 +139,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(buildPauseSource).toContain("this.buildLegacySettingsSheetOverlay('pause')");
     expect(sheetSource).toContain('buildLegacySettingsSheetPlan({');
     expect(sheetSource).toContain('this.buildLegacyGuideSheetOverlay(context);');
-    expect(sheetSource).toContain('settingsExpanded: this.pauseSettingsExpanded,');
+    // MAZER-UI-095: Pause opens on the in-game Menu dropdown; the sheet it opens has no collapsible group any more.
+    expect(sheetSource).not.toContain('settingsExpanded:');
+    expect(buildPauseSource).toContain('this.buildLegacyPlayMenuOverlay();');
     expect(menuSceneSource).not.toContain('createLegacyOptionsInfoSection');
     expect(menuSceneSource).not.toContain('createLegacyOptionsGuideHeaderButton');
     expect(menuSceneSource).not.toContain('createLegacyOptionsSessionActionBar');
@@ -958,7 +960,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // The compass idea was removed from the app entirely.
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayMenuControl(controls.pause, time);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
     // Player-facing toast/message cards were removed from the game entirely
@@ -1571,12 +1573,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Only the removed pause home icon's door cutout used this constant.
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_TOUCH_COG_HUB');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
-    expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
-    // No panel/border chrome behind the play cog at all, and now the same
-    // real settings icon (not the old procedural gear) as the menu
-    // surface's own settings icon too -- not just "no box" but the actual
-    // same icon/texture.
-    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.applyLegacyHudIconFrame\(\s*this\.touchSettingsCogIconImage,\s*MAZER_HUD_SETTINGS_ICON_METRICS,/);
+    // MAZER-UI-095: the play cog is gone. In its place the in-game Menu button: no panel/border chrome, drawn by the
+    // main menu's own three-line glyph (the same draw as the header dropdown toggle), not a second icon.
+    expect(menuSceneSource).not.toContain('drawLegacySettingsCogControl');
+    expect(menuSceneSource).not.toContain('touchSettingsCogIconImage');
+    expect(menuSceneSource).toContain('private drawLegacyPlayMenuControl(');
+    expect(menuSceneSource).toMatch(/drawLegacyPlayMenuControl\([\s\S]*?drawMenuBurgerGlyph\(\s*this\.hudGraphics,/);
     // L6: the menu cog is gone (the dropdown button blinks on its own per-frame update); the flag below still drives
     // the menu board redraw.
     expect(menuSceneSource).not.toContain('drawLegacyMenuSettingsCog');
@@ -1587,11 +1589,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // whatever else happens to touch boardPathDirty and jumps on the next
     // unrelated redraw instead of pulsing smoothly.
     expect(menuSceneSource).toContain("if (this.mode === 'menu' && this.overlay === 'none') {\n      this.boardPathDirty = true;\n    }");
-    // Both the menu header settings icon and this touch-control settings
-    // icon share the exact same source metrics (real icon, not a
-    // procedural gear duplicated per surface).
+    // The main-menu dropdown's Settings row and the in-game Menu's Settings row share the exact same source metrics
+    // (real icon, not a procedural gear duplicated per surface).
     expect(menuSceneSource.match(/MAZER_HUD_SETTINGS_ICON_METRICS/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(controls.pause, false, time);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayMenuControl(controls.pause, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     // L6: the menu header control is the dropdown toggle; its zone is the 44 px-grown hit rect from MenuScene.
@@ -1616,7 +1617,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('bboxHeight: 1183, bboxWidth: 1228, bboxX: 0, bboxY: 38');
   });
 
-  test('hides the persistent play settings texture whenever the play HUD clears', () => {
+  test('the play HUD has no persistent settings texture left to leak; the Menu button is HUD graphics, cleared with the HUD', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const drawHudSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private drawHud(time: number): void'),
@@ -1631,8 +1632,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private startPlayMode(): void')
     );
 
-    expect(drawHudSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {\n      this.touchSettingsCogIconImage.setVisible(false);");
-    expect(clearHudSource).toContain('this.touchSettingsCogIconImage.setVisible(false);');
+    // MAZER-UI-095: the old cog was a persistent Image that had to be hidden by hand; the Menu button is drawn into
+    // hudGraphics, so clearing the HUD clears it.
+    expect(menuSceneSource).not.toContain('touchSettingsCogIconImage');
+    expect(drawHudSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {\n      this.footerText.setText('');");
+    expect(clearHudSource).toContain('this.hudGraphics.clear();');
     expect(enterMenuSource).toContain('this.clearPlayHudImmediately();');
   });
 

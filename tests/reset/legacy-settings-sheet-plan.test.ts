@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_SETTINGS_DANGER_SEPARATION,
   LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS,
+  LEGACY_PAUSE_SETTINGS_GROUP_ROWS,
+  LEGACY_SETTINGS_MOVED_TO_MENU_ROW_IDS,
   LEGACY_SETTINGS_GROUP_ROWS,
   LEGACY_SETTINGS_PLAN_VIEWPORTS,
   LEGACY_SETTINGS_SIZES,
@@ -41,33 +43,41 @@ const plan = (
   context,
   height: viewport.height,
   width: viewport.width,
-  ...(context === 'menu' ? { signedIn: true } : { settingsExpanded: true }),
+  ...(context === 'menu' ? { signedIn: true } : {}),
   ...extra
 });
 
 describe('settings sheet model', () => {
-  test('menu and pause share the identical Settings group rows in the same order', () => {
+  test('both sheets show the same three Settings row objects; How to play and Sound moved to the Menu dropdowns (MAZER-UI-095/096)', () => {
     const menu = buildLegacySettingsSheetModel('menu', { signedIn: true });
     const pause = buildLegacySettingsSheetModel('pause');
     const menuGroup = menu.sections.find((section) => section.id === 'settings')!;
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(pauseGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'floating-anchor']);
+    expect(pauseGroup.rows).toBe(LEGACY_PAUSE_SETTINGS_GROUP_ROWS);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
+    expect(LEGACY_SETTINGS_MOVED_TO_MENU_ROW_IDS).toEqual(['how-to-play', 'sound']);
+    // Zac expected two remaining settings; the floating-anchor toggle (a real setting) is the third.
+    expect(LEGACY_PAUSE_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
+    for (const pauseRow of LEGACY_PAUSE_SETTINGS_GROUP_ROWS) {
+      expect(LEGACY_SETTINGS_GROUP_ROWS).toContain(pauseRow);
+    }
   });
 
   test('titles, overlay ids and collapse behaviour per context', () => {
     const menu = buildLegacySettingsSheetModel('menu', { signedIn: true });
     const pause = buildLegacySettingsSheetModel('pause');
     expect([menu.title, menu.overlayId]).toEqual(['Settings', 'options']);
-    expect([pause.title, pause.overlayId]).toEqual(['Paused', 'pause']);
+    expect([pause.title, pause.overlayId]).toEqual(['Settings', 'pause']);
     expect(menu.sections.find((s) => s.id === 'settings')!.collapsible).toBe(false);
+    // MAZER-UI-095: the in-game sheet is reached from Menu > Settings, so its rows are always open (no disclosure).
     const pauseSettings = pause.sections.find((s) => s.id === 'settings')!;
-    expect(pauseSettings.collapsible).toBe(true);
-    expect(pauseSettings.collapsedByDefault).toBe(true);
+    expect(pauseSettings.collapsible).toBe(false);
+    expect(pauseSettings.collapsedByDefault).toBe(false);
+    expect(pauseSettings.title).toBeNull();
   });
 
-  test('Account section (Reset progress, Sign out) exists in menu only; pause keeps Resume and Quit to Menu', () => {
+  test('Account section (Reset progress, Sign out) exists in menu only; pause keeps Resume, its Quit, Guide and Sound moved to the Menu', () => {
     const menuIds = buildLegacySettingsSheetModel('menu', { signedIn: true }).sections.flatMap((s) => s.rows.map((r) => r.id));
     const pauseIds = buildLegacySettingsSheetModel('pause').sections.flatMap((s) => s.rows.map((r) => r.id));
     expect(menuIds).toContain('reset-progress');
@@ -77,7 +87,10 @@ describe('settings sheet model', () => {
     // The menu's primary exit is its own row, never the pause Resume row.
     expect(menuIds).toContain('back-to-menu');
     expect(pauseIds).not.toContain('back-to-menu');
-    expect(pauseIds).toEqual(expect.arrayContaining(['resume', 'quit-to-menu', 'how-to-play']));
+    expect(pauseIds).toContain('resume');
+    for (const moved of ['quit-to-menu', 'how-to-play', 'sound', 'settings-disclosure']) {
+      expect(pauseIds, moved).not.toContain(moved);
+    }
     expect(pauseIds).not.toContain('reset-progress');
     expect(pauseIds).not.toContain('sign-out');
   });
@@ -135,7 +148,6 @@ describe('settings sheet model', () => {
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
       ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off'],
-      ['Sound effects', 'On', 'Off'],
       ['Floating anchor', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
@@ -150,8 +162,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
     const cases: Array<[string, LegacySettingsSheetPlan]> = [
       ['menu signed-in', plan('menu', viewport)],
       ['menu guest', plan('menu', viewport, { signedIn: false })],
-      ['pause expanded', plan('pause', viewport)],
-      ['pause collapsed', plan('pause', viewport, { settingsExpanded: false })]
+      ['pause', plan('pause', viewport)]
     ];
 
     test.each(cases)('%s: items and their descriptions never overlap each other or their own parts', (_label, p) => {
@@ -268,7 +279,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
       expect(menu.bodyViewport.width).toBe(pause.bodyViewport.width);
       expect(menu.bodyViewport.left).toBe(pause.bodyViewport.left);
       expect(menu.title.fontSize).toBe(pause.title.fontSize);
-      const sharedIds = LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id);
+      const sharedIds = LEGACY_PAUSE_SETTINGS_GROUP_ROWS.map((r) => r.id);
       for (const id of sharedIds) {
         const a = menu.items.find((i) => i.model.id === id)!;
         const b = pause.items.find((i) => i.model.id === id)!;
@@ -279,9 +290,9 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
         expect(a.labelFontSize).toBe(b.labelFontSize);
         expect(a.stateFontSize).toBe(b.stateFontSize);
       }
-      // Rows keep the same relative spacing inside the group.
+      // Rows that are neighbours in both sheets keep the same relative spacing.
       const relTops = (p: LegacySettingsSheetPlan): number[] => {
-        const group = sharedIds.map((id) => p.items.find((i) => i.model.id === id)!.rect.top);
+        const group = ['reduce-motion', 'haptics'].map((id) => p.items.find((i) => i.model.id === id)!.rect.top);
         return group.map((top) => top - group[0]!);
       };
       expect(relTops(menu)).toEqual(relTops(pause));
@@ -290,35 +301,20 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
 );
 
 describe('settings sheet plan specifics', () => {
-  test('pause collapsed hides the group rows but keeps Resume, Settings disclosure and Quit to Menu', () => {
-    const p = plan('pause', { height: 844, width: 390 }, { settingsExpanded: false });
-    expect(p.items.map((i) => i.model.id)).toEqual(['resume', 'settings-disclosure', 'quit-to-menu']);
+  test('MAZER-UI-095: the in-game Settings sheet is Resume then the three remaining settings (no Guide, Sound or Quit row)', () => {
+    const p = plan('pause', { height: 844, width: 390 });
+    expect(p.items.map((i) => i.model.id)).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(p.settingsExpanded).toBe(true);
     expect(p.scrollable).toBe(false);
   });
 
-  test('pause expanded lists Resume, disclosure, group rows, then Quit to Menu last', () => {
-    const p = plan('pause', { height: 844, width: 390 });
-    expect(p.items.map((i) => i.model.id)).toEqual([
-      'resume',
-      'settings-disclosure',
-      'how-to-play',
-      'reduce-motion',
-      'haptics',
-      'sound',
-      'floating-anchor',
-      'quit-to-menu'
-    ]);
-  });
-
   test('menu is always open: Back to Menu, group rows, then Account heading, Reset progress, Sign out', () => {
-    const p = plan('menu', { height: 844, width: 390 }, { settingsExpanded: false });
+    const p = plan('menu', { height: 844, width: 390 });
     expect(p.settingsExpanded).toBe(true);
     expect(p.items.map((i) => i.model.id)).toEqual([
       'back-to-menu',
-      'how-to-play',
       'reduce-motion',
       'haptics',
-      'sound',
       'floating-anchor',
       'account-heading',
       'reset-progress',
@@ -330,7 +326,7 @@ describe('settings sheet plan specifics', () => {
     expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
     const wide = plan('menu', { height: 720, width: 1280 });
     expect(wide.title.text).toBe('Settings');
-    expect(plan('pause', { height: 720, width: 1280 }).title.text).toBe('Paused');
+    expect(plan('pause', { height: 720, width: 1280 }).title.text).toBe('Settings');
   });
 
   test('safe-area insets shrink the available panel without breaking the plan', () => {
@@ -362,7 +358,7 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
   const plans = LEGACY_SETTINGS_PLAN_VIEWPORTS.flatMap(({ height, width }) => (
     (['menu', 'pause'] as const).map((context) => [
       `${context} ${width}x${height}`,
-      buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width })
+      buildLegacySettingsSheetPlan({ context, height, signedIn: true, width })
     ] as const)
   ));
 
@@ -395,7 +391,7 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
   });
 
   test('at 320x568 the expanded Pause card and the signed-in menu sheet fill the panel and scroll when they overflow', () => {
-    const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, settingsExpanded: true, signedIn: true, width: 320 });
+    const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 568, signedIn: true, width: 320 });
     expect(pause.panel.height).toBe(552);
     expect(pause.card.height).toBe(Math.min(pause.naturalCardHeight, pause.panel.height));
     expect(pause.scrollable).toBe(pause.naturalCardHeight > pause.panel.height);
@@ -407,19 +403,19 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
   test('the scroll rail appears only when the content truly overflows the body', () => {
     for (const { height, width } of LEGACY_SETTINGS_PLAN_VIEWPORTS) {
       for (const context of ['menu', 'pause'] as const) {
-        const p = buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width });
+        const p = buildLegacySettingsSheetPlan({ context, height, signedIn: true, width });
         expect(p.scrollable).toBe(p.contentHeight > p.bodyViewport.height);
         if (!p.scrollable) {
           expect(p.card.height).toBe(p.naturalCardHeight);
         }
       }
     }
-    // MAZER-L9: the experimental Floating anchor row (device-local, default off) adds one toggle plus its
-    // description (835 px of content), so the signed-in menu sheet now scrolls a short rail on 390x844 (body 734)
-    // and 412x915 (body 805) as well as on the short 360x740 and 320x568 phones. Before the row it fit the first two.
-    expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(true);
-    expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(true);
-    expect(plan('menu', { height: 740, width: 360 }).scrollable).toBe(true);
+    // MAZER-UI-096: How to play and Sound left the main-menu sheet for the Menu dropdown, so the signed-in sheet
+    // fits again on 390x844 and 412x915 (the Floating anchor row had made both scroll, MAZER-L9). The short
+    // 320x568 phone still scrolls a short rail.
+    expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
   });
 
   test('at 320 wide the Reduce Motion label column still holds its widest word and the state column holds "System"', () => {
@@ -435,7 +431,6 @@ describe('settings row description rule (MAZER-UI-026)', () => {
     buildLegacySettingsSheetModel('menu', { signedIn: true }),
     buildLegacySettingsSheetModel('pause', {
       levelPreview: { checkpoints: [1, 10], level: 5, maxLevel: 20, minLevel: 1 },
-      quitConfirmArmed: true,
       rotatePrompt: true
     })
   ];
@@ -444,7 +439,10 @@ describe('settings row description rule (MAZER-UI-026)', () => {
     .flatMap((section) => section.rows);
 
   test('the Settings group and the Account section have rows (so the checks below are not vacuous)', () => {
-    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'reset-progress', 'sign-out']));
+    expect(settingRows.map((r) => r.id)).toEqual(expect.arrayContaining(['reduce-motion', 'haptics', 'floating-anchor', 'reset-progress', 'sign-out']));
+    // MAZER-UI-095/096: Guide and Sound are Menu dropdown rows now, on no sheet in any context.
+    expect(settingRows.map((r) => r.id)).not.toContain('how-to-play');
+    expect(settingRows.map((r) => r.id)).not.toContain('sound');
   });
 
   test('every setting row has a non-empty plain-words description within the length rule', () => {
@@ -472,7 +470,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
     const viewports = [...LEGACY_SETTINGS_PLAN_VIEWPORTS, { height: 740, width: 360 }, { height: 915, width: 412 }];
     for (const { height, width } of viewports) {
       for (const context of ['menu', 'pause'] as const) {
-        const p = buildLegacySettingsSheetPlan({ context, height, settingsExpanded: true, signedIn: true, width });
+        const p = buildLegacySettingsSheetPlan({ context, height, signedIn: true, width });
         const described = p.items.filter((item) => item.model.role === 'setting');
         expect(described.length).toBeGreaterThan(0);
         for (const item of described) {
@@ -503,7 +501,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
       expect(rows.map((r) => r.label)).not.toContain(retired);
     }
     expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
-      .toEqual(['floatingAnchorControls', 'hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
+      .toEqual(['floatingAnchorControls', 'hapticsEnabled', 'toggleReducedMotion']);
   });
 
   test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {

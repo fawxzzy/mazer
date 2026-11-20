@@ -5,19 +5,25 @@
  * canonical; the main-menu Settings sheet must have the same structure. This
  * module is that structure: one row vocabulary, one set of sizes, one layout
  * routine. The two contexts differ only in
- *   - the card title            ('Paused' | 'Settings'),
- *   - the context actions       (pause: Resume above, Quit to Menu below;
- *                                menu: Back to Menu above, Account section
- *                                with Reset progress and Sign out),
+ *   - the context actions       (pause: Resume above; menu: Back to Menu
+ *                                above, Account section with Reset progress
+ *                                and Sign out),
  *   - the exit                  (pause: the primary Resume row; menu: the
  *                                primary Back to Menu row in the same slot).
  *                                Neither sheet draws a Close pill, an X or a
  *                                back arrow: the primary top row IS the exit.
- *   - whether the Settings group is a collapsed disclosure (pause) or the
- *     always-open body (menu).
- * Everything inside the Settings group (How to play, Display heading, Reduce
- * Motion, Haptics) is the SAME row spec with the SAME geometry, so the surfaces
- * cannot drift apart again.
+ *   - which Settings rows show (MAZER-UI-095, below).
+ * Every Settings row is the SAME row spec with the SAME geometry in both
+ * contexts, so the surfaces cannot drift apart again.
+ *
+ * MAZER-UI-095 (Zac, 2026-11-19): in a played game the in-game Menu dropdown
+ * (legacyPlayMenu.ts) now owns Guide, Sound and Main menu, so the pause sheet
+ * is reached from Menu > Settings, is titled 'Settings', has no Quit row and
+ * shows only the Settings group (Reduce Motion, Haptics, the floating-anchor
+ * toggle), always open. MAZER-UI-096: the main menu's dropdown got the same
+ * Guide and Sound rows (one row model, legacyMenuRows.ts), so the main-menu
+ * sheet lost How to play and Sound too: both sheets show the same three
+ * settings (the main menu adds its Account section).
  *
  * DESCRIPTION RULE (MAZER-UI-026): every SETTING row (each row of the Settings
  * group and of the Account section) is {label, control, description}. The
@@ -52,7 +58,6 @@ import {
   LEGACY_FLOATING_ANCHOR_LABEL
 } from './legacyFloatingAnchorPreference';
 import { LEGACY_ROTATE_PROMPT_LABEL } from './legacyOrientationFlip';
-import { LEGACY_QUIT_CONFIRM_ARMED_LABEL } from './legacyQuitConfirm';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   LEGACY_UI_MIN_TOUCH_TARGET,
@@ -186,12 +191,6 @@ export interface LegacySettingsModelOptions {
   /** Pause only: adds the Level Preview section (dev/QA route). Absent = default sheet, unchanged. */
   levelPreview?: LegacySettingsLevelPreviewOptions;
   /**
-   * Pause only: the Quit to Menu row is armed (a move was made and the first
-   * press already happened), so it reads "Tap again to quit". Absent/false =
-   * the default "Quit to Menu" row. See legacyQuitConfirm.ts.
-   */
-  quitConfirmArmed?: boolean;
-  /**
    * Pause only: an orientation flip paused the run and the refit corridor is
    * too thin, so a non-interactive "Rotate back" notice leads the sheet
    * (legacyOrientationFlip.ts). Absent/false = default sheet, unchanged.
@@ -261,8 +260,6 @@ const settingRow = (
  */
 export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
   haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.',
-  sound: 'Soft ticks on steps, wall bumps and wins. On unless you turn it off.',
-  howToPlay: 'Controls, the goal, and what each icon means.',
   resetProgress: 'Sets your level back to 1. Asks you to confirm first.',
   signOut: 'Signs this device out. Your progress stays on your account.'
 });
@@ -270,12 +267,10 @@ export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
 /**
  * The Settings group. IDENTICAL object list in both contexts. Labels and
  * state words are today's shipping copy (createFeatureControlRows).
+ * MAZER-UI-095/096: How to play and Sound are not here any more; both Menu
+ * dropdowns show them as their own Guide and Sound rows (legacyMenuRows.ts).
  */
 export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[] = Object.freeze([
-  settingRow('how-to-play', 'nav', 'How to play', LEGACY_SETTINGS_DESCRIPTIONS.howToPlay, {
-    command: { type: 'OPEN_GUIDE' },
-    emphasis: 'secondary'
-  }),
   settingRow('reduce-motion', 'toggle', REDUCED_MOTION_SETTING_LABEL, REDUCED_MOTION_SETTING_NOTE, {
     offLabel: REDUCED_MOTION_SETTING_OFF_LABEL,
     onLabel: REDUCED_MOTION_SETTING_ON_LABEL,
@@ -287,13 +282,6 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     onLabel: 'On',
     settingKey: 'hapticsEnabled'
   }),
-  // Small synthesized effects (src/legacy-runtime/legacySoundEffects.ts). Default off; the audio engine is only
-  // created after the player turns it on.
-  settingRow('sound', 'toggle', 'Sound effects', LEGACY_SETTINGS_DESCRIPTIONS.sound, {
-    offLabel: 'Off',
-    onLabel: 'On',
-    settingKey: 'soundEnabled'
-  }),
   // MAZER-L9 / CTRL-003 option B: the anchor follows a far finger, default on, this device only (legacyFloatingAnchor.ts).
   settingRow('floating-anchor', 'toggle', LEGACY_FLOATING_ANCHOR_LABEL, LEGACY_FLOATING_ANCHOR_DESCRIPTION, {
     offLabel: 'Off',
@@ -301,6 +289,11 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     settingKey: 'floatingAnchorControls'
   })
 ]);
+
+/** MAZER-UI-095/096: the rows that left both Settings sheets for the Menu dropdowns (Guide and Sound rows there). */
+export const LEGACY_SETTINGS_MOVED_TO_MENU_ROW_IDS: readonly LegacySettingsRowId[] = Object.freeze(['how-to-play', 'sound']);
+/** The in-game sheet shows the same Settings group object as the main menu. */
+export const LEGACY_PAUSE_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[] = LEGACY_SETTINGS_GROUP_ROWS;
 
 /** Separation between Reset progress and Sign out (spacing token 24). */
 export const LEGACY_SETTINGS_DANGER_SEPARATION = 24;
@@ -363,29 +356,14 @@ export const buildLegacySettingsSheetModel = (
         },
         ...previewSections,
         {
-          collapsedByDefault: true,
-          collapsible: true,
-          id: 'settings',
-          rows: LEGACY_SETTINGS_GROUP_ROWS,
-          title: 'Settings'
-        },
-        {
           collapsedByDefault: false,
           collapsible: false,
-          id: 'pause-bottom',
-          rows: [options.quitConfirmArmed === true
-            ? row('quit-to-menu', 'action', LEGACY_QUIT_CONFIRM_ARMED_LABEL, {
-              command: { type: 'RETURN_HOME' },
-              emphasis: 'danger-outline'
-            })
-            : row('quit-to-menu', 'action', 'Quit to Menu', {
-              command: { type: 'RETURN_HOME' },
-              emphasis: 'tertiary'
-            })],
+          id: 'settings',
+          rows: LEGACY_PAUSE_SETTINGS_GROUP_ROWS,
           title: null
         }
       ],
-      title: 'Paused'
+      title: 'Settings'
     };
   }
 
@@ -573,14 +551,10 @@ export interface LegacySettingsPlanInput {
   safeArea?: { bottom?: number; top?: number };
   /** Menu only. */
   signedIn?: boolean;
-  /** Pause only: whether the Settings disclosure is open. Menu is always open. */
-  settingsExpanded?: boolean;
   /** Pause only: Level Preview section (dev/QA route). Absent = default sheet. */
   levelPreview?: LegacySettingsLevelPreviewOptions;
   /** Pause + levelPreview only: whether the Jump to level disclosure is open. */
   previewLevelsExpanded?: boolean;
-  /** Pause only: the Quit to Menu row is armed and reads "Tap again to quit". */
-  quitConfirmArmed?: boolean;
   /** Pause only: lead with the "Rotate back" notice (orientation flip + thin corridor). */
   rotatePrompt?: boolean;
 }
@@ -667,8 +641,8 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
 };
 
 /**
- * Flattened row list for a model. Pause: Resume, Settings disclosure (and,
- * when expanded, the group rows), Quit to Menu. Menu: Back to Menu (same slot
+ * Flattened row list for a model. Pause: Resume, then the in-game Settings
+ * rows (always open, MAZER-UI-095). Menu: Back to Menu (same slot
  * and size as Resume), the group rows (always open), then the Account heading
  * and its rows.
  */
@@ -713,13 +687,13 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const s = LEGACY_SETTINGS_SIZES;
   const model = buildLegacySettingsSheetModel(input.context, {
     levelPreview: input.context === 'pause' ? input.levelPreview : undefined,
-    quitConfirmArmed: input.context === 'pause' ? input.quitConfirmArmed : undefined,
     rotatePrompt: input.context === 'pause' ? input.rotatePrompt : undefined,
     signedIn: input.signedIn
   });
   const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
   const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-  const settingsExpanded = input.context === 'menu' ? true : input.settingsExpanded === true;
+  // MAZER-UI-095: neither context collapses the Settings rows any more (the pause disclosure is gone).
+  const settingsExpanded = true;
 
   const cardPadding = compact ? s.cardPaddingCompact : s.cardPaddingRegular;
   const titleHeight = compact ? s.titleHeightCompact : s.titleHeightRegular;
