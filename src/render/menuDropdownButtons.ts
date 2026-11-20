@@ -27,6 +27,7 @@ import {
   drawMenuDropdownPanel
 } from './menuDropdownArt';
 import { toCyberArcadeCssHex } from './cyberArcadeMaterial';
+import { resolveButtonIconPressedTextureKey } from './buttonIcons';
 
 /** Invisible hit zones (alpha 0.001 so Phaser still hit-tests them); the colour is a theme token, never seen. */
 const HIT_ZONE_FILL = MENU_DROPDOWN_PANEL_FILL;
@@ -86,6 +87,8 @@ export const MENU_DROPDOWN_TOGGLE_DEPTH = 3;
 export const MENU_DROPDOWN_SCRIM_DEPTH = 5;
 export const MENU_DROPDOWN_PANEL_DEPTH = 6;
 export const MENU_DROPDOWN_ROW_DEPTH = 7;
+/** How long the toggle keeps its pressed look after a tap (a quick touch tap is otherwise a single frame). */
+export const MENU_TOGGLE_PRESS_FLASH_MS = 180;
 
 const hitRect = (rect: LegacyMenuDropdownRect): LegacyHitRect => ({
   bottom: rect.top + rect.height,
@@ -197,23 +200,32 @@ export class LegacyMenuDropdownController {
       .setVisible(false);
     let active = false;
     let drawnKey = '';
+    // MAZER-UI-097: C's pressed look (soft cyan ring) shows while the pointer is on the toggle and for a beat after a tap.
+    let pressedUntil = 0;
     background.on('pointerover', () => { active = true; });
     background.on('pointerout', () => { active = false; });
-    background.on('pointerdown', () => this.toggle());
+    background.on('pointerdown', () => {
+      pressedUntil = this.host.now() + MENU_TOGGLE_PRESS_FLASH_MS;
+      this.toggle();
+    });
     const updateFrame = (time: number): void => {
       this.host.tick?.(time);
       const progress = this.progress(time);
       const open = progress > 0.4;
-      const key = `${progress.toFixed(3)}|${open}`;
+      const pressed = active || time < pressedUntil;
+      const key = `${progress.toFixed(3)}|${open}|${pressed}`;
       if (key !== drawnKey) {
         drawnKey = key;
         graphics.clear();
-        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, open ? MENU_DROPDOWN_ACCENT : MENU_DROPDOWN_FOREGROUND);
+        // MAZER-UI-097: one ink for the lines in both states, like C (menu / menuOpen); the X is marked by its cyan dust
+        // dot. The ink stays the foreground the Guide's Menu row passes, so the guide and the button remain one draw.
+        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);
       }
       if (this.state.open) {
         graphics.setAlpha(1).setScale(1);
       } else {
-        graphics.setAlpha(Math.max(this.host.blinkAlpha(time, active), progress)).setScale(1);
+        // MAZER-UI-097: a pressed toggle holds full alpha so C's pressed ring and cyan lines read through the blink.
+        graphics.setAlpha(pressed ? 1 : Math.max(this.host.blinkAlpha(time, active), progress)).setScale(1);
       }
       if (this.closeRebuildPending && !this.isShown(time)) {
         this.closeRebuildPending = false;
@@ -309,7 +321,10 @@ export class LegacyMenuDropdownController {
     if (this.state.open) {
       background.setInteractive({ useHandCursor: true });
     }
-    const icon = scene.add.image(0, 0, this.host.textureKey(row.item.id))
+    const iconKey = this.host.textureKey(row.item.id);
+    // MAZER-UI-097: the lit row shows the icon's pressed bake (C: cyan ink), when one exists.
+    const litIconKey = resolveButtonIconPressedTextureKey(iconKey);
+    const icon = scene.add.image(0, 0, iconKey)
       .setOrigin(0.5, 0.5)
       .setDepth(MENU_DROPDOWN_ROW_DEPTH)
       .setVisible(false);
@@ -351,6 +366,10 @@ export class LegacyMenuDropdownController {
         .setColor(toCyberArcadeCssHex(lit ? MENU_DROPDOWN_ACCENT : MENU_DROPDOWN_FOREGROUND))
         .setAlpha(alpha)
         .setVisible(alpha > 0.01);
+      const wantKey = lit && scene.textures.exists(litIconKey) ? litIconKey : iconKey;
+      if (icon.texture.key !== wantKey) {
+        icon.setTexture(wantKey);
+      }
       this.host.placeIcon(icon, row.item.id, row.iconCenterX, row.centerY + offset, LEGACY_MENU_DROPDOWN_ICON_SIZE_PX, alpha);
     };
     updateFrame(this.host.now());

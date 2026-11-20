@@ -2,10 +2,15 @@ import Phaser from 'phaser';
 import {
   HUD_ICON_ATLAS_PUBLIC_URL,
   HUD_ICON_CELL_PX,
+  HUD_ICON_GLYPH_BOX,
   HUD_ICON_NAMES,
   resolveHudIconCell
 } from '../render/hudIconAtlas';
-import { designTokens } from '../theme/tokens';
+import {
+  BUTTON_ICON_HUD_TEXTURE_IDS,
+  bakeButtonIconCell,
+  resolveButtonIconPressedTextureKey
+} from '../render/buttonIcons';
 
 // The Mazer tile-font asset: a real raster atlas (5x7 dot-matrix glyphs,
 // white-on-transparent so it can be tinted per-character at runtime), the
@@ -56,7 +61,8 @@ const MAZER_VFX_ASSET_CACHE_BUST = 'v=20261114';
 // MAZER-VIS-011: the HUD icons are ONE small outline-icon atlas (src/render/hudIconAtlas.ts, built by
 // scripts/assets/build-hud-icon-atlas.mjs), white on transparent. It replaces three 1254 px bitmaps
 // (1.0 MB, three styles). BootScene.deriveHudIconTextures bakes the three the menu draws into the
-// textures below, tinted to one design token, so MenuScene still asks for them by these keys.
+// textures below (MAZER-UI-097: as the C Star Dust button icons, src/render/buttonIcons.ts), so
+// MenuScene still asks for them by these keys.
 export const MAZER_HUD_ATLAS_TEXTURE_KEY = 'mazerHudIconAtlas';
 export const MAZER_HUD_PROFILE_TEXTURE_KEY = 'mazerHudProfile';
 export const MAZER_HUD_LEADERBOARD_TEXTURE_KEY = 'mazerHudLeaderboard';
@@ -103,45 +109,40 @@ export class BootScene extends Phaser.Scene {
     this.scene.start('MenuScene');
   }
 
-  // MAZER-VIS-011: names every glyph of the HUD icon atlas as a frame on the atlas texture, then bakes
-  // the three icons the menu draws into their own HUD_ICON_CELL_PX square textures, recoloured to one
-  // token ('source-in' fill, the same manual-canvas recolour the tile font uses). A missing or broken
-  // atlas leaves the textures absent; Phaser then draws its missing-texture placeholder for the icon
-  // images and nothing else is affected, so it is never fatal to booting.
+  // MAZER-VIS-011: names every glyph of the HUD icon atlas as a frame on the atlas texture. MAZER-UI-097:
+  // the three icons the menu draws (dropdown rows, in-play control) are the C Star Dust button icons
+  // (src/render/buttonIcons.ts), baked ONCE here into HUD_ICON_CELL_PX square textures with the glyph in
+  // HUD_ICON_GLYPH_BOX, so MenuScene's crop and sizing are unchanged; each also gets a pressed (lit)
+  // variant. The bake needs no asset, so a missing atlas only skips the frame registration.
   private deriveHudIconTextures(): void {
-    if (!this.textures.exists(MAZER_HUD_ATLAS_TEXTURE_KEY)) {
-      return;
+    if (this.textures.exists(MAZER_HUD_ATLAS_TEXTURE_KEY)) {
+      const atlas = this.textures.get(MAZER_HUD_ATLAS_TEXTURE_KEY);
+      for (const name of HUD_ICON_NAMES) {
+        const cell = resolveHudIconCell(name);
+        if (!atlas.has(name)) {
+          atlas.add(name, 0, cell.x, cell.y, cell.width, cell.height);
+        }
+      }
     }
-    const atlas = this.textures.get(MAZER_HUD_ATLAS_TEXTURE_KEY);
-    const source = atlas.getSourceImage() as CanvasImageSource;
-    const tint = designTokens.color['semantic.info'];
-    const targets: ReadonlyArray<readonly [(typeof HUD_ICON_NAMES)[number], string]> = [
+    const targets: ReadonlyArray<readonly [keyof typeof BUTTON_ICON_HUD_TEXTURE_IDS, string]> = [
       ['profile', MAZER_HUD_PROFILE_TEXTURE_KEY],
       ['leaderboard', MAZER_HUD_LEADERBOARD_TEXTURE_KEY],
       ['settings', MAZER_HUD_SETTINGS_TEXTURE_KEY]
     ];
-    for (const name of HUD_ICON_NAMES) {
-      const cell = resolveHudIconCell(name);
-      if (!atlas.has(name)) {
-        atlas.add(name, 0, cell.x, cell.y, cell.width, cell.height);
+    for (const [name, baseKey] of targets) {
+      for (const state of ['idle', 'pressed'] as const) {
+        const key = state === 'idle' ? baseKey : resolveButtonIconPressedTextureKey(baseKey);
+        if (this.textures.exists(key)) {
+          continue;
+        }
+        const canvasTexture = this.textures.createCanvas(key, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
+        const context = canvasTexture?.getContext();
+        if (!canvasTexture || !context) {
+          continue;
+        }
+        bakeButtonIconCell(context, BUTTON_ICON_HUD_TEXTURE_IDS[name], HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX, state);
+        canvasTexture.refresh();
       }
-    }
-    for (const [name, key] of targets) {
-      if (this.textures.exists(key)) {
-        continue;
-      }
-      const cell = resolveHudIconCell(name);
-      const canvasTexture = this.textures.createCanvas(key, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-      const context = canvasTexture?.getContext();
-      if (!canvasTexture || !context) {
-        continue;
-      }
-      context.drawImage(source, cell.x, cell.y, cell.width, cell.height, 0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-      context.globalCompositeOperation = 'source-in';
-      context.fillStyle = tint;
-      context.fillRect(0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-      context.globalCompositeOperation = 'source-over';
-      canvasTexture.refresh();
     }
   }
 
