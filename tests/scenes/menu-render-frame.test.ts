@@ -2571,7 +2571,7 @@ const createFrameHarness = (overrides: Record<string, unknown> = {}) => {
     'syncLegacyAuthGateLoadingScreen', 'syncLegacyAuthOpeningTimeout', 'recordRuntimeFrame', 'consumePendingMazerAccountAction',
     'expireLegacyPlayerMessages', 'drawLegacyPlayerMessageToast', 'updateStars', 'advanceLegacyOverlayScrollMomentum',
     'holdLegacyPlayMazeLifecycleDuringPause', 'updateLegacyFlowFeedback', 'advanceLegacyMenuStaticDrawStage',
-    'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
+    'releaseLegacyGenerationInputLockIfStuck', 'isLegacyMenuBuildPrerollActive', 'hasLegacyPlayTrailPulsePendingFrame',
     'hasLegacyBleedOffGlowPendingFrame', 'syncLegacyBleedGateFrame', 'hasGoalStarSpinPendingFrame', 'hasLegacyPlayerVisualMotionPendingFrame', 'updateLegacyPlayerLocator',
     'settleLegacyPlayerTransferEnergy', 'isLegacyMenuHandoffAnimationActive',
     'hasLegacyMenuTitleAnimationPendingFrame', 'drawBackdrop', 'drawStaticBoard',
