@@ -378,7 +378,7 @@ import {
   type LegacyPlayMenuRowId,
   type LegacyPlayMenuView
 } from '../legacy-runtime/legacyPlayMenu';
-import { MENU_ROW_ICON_SOURCES, drawMenuRowVectorIcon, ensureMenuRowIconTextures } from '../render/menuRowIcons';
+import { MENU_ROW_ICON_SOURCES, drawMenuRowVectorIcon } from '../render/menuRowIcons';
 import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
 import {
   ensureMenuPlayLabelGlowTexture,
@@ -2579,7 +2579,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
     this.controllerHalo = new ControllerHaloView(this, () => resolveMazerCanvasResolution());
     this.menuDropdown = this.createLegacyMenuDropdown();
-    ensureMenuRowIconTextures(this);
     this.playMenu = this.createLegacyPlayMenu();
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
@@ -14381,8 +14380,8 @@ export class MenuScene extends Phaser.Scene {
         0.14,
         1
       ),
-      drawIcon: (graphics, id, centerX, centerY, size, alpha) => {
-        drawMenuRowVectorIcon(graphics, id, centerX, centerY, size, alpha, { soundEnabled: this.settings.soundEnabled });
+      drawIcon: (graphics, id, centerX, centerY, size, alpha, lit) => {
+        drawMenuRowVectorIcon(graphics, id, centerX, centerY, size, alpha, { soundEnabled: this.settings.soundEnabled }, lit);
       },
       fontFamily: LEGACY_UI_FONT_FAMILY,
       now: () => this.time.now,
@@ -14402,12 +14401,9 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  /** The only place a Menu row's registry entry becomes a texture: the three HUD glyphs BootScene bakes, or the Guide's. */
+  /** The only place a Menu row's registry entry becomes a texture: the three HUD glyphs BootScene bakes (C Star Dust). */
   private resolveLegacyMenuRowIconTexture(id: LegacyMenuRowId): { textureKey: string; metrics: LegacyHudIconSourceMetrics } | null {
     const source = MENU_ROW_ICON_SOURCES[id];
-    if (source.kind === 'texture') {
-      return { metrics: MAZER_HUD_SETTINGS_ICON_METRICS, textureKey: source.textureKey };
-    }
     if (source.kind !== 'hud') {
       return null;
     }

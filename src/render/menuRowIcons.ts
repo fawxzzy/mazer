@@ -1,86 +1,64 @@
 import type Phaser from 'phaser';
-import { designTokens } from '../theme/tokens';
 import type { LegacyMenuRowId } from '../legacy-runtime/legacyMenuRows';
-import { HUD_ICON_CELL_PX, resolveHudIconCell, type HudIconName } from './hudIconAtlas';
-import { drawGuideSoundGlyph } from './guideSoundGlyph';
-import { resolveStartSpiralArm, START_SPIRAL } from './endpointSpiral';
-import { MENU_DROPDOWN_ACCENT, drawMenuBurgerGlyph } from './menuDropdownArt';
+import {
+  BUTTON_ICON_HUD_TEXTURE_IDS,
+  cssHexToNumber,
+  drawButtonIconGraphics,
+  resolveButtonIconColours,
+  type ButtonIconId
+} from './buttonIcons';
 
 /**
  * MAZER-UI-095 / MAZER-UI-096: the ONE place the row icons of BOTH Menu dropdowns (main menu and in-game) are chosen.
- * Every icon is existing art; nothing new is drawn:
+ * MAZER-UI-097: every icon is a C Star Dust button icon (src/render/buttonIcons.ts), so both menus draw the same set:
  *
- *   Settings     the HUD settings glyph (the baked texture the main-menu Settings row and the old in-game cog used)
- *   Profile      the HUD profile glyph (main menu only)
- *   Leaderboard  the HUD leaderboard glyph (main menu only)
- *   Guide        the HUD atlas "info" glyph, tinted to the same token as the other HUD icons
- *   Sound        the Guide's speaker glyph (guideSoundGlyph.ts); dimmed with a slash when Sound is off
- *   Reset level  the board's START spiral held still (endpointSpiral.ts): "back to the start"
- *   Main menu    the main menu's own three-line button glyph, closed (menuDropdownArt.ts)
+ *   Settings     settings  (BootScene's baked HUD texture + its pressed bake)
+ *   Profile      profile   (baked HUD texture; main menu only)
+ *   Leaderboard  leaderboard (baked HUD texture; main menu only)
+ *   Guide        guide     (Graphics)
+ *   Sound        soundOn / soundOff by the current setting (Graphics; Sound off has no spark, per the set)
+ *   Reset level  reset     (Graphics; in-game only)
+ *   Main menu    home      (Graphics; in-game only)
  *
- * A later icons lane swaps a row's art here and nowhere else. MenuScene only asks this module; for the three 'hud'
- * glyphs it maps the name to BootScene's baked texture and its source metrics in one method
- * (resolveLegacyMenuRowIconTexture).
+ * A highlighted (lit) row uses the set's pressed colours, the same as the baked textures' pressed variant.
+ * MenuScene only asks this module; for the three 'hud' glyphs it maps the name to BootScene's baked texture and its
+ * source metrics in one method (resolveLegacyMenuRowIconTexture).
  */
 
-/** Same tint the BootScene bakes the three menu HUD icons with. */
-const PLAY_MENU_ICON_TINT = designTokens.color['semantic.info'];
-/** Vector icons use the dropdown accent, which is that same token (cyberArcadeMaterial.rail.cyan). */
-const PLAY_MENU_VECTOR_COLOR = MENU_DROPDOWN_ACCENT;
-const PLAY_MENU_SOUND_OFF_ALPHA = 0.5;
-
-/** Baked tinted copy of the atlas "info" glyph (BootScene only bakes profile, leaderboard and settings). */
-export const PLAY_MENU_GUIDE_TEXTURE_KEY = 'mazerHudPlayMenuGuide';
-const PLAY_MENU_ATLAS_TEXTURE_KEY = 'mazerHudIconAtlas';
-
-export type MenuRowHudIcon = 'settings' | 'profile' | 'leaderboard';
+export type MenuRowHudIcon = keyof typeof BUTTON_ICON_HUD_TEXTURE_IDS;
 
 export type MenuRowIconSource =
   | { readonly kind: 'hud'; readonly hudIcon: MenuRowHudIcon }
-  | { readonly kind: 'texture'; readonly textureKey: string; readonly atlasGlyph: HudIconName }
-  | { readonly kind: 'vector' };
+  | { readonly kind: 'vector'; readonly iconId: ButtonIconId; readonly offIconId?: ButtonIconId };
 
 export const MENU_ROW_ICON_SOURCES: Readonly<Record<LegacyMenuRowId, MenuRowIconSource>> = Object.freeze({
-  guide: { atlasGlyph: 'info', kind: 'texture', textureKey: PLAY_MENU_GUIDE_TEXTURE_KEY },
+  guide: { iconId: 'guide', kind: 'vector' },
   leaderboard: { hudIcon: 'leaderboard', kind: 'hud' },
-  'main-menu': { kind: 'vector' },
+  'main-menu': { iconId: 'home', kind: 'vector' },
   profile: { hudIcon: 'profile', kind: 'hud' },
-  'reset-level': { kind: 'vector' },
+  'reset-level': { iconId: 'reset', kind: 'vector' },
   settings: { hudIcon: 'settings', kind: 'hud' },
-  sound: { kind: 'vector' }
+  sound: { iconId: 'soundOn', kind: 'vector', offIconId: 'soundOff' }
 });
-
-/**
- * Bakes the tinted Guide glyph once per game (textures are global). Same 'source-in' recolour as
- * BootScene.deriveHudIconTextures; a missing atlas leaves it absent and the row draws Phaser's placeholder, never fatal.
- */
-export const ensureMenuRowIconTextures = (scene: Phaser.Scene): void => {
-  for (const source of Object.values(MENU_ROW_ICON_SOURCES)) {
-    if (source.kind !== 'texture' || scene.textures.exists(source.textureKey)) {
-      continue;
-    }
-    if (!scene.textures.exists(PLAY_MENU_ATLAS_TEXTURE_KEY)) {
-      return;
-    }
-    const atlasSource = scene.textures.get(PLAY_MENU_ATLAS_TEXTURE_KEY).getSourceImage() as CanvasImageSource;
-    const cell = resolveHudIconCell(source.atlasGlyph);
-    const canvasTexture = scene.textures.createCanvas(source.textureKey, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-    const context = canvasTexture?.getContext();
-    if (!canvasTexture || !context) {
-      continue;
-    }
-    context.drawImage(atlasSource, cell.x, cell.y, cell.width, cell.height, 0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-    context.globalCompositeOperation = 'source-in';
-    context.fillStyle = PLAY_MENU_ICON_TINT;
-    context.fillRect(0, 0, HUD_ICON_CELL_PX, HUD_ICON_CELL_PX);
-    context.globalCompositeOperation = 'source-over';
-    canvasTexture.refresh();
-  }
-};
 
 export interface MenuRowIconState {
   readonly soundEnabled: boolean;
 }
+
+/** Which Star Dust glyph a vector row draws right now (null for texture rows). */
+export const resolveMenuRowVectorIconId = (id: LegacyMenuRowId, state: MenuRowIconState): ButtonIconId | null => {
+  const source = MENU_ROW_ICON_SOURCES[id];
+  if (source.kind !== 'vector') {
+    return null;
+  }
+  return id === 'sound' && !state.soundEnabled && source.offIconId !== undefined ? source.offIconId : source.iconId;
+};
+
+/**
+ * The baked HUD textures draw the glyph on HUD_ICON_GLYPH_BOX of the cell and MenuScene crops to it, so the visible
+ * glyph fills the row's icon box; the Graphics glyphs use the same box so both kinds read at the same size.
+ */
+export const MENU_ROW_VECTOR_ICON_SCALE = 1;
 
 /** Paints a vector row icon centred on (centerX, centerY) into its own graphics (the caller clears it). */
 export const drawMenuRowVectorIcon = (
@@ -90,38 +68,23 @@ export const drawMenuRowVectorIcon = (
   centerY: number,
   size: number,
   alpha: number,
-  state: MenuRowIconState
+  state: MenuRowIconState,
+  lit = false
 ): void => {
-  if (MENU_ROW_ICON_SOURCES[id].kind !== 'vector' || alpha <= 0) {
+  const iconId = resolveMenuRowVectorIconId(id, state);
+  if (iconId === null || alpha <= 0) {
     graphics.setVisible(false);
     return;
   }
   graphics.setVisible(true).setAlpha(alpha);
-  if (id === 'sound') {
-    const radius = size / 2;
-    if (!state.soundEnabled) {
-      graphics.setAlpha(alpha * PLAY_MENU_SOUND_OFF_ALPHA);
-    }
-    drawGuideSoundGlyph(graphics, centerX + (radius * 0.05), centerY, radius, PLAY_MENU_VECTOR_COLOR);
-    if (!state.soundEnabled) {
-      graphics.lineStyle(Math.max(1.5, size * 0.09), PLAY_MENU_VECTOR_COLOR, 1);
-      graphics.lineBetween(centerX - (radius * 0.85), centerY + (radius * 0.85), centerX + (radius * 0.85), centerY - (radius * 0.85));
-    }
-    return;
-  }
-  if (id === 'reset-level') {
-    const outer = size * 0.42;
-    graphics.lineStyle(Math.max(1.5, size * 0.1), PLAY_MENU_VECTOR_COLOR, 1);
-    for (let arm = 0; arm < START_SPIRAL.arms; arm += 1) {
-      const flat = resolveStartSpiralArm({ cx: centerX, cy: centerY, inner: outer * START_SPIRAL.innerShare, outer }, arm, 0);
-      const points: Array<{ x: number; y: number }> = [];
-      for (let index = 0; index + 1 < flat.length; index += 2) {
-        points.push({ x: flat[index]!, y: flat[index + 1]! });
-      }
-      graphics.strokePoints(points, false, false);
-    }
-    return;
-  }
-  // main-menu: the closed three-line glyph, sized from the row icon box (it is drawn for a 32-40 px toggle frame).
-  drawMenuBurgerGlyph(graphics, centerX, centerY, size * 1.6, 0, PLAY_MENU_VECTOR_COLOR);
+  const colours = resolveButtonIconColours(lit ? 'pressed' : 'idle');
+  drawButtonIconGraphics(
+    graphics,
+    iconId,
+    centerX,
+    centerY,
+    size * MENU_ROW_VECTOR_ICON_SCALE,
+    { ink: cssHexToNumber(colours.ink), spark: cssHexToNumber(colours.spark) },
+    1
+  );
 };
