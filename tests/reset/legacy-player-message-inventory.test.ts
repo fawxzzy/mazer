@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
+  LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
   LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
@@ -79,7 +80,6 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Mazer is ready.', kind: 'static', route: 'static a11y live region; never updated today' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
-  { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'That username is already taken.', kind: 'duplicate-unrendered', route: 'duplicate of LEGACY_AUTH_MESSAGE_COPY.usernameTaken; save result error is never rendered' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not available right now.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'Could not reach the leaderboard. Check your connection and try again.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
   { file: 'src/legacy-runtime/legacyLeaderboard.ts', literal: 'The leaderboard is not set up yet.', kind: 'parallel-mapper', route: 'fold into the message module (source system)' },
@@ -411,6 +411,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
 
   test('routed copy tables are player-safe (no provider or internal wording)', () => {
     const tables = {
+      LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
       LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
@@ -433,6 +434,7 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     const source = readSource(file);
     const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const tableNames = new Set([
+      'LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY',
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
       'LEGACY_OAUTH_FAILURE_MESSAGE_COPY',

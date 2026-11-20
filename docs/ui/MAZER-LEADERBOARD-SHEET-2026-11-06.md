@@ -79,7 +79,7 @@ Guide: it does not describe the leaderboard, so no Guide copy changed (drift tes
 Superseded: the owner decided names are changed only on the account site (account.fawxzzy.com, Profile, behind its
 password check). The `Edit name` action, the empty-board offer (MAZER-ACCT-022), the gate action and the inline editor
 (`legacyLeaderboardUsernameEditor.ts`, `legacyAuthInputGeometry.ts`, the MenuScene editor, `saveLegacyAccountUsername`,
-`checkLegacyUsernameAvailable` and the save-failure copy) are deleted. The gate and the pinned You row now carry plain
+`checkLegacyUsernameAvailable`) are deleted; the unused save-failure copy in `legacyPlayerMessage.ts` (Wave 3B) waits for a follow-up. The gate and the pinned You row now carry plain
 words pointing to the menu's Profile item; the You row hint is one 12 px muted line under the row. The text below is
 kept as history only.
 

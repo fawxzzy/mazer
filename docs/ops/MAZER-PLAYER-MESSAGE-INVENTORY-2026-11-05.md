@@ -134,7 +134,6 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/boot/accessibilitySurface.ts:100` | `Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
-| `src/legacy-runtime/legacyAuth.ts:1447` | `That username is already taken.` | no (duplicate) | error / auth | duplicate-unrendered | Use `LEGACY_AUTH_MESSAGE_COPY.usernameTaken` and render it (F4) |
 | `src/legacy-runtime/legacyLeaderboard.ts:49` | `The leaderboard is not available right now.` | no | error / system | parallel-mapper | Fold into the message module |
 | `src/legacy-runtime/legacyLeaderboard.ts:68` | `Could not reach the leaderboard. Check your connection and try again.` | no | error / system | parallel-mapper | Fold into the message module |
 | `src/legacy-runtime/legacyLeaderboard.ts:71` | `The leaderboard is not set up yet.` | no | warning / system | parallel-mapper | Fold into the message module |
