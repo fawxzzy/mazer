@@ -1368,6 +1368,8 @@ interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
   /** MAZER-UI-024: force the menu "online" count for screenshots (null = unknown, undefined = release); no network. */
   setPresenceCount(count: number | null | undefined): void;
+  /** MAZER-VIS-066: hold the backdrop rainbow sweep at its current colour (true) or release it (false), so exact-pixel QA reads do not straddle a colour step. Diagnostics only. */
+  holdBackdropColour(held: boolean): void;
   getTrailPerfDiagnostics(): LegacyTrailPerfDiagnostics | null;
   /** Player-facing Settings action; the internal overlay id remains options. */
   openSettingsOverlay(): LegacyQaOverlayResult;
@@ -2390,6 +2392,8 @@ export class MenuScene extends Phaser.Scene {
   private backdropAccumulatedDeltaMs = 0;
   // MAZER-VIS-035: next time the rainbow backdrop stars are due a colour-only redraw while the drift redraw is off.
   private backdropColourNextDueAtMs = 0;
+  // MAZER-VIS-066: scene time the backdrop colour is held at by the diagnostics-only QA hook; null = live sweep.
+  private backdropColourHeldAtMs: number | null = null;
   private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
     enabled: false,
     lowPowerDetected: false,
@@ -2987,6 +2991,10 @@ export class MenuScene extends Phaser.Scene {
     window.__MAZER_QA__ = {
       movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move),
       setPresenceCount: (count: number | null | undefined): void => this.presence.setQaCount(count),
+      holdBackdropColour: (held: boolean): void => {
+        this.backdropColourHeldAtMs = held ? this.time.now : null;
+        this.backdropDirty = true;
+      },
       openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
@@ -7811,7 +7819,7 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-VIS-066: real star shapes (shape set "Mixed") with the lettering rainbow sweep, baked once and blitted
     // (src/render/backdropStarShapes.ts, backdropStarSprites.ts). Each star reads its persisted seed; the colour reads the
     // scene clock in every motion mode, so Reduce Motion stops the drift and twinkle but the rainbow keeps shifting.
-    fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.time.now, backdropMotionEnabled, palette.starAlphaScale);
+    fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.backdropColourHeldAtMs ?? this.time.now, backdropMotionEnabled, palette.starAlphaScale);
 
     this.backdropDirty = false;
   }
