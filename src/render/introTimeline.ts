@@ -174,8 +174,6 @@ export const INTRO_RING_CHARGE_MS = MOTION_DURATION_MS.long;
 export const INTRO_GOAL_PULSE_MS = 250;
 export const INTRO_REDUCED_MOTION_MS = MOTION_REDUCED_MS.crossfade;
 export const INTRO_DIGIT_MIN_SCALE = 0.72;
-/** Taps/keys inside this window after the intro began are ignored (the Start press itself). */
-export const INTRO_SKIP_GRACE_MS = 200;
 /** The ring lighting fades out over this long once the reveal ends (arrival) / near the outro end. */
 export const RING_ENERGY_FADE_MS = 150;
 /**
@@ -286,15 +284,6 @@ export const resolveIntroDurationMs = (reducedMotion: boolean, tileCount: number
 export const resolveIntroInputUnlockMs = (reducedMotion: boolean, tileCount: number): number => (
   reducedMotion ? INTRO_REDUCED_MOTION_MS : resolveIntroLaserEndMs(tileCount)
 );
-
-/**
- * Skip: the elapsed value that puts the intro in its final state. Never moves
- * time backwards, so skipping an already-finished intro is a no-op.
- */
-export const skipIntroElapsedMs = (
-  elapsedMs: number,
-  { reducedMotion, tileCount }: { readonly reducedMotion: boolean; readonly tileCount: number }
-): number => Math.max(normalizeElapsed(elapsedMs), resolveIntroDurationMs(reducedMotion, tileCount));
 
 /** 1 until `fadeStartMs`, then falls linearly to exactly 0 over RING_ENERGY_FADE_MS. */
 export const resolveRingEnergyEnvelope = (elapsedMs: number, fadeStartMs: number): number => (
