@@ -36,6 +36,7 @@ import {
   type EndpointTileSpec
 } from './endpointTiles';
 import { shouldDrawEndpointMarker } from './endpointMarkerLayering';
+import { drawStartPinwheel, resolveStartPinwheelClock, resolveStartPinwheelTile } from './startPinwheel';
 import { resolveStartSpiralArm, START_SPIRAL } from './endpointSpiral';
 import {
   drawSeedSpiral,
@@ -1451,6 +1452,13 @@ export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput
   const paintEndpoint = (kind: EndpointKind, cell: BoardCell, tile: EndpointTileRect | null | undefined): void => {
     const rect = tile ?? standaloneEndpointRect(cell, input.tileSize, scale, style);
     // L5 (endpointTileSkins.ts): the owner's picks are the defaults; the pre-L5 looks stay drawable below.
+    if (kind === 'start' && startSkin === 'blade-pinwheel') {
+      // MAZER-VIS-065: the default start (startPinwheel.ts). The play scene shows the same draw as a baked strip
+      // (startPinwheelLayer.ts); this path paints it for the Guide icon and any caller without the layer.
+      const clock = resolveStartPinwheelClock(skinTimeMs, reducedMotion);
+      drawStartPinwheel(painter, style.material.void, resolveStartPinwheelTile(rect, scale), clock.rotation, clock.alpha, ox, oy);
+      return;
+    }
     if (kind === 'start' && startSkin === 'seed-spiral') {
       drawSeedSpiral(painter, style.material, resolveSeedSpiralTile(rect, scale), resolveSeedSpiralClock(skinTimeMs, reducedMotion), ox, oy);
       return;

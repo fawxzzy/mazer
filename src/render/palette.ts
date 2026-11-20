@@ -852,6 +852,9 @@ export const HAZARD_GATE_MAGENTA = 0xff4fd8;
 /** L5: Seed spiral start-tile bead green, the owner's options-page pick (src/render/endpointTileSkins.ts). Floor contrast comes from its keyline. */
 export const SEED_SPIRAL_GREEN = 0x6dff7c;
 
+/** MAZER-VIS-065: Pinwheel start-tile hub, the blade green lifted 35 % toward white (src/render/startPinwheel.ts). */
+export const START_PINWHEEL_CORE = mixColor(SEED_SPIRAL_GREEN, 0xffffff, 0.35);
+
 /** MAZER-VIS-063: bleed gate tile floor, the owner's options-page pick D (src/render/bleedGateTileLook.ts). */
 export const BLEED_GATE_TILE_FLOOR = 0x1f3a38;
 
