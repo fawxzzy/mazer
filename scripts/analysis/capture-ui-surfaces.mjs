@@ -1362,21 +1362,20 @@ export const evaluateAuthStatusAnatomy = (surface) => {
   return { failures, pass: failures.length === 0 };
 };
 
-// Settings is ONE shared sheet (menu + pause, PR #386): a title, a `How to play`
-// row that opens the Guide sub-view, the Reduce Motion and Haptics rows, each with a description line under it (Trail Fade, Trail Shine and Animated Background were removed in MAZER-UI-026; the zoom slider on 2026-11-06) and,
+// Settings is ONE shared sheet (menu + pause, PR #386): a title, the Reduce Motion and Haptics rows, each with a description line under it (Trail Fade, Trail Shine and Animated Background were removed in MAZER-UI-026; the zoom slider on 2026-11-06) and,
 // in the menu context, an Account section. Every label below is a row label in
 // src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
 // asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
 // removed row fails a test instead of silently going stale here. The header
 // affordance (Close pill / `Back to Menu` row) is deliberately NOT listed: it is
 // owned by the sheet header and changes independently of the rows.
+// MAZER-UI-095/096: the `How to play` and Sound rows left the sheet for the Menu dropdown (legacyMenuRows.ts).
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'How to play',
   'Reduce Motion',
   'Haptics'
 ]);
 
-// The Guide sub-view opened from the `How to play` row (legacyGuideContent.ts).
+// The Guide opened from the main-menu dropdown's Guide row (legacyGuideContent.ts, MAZER-UI-096).
 // Title, one heading per guide row and the fixed `Got it` footer. Cross-checked
 // against LEGACY_GUIDE_ROWS / LEGACY_GUIDE_TITLE / LEGACY_GUIDE_CLOSE_LABEL by the
 // same test file.
@@ -1395,7 +1394,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Sound',
   'Got it'
 ]);
-const OPTIONS_GUIDE_OPEN_LABEL = 'How to play';
+const OPTIONS_GUIDE_OPEN_LABEL = 'Guide';
 const OPTIONS_GUIDE_CLOSE_LABEL = 'Got it';
 // The Guide body scrolls on a short viewport and rows scrolled out of the body
 // are not painted, so only the fixed frame (title + `Got it` footer) is
@@ -1479,8 +1478,16 @@ const clickVisualButton = async (page, label, timeoutMs) => {
   await clickPoint(page, point, label);
 };
 
+// MAZER-UI-096: the Guide is a row of the main-menu dropdown, not of the Settings sheet. Leave Settings through its
+// Back to Menu row, then open the Guide through the real dropdown row (the same overlay hosts it).
 const openGuideFromOptions = async (page, timeoutMs) => {
-  await clickVisualButton(page, OPTIONS_GUIDE_OPEN_LABEL, timeoutMs);
+  await clickVisualButton(page, 'Back to Menu', timeoutMs);
+  await waitForSurface(page, { expectedLabels: [], mode: 'menu', overlay: 'none', timeoutMs });
+  const guidePoint = await revealMenuDropdownActionPoint(page, OPTIONS_GUIDE_OPEN_LABEL, { timeoutMs });
+  if (!guidePoint) {
+    throw new Error(`Missing ${OPTIONS_GUIDE_OPEN_LABEL} menu row (timeout ${timeoutMs}ms).`);
+  }
+  await clickPoint(page, guidePoint, OPTIONS_GUIDE_OPEN_LABEL);
   await waitForSurface(page, {
     expectedLabels: OPTIONS_GUIDE_FRAME_LABELS,
     mode: 'menu',
@@ -1489,8 +1496,11 @@ const openGuideFromOptions = async (page, timeoutMs) => {
   });
 };
 
+// Got it returns to the main menu it was opened from; Settings is reopened for the scroll-to-bottom capture.
 const closeGuideToOptions = async (page, timeoutMs) => {
   await clickVisualButton(page, OPTIONS_GUIDE_CLOSE_LABEL, timeoutMs);
+  await waitForSurface(page, { expectedLabels: [], mode: 'menu', overlay: 'none', timeoutMs });
+  await openOptionsOverlayViaQa(page, timeoutMs);
   await waitForSurface(page, {
     expectedLabels: OPTIONS_BASE_EXPECTED_LABELS,
     mode: 'menu',
@@ -2992,10 +3002,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
             id: '02-options', mode: 'menu', overlay: 'options', page, route, timeoutMs, transition
           })
           : null;
-        // The Guide is a sub-view of the Settings sheet: open it through the real
-        // `How to play` row, capture it, then return through its `Got it` footer.
-        // This runs BEFORE the scroll-to-bottom capture below: on a short viewport
-        // the sheet scrolls and the `How to play` row is only on screen at the top.
+        // The Guide: open it through the real main-menu dropdown Guide row, capture
+        // it, then return through its `Got it` footer and reopen Settings for the
+        // scroll-to-bottom capture below (MAZER-UI-096).
         if (transition) {
           optionsGuideSurface = { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true };
         } else {

@@ -10,6 +10,7 @@ import {
   LEGACY_GUIDE_TITLE
 } from '../../src/legacy-runtime/legacyGuideContent';
 import { buildLegacySettingsSheetModel } from '../../src/legacy-runtime/legacySettingsSheetPlan';
+import { buildLegacyMenuRows } from '../../src/legacy-runtime/legacyMenuRows';
 import {
   collectGuideTextContainmentIssues,
   collectMenuControlSpacingIssues,
@@ -1134,11 +1135,15 @@ describe('capture label expectations stay tied to the Settings and Guide plan mo
     expect(settingsRowLabels(false)).not.toContain('Sign out');
   });
 
-  test('the Guide entry row label is the Settings row that opens the Guide', () => {
-    const [openRow] = buildLegacySettingsSheetModel('menu').sections
+  test('the Guide entry label is the main-menu dropdown Guide row; the Settings sheet no longer opens the Guide', () => {
+    // MAZER-UI-096: Guide moved from the Settings sheet to the Menu dropdown.
+    const guideRow = buildLegacyMenuRows('main', { soundEnabled: true }).find((row) => row.id === 'guide');
+    expect(guideRow).toBeDefined();
+    expect(source).toContain(`const OPTIONS_GUIDE_OPEN_LABEL = '${guideRow.label}';`);
+    const sheetGuideRows = buildLegacySettingsSheetModel('menu').sections
       .flatMap((section) => section.rows)
       .filter((row) => row.command?.type === 'OPEN_GUIDE');
-    expect(source).toContain(`const OPTIONS_GUIDE_OPEN_LABEL = '${openRow.label}';`);
+    expect(sheetGuideRows).toEqual([]);
   });
 
   test('OPTIONS_GUIDE_EXPECTED_LABELS are exactly the Guide title, row headings and footer', () => {

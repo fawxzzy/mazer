@@ -1570,7 +1570,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('? MENU_TEXT_COLOR');
     // L6: the menu Settings entry is the dropdown's Settings row (same semantic action, same bridge command).
     expect(menuSceneSource).not.toContain('createLegacyMenuSettingsCogButton');
-    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDropdown.ts'), 'utf8')).toContain("semanticAction: 'Settings'");
+    // MAZER-UI-096: the rows (and their semantic actions) come from the shared row model.
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRows.ts'), 'utf8')).toContain("settings: 'Settings'");
     expect(menuSceneSource).toContain("this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));");
     // Only the removed pause home icon's door cutout used this constant.
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_TOUCH_COG_HUB');
@@ -1637,7 +1638,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // MAZER-UI-095: the old cog was a persistent Image that had to be hidden by hand; the Menu button is drawn into
     // hudGraphics, so clearing the HUD clears it.
     expect(menuSceneSource).not.toContain('touchSettingsCogIconImage');
-    expect(drawHudSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {\n      this.footerText.setText('');");
+    expect(drawHudSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {\n      this.controllerHalo.hide();\n      this.footerText.setText('');");
     expect(clearHudSource).toContain('this.hudGraphics.clear();');
     expect(enterMenuSource).toContain('this.clearPlayHudImmediately();');
   });
@@ -1672,7 +1673,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).not.toContain("this.createOverlayTitle('Settings'");
     expect(menuSceneSource).not.toContain("this.createOverlayTitle('Paused'");
-    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDropdown.ts'), 'utf8')).toContain("id: 'settings', label: 'Settings', semanticAction: 'Settings'");
+    const menuRowsSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRows.ts'), 'utf8');
+    expect(menuRowsSource).toContain("settings: 'Settings'");
+    expect(menuRowsSource).toContain('semanticAction: LEGACY_MENU_ROW_SEMANTIC_ACTIONS[id]');
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).toContain('const trackId = this.resolveActiveLegacyProgressionTrackId();');
     expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
@@ -1689,8 +1692,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Signed out, the Profile row's sign-in continues to the account page (#645).
     expect(dropdownSource).toContain(
       'withMazerSignInContinuation(\'account\', () => (\n'
-      + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
-      + '          ));'
+      + '          this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '        ));'
     );
     expect(menuSceneSource).toContain('this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());');
     expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
@@ -1702,9 +1705,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(dropdownSource).toContain('sizeScale: this.layout.headerIconScale');
     expect(dropdownSource).toContain('const hit = resolveLegacyMinHitRect(frame, this.layout);');
     // The Profile row hides while the account service is unavailable (the corner icon did the same).
-    expect(dropdownSource).toContain("item.id !== 'profile'");
+    // MAZER-UI-096: the scene passes the auth state; the shared row model drops the row.
+    expect(dropdownSource).toContain("profileAvailable: this.authSnapshot.status !== 'unavailable'");
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRows.ts'), 'utf8')).toContain("filter((id) => id !== 'profile')");
     // The profile row keeps drawing the real profile texture.
-    expect(dropdownSource).toContain('profile: MAZER_HUD_PROFILE_TEXTURE_KEY');
+    // MAZER-UI-095/096: one icon registry (menuRowIcons.ts) resolved in one scene method for both Menus.
+    expect(menuSceneSource).toContain('textureKey: MAZER_HUD_PROFILE_TEXTURE_KEY');
   });
 
   test('routes signed-out account entry directly through shared OAuth without a local login surface', () => {
@@ -1808,8 +1814,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // L6: the main menu's account entry is the Profile row of the menu dropdown (same shared surface).
     expect(normalizeSourceLineEndings(menuSceneSource)).toContain(
       'withMazerSignInContinuation(\'account\', () => (\n'
-      + '            this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
-      + '          ));'
+      + '          this.dispatchUiBridgeCommand({ type: \'NAVIGATE\', surface: \'account\' }, () => this.openSharedAccountSurface())\n'
+      + '        ));'
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain("authUnavailable: AUTH_SURFACE_MESSAGES['signin.unavailable'],");
