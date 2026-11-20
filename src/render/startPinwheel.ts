@@ -5,9 +5,14 @@
  *
  * THE LOOK (the options page's design F, reproduced): four curved blades that taper from a wide root at the hub to a fine
  * tip at the rim, each sweeping 0.36 of a turn clockwise as it runs outward, around a small pale diamond hub. No circles.
- * Colour: the start green (`SEED_SPIRAL_GREEN`), solid at the hub and fading to 0.55 alpha at the rim; the hub is the green
- * lifted 35 % toward white. A one-device-pixel dark keyline (the board void) rings every blade and the hub so it stays
+ * Colour: the start green (`SEED_SPIRAL_GREEN`), solid at the hub and fading to 0.75 alpha at the rim; the hub is the green
+ * lifted 35 % toward white. A two-device-pixel dark keyline (the board void) rings every blade and the hub so it stays
  * crisp on the mid-tone chip.
+ *
+ * CONTRAST (measured in the real app, Reduce Motion, seed 7, levels 1/22/120 at 390x844@3, 412x915@2.625, 1280x720):
+ * the options page's values (1 dp keyline, fade to 0.55) gave a median contrast against the floor under the mark 0.1 to
+ * 0.3 below the Seed spiral's on today's Chip floor. A 2 dp keyline (the options page's own ink width) and a fade to 0.75
+ * put every case at or above the Seed spiral's median. Same blades, colour, hub and motion.
  *
  * MOTION. One clockwise turn per 2.17 s (the seed spiral's speed); the blades have 4-fold symmetry, so the motion repeats
  * every quarter turn (542.5 ms) and is quantised into 72 frames of that quarter turn (1.25 degrees each). The whole mark
@@ -16,7 +21,7 @@
  *
  * PAINTING THROUGH FILLS ONLY. The options page stroked a 2-device-px ink line (round joins) and filled with a radial
  * gradient. The Phaser Graphics adapter (the Guide icon) has neither gradients nor join control, so the same picture is
- * built from fills: the keyline is the blade dilated by one device px with the blade itself cut out (non-zero winding),
+ * built from fills: the keyline is the blade dilated by two device px with the blade itself cut out (non-zero winding),
  * and the radial fade is six nested fills along each blade whose stacked alphas equal the gradient at each band's middle.
  * One function draws the scene's baked strip (startPinwheelLayer.ts), the Guide icon and the unit tests' rasteriser.
  *
@@ -50,12 +55,15 @@ export const START_PINWHEEL = Object.freeze({
   coreOfReach: 0.2,
   /** Each blade sweeps this share of a turn from root to tip. */
   sweepTurns: 0.36,
+  /** Dark keyline width around every blade and the hub, device px (see CONTRAST); never over `keylineOfReach` R, never under 1 dp. */
+  keylineDevicePx: 2,
+  keylineOfReach: 0.15,
   /** The tip sits this many device px inside R (the options page: 1.5 dp). */
   tipInsetDevicePx: 1.5,
   /** Samples along each blade (a multiple of `fadeBands`). */
   steps: 48,
-  /** The radial fade: alpha 1 at the axis down to `fadeRimAlpha` at R, in `fadeBands` nested fills. */
-  fadeRimAlpha: 0.55,
+  /** The radial fade: alpha 1 at the axis down to `fadeRimAlpha` at R, in `fadeBands` nested fills (options page 0.55; see CONTRAST). */
+  fadeRimAlpha: 0.75,
   fadeBands: 6,
   /** The reach is at most this share of the half-tile (the options page). */
   maxReachOfRadius: 0.92
@@ -114,14 +122,20 @@ interface BladeSample { x: number; y: number; ux: number; uy: number; nx: number
 interface Blade {
   readonly left: number[];
   readonly right: number[];
-  /** Keyline outline: the blade dilated by one device px (flat [x0, y0, ...], closed). */
+  /** Keyline outline: the blade dilated by `keylineDevicePx` (flat [x0, y0, ...], closed). */
   readonly ink: number[];
 }
+
+/** Keyline width: `keylineDevicePx`, thinned on tiny marks (to no less than one device px) so they still fit their cell. */
+export const resolveStartPinwheelKeyline = (reach: number, dp: number): number => (
+  Math.min(START_PINWHEEL.keylineDevicePx * dp, Math.max(dp, reach * START_PINWHEEL.keylineOfReach))
+);
 
 const resolveBlade = (cx: number, cy: number, reach: number, dp: number, base: number): Blade => {
   const k = START_PINWHEEL;
   const r0 = reach * k.rootOfReach;
   const r1 = reach - (k.tipInsetDevicePx * dp);
+  const kw = resolveStartPinwheelKeyline(reach, dp);
   const sweep = k.sweepTurns * TAU;
   const left: number[] = [];
   const right: number[] = [];
@@ -145,17 +159,17 @@ const resolveBlade = (cx: number, cy: number, reach: number, dp: number, base: n
     const y = cy + (Math.sin(a) * r);
     left.push(x + (nx * half), y + (ny * half));
     right.push(x - (nx * half), y - (ny * half));
-    inkLeft.push(x + (nx * (half + dp)), y + (ny * (half + dp)));
-    inkRight.push(x - (nx * (half + dp)), y - (ny * (half + dp)));
-    const sample: BladeSample = { x, y, ux, uy, nx, ny, half: half + dp };
+    inkLeft.push(x + (nx * (half + kw)), y + (ny * (half + kw)));
+    inkRight.push(x - (nx * (half + kw)), y - (ny * (half + kw)));
+    const sample: BladeSample = { x, y, ux, uy, nx, ny, half: half + kw };
     if (i === 0) first = sample;
     last = sample;
   }
   const ink: number[] = [];
   const cap = (s: BladeSample, sign: number, side: number): void => {
-    ink.push(s.x + (s.ux * dp * sign) + (s.nx * s.half * side), s.y + (s.uy * dp * sign) + (s.ny * s.half * side));
+    ink.push(s.x + (s.ux * kw * sign) + (s.nx * s.half * side), s.y + (s.uy * kw * sign) + (s.ny * s.half * side));
   };
-  // Root cap (one dp behind the root), the left side out, the tip cap (one dp past the tip), the right side back.
+  // Root cap (one keyline behind the root), the left side out, the tip cap (one keyline past the tip), the right side back.
   cap(first!, -1, 1);
   ink.push(...inkLeft);
   cap(last!, 1, 1);
@@ -180,7 +194,7 @@ const diamond = (cx: number, cy: number, q: number, rotation: number): number[] 
 export interface StartPinwheelShape {
   /** Per blade: the fill outline (left side out, right side back). */
   readonly blades: readonly number[][];
-  /** Per blade: the keyline outline (blade dilated by one device px). */
+  /** Per blade: the keyline outline (blade dilated by `keylineDevicePx`). */
   readonly bladeInk: readonly number[][];
   /** Per blade: left/right side samples, root first (for the nested fade fills). */
   readonly sides: readonly { left: readonly number[]; right: readonly number[] }[];
@@ -216,8 +230,8 @@ export const resolveStartPinwheelShape = (
     bladeInk,
     sides,
     core: diamond(cx, cy, q, rotation),
-    // A miter offset of one device px along each edge of a right-angled diamond moves each vertex out by dp * sqrt(2).
-    coreInk: diamond(cx, cy, q + (dp * Math.SQRT2), rotation)
+    // A miter offset of w along each edge of a right-angled diamond moves each vertex out by w * sqrt(2).
+    coreInk: diamond(cx, cy, q + (resolveStartPinwheelKeyline(reach, dp) * Math.SQRT2), rotation)
   };
 };
 
@@ -345,7 +359,7 @@ export const drawStartPinwheel = (
     tracePolygon(p, shape.blades[b]!, true);
   }
   p.fill();
-  // Hub keyline: a solid diamond one device px larger (the opaque hub covers its middle).
+  // Hub keyline: a solid diamond one keyline width larger (the opaque hub covers its middle).
   p.fillStyle(inkStyle);
   p.begin();
   tracePolygon(p, shape.coreInk);

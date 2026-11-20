@@ -10,7 +10,11 @@
  * description only, their drawing code lives in the design archive (`mazer-look-options-2026-11-19-v4`, outside this repo),
  * and they are built when the shop needs them. Nothing here reads or writes player data: there is no picker yet.
  *
- * START = SEED SPIRAL (default). A one-arm spiral of 26 beads, small and faint at the centre, larger and solid at the
+ * START = PINWHEEL (default since MAZER-VIS-065, Zac's pick F of that options page). Its geometry, clock and draw live in
+ * startPinwheel.ts; the play scene shows it as a strip baked once (startPinwheelLayer.ts), the Guide and other callers
+ * draw it through this module's painter. The Seed spiral below is now `retired` (still drawable).
+ *
+ * START = SEED SPIRAL (L5 default, retired by VIS-065). A one-arm spiral of 26 beads, small and faint at the centre, larger and solid at the
  * rim, that turns clockwise about once per 2.2 s and breathes in and out (its radius swings +-7 %, period 2.1 s). It is
  * deliberately NOT in phase with the end tile (the owner asked for a faster spin, desynced from the end tile). Colour: the
  * options-page green (#6DFF7C, `SEED_SPIRAL.color`, skin-local), each bead over a one-device-pixel dark keyline disc so it

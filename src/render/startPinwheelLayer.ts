@@ -10,8 +10,8 @@
  * WHOLE CSS PX. Phaser floors an Image's position under roundPixels (pixelAlignment.ts), so the strip is placed at a
  * whole css offset m from the board image whose device offset m * scale is also whole: the strip's device grid is the
  * baked board's grid, and the mark's centre inside a frame keeps the exact sub-pixel centre the board's own geometry has.
- * At a scale where no such m exists within 24 css px, m is the plain whole css offset (the centre is still exact; the
- * strip is resampled by under a device px).
+ * At a scale where no such m exists within 8 css px (a zoomed board's backing scale often has none), m is the plain whole
+ * css offset: the centre is still exact and the strip is resampled by under a device px, and the frames stay small.
  */
 import type Phaser from 'phaser';
 import type { EndpointTileRect } from './endpointTiles';
@@ -33,14 +33,15 @@ import {
 
 /** Whole css px kept clear around the mark inside each frame. */
 const FRAME_PAD_CSS = 2;
-const ALIGN_SEARCH_CSS = 24;
+/** 8 covers every DPR whose device grid repeats within 8 css px (1, 2, 3 and 2.625 = 21/8); others take the floor. */
+const ALIGN_SEARCH_CSS = 8;
 
-/** A whole css offset m <= start whose device offset m * scale is whole (falls back to floor(start)). */
 /** The layer draws the start mark when the board is Chip and the start skin is the Pinwheel (Trace keeps its own art). */
 export const usesStartPinwheelLayer = (style: BoardTileStyleId | null | undefined, startTileSkin?: string | null): boolean => (
   resolveBoardTileStyleId(style) !== 'trace' && resolveStartTileSkin(startTileSkin) === 'blade-pinwheel'
 );
 
+/** A whole css offset m <= start whose device offset m * scale is whole (falls back to floor(start)). */
 export const resolveStartPinwheelAlignedOffset = (start: number, scale: number): number => {
   const m0 = Math.floor(start);
   for (let m = m0; m > m0 - ALIGN_SEARCH_CSS; m -= 1) {

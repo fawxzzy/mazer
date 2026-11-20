@@ -14,6 +14,7 @@ import {
   resolveStartPinwheelExtent,
   resolveStartPinwheelFadeAlphas,
   resolveStartPinwheelFrameRotation,
+  resolveStartPinwheelKeyline,
   resolveStartPinwheelShape,
   resolveStartPinwheelTile,
   scaleStartPinwheelSpec
@@ -128,18 +129,25 @@ describe('shape and fade', () => {
     }
   });
 
-  test('four blades, a diamond hub; the keyline outlines sit one device px outside what they ring', () => {
+  test('four blades, a diamond hub; the keyline outlines sit keylineDevicePx (2) outside what they ring', () => {
     const s = resolveStartPinwheelShape(50, 50, 20, 1, 0.3);
     expect(s.blades).toHaveLength(4);
     expect(s.bladeInk).toHaveLength(4);
     expect(s.core).toHaveLength(8);
     const r = (pts: readonly number[], i: number) => Math.hypot(pts[i]! - 50, pts[i + 1]! - 50);
     expect(r(s.core, 0)).toBeCloseTo(20 * START_PINWHEEL.coreOfReach, 9);
-    expect(r(s.coreInk, 0) - r(s.core, 0)).toBeCloseTo(Math.SQRT2, 9);
-    // the tip reaches R minus the tip inset; its keyline one more device px
+    expect(START_PINWHEEL.keylineDevicePx).toBe(2);
+    // phone and desktop marks get the full 2 dp; a tiny mark thins it, never below 1 dp
+    expect(resolveStartPinwheelKeyline(6.75, 1 / 3)).toBeCloseTo(2 / 3, 12);
+    expect(resolveStartPinwheelKeyline(7.17, 1 / 2.625)).toBeCloseTo(2 / 2.625, 12);
+    expect(resolveStartPinwheelKeyline(10, 1)).toBe(1.5);
+    expect(resolveStartPinwheelKeyline(2, 1)).toBe(1);
+    expect(r(s.coreInk, 0) - r(s.core, 0)).toBeCloseTo(START_PINWHEEL.keylineDevicePx * Math.SQRT2, 9);
+    // the tip reaches R minus the tip inset; its keyline reaches keylineDevicePx further (plus the cap's corner)
     const ext = resolveStartPinwheelExtent(20, 1);
-    expect(ext).toBeGreaterThan(20 - START_PINWHEEL.tipInsetDevicePx);
-    expect(ext).toBeLessThan(20 + 1.5);
+    const tip = 20 - START_PINWHEEL.tipInsetDevicePx;
+    expect(ext).toBeGreaterThan(tip + START_PINWHEEL.keylineDevicePx - 1e-9);
+    expect(ext).toBeLessThan(tip + (START_PINWHEEL.keylineDevicePx * Math.SQRT2) + (20 * START_PINWHEEL.tipHalfOfReach) + 1e-9);
   });
 
   test('the farthest painted point does not depend on the rotation', () => {
