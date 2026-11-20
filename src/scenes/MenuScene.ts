@@ -508,6 +508,8 @@ import {
   readLegacyFloatingAnchorPreference,
   writeLegacyFloatingAnchorPreference
 } from '../legacy-runtime/legacyFloatingAnchorPreference';
+import { drawControllerHaloGuideGlyph } from '../render/controllerHaloLook';
+import { ControllerHaloView } from '../render/controllerHaloView';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
   migrateLegacyGameToggleSettingsToGuestScope,
@@ -1598,8 +1600,6 @@ const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
 // the grid (progress 0) out to the true screen edge (progress 1), fading in
 // and out via the sine envelope so the loop has no visible seam, instead of
 // snapping back to the start mid-brightness.
-const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
-const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_TOUCH_ACCENT = cyberArcadeMaterial.rail.mint;
 const LEGACY_CYBER_PANEL_FILL = cyberArcadeMaterial.substrate.panel;
@@ -1619,7 +1619,6 @@ const LEGACY_OVERLAY_SCROLL_MOMENTUM_FRICTION_PER_MS = 0.994;
 const LEGACY_OVERLAY_SCROLL_MOMENTUM_STOP_PX_PER_MS = 0.02;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
-const LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS = 3200;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 // Stick caps follow the same owner-requested step-rate factor as the profile, or stick players would see no change.
@@ -1982,6 +1981,9 @@ export class MenuScene extends Phaser.Scene {
     coarsePointer: true,
     devicePixelRatio: 3
   }));
+  // MAZER-CTRL-006 Halo ring (visual only): the live finger and the leash the anchor was configured with at touch-down.
+  private playTouchStickFinger: { x: number; y: number } | null = null;
+  private floatingAnchorLeashPx: number | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleGraphics!: Phaser.GameObjects.Graphics;
   // Board layers share one untransformed container for stable draw ordering.
@@ -2213,6 +2215,7 @@ export class MenuScene extends Phaser.Scene {
   private overlayGuideMask: Phaser.Display.Masks.GeometryMask | null = null;
   private overlayGuideMaskGraphics: Phaser.GameObjects.Graphics | null = null;
   private hudGraphics!: Phaser.GameObjects.Graphics;
+  private controllerHalo!: ControllerHaloView;
   // Deliberately its own layer, outside boardZoomContainer (so screen-corner
   // coordinates stay the true corners regardless of board zoom) and never
   // touched by drawHud's own unconditional clear (which is play-mode-only
@@ -2574,6 +2577,7 @@ export class MenuScene extends Phaser.Scene {
     ]);
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
+    this.controllerHalo = new ControllerHaloView(this, () => resolveMazerCanvasResolution());
     this.menuDropdown = this.createLegacyMenuDropdown();
     ensureMenuRowIconTextures(this);
     this.playMenu = this.createLegacyPlayMenu();
@@ -5111,11 +5115,13 @@ export class MenuScene extends Phaser.Scene {
     } catch {
       // keep the phone-class defaults
     }
-    this.floatingAnchor.setConfig(resolveFloatingAnchorConfig({
+    const config = resolveFloatingAnchorConfig({
       coarsePointer,
       devicePixelRatio: typeof window === 'undefined' ? 1 : window.devicePixelRatio,
       logicalPerCssPx: this.layout.width / Math.max(1, canvasCssWidth)
-    }));
+    });
+    this.floatingAnchorLeashPx = config.leashPx;
+    this.floatingAnchor.setConfig(config);
   }
 
   // Per-frame: a finger held still beyond the leash keeps the anchor easing toward it.
@@ -5146,6 +5152,7 @@ export class MenuScene extends Phaser.Scene {
     this.playTouchStickPointerId = null;
     this.playTouchStickPull = null;
     this.playFloatingStickOrigin = null;
+    this.playTouchStickFinger = null;
   }
 
   // A fixed-size ring centered wherever the touch actually landed, instead
@@ -5215,6 +5222,7 @@ export class MenuScene extends Phaser.Scene {
     this.playTouchArrowPointerId = null;
     this.playTouchStickPointerId = normalizedPointerId;
     this.playFloatingStickOrigin = { x, y };
+    this.playTouchStickFinger = { x, y };
     if (this.floatingAnchorEnabled) {
       this.configureLegacyFloatingAnchor();
       this.floatingAnchor.down({ x, y }, this.time.now);
@@ -5244,6 +5252,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    this.playTouchStickFinger = { x, y };
     if (this.floatingAnchor.active) {
       // MAZER-L9: the anchor trails a far finger; the stick below is centred on it.
       const anchor = this.floatingAnchor.move({ x, y }, timeMs);
@@ -11314,6 +11323,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearHudTexts();
     this.hudTouchControlBounds = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
+      this.controllerHalo.hide();
       this.footerText.setText('');
       return;
     }
@@ -11424,6 +11434,7 @@ export class MenuScene extends Phaser.Scene {
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): VisualRect | null {
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
+      this.controllerHalo.hide();
       return null;
     }
 
@@ -11433,11 +11444,13 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayMenuControl(controls.pause, time);
 
     if (this.playFloatingStickOrigin === null) {
+      // Finger lifted: the halo fades out where it was (Reduce Motion: gone at once).
+      this.updateLegacyControllerHalo(null, null, null, time);
       return createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height);
     }
 
     const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
-    this.drawLegacyPlayTouchStick(stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull, time);
+    this.drawLegacyPlayTouchStick(stick, this.playTouchStickPull, time);
     return createVisualRect(
       stick.outer.left,
       stick.outer.top,
@@ -11446,69 +11459,51 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // The visual rework: a soft halo in the player's own trail color instead
-  // of the old fixed dpad's generic touch-icon palette, so the floating
-  // stick reads as "this game's" control rather than a boilerplate virtual
-  // joystick, and brightens slightly whenever it's actually being pulled in
-  // a direction so the feedback loop between thumb and knob is legible.
-  // Just the knob now -- no stationary outer ring, spokes, hub, deadzone
-  // ring, or glow halo. The knob still appears exactly where the touch
-  // landed (stick.outer is centered there, per
-  // resolveLegacyPlayFloatingStickGeometry) and still travels with the
-  // drag exactly as before; only the always-visible chrome around it is
-  // gone.
+  // MAZER-CTRL-006: the Halo ring (look A, 2026-11-19 controller options page) replaces the grey knob and the
+  // orbiting anchor tick: a thin ring on the anchor, one lit arc for the pull's 8-way sector, a nub that slides toward
+  // the thumb and a dashed leash cue near the floating anchor's leash. All of it is baked once and only moved
+  // (src/render/controllerHaloView.ts); the maths is pure (src/render/controllerHaloLook.ts). Visual only: the
+  // lit sector reads the true drag angle, movement still comes from pullVector's resolved axis, unchanged.
   private drawLegacyPlayTouchStick(
     stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
-    activeControl: HumanMovementActionKind | null,
     pullVector: TouchStickPullVector | null,
     time: number
   ): void {
-    const centerX = stick.outer.centerX;
-    const centerY = stick.outer.centerY;
-    const knobRadius = stick.knobRadius;
-    let knobX = centerX;
-    let knobY = centerY;
-
-    const travel = stick.travelRadius;
-    if (pullVector !== null) {
-      knobX += pullVector.normalizedX * travel;
-      knobY += pullVector.normalizedY * travel;
-    } else if (activeControl !== null) {
-      const vector = resolveHumanMovementActionVector(activeControl);
-      const length = Math.hypot(vector.deltaX, vector.deltaY) || 1;
-      knobX += (vector.deltaX / length) * travel;
-      knobY += (vector.deltaY / length) * travel;
-    }
-
-    // The anchor (where the touch first landed, i.e. "home" for the knob)
-    // has no chrome of its own once the knob drags away from it -- add back
-    // a quiet marker: a small static dot plus one tiny tick slowly orbiting
-    // it, so the anchor point stays legible without competing with the knob
-    // itself for attention.
-    // The accent color, not the same grey as the knob below -- against a
-    // grey knob (especially once it's resting right back on the anchor)
-    // a grey-on-grey dot was nearly invisible.
-    const anchorDotRadius = Math.max(2, Math.round(knobRadius * 0.16));
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.62);
-    this.hudGraphics.fillCircle(centerX, centerY, anchorDotRadius);
-    const anchorOrbitRadius = anchorDotRadius * 2.6;
-    // Reduced motion: the orbiting tick holds still.
-    const anchorOrbitAngle = this.prefersLegacyReducedMotion()
-      ? 0
-      : (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.55);
-    this.hudGraphics.fillCircle(
-      centerX + (Math.cos(anchorOrbitAngle) * anchorOrbitRadius),
-      centerY + (Math.sin(anchorOrbitAngle) * anchorOrbitRadius),
-      Math.max(1, Math.round(anchorDotRadius * 0.6))
+    this.updateLegacyControllerHalo(
+      { x: stick.outer.centerX, y: stick.outer.centerY },
+      this.playTouchStickFinger ?? { x: stick.outer.centerX, y: stick.outer.centerY },
+      pullVector,
+      time
     );
+  }
 
-    // Grey, not the green accent -- a quiet neutral knob instead of a
-    // colored control competing with the maze/trail for attention.
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, activeControl === null ? 0.55 : 0.78);
-    this.hudGraphics.fillCircle(knobX, knobY, knobRadius);
-    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_ICON, activeControl === null ? 0.52 : 0.86);
-    this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
+  private updateLegacyControllerHalo(
+    anchor: { x: number; y: number } | null,
+    finger: { x: number; y: number } | null,
+    pullVector: TouchStickPullVector | null,
+    time: number
+  ): void {
+    const offset = this.resolveBoardOffset();
+    const frame = this.resolveLegacyMazeRenderFrame(
+      this.layout.boardLeft + offset.x,
+      this.layout.boardTop + offset.y,
+      this.layout.boardWidth,
+      this.layout.boardHeight
+    );
+    const point = this.resolveLegacyRenderedPlayerPoint(time);
+    this.controllerHalo.update({
+      down: anchor !== null && finger !== null,
+      anchor,
+      finger,
+      engaged: pullVector !== null,
+      leashPx: this.floatingAnchor.active ? this.floatingAnchorLeashPx : null,
+      player: {
+        x: this.boardZoomContainer.x + ((frame.boardLeft + ((point.x + 0.5) * frame.tileSize)) * this.boardZoomContainer.scaleX),
+        y: this.boardZoomContainer.y + ((frame.boardTop + ((point.y + 0.5) * frame.tileSize)) * this.boardZoomContainer.scaleY)
+      },
+      nowMs: time,
+      reducedMotion: this.prefersLegacyReducedMotion()
+    });
   }
 
   // MAZER-UI-095: the in-game Menu button. The main menu's closed toggle draw (drawMenuBurgerGlyph, same colour, same
@@ -12635,25 +12630,15 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  // A miniature of the real floating movement stick (ring + knob, same colors
-  // as drawLegacyPlayTouchStick). That draw derives its geometry from the live
-  // viewport, so it cannot be called at icon scale; this is guide-local.
+  // A miniature of the real Halo ring controller drawn by drawLegacyPlayTouchStick (MAZER-CTRL-006: ring, one lit
+  // diagonal, nub), from the same look module. The live draw follows the thumb, so this is guide-local.
   private drawLegacyOptionsGuideMoveGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
     centerY: number,
     size: number
   ): void {
-    const outerRadius = size * 0.86;
-    const knobRadius = size * 0.34;
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.28);
-    graphics.fillCircle(centerX, centerY, outerRadius);
-    graphics.lineStyle(Math.max(1, size * 0.1), LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.55);
-    graphics.strokeCircle(centerX, centerY, outerRadius);
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.38);
-    graphics.fillCircle(centerX, centerY, knobRadius);
-    graphics.lineStyle(Math.max(1, size * 0.08), LEGACY_PLAY_TOUCH_ICON, 0.72);
-    graphics.strokeCircle(centerX, centerY, knobRadius);
+    drawControllerHaloGuideGlyph(graphics, centerX, centerY, size);
   }
 
   // Chip tile under a Guide marker icon (single cell), then the marker itself drawn by the board's own

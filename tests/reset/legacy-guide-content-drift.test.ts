@@ -453,8 +453,10 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(icon).toContain('drawMenuBurgerGlyph(graphics, centerX, centerY,');
     expect(read('src/render/menuDropdownButtons.ts')).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress,');
     expect(method('private rebuildUi(): void')).toContain('this.uiButtons.push(...this.buildLegacyMenuDropdownButtons());');
-    // move mirrors the stick.
-    expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('LEGACY_PLAY_TOUCH_BUTTON_STROKE');
+    // move mirrors the Halo ring controller (MAZER-CTRL-006): the icon and the board share the look module.
+    expect(method('private drawLegacyOptionsGuideMoveGlyph(')).toContain('drawControllerHaloGuideGlyph(graphics, centerX, centerY, size)');
+    expect(method('private drawLegacyPlayTouchStick(')).toContain('this.updateLegacyControllerHalo(');
+    expect(read('src/render/controllerHaloLook.ts')).toContain('export const drawControllerHaloGuideGlyph');
     expect(icon).toContain('this.progressionState.tracks.player.level');
   });
 
