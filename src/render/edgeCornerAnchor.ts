@@ -98,6 +98,17 @@ export const resolveEdgeCornerBottomTipInset = (viewport?: EdgeCornerViewport): 
   hasRoundedBottomCorners(viewport) ? EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX : EDGE_CORNER_TIP_INSET_PX
 );
 
+/**
+ * MAZER-VIS-068: the bottom band (css px) the page reports it may not show: the bottom safe area when it is a finite value > 0, else 0.
+ * The bottom corner stars keep their whole painted reach above it (edgeMarkers.ts resolveEdgeBottomCornerRise): the owner's iPhone 16
+ * still cut them off in portrait with only the VIS-056 display-corner inset, which headless runs show as clear.
+ */
+export const resolveEdgeCornerBottomHiddenBand = (viewport?: EdgeCornerViewport): number => (
+  viewport?.safeAreaBottom !== undefined && Number.isFinite(viewport.safeAreaBottom) && viewport.safeAreaBottom > 0
+    ? viewport.safeAreaBottom
+    : 0
+);
+
 /** Viewports narrower than this (css px) cap how large a corner diamond may grow (MAZER-UI-035 follow-up). 375 and up are unchanged. */
 export const EDGE_CORNER_NARROW_WIDTH_PX = 375;
 /**
