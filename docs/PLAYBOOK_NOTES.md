@@ -650,3 +650,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: the start mark is baked once and never redrawn per frame. Keep the strip at a whole css offset where offset x backing scale is a whole number, searching at most 8 css px: a zoomed board's backing scale (2.6303) often has no such offset, and a wider search grew frames to 111 px.
 - Left: per-frame cost was argued from the code (one Graphics redraw replaced by setFrame/position/alpha), not timed. Emerald colour mode is not on main, so only the current mode was checked.
 - Status: headless only; nothing was checked on a real phone.
+
+## 2026-11-20 Trail-corner raster re-baselined on the merged Pinwheel + size rule 2 + star field main
+
+- WHAT changed: the four `tests/fixtures/trail-corner-raster/*.png` baselines were regenerated on the merged main (#675 tiles, #676 stars, #678 size rule 2, #680 Pinwheel). No product code changed.
+- WHY it changed: #678 and #680 each re-baselined this check against a main that lacked the other, so after both merged the cornerNW crop exceeded the 40px region limit and main CI failed.
+- Evidence: `node scripts/analysis/verify-trail-corner-raster.mjs --skip-build` 4/4 on two consecutive runs after the update; cornerNW PNG viewed (pointed stars, Pinwheel start, red end star, trail).
+- Rule: when two PRs both regenerate the raster baselines, re-run the raster check on the merged main before the second merge, or re-baseline after the last one lands.
