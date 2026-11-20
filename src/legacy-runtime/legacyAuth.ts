@@ -1,13 +1,7 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import {
-  classifyLegacyUsernameSaveError,
-  ensureLegacyRemoteProfile,
-  isLegacyProfileMissingError
-} from './legacyProfileEnsure';
-import {
   LEGACY_AUTH_MESSAGE_COPY,
-  resolveLegacyOAuthFailureCopy,
-  type LegacyUsernameSaveFailureKind
+  resolveLegacyOAuthFailureCopy
 } from './legacyPlayerMessage';
 import {
   MAZER_OAUTH_AUTH_SESSION_KEY,
@@ -1126,65 +1120,3 @@ export const readLegacyAccountUsername = async (
   };
 };
 
-// Best-effort UX only -- mazer_is_username_available is a SECURITY DEFINER
-// RPC that bypasses RLS just enough to answer "is this taken" without
-// exposing any other user's actual profile row. The unique index on
-// mazer_profiles(lower(username)) is the real source of truth; a race
-// between two clients checking the same name still resolves correctly at
-// save time below (whichever save lands second gets error code 23505).
-export const checkLegacyUsernameAvailable = async (
-  candidate: string
-): Promise<{ available: boolean | null; error: string | null }> => {
-  const client = await getLegacyAuthClient();
-  if (!client) {
-    return { available: null, error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured };
-  }
-
-  const { data, error } = await client.rpc('mazer_is_username_available', { candidate });
-  if (error) {
-    return { available: null, error: error.message };
-  }
-
-  return { available: data === true, error: null };
-};
-
-export const saveLegacyAccountUsername = async (
-  userId: string,
-  username: string
-): Promise<{ error: string | null; failure: LegacyUsernameSaveFailureKind | null; ok: boolean }> => {
-  const client = await getLegacyAuthClient();
-  if (!client) {
-    return { error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured, failure: 'failed', ok: false };
-  }
-
-  // Direct authenticated writes to mazer_profiles are intentionally revoked.
-  // Route the rename through the auth-bound definer so it can update only the
-  // caller's row, preserve every unrelated profile field, and let the unique
-  // index remain the final collision authority. An account created on the
-  // shared account host has no profile row yet (the definer raises
-  // MAZER_PROFILE_MISSING), so create it through mazer_ensure_profile and
-  // retry the rename once; a second miss is reported, never looped.
-  const rename = () => client.rpc('mazer_set_username', {
-    p_expected_user_id: userId,
-    p_username: username
-  });
-  let { error } = await rename();
-  if (error && isLegacyProfileMissingError(error)) {
-    const ensured = await ensureLegacyRemoteProfile(client, userId, null);
-    if (ensured.ok) {
-      ({ error } = await rename());
-    } else {
-      return { error: ensured.error, failure: 'failed', ok: false };
-    }
-  }
-
-  if (error) {
-    return {
-      error: error.code === '23505' ? 'That username is already taken.' : error.message,
-      failure: classifyLegacyUsernameSaveError(error),
-      ok: false
-    };
-  }
-
-  return { error: null, failure: null, ok: true };
-};

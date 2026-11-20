@@ -3,6 +3,10 @@
 Date: 2026-11-14. Status: read of source plus one read-only live check with the standing QA account. Headless desktop
 Chromium only; nothing was checked on a real phone. This document grants no release, deploy or provider authority.
 
+Update 2026-11-19 (MAZER-ACCT-047): the answer below is overtaken. FawxzzyWeb adds a Mazer name editor on the account
+page (calls `mazer_set_username`, behind the same password check as Change username), and Mazer deletes the leaderboard
+`Edit name` editor.
+
 Question (left open by MAZER-ACCT-043): the owner rule is "no Mazer account screens, only account.fawxzzy.com screens".
 The leaderboard `Edit name` editor was kept because nobody had proved that a username save on the account host also
 renames the Mazer leaderboard profile. Can the editor be replaced by a hand-off to the host?

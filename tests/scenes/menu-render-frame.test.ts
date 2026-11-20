@@ -1657,7 +1657,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('converts each seeded backdrop twinkle cycle to radians', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    // MAZER-VIS-066: the twinkle maths moved with the star fill into src/render/backdropStarShapes.ts.
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/render/backdropStarShapes.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2)');
     expect(menuSceneSource).not.toContain('Math.sin((animationTime / twinklePeriodMs) + (starSeed * Math.PI * 2))');
@@ -2073,7 +2074,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('hydrates the signed-in username before deciding whether leaderboard access is gated', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     // The gate is resolved into the view-state first; the pure view-model owns
-    // the copy (profile loading / unavailable, 'Retry', 'Edit name') and
+    // the copy (profile loading / unavailable, 'Retry', the Profile pointer) and
     // tests/reset/legacy-leaderboard-view.test.ts pins it.
     const gateSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private resolveLegacyLeaderboardViewState(): LegacyLeaderboardViewState'),

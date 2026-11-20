@@ -13,6 +13,8 @@
  * pager), a pinned You row that is always visible once the player has a rank
  * (even when they are outside the loaded top N), top-3 emphasis by theme
  * colour. Raw error text is never shown: every failure maps to designed copy.
+ * The name is never edited here (MAZER-ACCT-047, owner decision): the gate and
+ * the line under the You row point to Profile on the account site instead.
  * See docs/ui/MAZER-LEADERBOARD-SHEET-2026-11-06.md.
  */
 import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
@@ -57,10 +59,9 @@ export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   emptyHeading: 'No ranks yet',
   errorBody: 'Something went wrong on our side. Try again in a moment.',
   errorHeading: 'Leaderboard unavailable',
-  editName: 'Edit name',
   exit: 'Back to Menu',
   loading: 'Loading the leaderboard…',
-  needsUsernameBody: 'Players appear on the leaderboard by username.',
+  needsUsernameBody: 'Choose it on the account site: open the menu and tap Profile.',
   needsUsernameHeading: 'Choose a username',
   notSetUpBody: 'It isn’t available yet. Check back soon.',
   notSetUpHeading: 'Leaderboard not ready',
@@ -70,6 +71,8 @@ export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   profileUnavailableBody: 'Check your connection and try again.',
   profileUnavailableHeading: 'Couldn’t load your profile',
   retry: 'Retry',
+  /** One line under the pinned You row: where a rename happens (never on this sheet). */
+  selfNameHint: 'To change your name, open the menu and tap Profile.',
   signIn: 'Sign in',
   signedOutBody: 'Sign in to see where you stand among other players.',
   signedOutHeading: 'Sign in to see the board',
@@ -199,7 +202,7 @@ const buildSelfRow = (
   const name = selfUsername.trim();
   // No usable self-rank: a caller without a username has none (the gate handles that), and a
   // named caller may not be ranked yet (MAZER-ACCT-022). A named player still gets the pinned
-  // You row, with a dash for rank and level, so Edit name stays reachable. An unnamed one gets none.
+  // You row, with a dash for rank and level, so they see their own name. An unnamed one gets none.
   if (selfRank === null || !selfRank.hasUsername || selfRank.rank === null) {
     if (name.length === 0) {
       return null;
@@ -252,7 +255,6 @@ export interface LegacyLeaderboardViewOptions {
 export type LegacyLeaderboardActionId =
   | 'retry-username'
   | 'retry-page'
-  | 'edit-username'
   | 'sign-in';
 
 export interface LegacyLeaderboardAction {
@@ -277,7 +279,7 @@ export interface LegacyLeaderboardStateModel {
   heading: string | null;
   text: string;
   tone: 'info' | 'muted' | 'error';
-  /** At most one action (Retry / Edit name / Sign in). */
+  /** At most one action (Retry / Sign in). */
   action: LegacyLeaderboardAction | null;
 }
 
@@ -302,6 +304,8 @@ export interface LegacyLeaderboardViewModel {
   rows: readonly LegacyLeaderboardRowModel[];
   /** The pinned You row; null until the player has a rank. */
   selfRow: LegacyLeaderboardSelfRowModel | null;
+  /** The plain line under the You row pointing to Profile (MAZER-ACCT-047); null without a You row. */
+  selfNameHint: string | null;
   skeletonRowCount: number;
   /** The designed state block (replaces the list), or null while rows are shown. */
   state: LegacyLeaderboardStateModel | null;
@@ -311,7 +315,6 @@ export interface LegacyLeaderboardViewModel {
 
 const RETRY_USERNAME: LegacyLeaderboardAction = Object.freeze({ id: 'retry-username', label: LEGACY_LEADERBOARD_COPY.retry });
 const RETRY_PAGE: LegacyLeaderboardAction = Object.freeze({ id: 'retry-page', label: LEGACY_LEADERBOARD_COPY.retry });
-const EDIT_USERNAME: LegacyLeaderboardAction = Object.freeze({ id: 'edit-username', label: LEGACY_LEADERBOARD_COPY.editName });
 const SIGN_IN: LegacyLeaderboardAction = Object.freeze({ id: 'sign-in', label: LEGACY_LEADERBOARD_COPY.signIn });
 
 const base = (
@@ -326,6 +329,7 @@ const base = (
   phase,
   rows: [],
   selfRow: null,
+  selfNameHint: null,
   skeletonRowCount: 0,
   state: null,
   ...patch
@@ -335,10 +339,8 @@ const COPY = LEGACY_LEADERBOARD_COPY;
 
 const STATES = Object.freeze({
   empty: { action: null, heading: COPY.emptyHeading, kind: 'empty', text: COPY.emptyBody, tone: 'muted' },
-  // Same block for a named player: Edit name stays reachable with an empty board (MAZER-ACCT-022).
-  emptyNamed: { action: EDIT_USERNAME, heading: COPY.emptyHeading, kind: 'empty', text: COPY.emptyBody, tone: 'muted' },
   error: { action: RETRY_PAGE, heading: COPY.errorHeading, kind: 'error', text: COPY.errorBody, tone: 'error' },
-  needsUsername: { action: EDIT_USERNAME, heading: COPY.needsUsernameHeading, kind: 'needs-username', text: COPY.needsUsernameBody, tone: 'muted' },
+  needsUsername: { action: null, heading: COPY.needsUsernameHeading, kind: 'needs-username', text: COPY.needsUsernameBody, tone: 'muted' },
   notSetUp: { action: RETRY_PAGE, heading: COPY.notSetUpHeading, kind: 'not-set-up', text: COPY.notSetUpBody, tone: 'muted' },
   offline: { action: RETRY_PAGE, heading: COPY.offlineHeading, kind: 'offline', text: COPY.offlineBody, tone: 'info' },
   profileLoading: { action: null, heading: null, kind: 'profile-loading', text: COPY.profileLoading, tone: 'info' },
@@ -403,12 +405,13 @@ export const buildLegacyLeaderboardViewModel = (
   }
 
   if (loaded.length === 0) {
-    return boardBase('empty', { state: state.selfUsername.trim().length > 0 ? STATES.emptyNamed : STATES.empty });
+    return boardBase('empty', { state: STATES.empty });
   }
 
   return boardBase('ready', {
     columns: { level: COPY.columnLevel, player: COPY.columnPlayer, rank: COPY.columnRank },
     rows: loaded.map((entry) => buildRow(entry, usernameMaxChars)),
+    selfNameHint: selfRow === null ? null : COPY.selfNameHint,
     selfRow
   });
 };

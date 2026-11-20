@@ -192,8 +192,9 @@ describe('leaderboard plan: specifics', () => {
       expect(plan.stateBlock).not.toBeNull();
       expect(plan.card.height).toBeLessThan(plan.panel.height);
     }
-    // The fixture player is named, so the empty board offers Edit name (MAZER-ACCT-022).
-    expect(find('390x844 empty').stateBlock!.action).not.toBeNull();
+    // No name editor on the leaderboard (MAZER-ACCT-047): the empty board has no action.
+    expect(find('390x844 empty').stateBlock!.action).toBeNull();
+    expect(find('390x844 needs username').stateBlock!.action).toBeNull();
     expect(find('390x844 error').stateBlock!.action).not.toBeNull();
   });
 

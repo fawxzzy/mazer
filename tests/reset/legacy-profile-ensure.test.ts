@@ -13,9 +13,7 @@ import {
 } from '../../src/legacy-runtime/legacyRemoteProgression';
 import {
   claimLegacyProfileEnsureAttempt,
-  classifyLegacyUsernameSaveError,
   ensureLegacyRemoteProfile,
-  isLegacyProfileMissingError,
   resetLegacyProfileEnsureAttemptsForTests
 } from '../../src/legacy-runtime/legacyProfileEnsure';
 import { LEGACY_DEFAULTS } from '../../src/legacy-runtime/legacyDefaults';
@@ -152,29 +150,6 @@ describe('ensureLegacyRemoteProfile', () => {
     expect(claimLegacyProfileEnsureAttempt('settings-write', USER_ID)).toBe(false);
     expect(claimLegacyProfileEnsureAttempt('settings-write', 'someone-else')).toBe(true);
     expect(claimLegacyProfileEnsureAttempt('other-scope', USER_ID)).toBe(true);
-  });
-});
-
-describe('username save error mapping', () => {
-  test.each([
-    [{ code: '23505', message: 'duplicate key value violates unique constraint' }, 'taken'],
-    [{ message: 'duplicate key value' }, 'taken'],
-    [{ code: '22023', message: 'MAZER_USERNAME_INVALID' }, 'invalid'],
-    [{ code: '28000', message: 'mazer_set_username account mismatch' }, 'try-again'],
-    [{ message: 'Failed to fetch' }, 'try-again'],
-    [{ message: 'Load failed' }, 'try-again'],
-    [{ code: 'PGRST301', message: 'JWT expired' }, 'failed'],
-    [{ code: '42501', message: 'permission denied' }, 'failed'],
-    [null, 'failed']
-  ] as const)('%j maps to %s', (error, kind) => {
-    expect(classifyLegacyUsernameSaveError(error)).toBe(kind);
-  });
-
-  test('recognises the missing-profile error by code or sentinel', () => {
-    expect(isLegacyProfileMissingError({ code: 'P0002', message: 'x' })).toBe(true);
-    expect(isLegacyProfileMissingError({ message: 'MAZER_PROFILE_MISSING' })).toBe(true);
-    expect(isLegacyProfileMissingError({ code: '23505', message: 'taken' })).toBe(false);
-    expect(isLegacyProfileMissingError(null)).toBe(false);
   });
 });
 
