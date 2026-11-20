@@ -224,7 +224,8 @@ export class LegacyMenuDropdownController {
       if (this.state.open) {
         graphics.setAlpha(1).setScale(1);
       } else {
-        graphics.setAlpha(Math.max(this.host.blinkAlpha(time, active), progress)).setScale(1);
+        // MAZER-UI-097: a pressed toggle holds full alpha so C's pressed ring and cyan lines read through the blink.
+        graphics.setAlpha(pressed ? 1 : Math.max(this.host.blinkAlpha(time, active), progress)).setScale(1);
       }
       if (this.closeRebuildPending && !this.isShown(time)) {
         this.closeRebuildPending = false;
