@@ -16,6 +16,7 @@ import {
   GEOMETRY_BUDGET_BASE_CANDIDATES,
   GEOMETRY_BUDGET_WINDOW,
   GEOMETRY_BUDGET_CEILING,
+  scaleGeometryBudgetFelt,
   GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS,
   GEOMETRY_BUDGET_TIE_RETRY_BASES,
   GEOMETRY_BUDGET_TUNE_ATTEMPTS,
@@ -23,6 +24,7 @@ import {
   resolveGeometryBudgetCandidateSeed,
   resolveGeometryBudgetFeltLevel,
   resolveGeometryBudgetForks,
+  resolveGeometryBudgetBoardFeltPermille,
   resolveGeometryBudgetBoardFillFloor,
   resolveGeometryBudgetFillFloor,
   resolveGeometryBudgetFringeCells,
@@ -661,8 +663,12 @@ const selectLegacyGeometryBudgetMaze = (
   const feltLevel = resolveGeometryBudgetFeltLevel(budgetLevel);
   const fringeCells = resolveGeometryBudgetFringeCells(budgetLevel);
   const fillFloor = resolveGeometryBudgetFillFloor(budgetLevel);
-  const gateTarget = resolveGeometryBudgetTarget(feltLevel);
-  const routeTarget = resolveGeometryBudgetRouteTarget(feltLevel);
+  // MAZER-UI-098: a size-rule-2 board past the reference scale grows its felt targets with its cells (1000 = unchanged).
+  const feltPermille = generationProfile.feltScalesWithBoard === true ? resolveGeometryBudgetBoardFeltPermille(scale) : 1000;
+  const unscaledGateTarget = resolveGeometryBudgetTarget(feltLevel);
+  const gateTarget = unscaledGateTarget === null ? null : scaleGeometryBudgetFelt(unscaledGateTarget, feltPermille);
+  const routeTarget = scaleGeometryBudgetFelt(resolveGeometryBudgetRouteTarget(feltLevel), feltPermille);
+  const feltCeiling = scaleGeometryBudgetFelt(GEOMETRY_BUDGET_CEILING, feltPermille);
   const maxBranch = resolveGeometryBudgetMaxBranch(feltLevel);
   const routeBranch = resolveGeometryBudgetRouteBranch(feltLevel);
   const forks = resolveGeometryBudgetForks(feltLevel);
@@ -704,7 +710,7 @@ const selectLegacyGeometryBudgetMaze = (
     const baseProfile = profileWithRungs(baseRungs);
     // Every maze is double-lured and held to the reverse floor of its level and wrap rungs
     // (legacyGeometryBudget.ts).
-    const reverseFloor = resolveGeometryBudgetReverseFloor(feltLevel, baseRungs);
+    const reverseFloor = scaleGeometryBudgetFelt(resolveGeometryBudgetReverseFloor(feltLevel, baseRungs), feltPermille);
     const base = buildLegacyRuntimeMazeForMode(mode, scale, candidateSeed, baseProfile, aspectRatio);
     searched += 1;
     let tuned: ReturnType<typeof tuneMazeFeltToTarget> | null = null;
@@ -724,7 +730,7 @@ const selectLegacyGeometryBudgetMaze = (
         base,
         gateTarget,
         resolveGeometryBudgetCandidateSeed(seed, feltLevel, GEOMETRY_BUDGET_BASE_CANDIDATES + index),
-        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling: GEOMETRY_BUDGET_CEILING, wrapPricePercent, bleedGatePrice, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor: resolveGeometryBudgetBoardFillFloor(fillFloor, base.width * base.height), reverseFloor }
+        { overshoot: GEOMETRY_BUDGET_WINDOW, routeTarget, maxBranch, routeBranch, forks, loops, feltCeiling, wrapPricePercent, bleedGatePrice, fringeCells, attempts: GEOMETRY_BUDGET_TUNE_ATTEMPTS, doubleLure: true, straightBranches: true, fillFloor: resolveGeometryBudgetBoardFillFloor(fillFloor, base.width * base.height), reverseFloor }
       );
       distance = tuned.windowDistance;
       // A landed maze whose number is a coin flip for the explorer (a looped maze that

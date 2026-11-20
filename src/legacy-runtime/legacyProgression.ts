@@ -1013,7 +1013,9 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   if (scaleContext?.sizeRule === undefined || scaleContext.sizeRule === 1) {
     return profile;
   }
-  return { ...profile, minGridAxis: resolveLegacyBoardSizeRuleSpec(scaleContext.sizeRule).minGridAxis };
+  // Rule 2 also grows the felt targets with its late boards (legacyGeometryBudget.ts, board felt), so a board
+  // bigger than the one the ladder was calibrated on is filled, not left a small maze in an empty field.
+  return { ...profile, minGridAxis: resolveLegacyBoardSizeRuleSpec(scaleContext.sizeRule).minGridAxis, feltScalesWithBoard: true };
 };
 
 // MAZER-MENU-BLEED (2026-11-19, owner): the main-menu demo follows the SAME bleed rules as play. MAZER-VIS-052 gave

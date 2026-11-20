@@ -105,6 +105,10 @@ export interface LegacyMazeGenerationProfile {
   // MAZER-UI-098: the smallest grid axis for this board (15..25). Absent keeps the floor of 25. Set only by the
   // play surface under size rule 2, whose early boards are smaller than 25 on their short axis.
   minGridAxis?: number;
+  // MAZER-UI-098: true scales a ladder level's felt targets with the board past the reference board
+  // (legacyGeometryBudget.ts, resolveGeometryBudgetBoardFeltPermille). Set only on size-rule-2 play profiles,
+  // whose late boards outgrow the board the felt ladder was calibrated on. Absent keeps every target exactly.
+  feltScalesWithBoard?: true;
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -408,6 +412,7 @@ export const normalizeLegacyMazeGenerationProfile = (
       ? { minGridAxis: resolveMinGridAxis(profile.minGridAxis) }
       : {}
   ),
+  ...(profile?.feltScalesWithBoard === true ? { feltScalesWithBoard: true as const } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,

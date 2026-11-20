@@ -18,7 +18,9 @@ import {
   measureGeometryBudgetProxy,
   resolveGeometryBudgetProfile,
   resolveGeometryBudgetRungCount,
-  resolveGeometryBudgetTarget
+  resolveGeometryBudgetBoardFeltPermille,
+  resolveGeometryBudgetTarget,
+  scaleGeometryBudgetFelt
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
@@ -330,8 +332,10 @@ describe('geometry budget felt tuning (realized felt difficulty)', () => {
         previousHeight = maze.height;
         if (level >= LEGACY_BOARD_SIZE_RULE2_CAP_LEVEL) { cappedDimensions.add(`${maze.width}x${maze.height}`); }
         const target = resolveGeometryBudgetTarget(Math.min(level, LAST_BUDGET_LEVEL))!;
-        expect(felt).toBeGreaterThanOrEqual(target);
-        expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
+        // Rule 2 board felt: past the reference scale the level's target grows with the board's cells.
+        const boardTarget = scaleGeometryBudgetFelt(target, resolveGeometryBudgetBoardFeltPermille(scale));
+        expect(felt).toBeGreaterThanOrEqual(boardTarget);
+        expect(felt).toBeLessThanOrEqual(boardTarget + GEOMETRY_BUDGET_WINDOW);
         // The fringe (zero-felt-cost stubs) is exact for the level, and absent up to the felt saturation.
         expect((maze as { fringeStats?: { cells: number } }).fringeStats?.cells ?? 0).toBe(resolveGeometryBudgetFringeCells(level));
         if (level <= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL) {

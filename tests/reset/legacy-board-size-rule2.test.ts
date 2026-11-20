@@ -16,6 +16,16 @@ import {
   resolveLegacyAdaptiveUnderTargetScale
 } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
+  GEOMETRY_BUDGET_FELT_REFERENCE_SCALE,
+  GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
+  GEOMETRY_BUDGET_MIN_STEP,
+  GEOMETRY_BUDGET_WINDOW,
+  resolveGeometryBudgetBoardFeltPermille,
+  resolveGeometryBudgetTarget,
+  scaleGeometryBudgetFelt
+} from '../../src/legacy-runtime/legacyGeometryBudget';
+import { measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
+import {
   LEGACY_MIN_GRID_AXIS,
   normalizeGridDimension,
   normalizeLegacyMazeGenerationProfile
@@ -215,4 +225,72 @@ describe('MAZER-UI-098 board size rule 2: adaptive retry', () => {
       expect(resolveLegacyAdaptiveUnderTargetScale(scale)).toBeGreaterThanOrEqual(Math.floor(scale));
     }
   });
+});
+
+// MAZER-UI-098 board felt: the felt ladder was calibrated on scale-35-to-40 boards. Rule 2 grows the play board to
+// scale 88, so past the reference scale a level's felt targets grow with the board's cells; without it floor share
+// fell from 31-40 percent to 15 at level 250 (a small maze in an empty field).
+describe('MAZER-UI-098 board size rule 2: board felt', () => {
+  test('the felt factor is exactly 1000 up to the reference scale, then (scale / 38)^2 and nondecreasing', () => {
+    expect(GEOMETRY_BUDGET_FELT_REFERENCE_SCALE).toBe(38);
+    for (const scale of [0, 1, 22, 35, 37.9, 38, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(resolveGeometryBudgetBoardFeltPermille(scale)).toBe(1000);
+    }
+    expect(resolveGeometryBudgetBoardFeltPermille(76)).toBe(4000);
+    expect(resolveGeometryBudgetBoardFeltPermille(88)).toBe(5362);
+    let previous = 1000;
+    for (let level = 1; level <= 300; level += 1) {
+      const permille = resolveGeometryBudgetBoardFeltPermille(resolveLegacyBoardScaleForLevelRule2(level));
+      expect(permille).toBeGreaterThanOrEqual(previous);
+      previous = permille;
+    }
+    expect(scaleGeometryBudgetFelt(901, 1000)).toBe(901);
+    expect(scaleGeometryBudgetFelt(901, 999)).toBe(901);
+    expect(scaleGeometryBudgetFelt(901, 5362)).toBe(4831);
+  });
+
+  test('scaled level targets still rise by at least the schedule step on every phone and desktop', () => {
+    for (const viewport of VIEWPORTS) {
+      let previous = 0;
+      for (let level = 2; level <= GEOMETRY_BUDGET_FELT_SATURATION_LEVEL; level += 1) {
+        const { scale } = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), { surface: 'play', viewport });
+        const target = scaleGeometryBudgetFelt(resolveGeometryBudgetTarget(level)!, resolveGeometryBudgetBoardFeltPermille(scale));
+        expect(target - previous).toBeGreaterThanOrEqual(GEOMETRY_BUDGET_MIN_STEP);
+        previous = target;
+      }
+    }
+  });
+
+  test('only a rule-2 profile scales its felt; rule 1 and the menu demo keep every target', () => {
+    const track = trackForLevel(200);
+    expect(resolveLegacyMazeGenerationProfileForProgression(track).feltScalesWithBoard).toBeUndefined();
+    expect(resolveLegacyMazeGenerationProfileForProgression(track, { fraction: 1, sizeRule: 1 }).feltScalesWithBoard).toBeUndefined();
+    expect(resolveLegacyMazeGenerationProfileForProgression(track, { fraction: 1, sizeRule: 2 }).feltScalesWithBoard).toBe(true);
+    expect(normalizeLegacyMazeGenerationProfile({}).feltScalesWithBoard).toBeUndefined();
+  });
+
+  test('late boards stay filled: floor share at least 30 percent from level 160 to the cap, on the exact scaled target', () => {
+    for (const viewport of VIEWPORTS.filter((entry) => ['390x844', '412x915', '1280x720'].includes(entry.name))) {
+      for (const level of [160, 200, 250]) {
+        const track = trackForLevel(level);
+        const detail = resolveLegacyProgressionScaleDetail(50, track, { surface: 'play', viewport });
+        const plan = planLegacyBoard(viewport, detail.scale, 'play', 50, resolveLegacyBoardSizeRuleSpec(detail.sizeRule).minGridAxis);
+        const maze = createLegacyRuntimeMazeForMode(
+          'play',
+          detail.scale,
+          777 + level,
+          resolveLegacyMazeGenerationProfileForProgression(track, { fraction: detail.fraction, sizeRule: detail.sizeRule }),
+          {},
+          plan.aspectRatio
+        );
+        const floor = maze.grid.reduce((sum, row) => sum + row.filter(Boolean).length, 0);
+        expect(floor / (maze.width * maze.height)).toBeGreaterThanOrEqual(0.3);
+        const target = scaleGeometryBudgetFelt(resolveGeometryBudgetTarget(level)!, resolveGeometryBudgetBoardFeltPermille(detail.scale));
+        const felt = measurePricedFeltSteps(maze);
+        expect(felt).toBeGreaterThanOrEqual(target);
+        expect(felt).toBeLessThanOrEqual(target + GEOMETRY_BUDGET_WINDOW);
+        expect(maze.generation?.selection?.selectedDistance).toBe(0);
+      }
+    }
+  }, 120000);
 });
