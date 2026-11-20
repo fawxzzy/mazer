@@ -58,12 +58,13 @@ describe('path.chip is derived, not a free hex', () => {
 });
 
 describe('style ids', () => {
-  test('chip is the default and unknown values fall back to it', () => {
-    expect(DEFAULT_BOARD_TILE_STYLE).toBe('chip');
-    expect(BOARD_TILE_STYLE_IDS).toEqual(['chip', 'trace']);
+  test('starlit is the default (MAZER-VIS-064), chip and trace stay selectable, unknown values fall back', () => {
+    expect(DEFAULT_BOARD_TILE_STYLE).toBe('starlit');
+    expect(BOARD_TILE_STYLE_IDS).toEqual(['starlit', 'chip', 'trace']);
     expect(resolveBoardTileStyleId('trace')).toBe('trace');
-    expect(resolveBoardTileStyleId('nope')).toBe('chip');
-    expect(resolveBoardTileStyleId(undefined)).toBe('chip');
+    expect(resolveBoardTileStyleId('chip')).toBe('chip');
+    expect(resolveBoardTileStyleId('nope')).toBe('starlit');
+    expect(resolveBoardTileStyleId(undefined)).toBe('starlit');
   });
 });
 

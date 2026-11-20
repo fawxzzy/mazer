@@ -58,14 +58,14 @@ describe('bakeBoardTiles basics', () => {
     expect(result.scale).toBe(2);
     expect(result.pixelWidth).toBe(Math.round(result.width * 2));
     expect(result.hash).toMatch(/^[0-9a-f]{14}$/);
-    expect(result.style).toBe('chip');
+    expect(result.style).toBe('starlit');
     expect(BOARD_TILE_BAKE_VERSION).toContain('board-tile-bake');
   });
 });
 
 describe('determinism and rebuild skipping', () => {
   test('same input gives an identical draw list and hash, for both styles', () => {
-    for (const style of ['chip', 'trace'] as const) {
+    for (const style of ['starlit', 'chip', 'trace'] as const) {
       const a = bake(inputFor(maze, { style }));
       const b = bake(inputFor(maze, { style }));
       expect(a.rec.log).toEqual(b.rec.log);
@@ -91,6 +91,7 @@ describe('determinism and rebuild skipping', () => {
   test('hash changes with style, dpr, tile size, grid and docks but not with reducedMotion', () => {
     const base = computeBoardTileBakeHash(inputFor(maze));
     expect(computeBoardTileBakeHash(inputFor(maze, { style: 'trace' }))).not.toBe(base);
+    expect(computeBoardTileBakeHash(inputFor(maze, { style: 'chip' }))).not.toBe(base);
     expect(computeBoardTileBakeHash(inputFor(maze, { devicePixelRatio: 3 }))).not.toBe(base);
     expect(computeBoardTileBakeHash(inputFor(maze, { tileSize: 15 }))).not.toBe(base);
     const flipped = maze.map((row) => [...row]);
@@ -98,7 +99,7 @@ describe('determinism and rebuild skipping', () => {
     expect(computeBoardTileBakeHash(inputFor(flipped))).not.toBe(base);
     expect(computeBoardTileBakeHash(inputFor(maze, { docks: [{ x: 1, y: 1, side: 'left' }] }))).not.toBe(base);
     expect(computeBoardTileBakeHash(inputFor(maze, { reducedMotion: true }))).toBe(base);
-    expect(computeBoardTileBakeHash(inputFor(maze, { style: 'chip' }))).toBe(base);
+    expect(computeBoardTileBakeHash(inputFor(maze, { style: 'starlit' }))).toBe(base);
   });
 
   test('cache skips the rebuild when nothing changed and rebuilds when something did', () => {

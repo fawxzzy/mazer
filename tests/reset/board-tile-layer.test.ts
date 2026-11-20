@@ -19,20 +19,21 @@ import { braidedMazeGrid, contrast, inputFor, wrapDockMaze } from '../render/sup
 const MENU_SCENE = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n?/g, '\n');
 
 describe('board tile style flag resolver', () => {
-  test('defaults to Chip, and ?tileStyle=trace selects the alternate', () => {
-    expect(DEFAULT_BOARD_TILE_STYLE).toBe('chip');
+  test('defaults to Starlit (MAZER-VIS-064); ?tileStyle=chip and ?tileStyle=trace select the alternates', () => {
+    expect(DEFAULT_BOARD_TILE_STYLE).toBe('starlit');
     expect(BOARD_TILE_STYLE_PARAM).toBe('tileStyle');
-    expect(resolveBoardTileStyleFromSearch('')).toBe('chip');
-    expect(resolveBoardTileStyleFromSearch(null)).toBe('chip');
+    expect(resolveBoardTileStyleFromSearch('')).toBe('starlit');
+    expect(resolveBoardTileStyleFromSearch(null)).toBe('starlit');
+    expect(resolveBoardTileStyleFromSearch('?tileStyle=starlit')).toBe('starlit');
     expect(resolveBoardTileStyleFromSearch('?tileStyle=chip')).toBe('chip');
     expect(resolveBoardTileStyleFromSearch('?tileStyle=trace')).toBe('trace');
     expect(resolveBoardTileStyleFromSearch('?a=1&tileStyle=trace&b=2')).toBe('trace');
   });
 
-  test('anything unrecognised falls back to Chip, never throws', () => {
-    expect(resolveBoardTileStyleFromSearch('?tileStyle=legacy')).toBe('chip');
-    expect(resolveBoardTileStyleFromSearch('?tileStyle=')).toBe('chip');
-    expect(resolveBoardTileStyleFromSearch('?tileStyle=TRACE')).toBe('chip');
+  test('anything unrecognised falls back to Starlit, never throws', () => {
+    expect(resolveBoardTileStyleFromSearch('?tileStyle=legacy')).toBe('starlit');
+    expect(resolveBoardTileStyleFromSearch('?tileStyle=')).toBe('starlit');
+    expect(resolveBoardTileStyleFromSearch('?tileStyle=TRACE')).toBe('starlit');
   });
 });
 
