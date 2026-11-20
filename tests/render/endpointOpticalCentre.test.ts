@@ -81,7 +81,7 @@ const same = (a: Rgba, b: Rgba): boolean => a[0] === b[0] && a[1] === b[1] && a[
 const near = (a: Rgba, b: Rgba): boolean => Math.abs(a[0] - b[0]) < 6 && Math.abs(a[1] - b[1]) < 6 && Math.abs(a[2] - b[2]) < 6;
 
 const inputFor = (cells: boolean[][], tileSize: number, devicePixelRatio: number, goal: BoardCell): BoardTileBakeInput => ({
-  grid: cells, width: cells[0]!.length, height: cells.length, tileSize, devicePixelRatio, goal
+  grid: cells, width: cells[0]!.length, height: cells.length, tileSize, devicePixelRatio, goal, style: 'chip'
 });
 
 const shapeKey = (t: ChipTileGeometry): string => (

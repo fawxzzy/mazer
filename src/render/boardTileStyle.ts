@@ -4,7 +4,8 @@
  * This module owns three things and nothing else:
  *   1. the render-local `board` colour group, built ONLY from the existing token registry
  *      (`designTokens` / `cyberArcadeMaterial`) -- no free hex literals live in this file;
- *   2. the geometry ratios (named constants) that the chip and trace styles are built from;
+ *   2. the geometry ratios (named constants) that the starlit, chip and trace styles are built from
+ *      (Starlit's own colours live in palette.ts `STARLIT_BEVEL_TILE`, the allowlisted colour home);
  *   3. `resolveBoardTileStyle(style, tileSize, dpr)`, which turns ratios into concrete CSS-pixel
  *      numbers snapped to the device-pixel grid (every line width is at least one device pixel).
  *
@@ -17,19 +18,25 @@
  * (docs/assets/reference/navigation-core-v2/README.md).
  */
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
+import { STARLIT_BEVEL_TILE } from './palette';
 import { PLAYER_COLOR } from './trailPalette';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 
-export type BoardTileStyleId = 'chip' | 'trace';
+/**
+ * 'starlit' = tile set H "Starlit Bevel" (MAZER-VIS-064, owner pick 2026-11-19): the Chip geometry with a crisp rim,
+ * a one-band bevel and sparse wall specks. 'chip' (the 2026-11-06 pick it replaces) and 'trace' stay drawable as
+ * alternates through the existing `?tileStyle=` switch (boardTileLayer.ts); they are not defaults.
+ */
+export type BoardTileStyleId = 'starlit' | 'chip' | 'trace';
 
-/** Owner-delegated default (reversible): flip by passing `style: 'trace'` to the bake. */
-export const DEFAULT_BOARD_TILE_STYLE: BoardTileStyleId = 'chip';
+/** Owner pick (MAZER-VIS-064): flip back by passing `style: 'chip'` (or `'trace'`) to the bake. */
+export const DEFAULT_BOARD_TILE_STYLE: BoardTileStyleId = 'starlit';
 
-export const BOARD_TILE_STYLE_IDS: readonly BoardTileStyleId[] = Object.freeze(['chip', 'trace'] as const);
+export const BOARD_TILE_STYLE_IDS: readonly BoardTileStyleId[] = Object.freeze(['starlit', 'chip', 'trace'] as const);
 
 /** Parses an untrusted value (setting, URL parameter) into a style id, falling back to the default. */
 export const resolveBoardTileStyleId = (value: unknown): BoardTileStyleId => (
-  value === 'trace' || value === 'chip' ? value : DEFAULT_BOARD_TILE_STYLE
+  value === 'starlit' || value === 'trace' || value === 'chip' ? value : DEFAULT_BOARD_TILE_STYLE
 );
 
 /* ------------------------------------------------------------------------------------------ */
@@ -134,10 +141,19 @@ export const boardMaterial = Object.freeze({
   playerEdge: cyberArcadeMaterial.signal.playerAccent,
   /** Trail reference colour used for the 3:1 contrast check (the real trail keeps its energy stops). */
   trailReference: cyberArcadeMaterial.rail.cyan,
-  white: cyberArcadeMaterial.rail.white
+  white: cyberArcadeMaterial.rail.white,
+  /** Tile set H "Starlit Bevel" surfaces (palette.ts STARLIT_BEVEL_TILE): floor, gate, rim/speck, bevel highlight and shade. */
+  starlit: STARLIT_BEVEL_TILE
 } as const);
 
 export type BoardMaterial = typeof boardMaterial;
+
+/** Rim and fill of a flat tile swatch (the Guide's tile icons) in the board's own tile colours for `style`. */
+export const resolveBoardSwatchColors = (style: BoardTileStyleId): { rim: number; fill: number } => {
+  if (style === 'trace') return { rim: boardMaterial.channelBorder, fill: boardMaterial.channel };
+  if (style === 'chip') return { rim: boardMaterial.rim, fill: boardMaterial.chip };
+  return { rim: boardMaterial.starlit.rim, fill: boardMaterial.starlit.floor };
+};
 
 /* ------------------------------------------------------------------------------------------ */
 /* geometry ratios (named, tile-relative unless suffixed Css/Px)                              */
@@ -179,6 +195,19 @@ export const BOARD_TILE_GEOMETRY = Object.freeze({
   dockDefaultLengthTiles: 3,
   /** Transparent margin around the board inside the bake so the rim glow is never clipped. */
   bakeEdgePadCss: 2,
+  /** Tile set H "Starlit Bevel" (MAZER-VIS-064): the options-page painter's numbers, unchanged. */
+  starlit: Object.freeze({
+    /** Bevel band (highlight top/left, shade bottom/right; the gate tile's sunken ring) as a share of the tile. */
+    bevelRatio: 0.07,
+    /** Alpha of the gate tile's highlight strips (its bottom and right inner edges). */
+    gateHighlightAlpha: 0.55,
+    /** Wall specks: square dots on about one wall cell in `speckEvery` (cell-hash picked, deterministic). */
+    speckRatio: 0.05,
+    speckMinCss: 0.6,
+    speckAlpha: 0.16,
+    speckEvery: 5,
+    speckCap: 600
+  }),
   trace: Object.freeze({
     channelRatio: 0.9,
     channelBorderCss: 1,
@@ -335,6 +364,12 @@ export interface ResolvedBoardTileStyle {
     readonly alphas: readonly number[];
     readonly defaultLength: number;
   };
+  readonly starlit: {
+    /** Bevel band width, whole device px, at least one. */
+    readonly bevel: number;
+    /** Wall speck side, whole device px, at least one. */
+    readonly speck: number;
+  };
   readonly trace: {
     readonly channelWidth: number;
     readonly channelBorderWidth: number;
@@ -418,6 +453,10 @@ export const resolveBoardTileStyle = (
       lintel: line(g.dockLintelCss),
       alphas: g.dockSliceAlphas,
       defaultLength: coord(T * g.dockDefaultLengthTiles)
+    }),
+    starlit: Object.freeze({
+      bevel: line(T * g.starlit.bevelRatio),
+      speck: line(Math.max(g.starlit.speckMinCss, T * g.starlit.speckRatio))
     }),
     trace: Object.freeze({
       channelWidth: line(T * tr.channelRatio),

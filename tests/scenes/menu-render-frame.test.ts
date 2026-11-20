@@ -2477,8 +2477,8 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
     expect(body).toContain('shouldDrawEndpointMarker(kind, this.player.x === point.x && this.player.y === point.y)');
   });
 
-  test('the board style flag defaults to Chip and reads ?tileStyle= through the shared resolver', () => {
-    expect(menuSceneSource).toContain("private boardTileStyle: BoardTileStyleId = 'chip';");
+  test('the board style flag defaults to the shared default (Starlit, MAZER-VIS-064) and reads ?tileStyle= through the shared resolver', () => {
+    expect(menuSceneSource).toContain('private boardTileStyle: BoardTileStyleId = DEFAULT_BOARD_TILE_STYLE;');
     expect(menuSceneSource).toContain('this.boardTileStyle = resolveBoardTileStyleFromSearch(');
   });
 
@@ -2492,8 +2492,8 @@ describe('Chip wiring: start/goal markers, trail underlay, board layer', () => {
     expect(menuSceneSource).not.toContain('boardBleedPathImages');
   });
 
-  test('the trail sits on a dark underlay on the Chip floor (amendment open item A8), drawn by the same trail compositor', () => {
-    expect(menuSceneSource).toContain("if (this.boardTileStyle === 'chip') {");
+  test('the trail sits on a dark underlay on the Chip and Starlit floors (amendment open item A8), drawn by the same trail compositor', () => {
+    expect(menuSceneSource).toContain("} else if (this.boardTileStyle !== 'trace') {");
     expect(menuSceneSource).toContain('drawTrailLayersToCanvasContext(this.trailCanvasTexture.context, segments, {');
     expect(menuSceneSource).toContain('underlayAlpha: LEGACY_TRAIL_UNDERLAY_ALPHA');
     expect(menuSceneSource).toContain('underlayWidth,');
