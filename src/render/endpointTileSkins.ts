@@ -10,7 +10,11 @@
  * description only, their drawing code lives in the design archive (`mazer-look-options-2026-11-19-v4`, outside this repo),
  * and they are built when the shop needs them. Nothing here reads or writes player data: there is no picker yet.
  *
- * START = SEED SPIRAL (default). A one-arm spiral of 26 beads, small and faint at the centre, larger and solid at the
+ * START = PINWHEEL (default since MAZER-VIS-065, Zac's pick F of that options page). Its geometry, clock and draw live in
+ * startPinwheel.ts; the play scene shows it as a strip baked once (startPinwheelLayer.ts), the Guide and other callers
+ * draw it through this module's painter. The Seed spiral below is now `retired` (still drawable).
+ *
+ * START = SEED SPIRAL (L5 default, retired by VIS-065). A one-arm spiral of 26 beads, small and faint at the centre, larger and solid at the
  * rim, that turns clockwise about once per 2.2 s and breathes in and out (its radius swings +-7 %, period 2.1 s). It is
  * deliberately NOT in phase with the end tile (the owner asked for a faster spin, desynced from the end tile). Colour: the
  * options-page green (#6DFF7C, `SEED_SPIRAL.color`, skin-local), each bead over a one-device-pixel dark keyline disc so it
@@ -64,8 +68,16 @@ export interface EndpointSkinEntry<Id extends string = string> {
   readonly drawable: boolean;
 }
 
-export type DrawableStartTileSkinId = 'seed-spiral' | 'pinwheel';
-export type StartTileSkinId = DrawableStartTileSkinId | 'floor-inlay' | 'portal-rings' | 'landing-pad';
+export type DrawableStartTileSkinId = 'blade-pinwheel' | 'seed-spiral' | 'pinwheel';
+export type StartTileSkinId = DrawableStartTileSkinId
+  | 'floor-inlay'
+  | 'portal-rings'
+  | 'landing-pad'
+  | 'ribbon-spiral'
+  | 'stepped-spiral'
+  | 'arrow-spiral'
+  | 'double-helix'
+  | 'carved-spiral';
 export type DrawableEndTileSkinId = 'twin-stars' | 'solid-star';
 export type EndTileSkinId = DrawableEndTileSkinId
   | 'inlay-star'
@@ -79,7 +91,7 @@ export type EndTileSkinId = DrawableEndTileSkinId
   | 'diamond-gem'
   | 'sun-rays';
 
-export const DEFAULT_START_TILE_SKIN: DrawableStartTileSkinId = 'seed-spiral';
+export const DEFAULT_START_TILE_SKIN: DrawableStartTileSkinId = 'blade-pinwheel';
 export const DEFAULT_END_TILE_SKIN: DrawableEndTileSkinId = 'twin-stars';
 
 const entry = <Id extends string>(
@@ -97,11 +109,19 @@ const entry = <Id extends string>(
 });
 
 export const START_TILE_SKINS: readonly EndpointSkinEntry<StartTileSkinId>[] = Object.freeze([
-  entry('seed-spiral', 'Seed spiral', 'A beaded spiral that breathes in and out as it turns.', 'default'),
+  // MAZER-VIS-065 (owner pick F, 2026-11-19): the default start look; geometry and draw code in startPinwheel.ts.
+  entry('blade-pinwheel', 'Pinwheel', 'Four tapered curved blades around a small pale diamond hub, turning and breathing.', 'default'),
+  entry('seed-spiral', 'Seed spiral', 'A beaded spiral that breathes in and out as it turns (the start tile from L5 to VIS-065).', 'retired'),
   entry('pinwheel', 'Pinwheel spiral', 'Two gold arms turning slowly in step with the end star (the start tile before L5).', 'retired'),
   entry('floor-inlay', 'Floor inlay', 'A two-arm spiral set into a faint plate, like it is printed on the floor.', 'archived'),
   entry('portal-rings', 'Portal rings', 'Four broken rings turning against each other around a pulsing centre.', 'archived'),
-  entry('landing-pad', 'Landing pad', 'Corner brackets and a ticking ring frame a small fast spiral.', 'archived')
+  entry('landing-pad', 'Landing pad', 'Corner brackets and a ticking ring frame a small fast spiral.', 'archived'),
+  // MAZER-VIS-065 options page (2026-11-19), designs A to E: kept for the shop; their drawing code is in the options archive.
+  entry('ribbon-spiral', 'Ribbon spiral', 'One tapered ribbon, thin and faint at the centre, wide and solid at the rim.', 'archived'),
+  entry('stepped-spiral', 'Stepped spiral', 'A square pixel spiral with a light running outward along it.', 'archived'),
+  entry('arrow-spiral', 'Arrow spiral', 'A spiral arm ending in an arrowhead pointing outward.', 'archived'),
+  entry('double-helix', 'Double helix', 'Two interleaved arms half a turn apart, one solid and one fainter.', 'archived'),
+  entry('carved-spiral', 'Carved spiral', 'A spiral groove carved into the tile with a lit lip and a glowing inlay.', 'archived')
 ]);
 
 export const END_TILE_SKINS: readonly EndpointSkinEntry<EndTileSkinId>[] = Object.freeze([

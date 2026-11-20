@@ -23,6 +23,7 @@ import {
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
 import { SEED_SPIRAL } from '../../src/render/endpointTileSkins';
+import { START_PINWHEEL } from '../../src/render/startPinwheel';
 import { resolveSharedBorderColor } from '../../src/render/trailPalette';
 import {
   braidedMazeGrid,
@@ -416,7 +417,8 @@ describe('markers', () => {
   test('draws with bounded work, no gradient and no shadow, for both styles', () => {
     for (const style of ['chip', 'trace'] as const) {
       const { rec, stats } = draw({ style });
-      expect(stats.paintOps).toBeLessThanOrEqual(16);
+      // MAZER-VIS-065: the Chip start (Pinwheel) is 9 fills here (was 5); the play scene shows it as a baked strip instead.
+      expect(stats.paintOps).toBeLessThanOrEqual(20);
       expect(stats.paintOps).toBe(countPaintOps(rec));
       expect(rec.count('save(')).toBe(1);
       expect(rec.count('restore(')).toBe(1);
@@ -537,8 +539,8 @@ describe('markers', () => {
   test('start marker is skipped while the player stands on it', () => {
     const on = draw({ player: { x: 1, y: 1 }, goal: undefined });
     const off = draw({ player: { x: 2, y: 1 }, goal: undefined });
-    // the default Seed spiral's bead colour (skin-local green, drawn as rgba()), by its channels
-    const beads = cssRgb(SEED_SPIRAL.color).slice('rgb('.length, -1);
+    // the default Pinwheel's blade green (drawn as rgba() fade fills), by its channels
+    const beads = cssRgb(START_PINWHEEL.color).slice('rgb('.length, -1);
     expect(on.rec.log.some((e) => e.includes(beads))).toBe(false);
     expect(off.rec.log.some((e) => e.includes(beads))).toBe(true);
   });
@@ -569,7 +571,12 @@ describe('markers', () => {
       ['start spiral on keyline', boardMaterial.start, boardMaterial.void],
       // the default Seed spiral's green beads (each over its own void keyline disc)
       ['seed spiral beads', SEED_SPIRAL.color, chip],
-      ['seed spiral beads on keyline', SEED_SPIRAL.color, boardMaterial.void]
+      ['seed spiral beads on keyline', SEED_SPIRAL.color, boardMaterial.void],
+      // the default Pinwheel (MAZER-VIS-065): solid blade green at the hub, the pale hub, both inside a void keyline
+      ['pinwheel blades', START_PINWHEEL.color, chip],
+      ['pinwheel blades on keyline', START_PINWHEEL.color, boardMaterial.void],
+      ['pinwheel hub', START_PINWHEEL.coreColor, chip],
+      ['pinwheel hub on keyline', START_PINWHEEL.coreColor, boardMaterial.void]
     ];
     console.info(`BOARD_TILE_CONTRAST ${rows.map(([n, f, b]) => `${n}: ${contrast(f, b).toFixed(2)}`).join(' | ')}`);
     for (const [name, fg, bg] of rows) {

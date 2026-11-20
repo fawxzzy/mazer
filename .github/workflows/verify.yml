@@ -79,6 +79,7 @@ jobs:
           tests/render/starlitBevelBake.test.ts
           tests/render/endpointTilePixels.test.ts
           tests/render/endpointTileSkins.test.ts
+          tests/render/startPinwheel.test.ts
           tests/reset/start-arrow-direction.test.ts
           tests/reset/trail-iridescence.test.ts
           tests/render/palette.test.ts
