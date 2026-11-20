@@ -116,19 +116,10 @@ import {
   resolveTrailWidthScale,
   sampleIridescentTrail
 } from '../render/trailIridescence';
-import {
-  createBackdropStarRandom,
-  resolveBackdropStarDraw,
-  resolveBackdropTwinkleAlpha,
-  resolveBackdropTwinkleSize
-} from '../render/backdropStars';
-import {
-  capBackdropStarAlpha,
-  isBackdropRainbowStar,
-  resolveBackdropRainbowColor,
-  stepBackdropColourRedraw
-} from '../render/backdropStarHue';
-import { BackdropStarDrawList, installBackdropStarCanvasRenderer } from '../render/backdropStarBatch';
+import { createBackdropStarRandom } from '../render/backdropStars';
+import { stepBackdropColourRedraw } from '../render/backdropStarHue';
+import { BackdropStarShapeList, fillBackdropStarShapeList } from '../render/backdropStarShapes';
+import { installBackdropStarSpriteRenderer } from '../render/backdropStarSprites';
 import { SHARED_BACKDROP_PHASER } from '../render/sharedBackdrop';
 import { drawChipCell, resolveChipGridGeometry } from '../render/chipTileGraphics';
 import { PhaserGraphicsTileContext } from '../render/phaserTileContext';
@@ -2065,8 +2056,8 @@ export class MenuScene extends Phaser.Scene {
   private menuAiProgressionBadgeTextBounds: VisualRect | null = null;
   private menuAiProgressionBadgeTextFits = false;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
-  // MAZER-PERF-014: the star circles the backdrop Graphics paints (src/render/backdropStarBatch.ts).
-  private readonly backdropStarList = new BackdropStarDrawList();
+  // MAZER-VIS-066: the shaped stars the backdrop Graphics paints (src/render/backdropStarShapes.ts, backdropStarSprites.ts).
+  private readonly backdropStarShapes = new BackdropStarShapeList();
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
   // Z-order anchor for the board layer (edgeMarkers.test pins it). The board's tiles are NOT drawn
@@ -2495,7 +2486,7 @@ export class MenuScene extends Phaser.Scene {
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
-    installBackdropStarCanvasRenderer(this.backdropGraphics, this.backdropStarList);
+    installBackdropStarSpriteRenderer(this.backdropGraphics, this.backdropStarShapes);
     // See src/render/pixelAlignment.ts: no half-pixel camera offset on odd-sized viewports.
     alignCameraToWholePixels(this.cameras.main);
     this.boardZoomContainer = this.add.container(0, 0);
@@ -7812,73 +7803,10 @@ export class MenuScene extends Phaser.Scene {
       mainCamera.setBackgroundColor(fieldColor);
     }
     const backdropMotionEnabled = resolveBackdropMotion(this.prefersLegacyReducedMotion());
-    const animationTime = backdropMotionEnabled ? this.time.now : 0;
-    // MAZER-PERF-014: circles go to a flat draw list the backdrop Graphics paints with cached colour strings and
-    // globalAlpha (src/render/backdropStarBatch.ts); same circles, same order, same colour and alpha as fillStyle/fillCircle.
-    const starList = this.backdropStarList;
-    starList.reset();
-    for (const star of this.stars) {
-      const pixelX = Math.round(star.x * width);
-      const pixelY = Math.round(star.y * height);
-      const coreSize = Math.max(1, Math.round(star.radius));
-      // Confirmed real defect (owner-reported: background stars "switch
-      // colors like a strobe" instead of smoothly twinkling): this used to
-      // be derived fresh every frame from the star's own (continuously
-      // drifting) position -- `((star.x * 9973) + (star.y * 6151)) % 1` --
-      // which looks like a stable position-keyed hash but isn't: measured
-      // live, a star moving at its own ordinary drift speed produced an
-      // uncorrelated new value on almost every real frame, silently
-      // re-randomizing the twinkle period, the color bucket below, and the
-      // sparkle hue every frame instead of giving each star one fixed
-      // identity. Now reads the star's own persisted seed (legacyMenuBackdrop.ts's
-      // own field doc has the measured trace) -- stable for the star's
-      // whole life, reassigned only at genuine rebirth.
-      const starSeed = star.seed;
-      // Was a small (68-100%) alpha-only wobble on a shared 1300ms period --
-      // reported as flickering badly, and asked to "make their size animate
-      // too and fade in and out." Each star gets its own period (+-25%,
-      // seeded off starSeed so they don't all pulse in lockstep) and a much
-      // wider swing (down to near-invisible, not just dimmer) eased through
-      // smoothstep so it lingers at the bright/dim ends and passes quickly
-      // through the middle -- reads as a genuine twinkle in and out, not a
-      // constant shimmer. sizeMultiplier rides the same eased cycle so a
-      // star visibly shrinks as it dims, not just fades.
-      const twinklePeriodMs = 2200 * (0.75 + (starSeed * 0.5));
-      const twinkleRaw = backdropMotionEnabled
-        ? (Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2) + 1) / 2
-        : 0.5;
-      const twinklePhase = twinkleRaw * twinkleRaw * (3 - (2 * twinkleRaw));
-      // A star never fully vanishes at the dim end of its twinkle (see backdropStars.ts).
-      const twinkleAlpha = star.alpha * resolveBackdropTwinkleAlpha(twinklePhase);
-      const sizeMultiplier = resolveBackdropTwinkleSize(twinklePhase);
-      // A fixed ~20 % of stars (chosen from the stable seed) keep a dim, slowly drifting rainbow hue (MAZER-VIS-035,
-      // src/render/backdropStarHue.ts). The hue reads the scene clock in every motion mode: colour is not motion.
-      const rainbowStar = isBackdropRainbowStar(starSeed);
-      const starColor = rainbowStar
-        ? resolveBackdropRainbowColor(starSeed, this.time.now)
-        : (starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff));
-      const starAlpha = capBackdropStarAlpha(twinkleAlpha * palette.starAlphaScale, rainbowStar);
-      // The coloured four-point sparkles that the nearest, biggest stars used to get are retired for good (owner,
-      // 2026-11-10: "no more stagnant stars in the background"), but every star is still drawn: the nearest ones
-      // as brighter "hero" dots with a soft round halo, the rest as dots; see src/render/backdropStars.ts.
-      const starDraw = resolveBackdropStarDraw(coreSize);
-      // Round, not square: the vast majority of stars (every one below the
-      // sparkle threshold above -- the bulk of the field) used to be a flat
-      // fillRect square, which reads as a blocky pixel rather than a point
-      // of light ("the stars in the starfield kinda suck"). A soft circle
-      // with the same two-pass halo underneath is a small, cheap change
-      // that makes every single star in the field read as an actual star
-      // instead of a tiny tile.
-      const starRadius = (coreSize / 2) * sizeMultiplier;
-      if (starDraw === 'hero') {
-        starList.fillCircle(starColor, starAlpha * 0.1, pixelX, pixelY, starRadius + 5);
-        starList.fillCircle(starColor, starAlpha * 0.16, pixelX, pixelY, starRadius + 3);
-        starList.fillCircle(starColor, starAlpha * 0.24, pixelX, pixelY, starRadius + 1.5);
-      } else if (coreSize > 1) {
-        starList.fillCircle(starColor, starAlpha * 0.18, pixelX, pixelY, starRadius + 1.5);
-      }
-      starList.fillCircle(starColor, starAlpha, pixelX, pixelY, Math.max(0.6, starRadius));
-    }
+    // MAZER-VIS-066: real star shapes (shape set "Mixed") with the lettering rainbow sweep, baked once and blitted
+    // (src/render/backdropStarShapes.ts, backdropStarSprites.ts). Each star reads its persisted seed; the colour reads the
+    // scene clock in every motion mode, so Reduce Motion stops the drift and twinkle but the rainbow keeps shifting.
+    fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.time.now, backdropMotionEnabled, palette.starAlphaScale);
 
     this.backdropDirty = false;
   }

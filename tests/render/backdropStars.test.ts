@@ -11,7 +11,7 @@ import {
   resolveBackdropTwinkleSize
 } from '../../src/render/backdropStars';
 import { createLegacyMenuBackdropStars } from '../../src/legacy-runtime/legacyMenuBackdrop';
-import { BackdropStarDrawList } from '../../src/render/backdropStarBatch';
+import { BackdropStarShapeList } from '../../src/render/backdropStarShapes';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
 vi.mock('phaser', () => ({
@@ -28,7 +28,9 @@ vi.mock('phaser', () => ({
  * are retired) and, after PR #411 drew too few: "why are there no more background stars? all i said was no more
  * stagnant ones". Also "there's weird symbols in the background that need removed".
  */
-describe('backdrop stars: every star is drawn as a round point of light, nothing glyph-like is', () => {
+// MAZER-VIS-066 (2026-11-19) now draws real star shapes (tests/render/backdropStarShapes.test.ts); the field policy
+// below (draw tiers, twinkle bands, seeded layout) is still what feeds that painter.
+describe('backdrop stars: field policy (every star drawn, twinkle bands, seeded layout)', () => {
   test('no star is ever hidden: small ones are dots, the nearest ones are hero dots', () => {
     for (let core = 1; core <= 12; core += 1) {
       const draw = resolveBackdropStarDraw(core);
@@ -66,7 +68,7 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
     }
   });
 
-  test.each([true, false])('MenuScene.drawBackdrop draws only the field, round dots and hero halos (motion %s)', (motion) => {
+  test.each([true, false])('MenuScene.drawBackdrop draws only the field and the shaped star list (motion %s)', (motion) => {
     const calls: string[] = [];
     const graphics = new Proxy({}, {
       get: (_target, name: string) => (...args: unknown[]) => {
@@ -86,7 +88,7 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
       layout: { width: 390, height: 844 },
       cameras: { main: mainCamera },
       backdropGraphics: graphics,
-      backdropStarList: new BackdropStarDrawList(),
+      backdropStarShapes: new BackdropStarShapeList(),
       settings: { darkMode: true, toggleAnimatedBackdrop: motion },
       prefersLegacyReducedMotion: () => false,
       time: { now: 1234 },
@@ -96,8 +98,8 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
 
     (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
 
-    // MAZER-PERF-014: the circles go to the star draw list (src/render/backdropStarBatch.ts, which pins them circle for
-    // circle against the old fillStyle/fillCircle pairs); the Graphics itself is only cleared.
+    // MAZER-VIS-066: the stars go to the shaped star list (src/render/backdropStarShapes.ts, pinned star for star in
+    // tests/render/backdropStarShapes.test.ts); the Graphics itself is only cleared.
     const allowed = new Set(['clear']);
     expect(calls.filter((name) => !allowed.has(name))).toEqual([]);
     // MAZER-PERF-010: no full-screen Graphics rect (it was ~40% of a menu frame); the opaque field is the camera
@@ -107,7 +109,7 @@ describe('backdrop stars: every star is drawn as a round point of light, nothing
     // A second draw with the same field colour must not touch the camera again.
     (MenuScene.prototype as unknown as { drawBackdrop(): void }).drawBackdrop.call(fakeScene);
     expect(cameraBackgrounds).toHaveLength(1);
-    expect(fakeScene.backdropStarList.count).toBeGreaterThanOrEqual(fakeScene.stars.length);
+    expect(fakeScene.backdropStarShapes.count).toBe(fakeScene.stars.length);
     expect(fakeScene.backdropDirty).toBe(false);
   });
 });

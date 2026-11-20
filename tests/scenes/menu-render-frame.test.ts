@@ -1657,7 +1657,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('converts each seeded backdrop twinkle cycle to radians', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    // MAZER-VIS-066: the twinkle maths moved with the star fill into src/render/backdropStarShapes.ts.
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/render/backdropStarShapes.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('Math.sin(((animationTime / twinklePeriodMs) + starSeed) * Math.PI * 2)');
     expect(menuSceneSource).not.toContain('Math.sin((animationTime / twinklePeriodMs) + (starSeed * Math.PI * 2))');

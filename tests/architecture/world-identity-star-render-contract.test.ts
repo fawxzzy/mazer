@@ -18,29 +18,29 @@ import { describe, expect, test } from 'vitest';
  * tested elsewhere.
  */
 describe('World Identity background-star render contract', () => {
-  test('drawBackdrop reads the stored per-star seed and draws no coloured sparkle stars', () => {
+  test('the backdrop star fill reads the stored per-star seed, and its colour reads the scene clock', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    // MAZER-VIS-066: drawBackdrop routes every star through the shaped star list (src/render/backdropStarShapes.ts).
+    const shapesSource = readFileSync(resolve(process.cwd(), 'src/render/backdropStarShapes.ts'), 'utf8');
 
-    // The active assignment must read the persisted field, not recompute a
-    // hash from the star's own continuously-drifting position. This does
-    // NOT check the whole file is free of the rejected expression's text --
-    // the fix's own explanatory comment quotes it verbatim as documentation
-    // of what was wrong -- it checks the specific assignment line itself.
-    expect(menuSceneSource).toContain('const starSeed = star.seed;');
+    // The active assignment must read the persisted field, not recompute a hash from the star's own
+    // continuously-drifting position (the old per-frame strobe bug).
+    expect(shapesSource).toContain('const starSeed = star.seed;');
+    expect(shapesSource).not.toContain('((star.x * 9973) + (star.y * 6151)) % 1');
     expect(menuSceneSource).not.toContain('const starSeed = ((star.x * 9973) + (star.y * 6151)) % 1');
 
-    // The coloured four-point sparkle tier was retired on 2026-11-10 (owner: "no more stagnant stars in the
-    // background", src/render/backdropStars.ts): its hue code must stay gone, and every star must be routed
-    // through the policy that draws every star (never hidden, never a cross).
+    // The 2026-11-10 coloured sparkle tier keyed its hue off the seed through Phaser; it stays gone.
     expect(menuSceneSource).not.toContain('Phaser.Display.Color.HSVToRGB(starSeed');
-    expect(menuSceneSource).toContain('resolveBackdropStarDraw(coreSize)');
 
-    // MAZER-VIS-035: the rainbow subset is chosen from the stable seed (never a position) and its hue reads the scene
-    // clock, not the motion-gated animationTime, so reduced motion / Still keep the colour shifting.
-    expect(menuSceneSource).toContain('isBackdropRainbowStar(starSeed)');
-    expect(menuSceneSource).toContain('resolveBackdropRainbowColor(starSeed, this.time.now)');
-    expect(menuSceneSource).not.toContain('resolveBackdropRainbowColor(starSeed, animationTime)');
+    // MAZER-VIS-066 (owner, 2026-11-19): real star shapes with the rainbow sweep. The scene passes the scene clock
+    // (this.time.now) for the colour in every motion mode and the motion flag separately, so Reduce Motion / Still stop
+    // the drift and twinkle but never the colour; the colour-only redraw gate keeps the sweep moving while still.
+    expect(menuSceneSource).toContain(
+      'fillBackdropStarShapeList(this.backdropStarShapes, this.stars, width, height, this.time.now, backdropMotionEnabled, palette.starAlphaScale);'
+    );
+    expect(menuSceneSource).toContain('installBackdropStarSpriteRenderer(this.backdropGraphics, this.backdropStarShapes);');
+    expect(shapesSource).toContain('resolveBackdropStarHueStep(sceneTimeMs, pixelX, width)');
+    expect(shapesSource).not.toContain('resolveBackdropStarHueStep(animationTime');
     expect(menuSceneSource).toContain('stepBackdropColourRedraw(time, this.backdropColourNextDueAtMs)');
-
   });
 });
