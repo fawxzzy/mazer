@@ -3,7 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
-  LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_BOOT_MESSAGE_COPY,
   LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
@@ -132,7 +131,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyGameModes.ts', literal: 'Obstacles and enemies. Stay out of Endless; a separate mode with its own ladder and leaderboard tab. Nothing is built.', kind: 'technical', route: 'reserved future-mode slot note, never rendered; documented in docs/architecture/MAZER-GAME-MODES-PRODUCT-CONTRACT.md' },
   { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Something went wrong on our side. Try again in a moment.', kind: 'raw-static', route: 'Leaderboard failure state body (generic); rendered by the MenuScene leaderboard sheet; fold into the message module later' },
   { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading the leaderboard…', kind: 'raw-static', route: 'Leaderboard loading status line; rendered by the MenuScene leaderboard sheet; fold into the message module later' },
-  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Players appear on the leaderboard by username.', kind: 'raw-static', route: 'Leaderboard username-gate body; rendered by the MenuScene leaderboard sheet; fold into the message module later' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Choose it on the account site: open the menu and tap Profile.', kind: 'raw-static', route: 'Leaderboard username-gate body (MAZER-ACCT-047: names change on the account site); rendered by the MenuScene leaderboard sheet; fold into the message module later' },
+  { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'To change your name, open the menu and tap Profile.', kind: 'raw-static', route: 'Leaderboard You-row hint (MAZER-ACCT-047); rendered by the MenuScene leaderboard sheet; fold into the message module later' },
   { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'It isn’t available yet. Check back soon.', kind: 'raw-static', route: 'Leaderboard not-set-up state body; rendered by the MenuScene leaderboard sheet; fold into the message module later' },
   { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Reconnect to see the leaderboard. Your progress is saved on this device.', kind: 'raw-static', route: 'Leaderboard offline state body; rendered by the MenuScene leaderboard sheet; fold into the message module later' },
   { file: 'src/legacy-runtime/legacyLeaderboardView.ts', literal: 'Loading your profile…', kind: 'raw-static', route: 'Leaderboard username-gate loading status line; rendered by the MenuScene leaderboard sheet; fold into the message module later' },
@@ -411,7 +411,6 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
 
   test('routed copy tables are player-safe (no provider or internal wording)', () => {
     const tables = {
-      LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY,
       LEGACY_AUTH_MESSAGE_COPY,
       LEGACY_BOOT_MESSAGE_COPY,
       LEGACY_OAUTH_FAILURE_MESSAGE_COPY,
@@ -434,7 +433,6 @@ describe('player-facing message inventory (source contract)', { timeout: GUARD_T
     const source = readSource(file);
     const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
     const tableNames = new Set([
-      'LEGACY_ACCOUNT_USERNAME_MESSAGE_COPY',
       'LEGACY_AUTH_MESSAGE_COPY',
       'LEGACY_BOOT_MESSAGE_COPY',
       'LEGACY_OAUTH_FAILURE_MESSAGE_COPY',

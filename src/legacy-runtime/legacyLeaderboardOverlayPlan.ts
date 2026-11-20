@@ -47,6 +47,10 @@ export const LEGACY_LEADERBOARD_SHEET_SIZES = Object.freeze({
   /** Pinned You row (two lines: label + username). */
   selfRowHeight: 56,
   selfRowGap: 8,
+  /** The one-line Profile hint under the You row (MAZER-ACCT-047). */
+  selfHintGap: 4,
+  selfHintHeight: 18,
+  selfHintFontSize: 12,
   columnHeaderHeight: 24,
   /** Gap between the exit row and what follows (spacing token 12). */
   sectionGap: LEGACY_SETTINGS_SIZES.sectionGap,
@@ -131,6 +135,8 @@ export interface LegacyLeaderboardOverlayPlan {
     viewport: LegacyLeaderboardPlanRect;
   } | null;
   selfRow: LegacyLeaderboardPlanSelfRow | null;
+  /** The plain Profile hint under the You row; null when there is no You row. */
+  selfHint: { centerX: number; centerY: number; maxWidth: number; text: string } | null;
   stateBlock: LegacyLeaderboardPlanStateBlock | null;
   /** Natural (unclipped) card height. */
   naturalCardHeight: number;
@@ -194,7 +200,9 @@ export const buildLegacyLeaderboardOverlayPlan = (
   const modeBlock = view.modeTabs === null ? 0 : z.sectionGap + LEGACY_LEADERBOARD_MODE_TAB_SIZES.height;
   const headBlock = (cardPadding * 2) + titleHeight + titleGap + exitHeight + modeBlock;
   const colBlock = hasColumns ? z.sectionGap + z.columnHeaderHeight : 0;
-  const selfBlock = hasSelf ? z.selfRowGap + z.selfRowHeight : 0;
+  const hasSelfHint = hasSelf && view.selfNameHint !== null;
+  const selfBlock = (hasSelf ? z.selfRowGap + z.selfRowHeight : 0)
+    + (hasSelfHint ? z.selfHintGap + z.selfHintHeight : 0);
 
   let stateHeight = 0;
   let stateBodyLines = 0;
@@ -282,6 +290,14 @@ export const buildLegacyLeaderboardOverlayPlan = (
       rect: rectOf(innerLeft, top, innerWidth, z.selfRowHeight)
     };
   }
+  const selfHint: LegacyLeaderboardOverlayPlan['selfHint'] = selfRow !== null && hasSelfHint && view.selfNameHint !== null
+    ? {
+      centerX: innerLeft + (innerWidth / 2),
+      centerY: selfRow.rect.top + selfRow.rect.height + z.selfHintGap + Math.round(z.selfHintHeight / 2),
+      maxWidth: innerWidth,
+      text: view.selfNameHint
+    }
+    : null;
 
   let stateBlock: LegacyLeaderboardOverlayPlan['stateBlock'] = null;
   if (view.state !== null) {
@@ -326,6 +342,7 @@ export const buildLegacyLeaderboardOverlayPlan = (
     naturalCardHeight,
     panel,
     selfRow,
+    selfHint,
     stateBlock,
     title: {
       centerX: panel.centerX,

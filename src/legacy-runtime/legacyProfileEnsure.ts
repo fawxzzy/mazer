@@ -1,5 +1,4 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { LegacyUsernameSaveFailureKind } from './legacyPlayerMessage';
 
 /**
  * Accounts created on the shared account host (Mazer's Create Account is an
@@ -73,48 +72,3 @@ export const resetLegacyProfileEnsureAttemptsForTests = (): void => {
   attemptedScopes.clear();
 };
 
-export interface LegacyUsernameRpcError {
-  code?: string | null;
-  message?: string | null;
-}
-
-export const isLegacyProfileMissingError = (
-  error: LegacyUsernameRpcError | null | undefined
-): boolean => Boolean(error) && (
-  error?.code === 'P0002'
-  || (error?.message ?? '').includes('MAZER_PROFILE_MISSING')
-);
-
-const NETWORK_FRAGMENTS: readonly string[] = [
-  'failed to fetch',
-  'load failed',
-  'network',
-  'timeout',
-  'timed out',
-  'internet connection',
-  'could not be found',
-  'cannot connect'
-];
-
-/**
- * Maps a mazer_set_username failure to the kind of toast the player gets.
- * 23505 is the unique index (name taken), 22023 the server's own format check,
- * 28000 a stale session (the sign-in changed under the call), anything that
- * looks like connectivity is "try again", the rest is the generic sentence.
- */
-export const classifyLegacyUsernameSaveError = (
-  error: LegacyUsernameRpcError | null | undefined
-): LegacyUsernameSaveFailureKind => {
-  const code = error?.code ?? '';
-  const message = (error?.message ?? '').toLowerCase();
-  if (code === '23505' || message.includes('duplicate key')) {
-    return 'taken';
-  }
-  if (code === '22023' || message.includes('mazer_username_invalid')) {
-    return 'invalid';
-  }
-  if (code === '28000' || NETWORK_FRAGMENTS.some((fragment) => message.includes(fragment))) {
-    return 'try-again';
-  }
-  return 'failed';
-};
