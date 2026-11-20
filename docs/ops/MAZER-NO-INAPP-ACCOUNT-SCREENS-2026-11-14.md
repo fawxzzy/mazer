@@ -28,11 +28,14 @@ language, not an account screen.
 | 5 | `Signing you in…` / `Loading…` gate cover | `syncLegacyAuthGateLoadingScreen` over the shared loader (VIS-039) | KEPT. A transient loading label, not an account screen. The wording rule (claim only with evidence) is unchanged |
 | 6 | Main menu `Login` button and the profile icon | `createButton('Login')`, `createLegacyMenuProfileButton` -> `openSharedAccountSurface` | KEPT. Plain hand-off: signed out starts the OAuth hand-off, signed in navigates to the account home. The online-counter lane edits the header; not touched here |
 | 7 | Settings `Account` section: `Reset progress` and `Sign out` rows | `legacySettingsSheetPlan.ts`, `SIGN_OUT` -> `handleLegacyAuthSignOut` | KEPT as rows of the Settings sheet (they open no screen). `Reset progress` is game data, not an account. `Sign out` still performs the local sign-out until the PWA-007 + ACCT-042 lane lands the host sign-out call (`https://account.fawxzzy.com/signout?returnTo=...`), which owns that function; not duplicated here |
-| 8 | Leaderboard username gate, `Edit name` and the inline name editor | `legacyLeaderboardView.ts`, `legacyLeaderboardUsernameEditor.ts`, `MenuScene` editor | KEPT for now, decision below |
+| 8 | Leaderboard username gate, `Edit name` and the inline name editor | `legacyLeaderboardView.ts`, `legacyLeaderboardUsernameEditor.ts`, `MenuScene` editor | REMOVED 2026-11-19 (MAZER-ACCT-047): the editor and every `Edit name` entry point are gone; the gate and You row point to Profile in words. The account site carries the Mazer name editor behind its password check (FawxzzyWeb PR, same card) |
 | 9 | Guide rows about accounts | `legacyGuideContent.ts` | None exist. Nothing to remove; the Guide drift test still passes |
 | 10 | Legal links (Privacy, Terms) | were on the Welcome screen | REMOVED with it. The host owns the legal pages; `src/boot/legalSurface.ts` (other lane) still serves them |
 
 ## Handle edit (row 8): decision
+
+Superseded 2026-11-19 by MAZER-ACCT-047 (owner: "we should not be able to edit username from leaderboard"). The
+account site now owns the Mazer name edit; the in-game editor was deleted. The text below is history.
 
 Decision: KEEP the leaderboard `Edit name` editor in this change and follow up (card suggested), because the leaderboard
 handle is game identity, not an account credential, and moving it to the host would strand players without a way to

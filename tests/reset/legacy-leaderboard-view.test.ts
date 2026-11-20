@@ -132,11 +132,28 @@ describe('leaderboard view-model: the pinned You row', () => {
     expect(view.selfRow).toMatchObject({ levelText: '68', ranked: true, rankText: '57' });
   });
 
-  test('MAZER-ACCT-022: an empty board offers Edit name to a named player only', () => {
+  test('MAZER-ACCT-047: an empty board offers no name editor, named or not', () => {
     const named = buildLegacyLeaderboardViewModel(state({ entries: [], status: 'empty' }));
-    expect(named.state).toMatchObject({ action: { id: 'edit-username', label: 'Edit name' }, kind: 'empty' });
+    expect(named.state).toMatchObject({ action: null, kind: 'empty' });
     const unnamed = buildLegacyLeaderboardViewModel(state({ entries: [], selfUsername: '', status: 'empty' }));
     expect(unnamed.state).toMatchObject({ action: null, kind: 'empty' });
+  });
+
+  test('MAZER-ACCT-047: the You row carries a plain pointer to Profile and no edit action', () => {
+    const ranked = buildLegacyLeaderboardViewModel(state({ entries: entries(50), selfRank: self('57', '68') }));
+    expect(ranked.selfNameHint).toBe('To change your name, open the menu and tap Profile.');
+    expect(ranked.selfNameHint!.length).toBeLessThanOrEqual(90);
+    expect(JSON.stringify(ranked)).not.toMatch(/edit-username|Edit name/);
+    // No You row (signed out, gate, empty, loading) means no hint.
+    for (const s of [
+      state({ signedIn: false }), state({ usernameGate: 'needs-username' }),
+      state({ entries: [], status: 'empty' }), state({ status: 'loading' })
+    ]) {
+      const view = buildLegacyLeaderboardViewModel(s);
+      if (view.selfRow === null) {
+        expect(view.selfNameHint).toBeNull();
+      }
+    }
   });
 
   test('an unknown saved username falls back to the bare You label', () => {
@@ -156,7 +173,7 @@ describe('leaderboard view-model: designed states (no raw error text)', () => {
     }
   });
 
-  test('empty: heading, one line, no action (an unnamed player; a named one gets Edit name, MAZER-ACCT-022)', () => {
+  test('empty: heading, one line, no action', () => {
     const view = buildLegacyLeaderboardViewModel(state({ entries: [], selfUsername: '', status: 'empty' }));
     expect(view.phase).toBe('empty');
     expect(view.state).toMatchObject({ action: null, heading: 'No ranks yet', kind: 'empty' });
@@ -196,13 +213,13 @@ describe('leaderboard view-model: designed states (no raw error text)', () => {
     expect(view.state).toMatchObject({ action: { id: 'sign-in', label: 'Sign in' }, kind: 'signed-out' });
   });
 
-  test('username gate: loading is a status line, unavailable retries, needs-username opens the name editor', () => {
+  test('username gate: loading is a status line, unavailable retries, needs-username points to Profile (no editor)', () => {
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'loading' })).state)
       .toMatchObject({ action: null, heading: null, kind: 'profile-loading' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'unavailable' })).state)
       .toMatchObject({ action: { id: 'retry-username' }, kind: 'profile-unavailable' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'needs-username' })).state)
-      .toMatchObject({ action: { id: 'edit-username', label: 'Edit name' }, kind: 'needs-username' });
+      .toMatchObject({ action: null, text: 'Choose it on the account site: open the menu and tap Profile.', kind: 'needs-username' });
     expect(buildLegacyLeaderboardViewModel(state({ usernameGate: 'needs-username' })).phase).toBe('gate');
   });
 
