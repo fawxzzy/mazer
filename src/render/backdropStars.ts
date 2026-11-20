@@ -1,6 +1,11 @@
 /**
  * What the play/menu backdrop draws. Pure policy, no drawing (MenuScene.drawBackdrop paints).
  *
+ * MAZER-VIS-066 (owner pick 2026-11-19, set d "Mixed"): the stars are now drawn as real star shapes (dots, four-point
+ * sparkles, five-point stars) in a slow rainbow sweep, by src/render/backdropStarShapes.ts and backdropStarSprites.ts.
+ * That supersedes the "round point of light, never coloured" rule below; the field, seeds, drift and twinkle here
+ * are unchanged. The history is kept for context.
+ *
  * History:
  *  - It used to draw its nearest, biggest stars as coloured four-point sparkles (green, orange, purple, blue, red
  *    crosses) and every other star as a small round dot. Owner feedback, 2026-11-10: "no more stagnant stars in the
