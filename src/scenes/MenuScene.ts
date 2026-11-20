@@ -174,7 +174,6 @@ import {
 import {
   INTRO_LASER_MS,
   INTRO_POP_MS,
-  INTRO_SKIP_GRACE_MS,
   isEdgePathCellShown,
   type IntroState,
   type OutroState,
@@ -186,9 +185,9 @@ import {
   resolveIntroInputUnlockMs,
   resolveIntroLaserStartMs,
   resolveOutroTilesEndMs,
-  resolveSpawnLaser,
-  skipIntroElapsedMs
+  resolveSpawnLaser
 } from '../render/introTimeline';
+import { resolveLegacyGenerationInputLock, type LegacyGenerationInputLock } from '../legacy-runtime/legacyGenerationInputLock';
 import {
   selectTeleportPrimaryAnchor,
   type TeleportAnchorId,
@@ -2312,6 +2311,8 @@ export class MenuScene extends Phaser.Scene {
   private trailDrawRecord: TrailDrawRecord | null = null;
   private trailRebuildCount = 0;
   private trailSkippedRedrawCount = 0;
+  /** MAZER-CTRL-007: times the generation input lock had to force-settle a stuck build (0 in every healthy run). */
+  private legacyGenerationInputLockSafetyReleaseCount = 0;
   // A one-way latch for the start marker's pre-spawn -> post-spawn
   // transition -- must not flip back to false just because the player
   // revisits the start tile later. Flipped only from
@@ -3489,6 +3490,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
+    this.releaseLegacyGenerationInputLockIfStuck(time);
     this.tickLegacyPresence(time);
     if (this.mode === 'menu' && this.playStartMazePrefetchPrimed === false && !this.authGateAwaitingResolution && !this.pendingBootPlayStart) {
       this.primeLegacyPlayStartMazePrefetch();
@@ -4485,8 +4487,17 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
-    // Any key (movement, Enter, ...) skips a still-running Play intro.
-    this.skipLegacyIntroIfBuilding(this.time.now);
+    // MAZER-CTRL-007: movement keys are dropped while the maze generates (the build always plays to its end);
+    // Esc / P below stay live so the menu and pause still work.
+    if (
+      this.overlay === 'none'
+      && this.resolveLegacyPlayMovementDirection(event) !== null
+      && this.resolveLegacyGenerationInputLockNow(this.time.now).locked
+    ) {
+      event.preventDefault();
+      this.resetLegacyPlayInputBuffer();
+      return true;
+    }
 
     if (this.handleLegacyPlayMovementKeyDown(event)) {
       return true;
@@ -5051,8 +5062,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
-    // A tap skips a still-running Play intro.
-    this.skipLegacyIntroIfBuilding(this.time.now);
     this.hazardLab?.runtime?.noteInput(this.time.now);
     const point = this.resolveLegacyInputPointerPoint(pointer);
     if (this.handleLegacyPlayTouchControl(point.x, point.y, pointer.id)) {
@@ -5177,6 +5186,13 @@ export class MenuScene extends Phaser.Scene {
 
     if (control === 'pause') {
       this.openOverlay('pause');
+      return true;
+    }
+
+    // MAZER-CTRL-007: while the maze generates, a touch is swallowed (no stick, no anchor, no step); pause above
+    // stays live. A finger put down during the build does nothing until a fresh touch after it settles.
+    if (this.resolveLegacyGenerationInputLockNow(this.time.now).locked) {
+      this.resetLegacyPlayInputBuffer();
       return true;
     }
 
@@ -7057,44 +7073,33 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
   }
 
-  // Skip (tap / key / Enter while the Play intro is still running): jumps the
-  // intro clock to its final state. The grace window ignores the very press
-  // that started the intro.
-  private skipLegacyIntroIfBuilding(time: number): boolean {
-    if (this.mode !== 'play' || this.overlay !== 'none' || this.introStartedAtMs === null) {
-      return false;
-    }
-    if (this.menuStaticDrawLifecyclePhase !== 'building') {
-      return false;
-    }
-    const elapsedMs = time - this.introStartedAtMs;
-    if (elapsedMs < INTRO_SKIP_GRACE_MS) {
-      return false;
-    }
-
-    const reducedMotion = this.prefersLegacyReducedMotion();
-    const skippedElapsedMs = skipIntroElapsedMs(elapsedMs, { reducedMotion, tileCount: this.menuStaticDrawTileOrder.length });
-    if (skippedElapsedMs <= elapsedMs) {
-      return false;
-    }
-    this.introStartedAtMs = time - skippedElapsedMs;
-    const laserStartedAtMs = this.resolveLegacyIntroLaserStartAtMs();
-    if (laserStartedAtMs !== null && this.playerSpawnBurstStartedAtMs !== null) {
-      this.playerSpawnBurstStartedAtMs = laserStartedAtMs;
-    }
-    if (laserStartedAtMs !== null && this.playerTransferEnergyDeliveryStartedAtMs !== null) {
-      this.playerTransferEnergyDeliveryStartedAtMs = laserStartedAtMs;
-    }
-    this.advanceLegacyMenuStaticDrawStage(time);
-    return true;
+  // MAZER-CTRL-007: input is locked while the Play maze generates; input can no longer skip the build (the old
+  // tap/key "skip intro" jumped the intro clock to its end). Rules: src/legacy-runtime/legacyGenerationInputLock.ts.
+  private resolveLegacyGenerationInputLockNow(time: number): LegacyGenerationInputLock {
+    return resolveLegacyGenerationInputLock({
+      mode: this.mode,
+      drawPhase: this.menuStaticDrawLifecyclePhase,
+      stagedBuildVisible: this.menuStaticDrawRowsVisible !== null || this.menuStaticDrawTilesVisible !== null,
+      introStartedAtMs: this.introStartedAtMs,
+      nowMs: time,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      tileCount: this.menuStaticDrawTileOrder.length
+    });
   }
 
-  // The beams leave their diamonds only once the BUILD is complete: an exact point on the intro clock
-  // (resolveIntroLaserStartMs, a pure function of the tile count), never a frame-stepped estimate.
-  private resolveLegacyIntroLaserStartAtMs(): number | null {
-    return this.introStartedAtMs === null
-      ? null
-      : this.introStartedAtMs + resolveIntroLaserStartMs(this.menuStaticDrawTileOrder.length);
+  // Safety release: a build with no intro clock, or one far past its own unlock instant, is settled now so the
+  // controls can never stay locked. Healthy builds settle in advanceLegacyMenuStaticDrawStage first; this is a no-op.
+  private releaseLegacyGenerationInputLockIfStuck(time: number): void {
+    if (this.resolveLegacyGenerationInputLockNow(time).release === 'none') {
+      return;
+    }
+    this.legacyGenerationInputLockSafetyReleaseCount += 1;
+    this.menuStaticDrawTilesVisible = null;
+    this.menuStaticDrawRowsVisible = null;
+    this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+    this.boardPathDirty = true;
+    this.boardDynamicDirty = true;
+    this.settleLegacyMenuStaticDrawStageIfComplete(time);
   }
 
   // msUntilLaserStart is positive until the intro's laser instant, negative
