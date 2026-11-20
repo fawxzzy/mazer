@@ -1409,15 +1409,35 @@ export const resolveOptionsGuideRequiredLabels = (surface) => (
     : OPTIONS_GUIDE_EXPECTED_LABELS
 );
 
-// Pause card (2026-11-06 header/pause lane): title, Resume, Settings (collapsed
-// on every open) and Quit to Menu. There is no Guide card and no inline toggles
-// until Settings is opened; the toggles then render inside the card.
-const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([
-  'Paused',
-  'Resume',
+// MAZER-UI-095: pausing opens the in-game Menu dropdown (legacyMenuRows.ts play rows), not the old Paused card.
+// The rows are dropdown buttons (visual.buttons), not overlay text labels; the Settings row opens the trimmed
+// sheet, whose toggles are asserted after a real click.
+const PAUSE_MENU_EXPECTED_ROWS = Object.freeze([
   'Settings',
-  'Quit to Menu'
+  'Guide',
+  'Sound',
+  'Reset level',
+  'Main menu'
 ]);
+const waitForMenuRowLabels = async (page, rows, timeoutMs) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const buttons = (await readDiagnostics(page)).visual?.buttons ?? [];
+    const drawn = rows.every((row) => buttons.some((button) => (
+      (button?.text === row || button?.semanticAction === row) && isFiniteBounds(button?.labelBounds)
+    )));
+    if (drawn) {
+      return;
+    }
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`In-game Menu rows did not finish drawing (timeout ${timeoutMs}ms).`);
+};
+const hasMenuRowButtons = (surface, rows) => rows.every((row) => (
+  (surface?.buttons ?? surface?.diagnostics?.visual?.buttons ?? []).some((button) => (
+    (button?.text === row || button?.semanticAction === row) && isFiniteBounds(button?.bounds)
+  ))
+));
 const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
   'Reduce Motion',
   'Haptics'
@@ -2437,11 +2457,11 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)
+      hasMenuRowButtons(surfaces.pause, PAUSE_MENU_EXPECTED_ROWS)
         && !hasLabels(surfaces.pause, ['Game Toggles'])
         && !hasLabels(surfaces.pause, ['GUIDE'])
         && (!includeOverlayBottom || hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)),
-      `labels=${labelDetail(surfaces.pause)}; settings-open=${includeOverlayBottom ? labelDetail(surfaces.pauseBottom) : 'skipped for viewport-transition proof'}`
+      `rows=${(surfaces.pause?.buttons ?? []).map((button) => button?.text).join(', ')}; labels=${labelDetail(surfaces.pause)}; settings-open=${includeOverlayBottom ? labelDetail(surfaces.pauseBottom) : 'skipped for viewport-transition proof'}`
     ),
     createCheck(
       'mobile-text-label-bounds',
@@ -3095,12 +3115,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
 
     currentStep = '04-pause';
     await openPauseOverlayViaQa(page, timeoutMs);
+    // The in-game Menu rows fade in one after another; capture once every row label is drawn (labelBounds set).
+    await waitForMenuRowLabels(page, PAUSE_MENU_EXPECTED_ROWS, timeoutMs);
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: transition
-        ? []
-        : PAUSE_CARD_EXPECTED_LABELS,
+      expectedLabels: [],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -3118,8 +3138,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const pauseBottomSurface = transition
       ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
       : await (async () => {
-        // Settings is collapsed on every open: expand it with a real click so
-        // the bottom capture proves the toggles render inside the card.
+        // Open the in-game Menu's Settings row with a real click so the bottom
+        // capture proves the trimmed sheet's toggles render.
         const pauseSettingsPoint = getVisualButtonPoint(pause.diagnostics.visual, 'Settings');
         await clickPoint(page, pauseSettingsPoint, 'Pause Settings');
         await waitForSurface(page, {

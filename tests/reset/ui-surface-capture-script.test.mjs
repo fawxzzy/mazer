@@ -848,7 +848,6 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("? []\n        : PAUSE_CARD_EXPECTED_LABELS");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -1000,11 +999,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    // Pause card: Resume / Settings / Quit to Menu with Settings collapsed on
-    // open; no Guide. The toggles are asserted after a real Settings click.
-    expect(source).toContain("const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([\n  'Paused',\n  'Resume',\n  'Settings',\n  'Quit to Menu'\n]);");
+    // MAZER-UI-095: pause opens the in-game Menu dropdown; its rows are the play rows of the shared row model
+    // (checked as dropdown buttons). The trimmed sheet's toggles are asserted after a real Settings click.
+    expect([...source.match(/const PAUSE_MENU_EXPECTED_ROWS = Object\.freeze\(\[([^\]]*)\]\);/)[1].matchAll(/'([^']*)'/g)].map((entry) => entry[1])).toEqual(buildLegacyMenuRows('play', { soundEnabled: true }).map((row) => row.label));
     expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Reduce Motion',\n  'Haptics'\n]);");
-    expect(source).toContain('hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)');
+    expect(source).toContain('hasMenuRowButtons(surfaces.pause, PAUSE_MENU_EXPECTED_ROWS)');
     expect(source).toContain("!hasLabels(surfaces.pause, ['GUIDE'])");
     expect(source).toContain('hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)');
     expect(source).toContain("getVisualButtonPoint(pause.diagnostics.visual, 'Settings')");
