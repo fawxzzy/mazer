@@ -5181,7 +5181,7 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private playMenuDismissedFrame = -1;
+  private playMenuDismissedAtMs = -1;
 
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
     // The fixed play controls must not intercept an overlay action. In
@@ -5196,7 +5196,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
-    if (this.game.getFrame() === this.playMenuDismissedFrame) {
+    if (this.time.now === this.playMenuDismissedAtMs) {
       return true;
     }
 
@@ -14094,8 +14094,8 @@ export class MenuScene extends Phaser.Scene {
       ...this.resolveLegacyMenuDropdownSharedHost<LegacyPlayMenuRowId>(),
       dismissed: () => {
         // The Resume X sits under the closed Menu button's hit region: this same press must not reach the play-control
-        // handler and reopen the pause (handleLegacyPlayTouchControl swallows presses in this frame).
-        this.playMenuDismissedFrame = this.game.getFrame();
+        // handler and reopen the pause (handleLegacyPlayTouchControl swallows a press with this same scene clock reading).
+        this.playMenuDismissedAtMs = this.time.now;
         this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
       },
       keepOpenOnSelect: (id) => shouldLegacyPlayMenuStayOpen(id, {

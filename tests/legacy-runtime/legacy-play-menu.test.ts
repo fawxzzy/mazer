@@ -362,9 +362,9 @@ describe('MAZER-UI-095 MenuScene wiring (source)', () => {
   });
 
   test('the Resume X sits under the closed Menu button: the press that resumed is swallowed by the play-control handler (no instant reopen)', () => {
-    expect(sceneMethod('private createLegacyPlayMenu(')).toContain('this.playMenuDismissedFrame = this.game.getFrame();');
+    expect(sceneMethod('private createLegacyPlayMenu(')).toContain('this.playMenuDismissedAtMs = this.time.now;');
     expect(sceneMethod('private handleLegacyPlayTouchControl(')).toMatch(
-      /this\.game\.getFrame\(\) === this\.playMenuDismissedFrame\) \{\s+return true;\s+\}[\s\S]*?if \(control === 'pause'\)/
+      /this\.time\.now === this\.playMenuDismissedAtMs\) \{\s+return true;\s+\}[\s\S]*?if \(control === 'pause'\)/
     );
   });
 
