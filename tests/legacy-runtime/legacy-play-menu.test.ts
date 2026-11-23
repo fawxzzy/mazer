@@ -361,6 +361,13 @@ describe('MAZER-UI-095 MenuScene wiring (source)', () => {
     expect(sceneMethod('private selectLegacyPlayMenuRow(')).toContain('this.pressLegacyQuitToMenu();');
   });
 
+  test('the Resume X sits under the closed Menu button: the press that resumed is swallowed by the play-control handler (no instant reopen)', () => {
+    expect(sceneMethod('private createLegacyPlayMenu(')).toContain('this.playMenuDismissedFrame = this.game.getFrame();');
+    expect(sceneMethod('private handleLegacyPlayTouchControl(')).toMatch(
+      /this\.game\.getFrame\(\) === this\.playMenuDismissedFrame\) \{\s+return true;\s+\}[\s\S]*?if \(control === 'pause'\)/
+    );
+  });
+
   test('MAZER-UI-096 main menu: rows from the shared model; Guide opens on the Settings overlay and returns; Sound flips in place; no pause', () => {
     expect(sceneMethod('private buildLegacyMenuDropdownButtons(')).toContain("buildLegacyMenuRows('main', {");
     const create = sceneMethod('private createLegacyMenuDropdown(');
