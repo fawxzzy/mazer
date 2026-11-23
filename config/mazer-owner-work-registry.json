@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-19T19:08:01.000Z",
+  "updatedAt": "2026-11-20T08:08:52.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 308,
+    "stableIdentityCount": 327,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 91,
+    "openCardCount": 110,
     "completedCardCount": 84,
     "deferredCardCount": 25,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-19T19:08:01.000Z",
-      "appliedEventCount": 491,
-      "lastEventId": "4b859d1f3e49"
+      "at": "2026-11-20T08:08:52.000Z",
+      "appliedEventCount": 523,
+      "lastEventId": "5bb1d99b90d6"
     },
     "archivedCardCount": 108
   },
@@ -5610,6 +5610,329 @@
         "Idle gate tiles read as a dark patch with corner brackets from across the maze",
         "The current ring, arrows and animation are unchanged",
         "The dark floor does not read as a wall or hole next to real walls"
+      ]
+    },
+    {
+      "id": "MAZER-UI-094",
+      "status": "review",
+      "updatedAt": "2026-11-19T22:58:37.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-094",
+      "title": "Make the TAP TO PLAY label breathe and sweep to draw the eye",
+      "description": "The front-door play label should draw attention: a slow breathing scale with a soft glow, plus a light band that sweeps across the letters and then rests. Reduced motion keeps it still. Board update 2026-11-19: Play label breathe and sweep merged and deployed; headless only, awaiting phone check PR #671 merged (668adb86). Deployed: production build main-CwpiCAu6. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The label breathes 1.00 to 1.04 and a light band sweeps across it on the game's 1.2 s beat grid",
+        "The tap area does not scale and Reduce Motion keeps the label static",
+        "No new per-frame canvas redraw and no LEVEL line under the label"
+      ]
+    },
+    {
+      "id": "MAZER-CTRL-006",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:14.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-006",
+      "title": "New controller look: Halo ring with 8-direction highlight",
+      "description": "Restyle the on-screen controller as a halo ring that lights the drag direction in all eight directions (up, down, left, right and the four diagonals). Steering behaviour does not change. Board update 2026-11-19: Halo ring controller with 8-direction highlight open as PR 672; CI running; headless only, not checked on a phone Checked only in headless Chromium, not on a real phone. Board update 2026-11-20: Halo ring controller with 8-direction highlight merged and deployed; headless only, awaiting phone check PR #672 merged (7a41883a). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The ring lights the sector for the drag direction in 8 directions with no flicker at sector boundaries",
+        "Steering, leash, speed and placement behave exactly as before",
+        "The ring never hides the player or the corridor ahead and costs no per-frame large redraw"
+      ]
+    },
+    {
+      "id": "MAZER-UI-095",
+      "status": "in_progress",
+      "updatedAt": "2026-11-19T22:56:27.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-095",
+      "title": "In-game Menu dropdown replaces the Settings button",
+      "description": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The in-game Settings button is replaced by a Menu button whose dropdown lists Settings, Guide, Sound toggle, Reset level and Main menu, with the X acting as Resume",
+        "Opening the dropdown pauses the game and Resume continues it exactly where it was",
+        "Sound, Guide and Main menu are removed from the Settings sheet and Reset level restarts the current level"
+      ]
+    },
+    {
+      "id": "MAZER-UI-096",
+      "status": "in_progress",
+      "updatedAt": "2026-11-19T23:29:56.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-096",
+      "title": "Main-menu dropdown matches the in-game Menu dropdown",
+      "description": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The main-menu dropdown has Guide, Sound toggle and Settings rows styled like the in-game menu, plus Leaderboard and Profile",
+        "Sound and Guide are removed from the Settings sheet on every screen",
+        "Both menus share one row model with a unit-tested row list per screen"
+      ]
+    },
+    {
+      "id": "MAZER-UI-097",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:18.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-097",
+      "title": "Button icons switch to the Star Dust set (C)",
+      "description": "Owner picked icon set C Star Dust. Every in-game and menu button uses it, and the menu button keeps the animation where the three lines cross into an X when tapped. Board update 2026-11-20: Star Dust button icon set merged and deployed; headless only, awaiting phone check PR #674 merged (62b7e0b7). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "All 19 buttons draw the Star Dust icons through one icon lookup",
+        "The menu button still animates three lines into an X on tap and back",
+        "Icons stay whole-pixel crisp at 390x844@3 and 412x915@2.625 with no frame cost regression"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-064",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:23.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-064",
+      "title": "Board tiles switch to Starlit Bevel (H)",
+      "description": "Owner picked tile set H Starlit Bevel. Floor, wall and gate tiles use it. The end tile keeps its red star. The start tile is redesigned separately. Board update 2026-11-20: Starlit Bevel board tiles merged and deployed; headless only, awaiting phone check PR #675 merged (99f2abde). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Floor, wall and gate tiles render as Starlit Bevel with floor vs wall contrast of at least 3:1",
+        "The end tile keeps its red star and the gate ring stays readable on the new tiles",
+        "Tile bake time stays within the Chip baseline band at 390x844@3 and 412x915@2.625"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-065",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:52.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-065",
+      "title": "Start tile spiral redrawn without circles",
+      "description": "Owner likes the seed spiral start tile but not that it is made of circles. Options on the live app first, then build the pick. Board update 2026-11-20: Owner picked F Pinwheel for the start tile; build started No device surface. Board update 2026-11-20: F Pinwheel start tile as a baked strip with matching Guide icon; merged and deployed; headless only, awaiting phone check PR #680 merged (4a33ac01). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Live-app options page shows at least 4 non-circle spiral start tiles on the Starlit Bevel tiles",
+        "The owner picks one before any build",
+        "The picked start tile stays crisp at whole pixels and does not blur into the floor"
+      ]
+    },
+    {
+      "id": "MAZER-UI-098",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:43.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-098",
+      "title": "Maze size limit and zoom progression by level",
+      "description": "The whole maze always fits the screen, so a bigger maze means a smaller zoom. Pick the largest size and zoom-out limit from fully generated mazes on the live app, then make early levels zoomed in and later levels bigger and more zoomed out. Finish with snapshots of levels 1 to 200 every ten levels. Board update 2026-11-20: Owner set the cap at scale 88 reached by about level 200 or later; the size curve build and the every-ten-levels snapshots of levels 1 to 200 are part of this card No device surface. Board update 2026-11-20: Size rule 2: board starts zoomed in and grows to scale 88 by level 250; merged and deployed; level 88 versus scale 88 still unconfirmed; headless only PR #678 merged (cc7a2de5). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Live-app page shows fully generated full-screen mazes at several sizes with tile pixel size, readability and cost numbers",
+        "The owner picks the size and zoom-out limit and the level curve before the game is wired to it",
+        "Levels 1 to 200 every ten levels are captured from the real game after the wiring"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-066",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:26.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-066",
+      "title": "Star field uses real star shapes with rainbow colour shift",
+      "description": "Owner accepted the Mixed star shape set (d). The background stars are real star shapes with a slow rainbow colour shift. Reduce Motion stops movement but keeps the colour shifting. Board update 2026-11-20: Real pointed background stars in a rainbow sweep merged and deployed; Reduce Motion keeps colour; headless only, awaiting phone check PR #676 merged (fb49f832). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Background stars draw as star shapes (Mixed set), not faded circles, with a rainbow colour shift",
+        "Reduce Motion stops star movement and keeps the colour shift",
+        "Frame cost stays within noise of today at 390x844@3 and 412x915@2.625"
+      ]
+    },
+    {
+      "id": "MAZER-UI-099",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T00:26:42.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-099",
+      "title": "Update pass on remaining screens to match the new look",
+      "description": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Audit lists every remaining screen with a keep or update verdict and evidence from the live app",
+        "Screens marked update get a live-app before and after page that matches the live game except the change under test",
+        "The owner looks before any merge"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-067",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T00:55:22.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-067",
+      "title": "Bleed gate tile easier to see when idle",
+      "description": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Live-app options page shows at least 4 gate treatments idle and active on Starlit Bevel tiles",
+        "Each option reports contrast against the floor and wall and the owner picks one before any build",
+        "The picked gate stays readable at 390x844@3 and 412x915@2.625 with no frame cost regression"
+      ]
+    },
+    {
+      "id": "MAZER-UI-100",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T00:55:22.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-100",
+      "title": "Sign out and Reset progress move to the account screen only",
+      "description": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Main-menu Settings no longer shows Sign out, Reset progress or Guide",
+        "The account screen from Profile shows Sign out and Reset progress and they work as before with the same confirmations",
+        "Sign out and Reset progress exist in exactly one place in the app"
+      ]
+    },
+    {
+      "id": "MAZER-UI-101",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T00:55:22.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-101",
+      "title": "Played board uses the full screen height",
+      "description": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Investigation explains why the bottom margin is larger than the other sides with measurements at 390x844@3 and 412x915@2.625",
+        "A fix or options page shows the board using the available height with the whole maze still visible",
+        "Bleed-off path room is even on all four sides or the owner picks otherwise"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-030",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T01:13:32.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-030",
+      "title": "Maze generation quality: fewer dead stubs, more route choice",
+      "description": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Metrics for levels 1 to 200 every 10 levels from the real generator show dead-end count and length, route count and corridor shape",
+        "At least 4 candidate generation rules are shown side by side with today on the live app, with the same metrics",
+        "The owner picks before any generator change, and the difficulty tuner and progression ladder still hold after the pick"
+      ]
+    },
+    {
+      "id": "MAZER-UI-102",
+      "status": "in_progress",
+      "updatedAt": "2026-11-20T01:13:32.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-102",
+      "title": "Dark mode setting with neon purple UI",
+      "description": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Settings has a Dark mode toggle that switches the whole game to the neon purple on dark look and back",
+        "Every screen and the board follow the theme with readable contrast and the setting is remembered",
+        "Live-app demo of the theme matches the live game except the colours before any merge"
+      ]
+    },
+    {
+      "id": "MAZER-ACCT-047",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:48.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ACCT-047",
+      "title": "Edit the username only on the account site; retire leaderboard Edit name",
+      "description": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The account site lets a signed-in player change their username with the existing hardened rename path and plain errors",
+        "Mazer leaderboard and the Choose a username gate no longer offer Edit name, and point to the account site instead",
+        "Rename still shows on the leaderboard and header after the change and no database change is made"
+      ]
+    },
+    {
+      "id": "MAZER-CTRL-007",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:37.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-CTRL-007",
+      "title": "Lock controls until the maze finishes generating",
+      "description": "In a played game, moving the player while the maze is still generating skips the generation animation and jumps to the finished maze. Input must be ignored until generation is done. Board update 2026-11-20: Controls stay off while the maze generates; merged and deployed; headless only, awaiting phone check PR #677 merged (9cee1555). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Touch, drag, keyboard and gamepad input are ignored while the maze generates and the generation plays to the end",
+        "Controls work on the first frame after generation ends and the timer starts only then",
+        "A test proves a move during generation changes nothing and Reduce Motion generation also locks input"
+      ]
+    },
+    {
+      "id": "MAZER-VIS-068",
+      "status": "review",
+      "updatedAt": "2026-11-20T08:08:31.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-VIS-068",
+      "title": "Fix the bottom corner stars cut off in portrait on iPhone",
+      "description": "Owner reported the bottom corner stars are cut off in portrait on his iPhone 16; the earlier fix covered only landscape and iPad. Board update 2026-11-20: Bottom corner stars clear the rounded display corner; merged and deployed; headless only, awaiting phone check PR #676 merged (fb49f832). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "bug",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "At 390x844 and 393x852 with safe areas emulated, all four corner stars show in full",
+        "A test pins the corner star bounds against the safe area",
+        "Before and after crops of the real app show the fix"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-016",
+      "status": "planning",
+      "updatedAt": "2026-11-20T02:44:36.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-016",
+      "title": "Full performance pass and a permanent regression guard",
+      "description": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "A measured baseline and after table for boot time, steady frame cost and walking frame cost on a throttled phone profile at levels 1, 120 and 300",
+        "Every hotspot found is fixed or has a recorded reason and the top three are fixed",
+        "An automated budget check in CI fails when frame cost or bundle size regresses past the recorded limits"
       ]
     }
   ]
