@@ -55,6 +55,7 @@ import {
   REDUCED_MOTION_SETTING_OFF_LABEL,
   REDUCED_MOTION_SETTING_ON_LABEL
 } from '../render/reducedMotion';
+import { DARK_MODE_SETTING_DESCRIPTION, DARK_MODE_SETTING_LABEL } from './legacyDarkModePreference';
 import { designTokens } from '../theme/tokens';
 import {
   LEGACY_FLOATING_ANCHOR_DESCRIPTION,
@@ -76,7 +77,9 @@ export type LegacySettingsToggleKey =
   | 'hapticsEnabled'
   | 'soundEnabled'
   // MAZER-L9: device-local (legacyFloatingAnchorPreference), not a LegacySettings key.
-  | 'floatingAnchorControls';
+  | 'floatingAnchorControls'
+  // MAZER-UI-102: device-local (legacyDarkModePreference.ts), not a LegacySettings key; flipping it reloads the game.
+  | 'darkMode';
 
 export type LegacySettingsRowId =
   | 'rotate-notice'
@@ -88,6 +91,7 @@ export type LegacySettingsRowId =
   | 'haptics'
   | 'sound'
   | 'floating-anchor'
+  | 'dark-mode'
   | 'account-heading'
   | 'reset-progress'
   | 'sign-out'
@@ -290,6 +294,12 @@ export const LEGACY_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRowModel[
     offLabel: 'Off',
     onLabel: 'On',
     settingKey: 'floatingAnchorControls'
+  }),
+  // MAZER-UI-102: the one dark-mode switch, default off, this device only (src/legacy-runtime/legacyDarkModePreference.ts).
+  settingRow('dark-mode', 'toggle', DARK_MODE_SETTING_LABEL, DARK_MODE_SETTING_DESCRIPTION, {
+    offLabel: 'Off',
+    onLabel: 'On',
+    settingKey: 'darkMode'
   })
 ]);
 

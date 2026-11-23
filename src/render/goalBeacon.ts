@@ -31,6 +31,7 @@ import {
   resolveGoalEffectiveTile,
   BOARD_TILE_GEOMETRY
 } from './boardTileStyle';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export const GOAL_BEACON = Object.freeze({
   /** Halo outer radius: at least this many css px from the cell centre... */
@@ -122,7 +123,7 @@ export interface GoalBeaconDrawInput extends GoalBeaconInput {
 }
 
 /** Paints the halo and ping into `ctx` (a Phaser Graphics adapter in the game, any 2D context in tests). */
-export const drawGoalBeacon = (ctx: TileBakeContext2D, input: GoalBeaconDrawInput): GoalBeaconSpec => {
+const drawGoalBeaconImpl = (ctx: TileBakeContext2D, input: GoalBeaconDrawInput): GoalBeaconSpec => {
   const spec = resolveGoalBeacon(input);
   const scale = clampBoardDevicePixelRatio(input.devicePixelRatio);
   const [cx, cy] = centerOfCell(input.goal, input.tileSize, scale, input.originX, input.originY);
@@ -162,3 +163,6 @@ export const drawGoalBeacon = (ctx: TileBakeContext2D, input: GoalBeaconDrawInpu
   ctx.restore();
   return spec;
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawGoalBeacon: typeof drawGoalBeaconImpl = (...args: Parameters<typeof drawGoalBeaconImpl>) => withCosmeticColours(() => drawGoalBeaconImpl(...args));

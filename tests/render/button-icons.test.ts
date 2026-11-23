@@ -222,7 +222,7 @@ describe('menu toggle: the hamburger-to-X morph is unchanged, only its look is C
   test('the toggle redraws only when progress, open or pressed changes (bake-once cost)', () => {
     const buttons = read('src/render/menuDropdownButtons.ts');
     expect(buttons).toContain('const key = `${progress.toFixed(3)}|${open}|${pressed}`;');
-    expect(buttons).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);');
+    expect(buttons).toContain('drawMenuBurgerGlyph(graphics, 0, 0, size, progress, themeIconColor(MENU_DROPDOWN_FOREGROUND), 1, pressed);');
   });
 });
 

@@ -123,8 +123,8 @@ describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (leg
     const menu = buildLegacySettingsSheetModel('menu', { signedIn: true });
     const pause = buildLegacySettingsSheetModel('pause');
     const groupIds = (model: typeof menu) => model.sections.find((section) => section.id === 'settings')!.rows.map((row) => row.id);
-    expect(groupIds(menu)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
-    expect(groupIds(pause)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
+    expect(groupIds(menu)).toEqual(['reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
+    expect(groupIds(pause)).toEqual(['reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     const allMenuIds = menu.sections.flatMap((section) => section.rows.map((row) => row.id));
     for (const moved of LEGACY_SETTINGS_MOVED_TO_MENU_ROW_IDS) {
       expect(allMenuIds, moved).not.toContain(moved);
@@ -218,7 +218,7 @@ describe('MAZER-UI-095 in-game Menu rows (legacyPlayMenu.ts)', () => {
 
   test('the Settings sheet the Settings row opens no longer has Guide, Sound or Main menu', () => {
     const ids = buildLegacySettingsSheetModel('pause').sections.flatMap((section) => section.rows.map((row) => row.id));
-    expect(ids).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(ids).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     expect(LEGACY_PLAY_MENU_LABELS.guide).toBe('Guide');
   });
 });

@@ -26,7 +26,7 @@ describe('settings sheet: Level Preview section (pause only, opt-in)', () => {
     const pause = buildLegacySettingsSheetPlan({ context: 'pause', height: 844, settingsExpanded: true, width: 390 });
     // MAZER-UI-095: Guide, Sound and Quit moved to the in-game Menu dropdown, so the settings group is always open.
     expect(pause.items.map((item) => item.model.id)).toEqual([
-      'resume', 'reduce-motion', 'haptics', 'floating-anchor'
+      'resume', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode'
     ]);
     const withIgnoredOption = buildLegacySettingsSheetPlan({
       context: 'menu', height: 844, levelPreview: preview(100), signedIn: true, width: 390
@@ -40,7 +40,7 @@ describe('settings sheet: Level Preview section (pause only, opt-in)', () => {
     });
     expect(plan.items.map((item) => item.model.id)).toEqual([
       'resume', 'account-heading', 'preview-next', 'preview-prev', 'preview-jump-disclosure',
-      'reduce-motion', 'haptics', 'floating-anchor'
+      'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode'
     ]);
     const labels = plan.items.map((item) => item.model.label);
     expect(labels).toContain('Level preview L100');

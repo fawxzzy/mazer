@@ -33,6 +33,7 @@ import type { EndpointTileRect } from './endpointTiles';
 import { cssRgb, cssRgba } from './boardTileStyle';
 import { SEED_SPIRAL_GREEN, START_PINWHEEL_CORE } from './palette';
 import type { EndpointSkinPainter } from './endpointTileSkins';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 const TAU = Math.PI * 2;
 
@@ -338,7 +339,7 @@ export const START_PINWHEEL_PAINT_OPS = 3 + START_PINWHEEL.fadeBands;
  * Paints the pinwheel at `rotation` (use a clock's quantised rotation): blade keyline ring, hub keyline, the nested fade
  * fills, then the opaque hub. `alpha` multiplies every fill (the baked strip paints at 1 and breathes through its Image).
  */
-export const drawStartPinwheel = (
+const drawStartPinwheelImpl = (
   p: EndpointSkinPainter,
   ink: number,
   spec: StartPinwheelSpec,
@@ -381,3 +382,6 @@ export const drawStartPinwheel = (
   tracePolygon(p, shape.core);
   p.fill();
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawStartPinwheel: typeof drawStartPinwheelImpl = (...args: Parameters<typeof drawStartPinwheelImpl>) => withCosmeticColours(() => drawStartPinwheelImpl(...args));

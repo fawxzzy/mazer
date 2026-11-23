@@ -96,8 +96,8 @@ describe('guide structure', () => {
     expect(sceneMethod('private selectLegacyMainMenuRow(')).toMatch(/case 'guide':[\s\S]*?this\.settingsGuideOpen = true;/);
   });
 
-  test('MAZER-UI-095/096: the Menu row says the button pauses a game, and the Sound row points at the Menu (both Menus have a Sound row)', () => {
-    expect(row('menu').text).toMatch(/Mid-game it pauses/);
+  test('MAZER-UI-095/096: the Menu row names Dark mode under Settings, and the Sound row points at the Menu (both Menus have a Sound row)', () => {
+    expect(row('menu').text).toMatch(/Settings \(Dark mode\)/);
     expect(MENU_SCENE).toContain('this.drawLegacyPlayMenuControl(controls.pause, time);');
     expect(row('sound').text).toMatch(/Turn it off from the Menu\.$/);
     // Menu > Sound on both screens; no Settings sheet carries a Sound row any more.

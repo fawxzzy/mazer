@@ -55,10 +55,10 @@ describe('settings sheet model', () => {
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
     expect(pauseGroup.rows).toBe(LEGACY_PAUSE_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     expect(LEGACY_SETTINGS_MOVED_TO_MENU_ROW_IDS).toEqual(['how-to-play', 'sound']);
     // Zac expected two remaining settings; the floating-anchor toggle (a real setting) is the third.
-    expect(LEGACY_PAUSE_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor']);
+    expect(LEGACY_PAUSE_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     for (const pauseRow of LEGACY_PAUSE_SETTINGS_GROUP_ROWS) {
       expect(LEGACY_SETTINGS_GROUP_ROWS).toContain(pauseRow);
     }
@@ -80,7 +80,7 @@ describe('settings sheet model', () => {
   test('MAZER-UI-100: neither sheet has Reset progress or Sign out (they live on the account page); pause keeps Resume, its Quit, Guide and Sound moved to the Menu', () => {
     for (const signedIn of [true, false]) {
       const menuIds = buildLegacySettingsSheetModel('menu', { signedIn }).sections.flatMap((s) => s.rows.map((r) => r.id));
-      expect(menuIds).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor']);
+      expect(menuIds).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
       expect(buildLegacySettingsSheetModel('menu', { signedIn }).sections.map((s) => s.id)).not.toContain('account');
     }
     const menuIds = buildLegacySettingsSheetModel('menu', { signedIn: true }).sections.flatMap((s) => s.rows.map((r) => r.id));
@@ -133,7 +133,8 @@ describe('settings sheet model', () => {
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
       ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off'],
-      ['Floating anchor', 'On', 'Off']
+      ['Floating anchor', 'On', 'Off'],
+      ['Dark mode', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
       expect(toggle.label).not.toContain(':');
@@ -246,7 +247,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
     test('MAZER-UI-100: no danger rows; the menu sheet ends on its last setting', () => {
       const p = plan('menu', viewport);
       expect(p.items.some((i) => i.model.emphasis === 'danger' || i.model.emphasis === 'danger-outline')).toBe(false);
-      expect(p.items.at(-1)!.model.id).toBe('floating-anchor');
+      expect(p.items.at(-1)!.model.id).toBe('dark-mode');
       // The token stays on the scale for any future destructive row.
       expect(designTokens.spacingPx).toContain(LEGACY_SETTINGS_DANGER_SEPARATION);
     });
@@ -283,7 +284,7 @@ describe.each(LEGACY_SETTINGS_PLAN_VIEWPORTS.map((v) => [`${v.width}x${v.height}
 describe('settings sheet plan specifics', () => {
   test('MAZER-UI-095: the in-game Settings sheet is Resume then the three remaining settings (no Guide, Sound or Quit row)', () => {
     const p = plan('pause', { height: 844, width: 390 });
-    expect(p.items.map((i) => i.model.id)).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(p.items.map((i) => i.model.id)).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     expect(p.settingsExpanded).toBe(true);
     expect(p.scrollable).toBe(false);
   });
@@ -291,11 +292,12 @@ describe('settings sheet plan specifics', () => {
   test('menu is always open: Back to Menu, then the three settings (MAZER-UI-100: no Account section)', () => {
     const p = plan('menu', { height: 844, width: 390 });
     expect(p.settingsExpanded).toBe(true);
-    expect(p.items.map((i) => i.model.id)).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(p.items.map((i) => i.model.id)).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
   });
 
-  test('the small menu sheet fits without scrolling even at 320x568; titles come from the model', () => {
-    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(false);
+  test('the small menu sheet fits without scrolling on every phone except 320x568 (Dark mode row, MAZER-UI-102); titles come from the model', () => {
+    expect(plan('menu', { height: 740, width: 360 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
     const wide = plan('menu', { height: 720, width: 1280 });
     expect(wide.title.text).toBe('Settings');
     expect(plan('pause', { height: 720, width: 1280 }).title.text).toBe('Settings');
@@ -383,10 +385,11 @@ describe('scroll rail and narrow rows (wiring lane, 2026-11-06)', () => {
       }
     }
     // MAZER-UI-096: How to play and Sound left the main-menu sheet for the Menu dropdown, and MAZER-UI-100 moved
-    // Reset progress and Sign out to the account page, so the sheet fits on every phone, 320x568 included.
+    // Reset progress and Sign out to the account page, so the sheet fits on every phone. MAZER-UI-102 added the Dark
+    // mode row (4 settings, 562 px of content): it still fits 390x844 and 412x915, and only 320x568 (body 458) scrolls.
     expect(plan('menu', { height: 844, width: 390 }).scrollable).toBe(false);
     expect(plan('menu', { height: 915, width: 412 }).scrollable).toBe(false);
-    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(false);
+    expect(plan('menu', { height: 568, width: 320 }).scrollable).toBe(true);
   });
 
   test('at 320 wide the Reduce Motion label column still holds its widest word and the state column holds "System"', () => {
@@ -474,7 +477,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
       expect(rows.map((r) => r.label)).not.toContain(retired);
     }
     expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
-      .toEqual(['floatingAnchorControls', 'hapticsEnabled', 'toggleReducedMotion']);
+      .toEqual(['darkMode', 'floatingAnchorControls', 'hapticsEnabled', 'toggleReducedMotion']);
   });
 
   test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {

@@ -1,3 +1,4 @@
+import '../theme/themeBoot';
 import Phaser from 'phaser';
 import '../styles/base.css';
 import {
