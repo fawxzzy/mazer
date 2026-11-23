@@ -238,7 +238,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'menu',
-    text: 'Tap the three lines at the top right for Settings, Profile and the Leaderboard.'
+    text: 'Tap the three lines at the top right for Settings (Dark mode), Profile and Leaderboard.'
   },
   {
     heading: 'Sound',

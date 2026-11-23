@@ -26,6 +26,7 @@
 import { chunkTrailSegments, type TrailCanvasSegment } from './navigationCoreTrailCanvas';
 import { drawTrailBloomChunks } from './trailLayersCanvas';
 import { PALETTE_WHITE, mixPaletteRgb } from './trailPalette';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export const STAR_DUST_TRAIL = Object.freeze({
   /** Distance between sparkle centres along the route, in tiles. */
@@ -289,7 +290,7 @@ const traceStarGraphics = (g: StarDustGraphics, base: number, waist: number): vo
  * The star-dust trail, still (no twinkle, no spin), through Phaser Graphics: the Guide's trail legend. Same placement,
  * sizes, keyline and colours as the board; no bloom (the legend has no canvas). Returns the sparkle count.
  */
-export const drawStarDustToGraphics = (
+const drawStarDustToGraphicsImpl = (
   g: StarDustGraphics,
   segments: readonly StarDustSegment[],
   options: { tileSize: number; threadWidth: number; keylineColor: number; keylineAlpha: number }
@@ -322,7 +323,7 @@ export const drawStarDustToGraphics = (
 };
 
 /** Draws the star-dust trail into the trail canvas (already cleared and transformed by the caller). Returns the sparkle count. */
-export const drawStarDustTrailToCanvasContext = (
+const drawStarDustTrailToCanvasContextImpl = (
   ctx: CanvasRenderingContext2D,
   segments: readonly StarDustSegment[],
   options: StarDustDrawOptions
@@ -387,3 +388,7 @@ export const drawStarDustTrailToCanvasContext = (
   ctx.restore();
   return count;
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawStarDustToGraphics: typeof drawStarDustToGraphicsImpl = (...args: Parameters<typeof drawStarDustToGraphicsImpl>) => withCosmeticColours(() => drawStarDustToGraphicsImpl(...args));
+export const drawStarDustTrailToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => drawStarDustTrailToCanvasContextImpl(...args));

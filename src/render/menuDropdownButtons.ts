@@ -27,6 +27,7 @@ import {
   drawMenuDropdownPanel
 } from './menuDropdownArt';
 import { toCyberArcadeCssHex } from './cyberArcadeMaterial';
+import { themeIconColor } from '../theme/themes';
 import { resolveButtonIconPressedTextureKey } from './buttonIcons';
 
 /** Invisible hit zones (alpha 0.001 so Phaser still hit-tests them); the colour is a theme token, never seen. */
@@ -219,7 +220,7 @@ export class LegacyMenuDropdownController {
         graphics.clear();
         // MAZER-UI-097: one ink for the lines in both states, like C (menu / menuOpen); the X is marked by its cyan dust
         // dot. The ink stays the foreground the Guide's Menu row passes, so the guide and the button remain one draw.
-        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, MENU_DROPDOWN_FOREGROUND, 1, pressed);
+        drawMenuBurgerGlyph(graphics, 0, 0, size, progress, themeIconColor(MENU_DROPDOWN_FOREGROUND), 1, pressed);
       }
       if (this.state.open) {
         graphics.setAlpha(1).setScale(1);
