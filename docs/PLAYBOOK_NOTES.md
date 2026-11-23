@@ -657,3 +657,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: #678 and #680 each re-baselined this check against a main that lacked the other, so after both merged the cornerNW crop exceeded the 40px region limit and main CI failed.
 - Evidence: `node scripts/analysis/verify-trail-corner-raster.mjs --skip-build` 4/4 on two consecutive runs after the update; cornerNW PNG viewed (pointed stars, Pinwheel start, red end star, trail).
 - Rule: when two PRs both regenerate the raster baselines, re-run the raster check on the merged main before the second merge, or re-baseline after the last one lands.
+
+## 2026-11-23 MAZER-UI-102: Settings > Dark mode (neon purple UI, skins keep their colours)
+
+- WHAT changed: one new Settings row, "Dark mode" (device-local `mazer.dark-mode.v1`, default OFF). On gives a near-black look with every UI accent in one neon magenta-purple, across the menu, play HUD, Settings, Guide, Leaderboard, Profile and the dropdown. The Guide menu line names it (87 chars, cap 90).
+- HOW: the theme is chosen once at boot (`src/theme/themeBoot.ts`, first import in `main.ts`). When on, `darkThemeCanvasBridge.ts` maps colours at the canvas boundary (2D context fill/stroke/shadow/gradient stops, Phaser Graphics fillStyle/lineStyle when recorded, the HUD icon bitmap, DOM tokens, theme-color) from `themes.ts` tokens, so no per-literal edits in MenuScene. When off nothing is installed: the default path is the shipping app.
+- Decision: toggling saves and reloads (160 ms) instead of live swapping, because boards, tiles, the star field and bitmap strips are baked once under one theme. Decision: cosmetics keep their own colours (owner's recommended option); player, trail, start Pinwheel, end star, edge stars/beams and the bleed glow draw inside `withCosmeticColours` (`cosmeticScope.ts`). One dark theme only; Reduce Motion is untouched.
+- Rule: a new cosmetic draw function must wrap its body in `withCosmeticColours`, or dark mode will recolour it.
+- Left: `index.html` boot splash is static teal, so dark mode shows one brief teal flash before the first frame. Nothing was checked on a real phone.
+- Raster baselines: another open PR touches `tests/fixtures/trail-corner-raster`; this PR does not change them (default theme only).

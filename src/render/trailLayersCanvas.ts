@@ -10,6 +10,7 @@
  */
 import { chunkTrailSegments, type TrailCanvasSegment } from './navigationCoreTrailCanvas';
 import { resolveTrailBloomClip } from './trailBloomClip';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export interface TrailLayerSegment extends TrailCanvasSegment {
   /** Alpha for the underlay, independent of `alpha` (the age fade). Falls back to `alpha`. */
@@ -182,7 +183,7 @@ export const drawTrailBloomChunks = (
   }
 };
 
-export const drawTrailLayersToCanvasContext = (
+const drawTrailLayersToCanvasContextImpl = (
   ctx: CanvasRenderingContext2D,
   segments: readonly TrailLayerSegment[],
   options: TrailLayersOptions
@@ -216,3 +217,6 @@ export const drawTrailLayersToCanvasContext = (
   }
   ctx.restore();
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawTrailLayersToCanvasContext: typeof drawTrailLayersToCanvasContextImpl = (...args: Parameters<typeof drawTrailLayersToCanvasContextImpl>) => withCosmeticColours(() => drawTrailLayersToCanvasContextImpl(...args));

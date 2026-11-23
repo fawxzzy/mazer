@@ -60,6 +60,7 @@ import {
   resolveBleedGateBrackets,
   type BleedGateBracketPlan
 } from './bleedGateTileLook';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 /** The goal star's border when the caller has no live trail colour (the Guide icon): the player colour at the trail's start, read per call. */
 const resolveStaticEndpointBorderColor = (): number => resolveSharedBorderColor(null, 0, true);
@@ -1566,7 +1567,7 @@ const standaloneEndpointRect = (
  * the baked tile (no box behind them), placed from `startTile` / `goalTile` (the baked tile's geometry). The start
  * arrow points along `startTile.direction`. Trace style: the alternate marker artwork, unchanged.
  */
-export const drawBoardMarkers = (ctx: TileBakeContext2D, input: BoardMarkerInput): BoardMarkerStats => {
+const drawBoardMarkersImpl = (ctx: TileBakeContext2D, input: BoardMarkerInput): BoardMarkerStats => {
   const scale = clampBoardDevicePixelRatio(input.devicePixelRatio);
   const styleId = resolveBoardTileStyleId(input.style ?? DEFAULT_BOARD_TILE_STYLE);
   const style = resolveBoardTileStyle(styleId, input.tileSize, scale);
@@ -1763,3 +1764,6 @@ export const slotPatrol = (_ctx: TileBakeContext2D | null, input: BoardSlotInput
 };
 
 export type { BoardTileStyleId, ResolvedBoardTileStyle } from './boardTileStyle';
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawBoardMarkers: typeof drawBoardMarkersImpl = (...args: Parameters<typeof drawBoardMarkersImpl>) => withCosmeticColours(() => drawBoardMarkersImpl(...args));

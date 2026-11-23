@@ -29,7 +29,9 @@ const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.css'];
 /** Files that DEFINE colour values. Everything else must reference them. */
 const OFF_THEME_ALLOWLIST_FILES = [
   'src/render/palette.ts',
-  'src/render/trailPalette.ts'
+  'src/render/trailPalette.ts',
+  // MAZER-UI-102: the dark theme's token values and source-to-role map define colours.
+  'src/theme/themes.ts'
 ] as const;
 /** Prefix allowlist: src/theme/tokens.ts and src/theme/tokens.css. */
 const OFF_THEME_ALLOWLIST_PREFIXES = ['src/theme/tokens.'] as const;
@@ -131,6 +133,7 @@ describe('off-theme colour literal ratchet (MAZER-UI-013)', () => {
   it('allowlists exactly the files that define colours and nothing else', () => {
     expect(isAllowlisted('src/render/palette.ts')).toBe(true);
     expect(isAllowlisted('src/render/trailPalette.ts')).toBe(true);
+    expect(isAllowlisted('src/theme/themes.ts')).toBe(true);
     expect(isAllowlisted('src/theme/tokens.ts')).toBe(true);
     expect(isAllowlisted('src/theme/tokens.css')).toBe(true);
     expect(isAllowlisted('src/scenes/MenuScene.ts')).toBe(false);
