@@ -2,6 +2,10 @@
  * MAZER-VIS-035: a small share of the background stars keep a rainbow-y hue that drifts slowly through the spectrum.
  * Pure policy and colour maths, no Phaser, DOM, randomness or wall clock (MenuScene.drawBackdrop paints; this decides).
  *
+ * MAZER-VIS-066 (2026-11-19) supersedes the ~20 % rainbow subset: every star now takes its colour from
+ * src/render/backdropStarShapes.ts (one slow sweep across the screen, gate cyan guarded). The colour-only redraw
+ * gate (stepBackdropColourRedraw) here is still what keeps the sweep moving under Reduce Motion.
+ *
  * Owner request, 2026-11-13: "can we make some of the stars in the background still rainbow-y colour". The word
  * "still" points at the colour-shifting backdrop stars the owner remembers; the coloured four-point sparkles were
  * retired on 2026-11-10 (src/render/backdropStars.ts) and the stars have been white, pale blue and warm white since.

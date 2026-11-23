@@ -2,6 +2,8 @@
 
 Owner request, 2026-11-13, verbatim: "can we make some of the stars in the background still rainbow-y colour".
 
+> Superseded 2026-11-19 by MAZER-VIS-066 (owner pick, star set d "Mixed"): every star is now a real star shape (dot, four-point sparkle or five-point star) and every star takes part in one slow rainbow sweep (`src/render/backdropStarShapes.ts`, `src/render/backdropStarSprites.ts`). Reduce Motion still stops movement and keeps the colour moving. The text below is the 2026-11-13 state, kept for history.
+
 ## Decided direction kept
 
 - Dark neon look, tile style B "Chip", board size and zoom: untouched.

@@ -102,6 +102,13 @@ export interface LegacyMazeGenerationProfile {
   // MAZER-L8: 'least-saving' picks each mandatory bleed-off line by trial (the line whose wrap saves a
   // modest share of the shortest route) instead of the carve-cost pick. Absent keeps the seeded pick exactly.
   bleedPlacement?: 'least-saving';
+  // MAZER-UI-098: the smallest grid axis for this board (15..25). Absent keeps the floor of 25. Set only by the
+  // play surface under size rule 2, whose early boards are smaller than 25 on their short axis.
+  minGridAxis?: number;
+  // MAZER-UI-098: true scales a ladder level's felt targets with the board past the reference board
+  // (legacyGeometryBudget.ts, resolveGeometryBudgetBoardFeltPermille). Set only on size-rule-2 play profiles,
+  // whose late boards outgrow the board the felt ladder was calibrated on. Absent keeps every target exactly.
+  feltScalesWithBoard?: true;
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -336,6 +343,17 @@ export interface LegacyMazeSnapshot {
 }
 
 const LEGACY_MIN_SCALE = 25;
+// MAZER-UI-098: the smallest grid axis. Every board keeps the old floor of 25 per axis (LEGACY_MIN_SCALE)
+// unless its generation profile carries minGridAxis: size rule 2 (the zoomed-in early play levels, level 1 at
+// scale 22, about 15 x 31 on a phone) sets 15. Rule-1 boards and every profile without the field generate
+// exactly the grids they did before.
+export const LEGACY_MIN_GRID_AXIS = 15;
+export const LEGACY_DEFAULT_MIN_GRID_AXIS = LEGACY_MIN_SCALE;
+const resolveMinGridAxis = (minAxis: number | undefined): number => (
+  typeof minAxis === 'number' && Number.isFinite(minAxis)
+    ? clampInteger(minAxis, LEGACY_MIN_GRID_AXIS, LEGACY_DEFAULT_MIN_GRID_AXIS)
+    : LEGACY_DEFAULT_MIN_GRID_AXIS
+);
 export const LEGACY_JOURNEY_MAX_LEGS = 4;
 const LEGACY_MAX_SCALE = 150;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
@@ -388,6 +406,13 @@ export const normalizeLegacyMazeGenerationProfile = (
   ),
   ...(profile?.journeyStart === true ? { journeyStart: true } : {}),
   ...(profile?.bleedPlacement === 'least-saving' ? { bleedPlacement: 'least-saving' as const } : {}),
+  // Same rule: only materialised below the default floor, so every other profile keeps its exact prior shape.
+  ...(
+    typeof profile?.minGridAxis === 'number' && resolveMinGridAxis(profile.minGridAxis) < LEGACY_DEFAULT_MIN_GRID_AXIS
+      ? { minGridAxis: resolveMinGridAxis(profile.minGridAxis) }
+      : {}
+  ),
+  ...(profile?.feltScalesWithBoard === true ? { feltScalesWithBoard: true as const } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
@@ -411,10 +436,11 @@ const createSeededRng = (seed: number): (() => number) => {
 // axis still gets the same clamp+odd-size treatment a single square scale
 // used to get (odd sizes keep a true center cell for symmetric border/
 // corner logic on that axis).
-export const normalizeGridDimension = (scale: number): number => {
-  const clamped = clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE);
+export const normalizeGridDimension = (scale: number, minAxis?: number): number => {
+  const floor = resolveMinGridAxis(minAxis);
+  const clamped = clampInteger(scale, floor, LEGACY_MAX_SCALE);
   const normalized = clamped % 2 === 0 ? clamped - 1 : clamped;
-  return Math.max(LEGACY_MIN_SCALE, normalized);
+  return Math.max(floor, normalized);
 };
 
 // A single "scale" figure for shortcut-count budgeting where a square value
@@ -3086,8 +3112,9 @@ export const createLegacyMaze = (
   shortcutCount?: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyMazeSnapshot => {
-  const normalizedWidth = normalizeGridDimension(width);
-  const normalizedHeight = normalizeGridDimension(height);
+  const minGridAxis = generationProfile?.minGridAxis;
+  const normalizedWidth = normalizeGridDimension(width, minGridAxis);
+  const normalizedHeight = normalizeGridDimension(height, minGridAxis);
   const linearSize = (normalizedWidth + normalizedHeight) / 2;
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   if (profile.layout === 'corridor') {

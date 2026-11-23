@@ -169,9 +169,14 @@ describe('guide copy only names things that exist', () => {
     }
   });
 
-  test('Start row: Chip draws the start end marker (a gold spiral that turns slowly in step with the end star, MAZER-VIS-053) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
+  test('Start row: Chip draws the start end marker (the Pinwheel, MAZER-VIS-065; it replaced the Seed spiral) and the Guide has a Start row drawn by the same function; the copy names no colour', () => {
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'start')).toBe(true);
-    expect(row('start').text).toMatch(/spiral on the first tile is where you set off/);
+    expect(row('start').text).toMatch(/spinning pinwheel on the first tile is where you set off/);
+    expect(row('start').text).not.toMatch(/spiral/i);
+    // the default start skin is the Pinwheel, drawn by drawBoardMarkers (Guide) and baked once as a strip (play scene)
+    expect(read('src/render/endpointTileSkins.ts')).toContain("DEFAULT_START_TILE_SKIN: DrawableStartTileSkinId = 'blade-pinwheel'");
+    expect(read('src/render/boardTileBake.ts')).toMatch(/drawStartPinwheel\(/);
+    expect(read('src/render/startPinwheelLayer.ts')).toMatch(/drawStartPinwheel\(/);
     expect(row('start').text).not.toMatch(/ring|tile pad|tinted/i);
     expect(row('start').text).not.toMatch(/bracket/i);
     expect(row('start').icon.chipDraw?.marker).toBe('start');

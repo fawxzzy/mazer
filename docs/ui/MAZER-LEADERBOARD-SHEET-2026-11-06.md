@@ -46,7 +46,7 @@ Leaderboard                      title (shared createOverlayTitle)
 | error (not set up) | `Leaderboard not ready` / `It isn’t available yet. Check back soon.` | Retry |
 | offline (`navigator.onLine === false` and nothing loaded) | `You’re offline` / `Reconnect to see the leaderboard. Your progress is saved on this device.` | Retry |
 | signed out | `Sign in to see the board` / `Sign in to see where you stand among other players.` | Sign in |
-| username gate | `Choose a username` / `Players appear on the leaderboard by username.`; profile loading is a status line; profile unavailable retries | Go to Account / Retry |
+| username gate | `Choose a username` / `Choose it on the account site: open the menu and tap Profile.`; profile loading is a status line; profile unavailable retries | none (words only, MAZER-ACCT-047) / Retry |
 
 The source error strings in `legacyLeaderboard.ts` are matched (never displayed) to choose the designed state.
 Already-loaded rows are kept when a device goes offline later.
@@ -74,7 +74,14 @@ route, plus the fixture identity check in the RPC wrappers). Shapes: `top3` (you
 `legacy-leaderboard-fixture`, plus pins in `menu-render-frame` and the message-inventory guard.
 Guide: it does not describe the leaderboard, so no Guide copy changed (drift test unchanged).
 
-## Username editor (MAZER-ACCT-011, 2026-11-12)
+## Username editor (MAZER-ACCT-011, 2026-11-12) - REMOVED 2026-11-19 (MAZER-ACCT-047)
+
+Superseded: the owner decided names are changed only on the account site (account.fawxzzy.com, Profile, behind its
+password check). The `Edit name` action, the empty-board offer (MAZER-ACCT-022), the gate action and the inline editor
+(`legacyLeaderboardUsernameEditor.ts`, `legacyAuthInputGeometry.ts`, the MenuScene editor, `saveLegacyAccountUsername`,
+`checkLegacyUsernameAvailable`) are deleted; the unused save-failure copy in `legacyPlayerMessage.ts` (Wave 3B) waits for a follow-up. The gate and the pinned You row now carry plain
+words pointing to the menu's Profile item; the You row hint is one 12 px muted line under the row. The text below is
+kept as history only.
 
 Accounts created on the account host get a generated `Mazer-######` handle and Mazer has no Account-sheet editor any more,
 so the Leaderboard carries a small one. The pinned You row shows an `EDIT NAME` chip (the whole 56 px row is the hit

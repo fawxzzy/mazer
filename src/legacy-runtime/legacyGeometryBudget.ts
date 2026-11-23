@@ -511,6 +511,29 @@ export const resolveGeometryBudgetBoardFillFloor = (fillFloor: number, boardCell
   return Math.floor((fillFloor * boardCells) / GEOMETRY_BUDGET_FILL_REFERENCE_CELLS);
 };
 
+// MAZER-UI-098: BOARD FELT (size rule 2 only, profile.feltScalesWithBoard). The schedule, ceiling and floors above
+// were measured on boards of scale 35 to 40 (about 1,225 to 1,600 cells). Rule 2 grows the play board to scale 88
+// (about 7,700 cells) by level 250, and a maze tuned to the old felt number covers only a corner of it: the density
+// fill can only add branches the explorer does not pay for (one vision length past the walked maze), so floor
+// share fell from 31-40 percent to 22 at level 200 and 15 at level 250 (390x844, seed 777). So past the reference
+// scale the felt targets of a level (target, route target, ceiling, reverse floor) grow with the board's cell count,
+// (scale / reference)^2 in permille, which holds floor share where the rule-1 boards have it. Below the reference it
+// is exactly 1000: every early rule-2 level and every rule-1 board keep their targets. The factor is a pure,
+// nondecreasing function of the board scale, which is nondecreasing in the level, and the schedule rises by at least
+// GEOMETRY_BUDGET_MIN_STEP per level, so scaled targets of adjacent levels still differ by at least that step
+// (floor(a) - floor(b) > a - b - 1 >= 1 for a - b >= 2): the ladder stays strictly rising.
+export const GEOMETRY_BUDGET_FELT_REFERENCE_SCALE = 38;
+export const resolveGeometryBudgetBoardFeltPermille = (scale: number): number => {
+  if (!Number.isFinite(scale) || scale <= GEOMETRY_BUDGET_FELT_REFERENCE_SCALE) {
+    return 1000;
+  }
+  const reference = GEOMETRY_BUDGET_FELT_REFERENCE_SCALE * GEOMETRY_BUDGET_FELT_REFERENCE_SCALE;
+  return Math.floor((1000 * Math.round(scale * 10000) * Math.round(scale * 10000)) / (reference * 1e8));
+};
+export const scaleGeometryBudgetFelt = (value: number, permille: number): number => (
+  permille <= 1000 ? value : Math.floor((value * permille) / 1000)
+);
+
 // Longest deceptive branch the tuner carves in one move at level N: depth rises
 // with the level (8 cells at level 2 up to 40).
 export const resolveGeometryBudgetMaxBranch = (level: number): number => (

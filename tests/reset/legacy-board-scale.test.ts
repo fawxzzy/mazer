@@ -35,6 +35,8 @@ const phoneSweep = (): LegacyBoardPlanViewport[] => {
   return out;
 };
 
+// MAZER-UI-098: these pin size rule 1 (scale 38 toward 40, 10 px floor), which still builds the menu demo and
+// every board a caller pins to it; the play board's rule 2 is covered in legacy-board-size-rule2.test.ts.
 describe('MAZER-PROG-020 board scale and the tile floor', () => {
   test('level 1 starts at the base scale 38 and the curve is a function of the level only', () => {
     expect(LEGACY_BOARD_BASE_SCALE).toBe(38);
@@ -77,6 +79,7 @@ describe('MAZER-PROG-020 board scale and the tile floor', () => {
       for (const viewport of phones) {
         for (const surface of ['play', 'menu-demo'] as const) {
           const scale = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), {
+            sizeRule: 1,
             surface,
             viewport: { width: viewport.width, height: viewport.height, safeArea: viewport.safeArea, useFloatingTouchControls: true }
           }).scale;
@@ -125,6 +128,7 @@ describe('MAZER-PROG-020 board scale and the tile floor', () => {
       let previous = 0;
       for (let level = 1; level <= 1000; level += 1) {
         const scale = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), {
+          sizeRule: 1,
           surface,
           viewport: { width: phone.width, height: phone.height, safeArea: phone.safeArea, useFloatingTouchControls: true }
         }).scale;
@@ -148,7 +152,7 @@ describe('MAZER-PROG-020 board scale and the tile floor', () => {
           const viewport = { width, height, safeArea: { top: 0, bottom: 0 }, useFloatingTouchControls: true };
           let previous = 0;
           for (let level = 1; level <= 260; level += 1) {
-            const scale = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), { surface, viewport }).scale;
+            const scale = resolveLegacyProgressionScaleDetail(50, trackForLevel(level), { sizeRule: 1, surface, viewport }).scale;
             const label = `${width}x${height} ${surface} level ${level} s${scale}`;
             expect(planLegacyBoard(viewport, scale, surface === 'play' ? 'play' : 'menu').tileSize, label).toBeGreaterThanOrEqual(LEGACY_BOARD_MIN_TILE_PX);
             expect(scale, label).toBeGreaterThanOrEqual(previous);

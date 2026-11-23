@@ -29,15 +29,10 @@ describe('Mazer account username and progression repair', () => {
     expect(migration).toContain('revoke all on function mazer.mazer_set_username(uuid, text) from public, anon');
     expect(migration).not.toMatch(/grant\s+(insert|update|delete)\s+on\s+mazer\.mazer_profiles/i);
 
-    const saveSource = authSource.slice(
-      authSource.indexOf('export const saveLegacyAccountUsername = async ('),
-      authSource.indexOf('\n};', authSource.indexOf('export const saveLegacyAccountUsername = async (')) + 3
-    );
-    expect(saveSource).toContain("client.rpc('mazer_set_username'");
-    expect(saveSource).toContain('p_expected_user_id: userId');
-    expect(saveSource).toContain('p_username: username');
-    expect(saveSource).not.toContain(".from('mazer_profiles')");
-    expect(saveSource).not.toContain('.upsert(');
+    // The Mazer client no longer renames at all (MAZER-ACCT-047: the account site owns renames)
+    // and never writes the profile table directly.
+    expect(authSource).not.toContain("client.rpc('mazer_set_username'");
+    expect(authSource).not.toMatch(/\.from\('mazer_profiles'\)\s*\.(upsert|insert|update)\(/);
   });
 
   test('keeps the applied R019 bytes immutable and supersedes its classifier forward-only', () => {

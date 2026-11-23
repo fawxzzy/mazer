@@ -216,6 +216,10 @@ const main = async () => {
         // The counter is ~85 px wide at the leading edge. Cap the slot at 200 px so a wide desktop slot does not
         // pull in extra backdrop (a 1280 px slot from the edge to the title read a -5 px control delta once).
         const slot = { left: 0, right: Math.min(header.title.left, 200), top: 0, bottom: Math.max(header.menu.bottom, 64) };
+        // MAZER-VIS-066: every backdrop star now carries the rainbow sweep, which keeps shifting under Reduce Motion, so
+        // two released reads could differ by a couple of anti-aliased star edge pixels ("control delta must be exactly
+        // 0, got 2"). Hold the sweep for the measurement; it is diagnostics only and does not touch the counter.
+        await page.evaluate(() => window.__MAZER_QA__.holdBackdropColour(true));
         const { hiddenA, hiddenB, shown, hiddenAfter } = await measureSeries(page, slot, INK_FLOOR);
         const delta = shown.ink - hiddenA.ink;
         assert(delta >= MIN_COUNTER_DELTA_PIXELS, `${name}: the counter is not painted (ink ${shown.ink} shown vs ${hiddenA.ink} released, need delta >= ${MIN_COUNTER_DELTA_PIXELS})`);

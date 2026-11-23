@@ -43,8 +43,8 @@ describe('leaderboard non-populated states (MAZER-UI-017)', () => {
     }
     expect(view.exit.label).toBe('Back to Menu');
     // Failures and gates carry their own action; empty and transient states rely on the exit.
-    // (A named player's empty board also carries Edit name, MAZER-ACCT-022.)
-    if (!['empty', 'profile-loading'].includes(kind)) {
+    // The username gate points to Profile in words only (MAZER-ACCT-047).
+    if (!['empty', 'profile-loading', 'needs-username'].includes(kind)) {
       expect(view.state?.action?.label.length).toBeGreaterThan(0);
     }
     const shown = `${view.state?.heading ?? ''} ${view.state?.text ?? ''}`;

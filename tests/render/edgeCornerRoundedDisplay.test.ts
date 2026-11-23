@@ -6,6 +6,7 @@ import {
   EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX,
   EDGE_CORNER_ROUNDED_TIP_INSET_PX,
   hasRoundedBottomCorners,
+  resolveEdgeCornerBottomHiddenBand,
   resolveEdgeCornerBottomTipInset,
   resolveEdgeCornerTipInset,
   type EdgeCornerViewport
@@ -20,6 +21,9 @@ import {
 import {
   anchorStationToOuterTip,
   drawEdgeMarker,
+  EDGE_MARKER_MAX_EXTENT_PX,
+  resolveEdgeBottomCornerInset,
+  resolveEdgeBottomCornerRise,
   resolveEdgeMarkerPaintedPolygon,
   resolveEdgeStations,
   resolveOrbitingEdgeStations,
@@ -313,10 +317,46 @@ describe('bottom corner stars clear the real (continuous, up to R66) display cor
         }
         expect(bottomCircularDepth(samples, viewport, 55), `${label} circular R55`).toBeLessThanOrEqual(0);
         expect(bottomCircularDepth(samples, viewport, 48), `${label} circular R48`).toBeLessThanOrEqual(0);
+        const band = resolveEdgeCornerBottomHiddenBand(viewport);
+        if (band > 0) {
+          // MAZER-VIS-068: with a reported bottom safe area the star's painted bounds stay above it, and it does not drift further up
+          // than its own largest reach (it still reads as the corner star).
+          const lowestPaint = Math.max(...painted.map((point) => point.y));
+          expect(lowestPaint, `${label} above the bottom safe area`).toBeLessThanOrEqual(viewport.height - band);
+          expect(viewport.height - band - lowestPaint, `${label} gap above the safe area`).toBeLessThanOrEqual(EDGE_MARKER_MAX_EXTENT_PX * 2);
+          continue;
+        }
         // Still in the corner: the outer tip is within 1.5 css px of the R66 display edge (it does not drift inward).
         expect(bottomContinuousDepth(samples, viewport, EDGE_CORNER_DISPLAY_RADIUS_PX), `${label} distance from the R66 edge`).toBeGreaterThanOrEqual(-1.5);
       }
     }
+  });
+
+  test.each([
+    { name: 'iPhone 14 390x844', width: 390, height: 844, safeAreaBottom: 34 },
+    { name: 'iPhone 16 393x852', width: 393, height: 852, safeAreaBottom: 34 },
+    { name: 'iPhone 16 home screen 393x798', width: 393, height: 798, safeAreaBottom: 34 }
+  ])('MAZER-VIS-068 $name portrait: both bottom corner stars stay above the bottom safe area at every spin up to full size, inside the canvas', (phone) => {
+    const viewport = { width: phone.width, height: phone.height, safeAreaBottom: phone.safeAreaBottom };
+    const stations = resolveEdgeStations(viewport);
+    const safeBottom = phone.height - phone.safeAreaBottom;
+    for (const id of [4, 6] as const) {
+      const station = stations[id]!;
+      // Same side inset as VIS-056; only the height moved.
+      expect(Math.min(station.x, phone.width - station.x), `station ${id} side inset`).toBeCloseTo(Math.min(stations[id === 4 ? 6 : 4]!.x, phone.width - stations[id === 4 ? 6 : 4]!.x), 6);
+      for (let step = 0; step < 72; step += 1) {
+        const inwardAngle = (step / 72) * Math.PI * 2;
+        // Full size (1) is the largest reach; the scaled-down states are covered by the rest test above.
+        const painted = resolveEdgeMarkerPaintedPolygon({ x: station.x, y: station.y, inwardAngle }, 1);
+        const label = `station ${id} angle ${step * 5}`;
+        expectInsideCanvas(painted, viewport, label);
+        expect(Math.max(...painted.map((point) => point.y)), label).toBeLessThanOrEqual(safeBottom + 1e-9);
+      }
+    }
+    // Without a reported safe area the VIS-056 placement is unchanged.
+    const plain = resolveEdgeStations({ width: phone.width, height: phone.height });
+    expect(phone.height - plain[4]!.y).toBeCloseTo(resolveEdgeBottomCornerInset({ width: phone.width, height: phone.height }), 6);
+    expect(resolveEdgeBottomCornerRise({ width: phone.width, height: phone.height, safeAreaBottom: 0 })).toBeCloseTo(resolveEdgeBottomCornerInset({ width: phone.width, height: phone.height }), 6);
   });
 
   const orbitCases = VIS_056_PHONES.flatMap((phone) => [0, 34].map((safeAreaBottom) => ({ ...phone, safeAreaBottom })));
