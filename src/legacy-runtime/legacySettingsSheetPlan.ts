@@ -99,13 +99,17 @@ export type LegacySettingsRowId =
   | 'preview-next'
   | 'preview-prev'
   | 'preview-jump-disclosure'
-  | `preview-jump-${number}`;
+  | `preview-jump-${number}`
+  // MAZER-FLOW-019: the build stamp line at the foot of both sheets (legacyBuildStamp.ts).
+  | 'build-stamp';
 
 export type LegacySettingsRowKind =
   | 'action'
   | 'disclosure'
   | 'nav'
   | 'heading'
+  // MAZER-FLOW-019: one muted, non-interactive line in the description style (the build stamp).
+  | 'note'
   | 'toggle';
 
 export type LegacySettingsEmphasis = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'danger-outline';
@@ -168,7 +172,7 @@ export interface LegacySettingsSettingSectionModel extends LegacySettingsSection
 }
 
 export interface LegacySettingsChromeSectionModel extends LegacySettingsSectionBase {
-  id: 'pause-notice' | 'pause-top' | 'menu-top' | 'pause-bottom' | 'preview' | 'preview-jump';
+  id: 'pause-notice' | 'pause-top' | 'menu-top' | 'pause-bottom' | 'preview' | 'preview-jump' | 'build-stamp';
   rows: readonly LegacySettingsChromeRowModel[];
 }
 
@@ -203,6 +207,12 @@ export interface LegacySettingsModelOptions {
    * (legacyOrientationFlip.ts). Absent/false = default sheet, unchanged.
    */
   rotatePrompt?: boolean;
+  /**
+   * MAZER-FLOW-019: the build stamp line (`Build main-<hash> · <sha>`, legacyBuildStamp.ts) shown as the last row of
+   * both sheets. The scene passes it from the first paint, so the sheet never grows after it opens. Absent/empty = no
+   * row (the pure model stays free of DOM and build reads).
+   */
+  buildStamp?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -311,6 +321,19 @@ export const LEGACY_PAUSE_SETTINGS_GROUP_ROWS: readonly LegacySettingsSettingRow
 /** Separation between Reset progress and Sign out (spacing token 24). */
 export const LEGACY_SETTINGS_DANGER_SEPARATION = 24;
 
+/** MAZER-FLOW-019: the trailing build stamp section, or nothing when no stamp was given. */
+const buildStampSections = (buildStamp: string | undefined): LegacySettingsChromeSectionModel[] => (
+  typeof buildStamp === 'string' && buildStamp.trim() !== ''
+    ? [{
+      collapsedByDefault: false,
+      collapsible: false,
+      id: 'build-stamp',
+      rows: [row('build-stamp', 'note', buildStamp.trim())],
+      title: null
+    }]
+    : []
+);
+
 export const buildLegacySettingsSheetModel = (
   context: LegacySettingsContext,
   options: LegacySettingsModelOptions = {}
@@ -375,7 +398,8 @@ export const buildLegacySettingsSheetModel = (
           id: 'settings',
           rows: LEGACY_PAUSE_SETTINGS_GROUP_ROWS,
           title: null
-        }
+        },
+        ...buildStampSections(options.buildStamp)
       ],
       title: 'Settings'
     };
@@ -402,7 +426,8 @@ export const buildLegacySettingsSheetModel = (
         id: 'settings',
         rows: LEGACY_SETTINGS_GROUP_ROWS,
         title: null
-      }
+      },
+      ...buildStampSections(options.buildStamp)
       // MAZER-UI-100: no Account section. Sign out and Reset progress live only on the account page (Profile).
     ],
     title: 'Settings'
@@ -427,6 +452,8 @@ export const LEGACY_SETTINGS_SIZES = Object.freeze({
   rowHeight: 52,
   /** Non-interactive heading row. */
   headingHeight: 24,
+  /** MAZER-FLOW-019: non-interactive note row (one line in the description style, the build stamp). */
+  noteHeight: 20,
   /**
    * The muted description under a setting row's control (13 px, the style the Reduce Motion note always had).
    * Non-interactive text that sits OUTSIDE the control, so the control's hit target is unchanged. Its height is
@@ -552,6 +579,8 @@ export interface LegacySettingsPlanInput {
   previewLevelsExpanded?: boolean;
   /** Pause only: lead with the "Rotate back" notice (orientation flip + thin corridor). */
   rotatePrompt?: boolean;
+  /** Both contexts: the build stamp line (MAZER-FLOW-019). Absent = no row. */
+  buildStamp?: string;
 }
 
 const rectOf = (left: number, top: number, width: number, height: number): LegacySettingsRect => ({
@@ -571,12 +600,14 @@ const rowHeightOf = (model: LegacySettingsRowModel): number => {
       return LEGACY_SETTINGS_SIZES.rowHeight;
     case 'heading':
       return LEGACY_SETTINGS_SIZES.headingHeight;
+    case 'note':
+      return LEGACY_SETTINGS_SIZES.noteHeight;
     default:
       return model.kind satisfies never;
   }
 };
 
-const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading';
+const isInteractiveKind = (kind: LegacySettingsRowKind): boolean => kind !== 'heading' && kind !== 'note';
 
 /**
  * Greedy word-wrap line count for a description at a given text width, using the wide average glyph width so the
@@ -629,6 +660,7 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
     }
     case 'action':
     case 'heading':
+    case 'note':
       return { ...none, label: rectOf(pad, 0, Math.max(1, width - (pad * 2)), height) };
     default:
       return model.kind satisfies never;
@@ -683,7 +715,8 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
   const model = buildLegacySettingsSheetModel(input.context, {
     levelPreview: input.context === 'pause' ? input.levelPreview : undefined,
     rotatePrompt: input.context === 'pause' ? input.rotatePrompt : undefined,
-    signedIn: input.signedIn
+    signedIn: input.signedIn,
+    buildStamp: input.buildStamp
   });
   const panel = resolveLegacyOverlayPanelLayout(input.width, input.height, input.safeArea ?? {});
   const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
@@ -730,7 +763,7 @@ export const buildLegacySettingsSheetPlan = (input: LegacySettingsPlanInput): Le
         description,
         interactive: isInteractiveKind(rowModel.kind),
         labelFontSize: s.labelFontSize,
-        labelMaxLines: rowModel.kind === 'heading' ? 1 : s.labelMaxLines,
+        labelMaxLines: rowModel.kind === 'heading' || rowModel.kind === 'note' ? 1 : s.labelMaxLines,
         model: rowModel,
         parts: resolveRowParts(rowModel, rowWidth, height),
         rect,

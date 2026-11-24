@@ -309,6 +309,7 @@ import {
   resolveLegacyOrientationFlip,
   shouldShowLegacyRotateNotice
 } from '../legacy-runtime/legacyOrientationFlip';
+import { resolveLegacyBuildStampText } from '../legacy-runtime/legacyBuildStamp';
 import {
   resolveLegacyPauseCommand,
   type LegacyPauseCommand
@@ -11866,7 +11867,9 @@ export class MenuScene extends Phaser.Scene {
         originLandscape: this.orientationFlipOriginLandscape
       }),
       signedIn: this.authSnapshot.status === 'authenticated',
-      width: this.layout.width
+      width: this.layout.width,
+      // MAZER-FLOW-019: build stamp from the page's own bundle name + the build-time sha, no network call.
+      buildStamp: resolveLegacyBuildStampText()
     });
     this.overlayMovementSpeedSliderBounds = null;
 
@@ -12004,6 +12007,11 @@ export class MenuScene extends Phaser.Scene {
     switch (model.kind) {
       case 'heading':
         this.createLegacySheetHeading(rect, model.label, item.stateFontSize);
+        return;
+      case 'note':
+        // MAZER-FLOW-019: the build stamp, one line in the setting-description look (13 px, #9fb6c9 at 0.85).
+        this.addLegacySheetWrappedText(model.label, rect.left - 8, rect.top + (rect.height / 2), rect.width, '#9fb6c9',
+          LEGACY_SETTINGS_SIZES.descriptionFontSize, LEGACY_SETTINGS_SIZES.descriptionFontSize - 1, 1, { alpha: 0.85 });
         return;
       case 'action':
         this.uiButtons.push(this.createLegacyAuthActionButton(

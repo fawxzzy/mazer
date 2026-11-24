@@ -745,6 +745,14 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Baseline (clean origin/main 10464c39, compared, not guessed): board-sync, project-board-owner-export, playbook-adoption-evidence (2 tests) and playbook-verification-report fail the same way there; unrelated and untouched here.
 - Checked: phone-shot chromium and webkit at 390x844, 320x568, 820x1180, default and dark, every PNG read; tile tap switches the panel; Got it closes. Not checked: a real phone.
 
+## 2026-11-24 Arrows control style audit (MAZER-UI-093) and Settings build stamp (MAZER-FLOW-019)
+
+- WHAT (UI-093): no behaviour change. The Arrows/Stick `controlMode` has had no Settings row and no touch effect since 0723a26e (every touch starts the floating stick); it is not in the Guide. New `tests/reset/legacy-control-mode-setting.test.ts` pins that, and the controls contract row is marked confirmed. The stored value (device toggles, remote progress column, telemetry, QA diagnostics) is left alone: retiring it needs an owner call on the remote column.
+- WHAT (FLOW-019): both Settings sheets end with a muted one-line note row "Build <main bundle> · <short sha>" (new row kind `note`, 20 px, setting-description style). The bundle id is the page's own `assets/main-*.js` script name (the same id the board's deployed field uses); the sha is the build-time `__MAZER_BUILD_ID__` define from PR #701 (read through `legacyBuildId.ts`), shown as 8 chars.
+- WHY: owners and testers need to tell which build a phone is running without a network call; the Arrows question kept coming back because the contract said "needs a browser check".
+- Evidence: headless Chrome 390x844 touch drags give the same stick origin and the same moves with controlMode arrows and stick; before/after Settings captures at 390x844, 375x667, 1280x720 (menu) and the scrolled pause sheet, every PNG read; new tests `legacy-build-stamp` (10) and `legacy-control-mode-setting` (4); full `npm run test` 317 files / 4056 tests passed.
+- Not checked: a real phone; whether the Vercel CLI build sees `VERCEL_GIT_COMMIT_SHA` or git (if neither, the line reads "no sha").
+
 ## 2026-11-24 MAZER-FB-001 in-game feedback popup (client)
 
 - WHAT: a Feedback row in the main and pause dropdowns (signed-in only, hidden when signed out) opens the picked layout A popup: 1-5 pointed rainbow stars with no star selected on load, an optional plain-text note, a calm in-flow notice for saved / rate limited / failed / offline (never red text). New `legacyFeedbackSubmit.ts` calls `mazer_submit_feedback_v1` through the legacy auth client (with a no-network `feedbackFixture` path for QA), `legacyBuildId.ts` + a `__MAZER_BUILD_ID__` define in `vite.config.ts` supply the build id, `legacyFeedbackLauncher.ts` loads `feedbackMount.ts` by dynamic import so the popup is not in the boot bundle. `MenuScene.ts` change is minimal wiring (row routing, `feedbackAvailable`, dropdown/pause suppression while open).
