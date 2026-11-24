@@ -1,5 +1,9 @@
 import { createMazerButton, createStatusBanner } from '../dom';
 import {
+  FEEDBACK_STAR_COLOUR_INTERVAL_MS,
+  resolveFeedbackStarColour
+} from './feedbackStarColour';
+import {
   FEEDBACK_COMMENT_MAX,
   FEEDBACK_COPY,
   FEEDBACK_COUNTER_FROM,
@@ -22,12 +26,16 @@ export interface FeedbackPopupOptions {
   onDismiss?: () => void;
   /** Stable id prefix so two popups on one page keep unique ids. */
   idPrefix?: string;
+  /** Clock for the slow rainbow shift of the picked stars (tests pass a fixed one). Defaults to performance.now(). */
+  now?: () => number;
 }
 
 export interface FeedbackPopupHandle {
   root: HTMLElement;
   dispatch: (event: FeedbackEvent) => void;
   getDraft: () => FeedbackDraft;
+  /** Stops the star colour timer. Call when the popup is removed. */
+  destroy: () => void;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -69,6 +77,7 @@ export const createFeedbackPopup = (
   const prefix = options.idPrefix ?? `mazer-feedback-${options.layout}`;
   let draft = options.draft ?? createFeedbackDraft();
   const layout = options.layout;
+  const now = options.now ?? (() => (typeof performance === 'undefined' ? 0 : performance.now()));
 
   const root = el(doc, 'section', `mazer-feedback mazer-feedback--${layout}`);
   root.dataset.mazerComponent = 'FeedbackPopup';
@@ -184,6 +193,8 @@ export const createFeedbackPopup = (
     starButtons.forEach((button, index) => {
       const on = index < draft.rating;
       button.classList.toggle('is-on', on);
+      // Picked stars: a flat fill in the shared rainbow material (never a glow); unpicked ones keep the outline colour.
+      button.style.color = on ? resolveFeedbackStarColour(index, now()) : '';
       button.setAttribute('aria-checked', String(index + 1 === draft.rating));
       button.tabIndex = draft.rating === 0 ? (index === 0 ? 0 : -1) : (index + 1 === draft.rating ? 0 : -1);
       button.disabled = draft.phase !== 'editing';
@@ -215,5 +226,18 @@ export const createFeedbackPopup = (
     noteWrap.hidden = true;
   }
   render();
-  return { root, dispatch, getDraft: () => draft };
+  // The colour moves slowly in every motion mode (Reduce Motion stops movement, never colour: VIS-066).
+  const colourTimer = typeof window === 'undefined'
+    ? null
+    : window.setInterval(() => {
+      if (draft.rating > 0) {
+        starButtons.forEach((button, index) => {
+          if (index < draft.rating) button.style.color = resolveFeedbackStarColour(index, now());
+        });
+      }
+    }, FEEDBACK_STAR_COLOUR_INTERVAL_MS);
+  const destroy = (): void => {
+    if (colourTimer !== null) window.clearInterval(colourTimer);
+  };
+  return { root, dispatch, getDraft: () => draft, destroy };
 };

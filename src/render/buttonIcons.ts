@@ -27,7 +27,7 @@ export const BUTTON_ICON_SPARK_STROKE_UNITS = 1.1;
 /** The 19 buttons of the icon options page plus Reset level (in-game menu row). */
 export const BUTTON_ICON_IDS = [
   'menu', 'menuOpen', 'settings', 'profile', 'leaderboard', 'pause', 'resume', 'home', 'back', 'close',
-  'soundOn', 'soundOff', 'guide', 'signIn', 'eye', 'eyeOff', 'check', 'share', 'install', 'reset'
+  'soundOn', 'soundOff', 'guide', 'signIn', 'eye', 'eyeOff', 'check', 'share', 'install', 'reset', 'feedback'
 ] as const;
 export type ButtonIconId = (typeof BUTTON_ICON_IDS)[number];
 export type ButtonIconState = 'idle' | 'pressed';
@@ -289,7 +289,9 @@ export const BUTTON_ICON_SOURCES: Readonly<Record<ButtonIconId, ButtonIconSource
   check: g(['M4.5 13l4.5 4.5L18 8'], [[20.6, 4.6, 2]]),
   share: g(['M8.6 10.8l6.8-3.4M8.6 13.2l6.8 3.4'], [[6, 12, 3], [18, 6, 3], [18, 18, 3]]),
   install: g(['M12 4v10M8 10.5l4 4 4-4M5 17v3h14v-3'], [[19.5, 4.5, 2]]),
-  reset: g(['M19 12.5a7 7 0 1 1-2.2-5.6', 'M18.5 3.8v3.7h-3.7'], [[12, 12.5, 2.4]])
+  reset: g(['M19 12.5a7 7 0 1 1-2.2-5.6', 'M18.5 3.8v3.7h-3.7'], [[12, 12.5, 2.4]]),
+  /** MAZER-FB-001: a speech bubble with the Star Dust spark inside (the Menu's Feedback row). */
+  feedback: g(['M4.5 5.5h15v10.5h-7.5l-4.2 3.6V16H4.5z'], [[12, 10.8, 2.6]])
 });
 
 export interface ButtonIconStroke extends IconPolyline { readonly width: number }

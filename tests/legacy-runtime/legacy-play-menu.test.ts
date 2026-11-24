@@ -81,11 +81,14 @@ const memoryStorage = () => {
   };
 };
 
+const MAIN_ROWS_SIGNED_OUT = LEGACY_MAIN_MENU_ROW_IDS.filter((id) => id !== 'feedback');
+const PLAY_ROWS_SIGNED_OUT = LEGACY_PLAY_MENU_ROW_IDS.filter((id) => id !== 'feedback');
+
 describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (legacyMenuRows.ts)', () => {
-  test('both screens open on Settings, Guide, Sound; the main menu adds Profile, Leaderboard; a game adds Reset level, Main menu', () => {
+  test('both screens open on Settings, Guide, Sound; the main menu adds Profile, Leaderboard; a game adds Reset level, Main menu (Feedback is signed-in only, MAZER-FB-001)', () => {
     expect(LEGACY_SHARED_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound']);
-    expect(LEGACY_MAIN_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'profile', 'leaderboard']);
-    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'reset-level', 'main-menu']);
+    expect(LEGACY_MAIN_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'profile', 'leaderboard', 'feedback']);
+    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'feedback', 'reset-level', 'main-menu']);
     const main = buildLegacyMenuRows('main', { soundEnabled: true });
     expect(main.map((row) => row.label)).toEqual(['Settings', 'Guide', 'Sound', 'Profile', 'Leaderboard']);
     // Profile keeps the retired corner button's published name so QA harnesses keep finding it.
@@ -101,11 +104,24 @@ describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (leg
     expect(buildLegacyMenuRows('main', { soundEnabled: false }).find((row) => row.id === 'sound')!.stateText).toBe('Off');
     expect(buildLegacyMenuRows('main', { soundEnabled: true }).find((row) => row.id === 'sound')!.stateText).toBe('On');
     expect(resolveLegacyMenuRowIds('main', { profileAvailable: false })).toEqual(['settings', 'guide', 'sound', 'leaderboard']);
-    expect(resolveLegacyMenuRowIds('main', { profileAvailable: true })).toEqual([...LEGACY_MAIN_MENU_ROW_IDS]);
-    expect(resolveLegacyMenuRowIds('play', { profileAvailable: false })).toEqual([...LEGACY_PLAY_MENU_ROW_IDS]);
+    expect(resolveLegacyMenuRowIds('main', { profileAvailable: true })).toEqual(MAIN_ROWS_SIGNED_OUT);
+    expect(resolveLegacyMenuRowIds('play', { profileAvailable: false })).toEqual(PLAY_ROWS_SIGNED_OUT);
     expect(buildLegacyMenuRows('main', { soundEnabled: true }).every((row) => row.disabled === false)).toBe(true);
     // The default item list the dropdown geometry falls back to is the main menu's list.
-    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.id)).toEqual([...LEGACY_MAIN_MENU_ROW_IDS]);
+    expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.id)).toEqual(MAIN_ROWS_SIGNED_OUT);
+  });
+
+  test('MAZER-FB-001: the Feedback row is shown only when feedbackAvailable (signed in), on both screens, after the destinations and before the play-only rows', () => {
+    expect(resolveLegacyMenuRowIds('main', {})).not.toContain('feedback');
+    expect(resolveLegacyMenuRowIds('play', {})).not.toContain('feedback');
+    expect(resolveLegacyMenuRowIds('main', { feedbackAvailable: false })).not.toContain('feedback');
+    expect(resolveLegacyMenuRowIds('main', { feedbackAvailable: true })).toEqual([...LEGACY_MAIN_MENU_ROW_IDS]);
+    expect(resolveLegacyMenuRowIds('play', { feedbackAvailable: true })).toEqual([...LEGACY_PLAY_MENU_ROW_IDS]);
+    const row = buildLegacyMenuRows('main', { feedbackAvailable: true, soundEnabled: true }).find((item) => item.id === 'feedback');
+    expect(row).toMatchObject({ disabled: false, label: 'Feedback', semanticAction: 'Feedback', stateText: null });
+    expect(buildLegacyPlayMenuRows({ feedbackAvailable: true, quitArmed: false, resetArmed: false, resetAvailable: true, soundEnabled: true }).map((item) => item.label))
+      .toEqual(['Settings', 'Guide', 'Sound', 'Feedback', 'Reset level', 'Main menu']);
+    expect(isLegacyMenuRowToggle('feedback')).toBe(false);
   });
 
   test('Sound is the only toggle row on either screen (the panel stays open on it)', () => {
@@ -133,9 +149,9 @@ describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (leg
 });
 
 describe('MAZER-UI-095 in-game Menu rows (legacyPlayMenu.ts)', () => {
-  test('rows are Settings, Guide, Sound, Reset level, Main menu, in that order, with those words', () => {
-    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'reset-level', 'main-menu']);
-    expect(rows().map((row) => row.id)).toEqual([...LEGACY_PLAY_MENU_ROW_IDS]);
+  test('rows are Settings, Guide, Sound, Reset level, Main menu, in that order, with those words (signed out: no Feedback)', () => {
+    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'feedback', 'reset-level', 'main-menu']);
+    expect(rows().map((row) => row.id)).toEqual(PLAY_ROWS_SIGNED_OUT);
     expect(rows().map((row) => row.label)).toEqual(['Settings', 'Guide', 'Sound', 'Reset level', 'Main menu']);
     expect(rows().map((row) => row.semanticAction)).toEqual(['Settings', 'Guide', 'Sound', 'Reset level', 'Main menu']);
     expect(Object.isFrozen(rows()[0])).toBe(true);
@@ -296,7 +312,7 @@ describe('MAZER-UI-095 shared dropdown geometry (legacyMenuDropdown.ts generics)
     expect(layout.panel.left).toBeGreaterThanOrEqual(0);
     expect(layout.panel.left + layout.panel.width).toBeLessThanOrEqual(viewport.width);
     expect(layout.panel.top).toBeGreaterThan(toggleFrame.top + toggleFrame.height - 1);
-    expect(layout.rows.map((row) => row.item.id)).toEqual([...LEGACY_PLAY_MENU_ROW_IDS]);
+    expect(layout.rows.map((row) => row.item.id)).toEqual(PLAY_ROWS_SIGNED_OUT);
     for (const row of layout.rows) {
       expect(row.rect.height).toBeGreaterThanOrEqual(44);
       expect(row.rect.height).toBe(LEGACY_MENU_DROPDOWN_ROW_HEIGHT_PX);
@@ -318,7 +334,7 @@ describe('MAZER-UI-095 shared dropdown geometry (legacyMenuDropdown.ts generics)
   test('the main menu panel has the same width, row height and state column (MAZER-UI-096)', () => {
     const main = resolveLegacyMenuDropdownLayout({ items: buildLegacyMenuRows('main', { soundEnabled: false }), toggleFrame, toggleHit, viewport });
     expect(main.panel.width).toBe(layout.panel.width);
-    expect(main.rows.map((row) => row.item.id)).toEqual([...LEGACY_MAIN_MENU_ROW_IDS]);
+    expect(main.rows.map((row) => row.item.id)).toEqual(MAIN_ROWS_SIGNED_OUT);
     for (const [index, row] of main.rows.entries()) {
       expect(row.rect.height).toBe(LEGACY_MENU_DROPDOWN_ROW_HEIGHT_PX);
       if (index < 3) {

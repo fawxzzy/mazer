@@ -1711,7 +1711,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // The Profile row hides while the account service is unavailable (the corner icon did the same).
     // MAZER-UI-096: the scene passes the auth state; the shared row model drops the row.
     expect(dropdownSource).toContain("profileAvailable: this.authSnapshot.status !== 'unavailable'");
-    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRows.ts'), 'utf8')).toContain("filter((id) => id !== 'profile')");
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRows.ts'), 'utf8')).toContain("(id !== 'profile' || screen === 'play' || state.profileAvailable !== false)");
     // The profile row keeps drawing the real profile texture.
     // MAZER-UI-095/096: one icon registry (menuRowIcons.ts) resolved in one scene method for both Menus.
     expect(menuSceneSource).toContain('textureKey: MAZER_HUD_PROFILE_TEXTURE_KEY');
