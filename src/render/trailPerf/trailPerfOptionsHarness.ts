@@ -4,6 +4,7 @@
  * exposes (window.__MAZER_GAME__, and window.__MAZER_QA__ under ?runtimeDiagnostics=1). Not imported by the game.
  */
 import { setStarDustTrailRenderOverride } from '../starDustRenderOverride';
+import { getStarDustTrailCacheStats } from '../starDustTrailCache';
 import { TRAIL_REDRAW_COST_MULTIPLE } from '../trailRedrawGate';
 import {
   createStarDustPlanRenderer,
@@ -89,8 +90,10 @@ export const createTrailPerfHarness = (initial: TrailPerfVariantId): TrailPerfHa
   let plan: Readonly<StarDustRenderPlan> = findTrailPerfVariant(variant).plan;
   let renderer = createStarDustPlanRenderer(plan);
   const install = (): void => {
-    // Today's draw goes through the shipped code path itself (no override), so the baseline is the real thing.
-    setStarDustTrailRenderOverride(variant === 'shipped' ? null : renderer);
+    // The shipped painter (C + A, starDustTrailCache.ts) runs through the game's own code path (no override), so that row
+    // is the real thing. 'shipped' (Before) paints the whole trail every time with today's plan, call for call the full
+    // painter (tests/render/starDustTrailVariants.test.ts).
+    setStarDustTrailRenderOverride(variant === 'CA' ? null : renderer);
   };
   install();
 
@@ -148,7 +151,11 @@ export const createTrailPerfHarness = (initial: TrailPerfVariantId): TrailPerfHa
       if (i < 0 || i + 1 >= route.length) return false;
       return qa.movePlayPlayer(dirFor(route[i]!, route[i + 1]!))?.accepted === true;
     },
-    stats: () => ({ ...renderer.stats }),
+    stats: () => {
+      if (variant !== 'CA') return { ...renderer.stats };
+      const s = getStarDustTrailCacheStats();
+      return { fullPaints: s.fullPaints, headPaints: s.headPaints, bodyRebuilds: s.bodyRebuilds, lastSparkles: s.lastSparkles };
+    },
     fillLongTrail(tilesShortOfEnd = 40) {
       const scene = findScene();
       if (!scene?.maze) return 0;

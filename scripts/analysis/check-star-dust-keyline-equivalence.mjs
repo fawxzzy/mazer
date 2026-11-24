@@ -57,7 +57,7 @@ try {
         const t0 = performance.now();
         let count = 0;
         try {
-          count = dust.drawStarDustTrailToCanvasContext(ctx, segments, {
+          count = dust.drawStarDustTrailFullToCanvasContext(ctx, segments, {
             originX: 0, originY: 0, tileSize: tile, coreWidth: 4.2, glowWidth: 11, glowAlphaRatio: 0.5, glowBlurPx: 9 * scale,
             keylineColor: 0x05030a, keylineAlpha: 1, timeMs: 4321, animated: true, originAdvancePx: 0
           });

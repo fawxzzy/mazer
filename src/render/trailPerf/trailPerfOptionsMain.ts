@@ -1,16 +1,16 @@
 /**
  * Entry for trail-perf-options.html (dev/proposal page, not a build input): installs the chosen star-dust painter, then
- * boots the real game unchanged. A small bar picks Today / A / B / C, fills a long trail, walks it, and shows a live frame
- * meter plus the frame times measured headless for each option (trailPerfMeasurements.ts).
+ * boots the real game unchanged. A small bar picks Before / A / B / C / C + A (shipped, the default), fills a long trail,
+ * walks it, and shows a live frame meter plus the frame times measured headless for each option (trailPerfMeasurements.ts).
  *
- * Open: /trail-perf-options.html?previewLevel=300&runtimeDiagnostics=1&trailVariant=A
+ * Open: /trail-perf-options.html?previewLevel=300&runtimeDiagnostics=1&trailVariant=shipped
  */
 import { createTrailPerfHarness, isPlayReady, type TrailPerfHarness } from './trailPerfOptionsHarness';
 import { TRAIL_PERF_SETUP, describeTrailPerfMeasurement } from './trailPerfMeasurements';
 import { findTrailPerfVariant, TRAIL_PERF_VARIANTS, type TrailPerfVariantId } from './starDustTrailVariants';
 
 const params = new URLSearchParams(window.location.search);
-const harness = createTrailPerfHarness(findTrailPerfVariant(params.get('trailVariant')).id);
+const harness = createTrailPerfHarness(findTrailPerfVariant(params.get('trailVariant') ?? 'CA').id);
 (window as unknown as { __MAZER_TRAIL_PERF__?: TrailPerfHarness }).__MAZER_TRAIL_PERF__ = harness;
 
 // The bar's styles are in trail-perf-options.html (kept out of src/ for the colour-literal ratchet).
@@ -32,7 +32,7 @@ const pickButtons = new Map<TrailPerfVariantId, HTMLButtonElement>();
 for (const variant of TRAIL_PERF_VARIANTS) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.textContent = variant.id === 'shipped' ? 'Today' : variant.name;
+  button.textContent = variant.id === 'shipped' ? 'Before' : variant.name;
   button.addEventListener('click', () => select(variant.id));
   pickButtons.set(variant.id, button);
   pickRow.appendChild(button);
@@ -76,7 +76,7 @@ function renderVariant(): void {
   for (const [key, button] of pickButtons) button.setAttribute('aria-pressed', String(key === variant.id));
   look.textContent = variant.look;
   const lines = describeTrailPerfMeasurement(variant.id);
-  measured.textContent = `Measured per frame${variant.id === 'shipped' ? '' : ' (this option vs Today, same run)'}: `
+  measured.textContent = `Measured per frame${variant.id === 'shipped' ? '' : ' (this option\'s frame / Before\'s, same run)'}: `
     + `${lines.join(' | ')}.`;
   measured.title = TRAIL_PERF_SETUP;
   const url = new URL(window.location.href);
