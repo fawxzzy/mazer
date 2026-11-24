@@ -353,9 +353,9 @@ describe('generated ladder mazes carry loops by the plan, and the menu AI clears
         }
       }
     }
-    // Variety: most high mazes are looped, and a real share is still one way.
+    // MAZER-GEN-030: a second way round is the rule from level 12 up (it was: a third looped, one in ten one-way).
     expect(looped / total).toBeGreaterThan(0.35);
-    expect(singleRoute / total).toBeGreaterThan(0.08);
+    expect(singleRoute / total).toBeLessThanOrEqual(0.03);
     // The ceiling holds the top: priced targets never pass it.
     expect(resolveGeometryBudgetTarget(198)!).toBeLessThanOrEqual(GEOMETRY_BUDGET_CEILING);
   }, 300_000);

@@ -40,6 +40,8 @@ import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
 import { forceRemoveOneTileStubs } from './legacyMazeStubs';
 import { applyOneTileStubRule } from './legacyMazeStubPass';
 import { applyStaircasePass, readLegacyStaircaseFlagFromLocation } from './legacyMazeStaircase';
+import { measureFelt } from './legacyMazeFeltDifficulty';
+import { applyMazeQualityPass, isMazeQualityPassEnabled, resolveQualityLoopPlan } from './legacyMazeQualityPass';
 import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFeltToTarget } from './legacyMazeFeltTuning';
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
@@ -697,6 +699,7 @@ const selectLegacyGeometryBudgetMaze = (
   let selectedProfile: LegacyMazeGenerationProfile = generationProfile;
   let selectedDistance = Number.POSITIVE_INFINITY;
   let selectedRank = Number.POSITIVE_INFINITY;
+  let selectedFringe: { x: number; y: number }[] = [];
   let searched = 0;
   // Usually the first base maze tunes into the window and the loop ends after one
   // build. A base can miss when its wrap corridors give the explorer a shortcut
@@ -721,7 +724,7 @@ const selectLegacyGeometryBudgetMaze = (
       // base that cannot land with loops is retried without them, so the ladder's
       // ordering guarantee always outranks the loop.
       const loops = index < GEOMETRY_BUDGET_LOOP_BASE_ATTEMPTS
-        ? (selectionOptions.loopPlan ?? resolveGeometryBudgetLoopPlan(feltLevel, seed, base.width * base.height))
+        ? (selectionOptions.loopPlan ?? resolveQualityLoopPlan(feltLevel, base.width * base.height, resolveGeometryBudgetLoopPlan(feltLevel, seed, base.width * base.height)))
         : LEGACY_EMPTY_LOOP_PLAN;
       const bleedGatePrice = gateLevel
         ? (grid: boolean[][], hint?: LegacyBleedGate | null) => measureLegacyBleedGateWrapPenalty({ width: grid[0]?.length ?? 0, height: grid.length, grid, start: base.start, goal: base.goal }, hint)
@@ -748,6 +751,7 @@ const selectLegacyGeometryBudgetMaze = (
       // missed its window or floor is discarded for the price of the tuning alone.
       selectedMaze = tuned === null ? base : assembleTunedMaze(base, tuned, baseProfile, reverseFloor, gateLevel);
       selectedProfile = baseProfile;
+      selectedFringe = tuned === null ? [] : tuned.fringeTiles;
       selectedDistance = distance;
       selectedRank = rank;
     }
@@ -757,6 +761,10 @@ const selectLegacyGeometryBudgetMaze = (
   }
   if (selectedMaze === null) {
     selectedMaze = buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
+  }
+  // MAZER-GEN-030: the quality pass (stub pruning, decoy loops) on a maze the tuner landed in its window.
+  if (isMazeQualityPassEnabled() && gateTarget !== null && selectedDistance === 0) {
+    selectedMaze = applyQualityPassToMaze(selectedMaze, selectedProfile, budgetLevel, seed, selectedFringe);
   }
   const complexity = resolveLegacyMazeComplexity(selectedMaze);
   const reviewTarget = clampInteger(selectionOptions.targetComplexity ?? complexity.total, 0, 999);
@@ -875,6 +883,51 @@ const assembleTunedMaze = (
 
 // MAZER-GEN-024: tuned gate-level mazes whose gate (or lack of one) the tuner's price already decided.
 const gateDecidedMazes = new WeakSet<object>();
+
+// MAZER-GEN-030: the quality pass on the finished maze (legacyMazeQualityPass.ts). Felt steps, the shortest route
+// (torus and planar) and the reverse floor are unchanged by construction, so the landed window, the ladder order,
+// the loop and wrap savings and a gate's priced detour are those of the tuner's landing. The route, the wrap
+// diagnostics, the reverse figure, the build trace and the gate follow the new grid.
+const applyQualityPassToMaze = (
+  maze: Omit<LegacyMazeSnapshot, 'generation'>,
+  profile: LegacyMazeGenerationProfile,
+  level: number,
+  seed: number,
+  fringe: ReadonlyArray<{ readonly x: number; readonly y: number }>
+): Omit<LegacyMazeSnapshot, 'generation'> => {
+  const loopConnectors = maze.loopStats === undefined ? [] : (maze.generationBuildTrace?.decoyTiles ?? []).slice(0, maze.loopStats.cells);
+  const savings = (maze.loopStats?.saved ?? 0) + (maze.wrapStats?.saved ?? 0);
+  const floor = maze.reverseStats?.floor ?? 0;
+  const pass = applyMazeQualityPass(maze, level, seed, floor > 0 ? floor + savings : 0, fringe, loopConnectors);
+  if (!pass.changed) { return maze; }
+  const routed = resolveLegacyShortestPath(pass.grid, maze.start, maze.goal, 'direct-floor');
+  const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...maze, grid: pass.grid, solutionPath: routed.found ? routed.path : maze.solutionPath };
+  if (routed.found && maze.wrapTopologyDiagnostics) {
+    next.wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics(next, profile.requiredOppositeBorderConnections);
+  }
+  if (maze.reverseStats) {
+    next.reverseStats = { ...maze.reverseStats, reverseFelt: measureFelt({ ...next, start: next.goal, goal: next.start }).steps - savings };
+  }
+  if (maze.generationBuildTrace) {
+    next.generationBuildTrace = {
+      ...maze.generationBuildTrace,
+      decoyTiles: [...(maze.generationBuildTrace.decoyTiles ?? []), ...pass.added],
+      decoyPrunedTiles: [...(maze.generationBuildTrace.decoyPrunedTiles ?? []), ...pass.removed]
+    };
+  }
+  if (gateDecidedMazes.has(maze)) {
+    const old = maze.bleedGates?.[0];
+    if (old) {
+      // The tuner priced this maze for its gate (the detour to it is part of the felt number), so the edit stays only
+      // if the gate lands again with exactly the same gated and ungated saving; otherwise the maze is left as tuned.
+      const placement = placeLegacyBleedGateWithHint(next, old);
+      if (placement === null || placement.gate.gatedSaving !== old.gatedSaving || placement.gate.ungatedSaving !== old.ungatedSaving) { return maze; }
+      next.bleedGates = [placement.gate];
+    }
+    gateDecidedMazes.add(next);
+  }
+  return next;
+};
 
 // MAZER-L10: a ladder level's bleed gates, placed on the finished maze (the grid is not changed, so the
 // level's golden fingerprint holds). Keyed on the level, see legacyBleedGates.ts for the cadence.
