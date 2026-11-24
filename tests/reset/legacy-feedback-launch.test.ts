@@ -294,6 +294,12 @@ describe('MAZER-FB-001 safety of the popup DOM', () => {
     expect(popup).not.toMatch(/tone: ?'(error|danger|warning)'/);
     expect(read('src/ui/feedback/feedbackPopup.css')).not.toMatch(/color:\s*(red|#f00|#ff0000)|semantic-error|semantic-danger/i);
   });
+
+  test('the card fits a 320px phone: the star row may shrink instead of pushing the card contents past its edge', () => {
+    const css = read('src/ui/feedback/feedbackPopup.css');
+    expect(css).toMatch(/\.mazer-feedback__rate \{[^}]*grid-template-columns: minmax\(0, 1fr\);/);
+    expect(css).toMatch(/\.mazer-feedback__star \{[^}]*flex: 0 1 52px;[^}]*min-width: 0;/);
+  });
 });
 
 describe('MAZER-FB-001 scene wiring stays minimal and hazard-free', () => {
