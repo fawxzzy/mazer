@@ -1,2 +1,3 @@
 scripts/** text eol=lf
 docs/PLAYBOOK_NOTES.md merge=union
+docs/ops/sql-proposals/** text eol=lf

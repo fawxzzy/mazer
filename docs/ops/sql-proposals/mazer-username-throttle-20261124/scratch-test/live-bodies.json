@@ -1,0 +1,22 @@
+{
+ "captured_at": "2026-11-24T07:03:56.4645+00:00",
+ "note": "Live function bodies read read-only from production on 2026-11-24 (prosrc, byte exact, CR kept). No secrets.",
+ "mazer_set_username": {
+  "md5_stored": "1b1fae6c5de66380e55f2f096f2de5cb",
+  "md5_reported": "1b1fae6c5de66380e55f2f096f2de5cb",
+  "cr_count": 31,
+  "live_lf_md5": "52aad54b788b197b4a47f2fdaffc7055",
+  "repo_20260827190000_md5_lf": "4646e17787259205270ccafa388506f7",
+  "src": "\r\ndeclare\r\n  v_user_id uuid := (select auth.uid());\r\n  v_username text := pg_catalog.btrim(p_username);\r\n  v_saved text;\r\nbegin\r\n  if v_user_id is null or p_expected_user_id is distinct from v_user_id then\r\n    raise exception 'mazer_set_username account mismatch' using errcode = '28000';\r\n  end if;\r\n\r\n  if v_username is null\r\n    or pg_catalog.char_length(v_username) not between 2 and 15\r\n    or v_username !~ '^[a-zA-Z0-9._-]+$'\r\n  then\r\n    raise exception 'MAZER_USERNAME_INVALID' using errcode = '22023';\r\n  end if;\r\n\r\n  update mazer.mazer_profiles p\r\n  set\r\n    username = v_username,\r\n    display_name = v_username,\r\n    updated_at = pg_catalog.clock_timestamp()\r\n  where p.user_id = v_user_id\r\n  returning p.username into v_saved;\r\n\r\n  if not found then\r\n    raise exception 'MAZER_PROFILE_MISSING' using errcode = 'P0002';\r\n  end if;\r\n\r\n  return v_saved;\r\nend;\r\n"
+ },
+ "mazer_enforce_username_origin": {
+  "md5_stored": "15faddd63b2eb3bc413f3751203ee961",
+  "md5_reported": "15faddd63b2eb3bc413f3751203ee961",
+  "src": "\nbegin\n  if new.username is distinct from old.username then\n    new.username_origin := 'claimed';\n  else\n    new.username_origin := old.username_origin;\n  end if;\n  return new;\nend;\n"
+ },
+ "mazer_protect_leaderboard_hidden": {
+  "md5_stored": "a2d34bf2c78cbcbcf0d1efc14c9a45f0",
+  "md5_reported": "a2d34bf2c78cbcbcf0d1efc14c9a45f0",
+  "src": "\nbegin\n  if current_user in ('authenticated', 'anon') then\n    if tg_op = 'INSERT' then\n      new.leaderboard_hidden := false;\n    else\n      new.leaderboard_hidden := old.leaderboard_hidden;\n    end if;\n  end if;\n  return new;\nend;\n"
+ }
+}
