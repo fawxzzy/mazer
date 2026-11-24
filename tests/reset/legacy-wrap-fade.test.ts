@@ -5,11 +5,13 @@ import {
   GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL,
   GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
   LAST_BUDGET_LEVEL,
+  resolveGeometryBudgetGateWrapFloor,
   resolveGeometryBudgetProfileForRungs,
   resolveGeometryBudgetRungCount,
   resolveGeometryBudgetTarget,
   resolveGeometryBudgetWrapRungs
 } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { isBleedGateLevel } from '../../src/legacy-runtime/legacyBleedGates';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { measureFelt, measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import {
@@ -33,6 +35,12 @@ const TO = GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL;
 const SEEDS = Array.from({ length: 400 }, (_, index) => seedForIndex(index));
 
 type Generated = ReturnType<typeof generateLadderMaze>;
+
+// The generator keys the gate cadence on the budget level, which stops at LAST_BUDGET_LEVEL.
+const isGateBudgetLevel = (level: number): boolean => isBleedGateLevel(Math.min(level, LAST_BUDGET_LEVEL));
+// Levels that own no wrap: a gate level past the fade keeps a wrap for its gate (MAZER-GEN-031, legacy-gate-survival.test.ts).
+const PLAIN_LEVELS = [2, 5, 9, TO, TO + 1, 160, LAST_BUDGET_LEVEL, 300, 141, 142, 143, 144, 145, 146, 147, 148]
+  .filter((level) => resolveGeometryBudgetGateWrapFloor(level, isGateBudgetLevel(level)) === 0).slice(0, 8);
 
 // Independent measure of a maze's shortest route over the finished grid: with or without the
 // wrap links, with the loop connector cells closed (they are the first `loopStats.cells`
@@ -135,7 +143,8 @@ describe('wrap fade: generated mazes follow the roll, are priced for their wraps
           const rolled = resolveGeometryBudgetWrapRungs(level, seed);
           const owned = maze.wrapStats?.rungs ?? 0;
           mazes += 1;
-          expect(owned).toBeLessThanOrEqual(rolled);
+          // MAZER-GEN-031: a gate level keeps at least the wrap its gate guards, whatever the fade rolled.
+          expect(owned).toBeLessThanOrEqual(Math.max(rolled, resolveGeometryBudgetGateWrapFloor(level, isBleedGateLevel(level))));
           if (owned < rolled) { fellBack += 1; }
           const required = maze.generation!.profile.requiredOppositeBorderConnections;
           expect(required).toEqual({ horizontal: owned >= 2, vertical: owned >= 1 });
@@ -204,7 +213,7 @@ describe('wrap fade: generated mazes follow the roll, are priced for their wraps
 
   test('plain levels are untouched: no wrap stats below level 10 and from the fade end, and no wrap link shortens their route', () => {
     for (const board of LADDER_BOARDS) {
-      for (const level of [2, 5, 9, TO, TO + 1, 160, LAST_BUDGET_LEVEL, 300]) {
+      for (const level of PLAIN_LEVELS) {
         for (let index = 0; index < 4; index += 1) {
           const maze = generateLadderMaze(level, board, seedForIndex(index));
           expect(maze.wrapStats).toBeUndefined();

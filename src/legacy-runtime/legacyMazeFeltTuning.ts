@@ -545,12 +545,15 @@ const tuneOnce = (
       loopRecords.forEach((record) => record.cells.forEach((cell) => { loopTiles.push(point(cell)); }));
       run = evaluate();
     }
-    overCeiling = options.feltCeiling !== undefined && priced(wrapSaving, wrapPercent) > 0 && baseTarget + total() > options.feltCeiling;
     if (options.bleedGatePrice !== undefined && wrapPercent > 0 && wrapSaving > 0) {
       const gatePrice = options.bleedGatePrice(currentGrid());
       gatePenalty = Math.min(priced(wrapSaving, wrapPercent), Math.max(0, priced(Math.trunc(gatePrice.penalty), wrapPercent)));
       pricedBleedGate = gatePrice.gate;
     }
+    // MAZER-GEN-031: the ceiling check weighs the wrap net of its gate (a gated wrap only gives back what is left
+    // after the detour to the gate, which is what the target is priced with), so a gate level at the top of the
+    // ladder is not marked hopeless by a saving its gate takes back.
+    overCeiling = options.feltCeiling !== undefined && priced(wrapSaving, wrapPercent) > 0 && baseTarget + total() > options.feltCeiling;
     if (loopRecords.length > 0 || wrapPercent > 0) { target = baseTarget + total(); }
   }
   // True while the maze's savings are still the ones the target was priced with. A switchback

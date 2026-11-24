@@ -93,11 +93,25 @@ describe('MAZER-MENU-BLEED menu demo follows the play bleed rules', () => {
     }
   }, 60000);
 
-  test('wraps fade out of the menu demo where they fade out of play (level 140 and up)', () => {
-    for (const level of [140, 200]) {
+  // MAZER-GEN-031: past the fade a wrap survives only on a gate level (it is the wrap the gate guards); 143 and 150
+  // are not gate levels, 140 and 200 are.
+  test('wraps fade out of the menu demo where they fade out of play (non-gate levels from 140 up)', () => {
+    for (const level of [143, 150]) {
+      expect(isBleedGateLevel(level), `level ${level}`).toBe(false);
       expect(countRingOpenings(buildMenuMaze(level, 1000).grid)).toBe(0);
     }
   }, 60000);
+
+  test('MAZER-GEN-031: a gate level past the fade keeps its wrap and carries one gate in the menu demo too', () => {
+    for (const level of [140, 200]) {
+      expect(isBleedGateLevel(level), `level ${level}`).toBe(true);
+      const mazes = SEEDS.map((seed) => buildMenuMaze(level, seed));
+      expect(Math.max(...mazes.map((maze) => maze.bleedGates?.length ?? 0)), `level ${level}`).toBe(1);
+      for (const maze of mazes) {
+        expect(countRingOpenings(maze.grid), `level ${level}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  }, 120000);
 
   const GATE_LEVELS = [28, 72, 90].filter((level) => isBleedGateLevel(level));
 
@@ -107,8 +121,8 @@ describe('MAZER-MENU-BLEED menu demo follows the play bleed rules', () => {
       const counts = SEEDS.map((seed) => buildMenuMaze(level, seed).bleedGates?.length ?? 0);
       expect(Math.max(...counts), `level ${level}`).toBe(1);
     }
-    for (const level of [5, 20, 140]) {
-      expect(isBleedGateLevel(level) && level < 140, `level ${level}`).toBe(false);
+    for (const level of [5, 20, 143]) {
+      expect(isBleedGateLevel(level), `level ${level}`).toBe(false);
       expect(buildMenuMaze(level, 1000).bleedGates, `level ${level}`).toBeUndefined();
     }
   }, 120000);

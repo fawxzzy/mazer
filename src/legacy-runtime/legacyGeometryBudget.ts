@@ -435,6 +435,18 @@ export const resolveGeometryBudgetWrapRungs = (level: number, seed: number): num
   return Math.min(owned, whole + (roll < (expectedPermille % 1000) ? 1 : 0));
 };
 
+// MAZER-GEN-031: a gate level keeps a wrap to guard. The fade above takes every wrap away by level 140, and a
+// gate hides a wrap, so the gate puzzle would end there. From the fade start up to the felt saturation level a gate
+// level owns at least the vertical corridor (the rung that is last to go anyway). From the felt saturation level on
+// the felt ceiling leaves a gate about one step of saving (measured: gated saving 1), so a wrap would cost the level
+// its plain reverse floor for a gate that guards nothing: those levels stay as they were. The cadence (which levels
+// are gate levels) is unchanged and every other level keeps its roll. `gateLevel` is isBleedGateLevel(level), passed
+// in so this module stays free of the gate module.
+export const resolveGeometryBudgetGateWrapFloor = (level: number, gateLevel: boolean): number => {
+  const felt = resolveGeometryBudgetFeltLevel(level);
+  return gateLevel && felt >= GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL && felt < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL ? 1 : 0;
+};
+
 // Base mazes tried (at most) with the wrap corridors of the roll before a level falls back to
 // plain bases: the wrap saving is priced into the target, so a base whose wraps leave the
 // tuner too little capacity is retried, and the ladder's ordering guarantee outranks the wrap

@@ -11,6 +11,7 @@ import {
   GEOMETRY_BUDGET_REVERSE_FLOOR_WRAP_PERMILLE,
   GEOMETRY_BUDGET_SATURATION_LEVEL,
   resolveGeometryBudgetFringeCells,
+  resolveGeometryBudgetGateWrapFloor,
   resolveGeometryBudgetReverseFloor,
   GEOMETRY_BUDGET_WINDOW,
   GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
@@ -24,6 +25,7 @@ import {
   resolveGeometryBudgetLevel,
   resolveLegacyMazeGenerationProfileForProgression
 } from '../../src/legacy-runtime/legacyProgression';
+import { isBleedGateLevel } from '../../src/legacy-runtime/legacyBleedGates';
 import { measureFelt, measurePricedFeltSteps } from '../../src/legacy-runtime/legacyMazeFeltDifficulty';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import {
@@ -153,8 +155,12 @@ describe('progression ladder v2: the double lure on every level from 2, and the 
             // Every ladder maze carries the stats: nothing generates through the old, un-lured path.
             expect(stats).toBeDefined();
             const rungs = (maze as LegacyMazeSnapshot).wrapStats?.rungs ?? 0;
-            // Wrap rules are unchanged: no wrap corridor below level 10 or from level 140 on.
-            if (level < 10 || level >= GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) { expect(rungs).toBe(0); }
+            // Wrap rules are unchanged: no wrap corridor below level 10 or from level 140 on, except the one
+            // wrap a gate level keeps for its gate (MAZER-GEN-031, legacy-gate-survival.test.ts).
+            if (level < 10) { expect(rungs).toBe(0); }
+            if (level >= GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL) {
+              expect(rungs).toBeLessThanOrEqual(resolveGeometryBudgetGateWrapFloor(level, isBleedGateLevel(Math.min(level, GEOMETRY_BUDGET_SATURATION_LEVEL))));
+            }
             const wrapped = rungs > 0;
             wrappedCount += wrapped ? 1 : 0;
             // A maze is held to the floor of the wrap corridors it actually owns (the rare maze of a
