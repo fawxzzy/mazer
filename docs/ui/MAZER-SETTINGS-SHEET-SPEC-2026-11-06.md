@@ -2,6 +2,8 @@
 
 Date 2026-11-06. Status: WIRED in `src/scenes/MenuScene.ts` (Wave 5C wiring lane, see "Wiring status" at the end). The spec sections below are the contract; the "MenuScene lines the wiring lane replaces" table is kept as the record of what was replaced.
 
+**Superseded in part (MAZER-UI-100, 2026-11-20):** the main-menu sheet no longer has an Account section. Reset progress and Sign out live only on the account page (Menu > Profile), which hands back with `?accountAction=reset-progress` (opens the same `confirm-progression-reset` overlay below, same copy) or `?accountAction=signed-out`. See `src/legacy-runtime/legacyAccountActionHandoff.ts` and docs/PLAYBOOK_NOTES.md. The reset flow, confirm copy and strategy below are unchanged.
+
 Owner decision (Zac): the in-game Pause > Settings look is correct; the main-menu Settings sheet must match it fully (same structure). Add a `Reset progress` button to the main-menu Settings list: reset the account's full maze progression only. Standing rule: the Guide's UI reflections are updated with every game/UI change.
 
 ## Modules

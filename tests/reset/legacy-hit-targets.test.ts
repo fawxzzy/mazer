@@ -9,6 +9,7 @@ import {
 } from '../../src/legacy-runtime/legacyHitTarget';
 import { resolveLegacyMenuDropdownLayout } from '../../src/legacy-runtime/legacyMenuDropdown';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
+import { LEGACY_PLAY_MENU_PANEL_WIDTH_PX, buildLegacyPlayMenuRows } from '../../src/legacy-runtime/legacyPlayMenu';
 import { buildLegacyGuideSheetPlan } from '../../src/legacy-runtime/legacyGuideSheetPlan';
 import { buildLegacySettingsSheetPlan } from '../../src/legacy-runtime/legacySettingsSheetPlan';
 
@@ -75,12 +76,26 @@ const enumerateHitZones = (viewport: { height: number; width: number }): HitZone
     name: 'play-pause',
     width: touch.controls.pause.width
   });
+  // MAZER-UI-095: the in-game Menu dropdown opens from that same control (its X is Resume); its rows are touch targets.
+  const pause = touch.controls.pause;
+  const playMenu = resolveLegacyMenuDropdownLayout({
+    items: buildLegacyPlayMenuRows({ quitArmed: false, resetArmed: false, resetAvailable: true, soundEnabled: true }),
+    panelWidth: LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
+    safeArea: { left: 0, right: 0 },
+    toggleFrame: { height: 36, left: pause.left + ((pause.width - 36) / 2), top: pause.top + ((pause.height - 36) / 2), width: 36 },
+    toggleHit: { height: pause.height, left: pause.left, top: pause.top, width: pause.width },
+    viewport
+  });
+  zones.push({ height: playMenu.toggle.height, name: 'play-menu-resume', width: playMenu.toggle.width });
+  for (const row of playMenu.rows) {
+    zones.push({ height: row.rect.height, name: `play-menu-${row.item.id}`, width: row.rect.width });
+  }
 
   // The shared Settings sheet (menu + pause) and the Guide sheet are painted
   // from their plans, so the plan rects ARE the hit zones.
   const plans = [
     buildLegacySettingsSheetPlan({ context: 'menu', height: viewport.height, signedIn: true, width: viewport.width }),
-    buildLegacySettingsSheetPlan({ context: 'pause', height: viewport.height, settingsExpanded: true, width: viewport.width })
+    buildLegacySettingsSheetPlan({ context: 'pause', height: viewport.height, width: viewport.width })
   ];
   for (const plan of plans) {
     for (const item of plan.items) {
@@ -132,27 +147,29 @@ describe('legacy hit targets (Wave 5C)', () => {
       }
     }
     expect(undersized).toEqual([]);
-    // The header menu button and its rows, play pause (the 2026-11-06 UI audit's under-44 px controls) plus
+    // The header menu button and its rows, play pause / the in-game Menu (the 2026-11-06 UI audit's under-44 px controls) plus
     // every interactive row of the shared Settings sheet (Back to Menu / Resume are the exits; no Close pill) and the Guide sheet (Got it).
     expect([...names].sort()).toEqual([
       'guide-got-it',
+      'menu-dropdown-guide',
       'menu-dropdown-leaderboard',
       'menu-dropdown-profile',
       'menu-dropdown-settings',
+      'menu-dropdown-sound',
       'menu-header-menu',
+      'play-menu-guide',
+      'play-menu-main-menu',
+      'play-menu-reset-level',
+      'play-menu-resume',
+      'play-menu-settings',
+      'play-menu-sound',
       'play-pause',
       'settings-row-back-to-menu',
       'settings-row-dark-mode',
       'settings-row-floating-anchor',
       'settings-row-haptics',
-      'settings-row-how-to-play',
-      'settings-row-quit-to-menu',
       'settings-row-reduce-motion',
-      'settings-row-reset-progress',
-      'settings-row-resume',
-      'settings-row-settings-disclosure',
-      'settings-row-sign-out',
-      'settings-row-sound'
+      'settings-row-resume'
     ]);
   });
 });

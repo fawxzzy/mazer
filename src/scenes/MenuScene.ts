@@ -348,8 +348,35 @@ import {
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
-import { LEGACY_MENU_DROPDOWN_ITEMS, type LegacyMenuDropdownItemId } from '../legacy-runtime/legacyMenuDropdown';
-import { LegacyMenuDropdownController } from '../render/menuDropdownButtons';
+import {
+  buildLegacyMenuRows,
+  isLegacyMenuRowToggle,
+  resolveLegacyGuideCloseTarget,
+  type LegacyMainMenuRowId,
+  type LegacyMenuRowId
+} from '../legacy-runtime/legacyMenuRows';
+import { LegacyMenuDropdownController, type MenuDropdownHost } from '../render/menuDropdownButtons';
+import {
+  IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE,
+  LEGACY_PLAY_MENU_DIM_ALPHA,
+  LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
+  LEGACY_PLAY_MENU_RESUME_ACTION,
+  LEGACY_PLAY_MENU_RESUME_LABEL,
+  LEGACY_PLAY_MENU_TOGGLE_ACTION,
+  buildLegacyPlayMenuRows,
+  resolveLegacyPlayMenuBack,
+  resolveLegacyPlayMenuOpenView,
+  resolveLegacyPlayResetAvailability,
+  shouldLegacyPlayMenuStayOpen,
+  type LegacyPlayMenuRowId,
+  type LegacyPlayMenuView
+} from '../legacy-runtime/legacyPlayMenu';
+import { MENU_ROW_ICON_SOURCES, drawMenuRowVectorIcon } from '../render/menuRowIcons';
+import {
+  clearMazerPendingAccountAction,
+  peekMazerPendingAccountAction,
+  resolveMazerAccountActionStep
+} from '../legacy-runtime/legacyAccountActionHandoff';
 import { MENU_DROPDOWN_ACCENT, MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph } from '../render/menuDropdownArt';
 import {
   ensureMenuPlayLabelGlowTexture,
@@ -1795,8 +1822,12 @@ export class MenuScene extends Phaser.Scene {
   private authGateHasSessionEvidence = false;
   // L6 main-menu dropdown (one three-line button for Settings / Profile / Leaderboard; src/render/menuDropdownButtons.ts).
   private menuDropdown!: LegacyMenuDropdownController;
-  // Pause card: the collapsible Settings section (collapsed on every open).
-  private pauseSettingsExpanded = false;
+  // MAZER-UI-095 in-game Menu: the same dropdown, opened from the play HUD's Menu button while the run is paused
+  // (legacyPlayMenu.ts rows), the pause surface showing (dropdown or the Settings sheet it opened), and the Reset
+  // level two-tap arm (same rule as Quit, legacyQuitConfirm.ts).
+  private playMenu!: LegacyMenuDropdownController<LegacyPlayMenuRowId>;
+  private playMenuView: LegacyPlayMenuView = 'menu';
+  private playResetConfirmState: LegacyQuitConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
   // Level Preview (dev/QA route ?previewLevel=N; see legacyLevelPreview.ts).
   // Null on every ordinary boot. When set, the scene runs against an
   // in-memory sandbox storage and the remote-ineligible fixture session, so
@@ -2051,10 +2082,6 @@ export class MenuScene extends Phaser.Scene {
   private boardTileDockMaze: LegacyMazeSnapshot | null = null;
   private boardTileDocks: BoardTileDock[] = [];
   private boardTileDockOwners: Uint8Array | null = null;
-  // Real settings icon (docs/assets/mazer-vfx-source-provenance.md) for active play's own pause/
-  // settings touch control (drawLegacySettingsCogControl) -- top-level, not
-  // boardZoomContainer, matching hudGraphics' own coordinate space.
-  private touchSettingsCogIconImage!: Phaser.GameObjects.Image;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private presenceView: PresenceCounterView | null = null;
   // Goal beacon (halo + ping): its own layer UNDER the trail canvas so the trail always sits on top of it.
@@ -2182,6 +2209,8 @@ export class MenuScene extends Phaser.Scene {
   private overlayGuideBounds: VisualRect | null = null;
   // The Guide is a sub-view of the options/pause sheet, not its own overlay (Pause must keep holding the run).
   private settingsGuideOpen = false;
+  /** MAZER-UI-096: the Guide was opened from a Menu dropdown row, so its Close goes back to that Menu, not to Settings. */
+  private guideOpenedFromMenu = false;
   private progressionResetState: LegacyProgressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
   private overlayScrollOffset = 0;
   private overlayScrollMax = 0;
@@ -2530,8 +2559,8 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
     this.controllerHalo = new ControllerHaloView(this, () => resolveMazerCanvasResolution());
-    this.touchSettingsCogIconImage = this.add.image(0, 0, MAZER_HUD_SETTINGS_TEXTURE_KEY).setOrigin(0.5, 0.5).setVisible(false);
     this.menuDropdown = this.createLegacyMenuDropdown();
+    this.playMenu = this.createLegacyPlayMenu();
     this.playerSpawnBurstGraphics = this.add.graphics();
     this.spawnLaserGraphics = this.add.graphics();
     this.uiTransitionGhost = new UiTransitionGhost(this, 'mazer-ui-transition-ghost', LEGACY_PLAYER_MESSAGE_TOAST_DEPTH - 1);
@@ -3399,6 +3428,7 @@ export class MenuScene extends Phaser.Scene {
         this.rebuildUi();
       }
     }
+    this.consumePendingMazerAccountAction();
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
@@ -5168,6 +5198,8 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private playMenuDismissedAtMs = -1;
+
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
     // The fixed play controls must not intercept an overlay action. In
     // particular, the pause cog's top-right footprint overlaps the Settings
@@ -5179,6 +5211,10 @@ export class MenuScene extends Phaser.Scene {
       || hasPendingLegacyResetRequest(this.pendingResetRequest)
     ) {
       return false;
+    }
+
+    if (this.time.now === this.playMenuDismissedAtMs) {
+      return true;
     }
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
@@ -5930,6 +5966,8 @@ export class MenuScene extends Phaser.Scene {
     this.legacyViewportLandscape = isLegacyLandscapeViewport(width, height);
     if (orientationFlip.autoPause) {
       this.openOverlay('pause');
+      // The flip opens straight on the Settings sheet: it carries the "Rotate back" notice (legacyPlayMenu.ts).
+      this.playMenuView = resolveLegacyPlayMenuOpenView('rotate');
       this.orientationFlipOriginLandscape = !isLegacyLandscapeViewport(width, height);
     }
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
@@ -11199,6 +11237,10 @@ export class MenuScene extends Phaser.Scene {
       this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
       this.uiDirty = true;
     }
+    if (hasLegacyQuitConfirmExpired(this.playResetConfirmState, time)) {
+      this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
+      this.uiDirty = true;
+    }
   }
 
   private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T {
@@ -11244,7 +11286,6 @@ export class MenuScene extends Phaser.Scene {
     this.clearHudTexts();
     this.hudTouchControlBounds = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
-      this.touchSettingsCogIconImage.setVisible(false);
       this.controllerHalo.hide();
       this.footerText.setText('');
       return;
@@ -11356,16 +11397,14 @@ export class MenuScene extends Phaser.Scene {
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): VisualRect | null {
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
-      this.touchSettingsCogIconImage.setVisible(false);
       this.controllerHalo.hide();
       return null;
     }
 
     const { controls } = touchControlLayout;
-    // No live pressed-state tracking for this control (matches the
-    // pre-existing behavior) -- always idle-colored, just now with the
-    // same blink pulse as the menu cog.
-    this.drawLegacySettingsCogControl(controls.pause, false, time);
+    // MAZER-UI-095: the Menu button (three lines, the main menu's own glyph and blink) where the Settings cog was.
+    // Same fixed hit region and the same 'pause' touch route, which returns before any stick/anchor drag can start.
+    this.drawLegacyPlayMenuControl(controls.pause, time);
 
     if (this.playFloatingStickOrigin === null) {
       // Finger lifted: the halo fades out where it was (Reduce Motion: gone at once).
@@ -11430,32 +11469,37 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  // Matches the menu surface's own real settings icon (same texture,
-  // applyLegacyHudIconFrame, same blink pulse) instead of the procedural
-  // gear it used to share via drawLegacySettingsCog -- reported as "played
-  // game screen never got the ui updates like for icons": this in-play
-  // pause/settings touch control was the one icon on the active-play screen
-  // that got missed when the menu header/overlay icons were replaced.
-  // `rect` here is the real touch hit-target (tuned for thumb reach,
-  // deliberately bigger than the menu's compact header box) -- the glyph's
-  // own display size is still pinned to the same visual footprint the menu
-  // cog uses, not the (bigger) hit target, centered within it.
-  private drawLegacySettingsCogControl(
+  // MAZER-UI-095: the in-game Menu button. The main menu's closed toggle draw (drawMenuBurgerGlyph, same colour, same
+  // header blink alpha, held still under Reduced Motion) at the old cog's visual footprint, centred in `rect`, the real
+  // touch hit target (tuned for thumb reach, bigger than the glyph). While the run is paused the play-menu controller
+  // draws the same glyph, open as an X, at the same frame (resolveLegacyPlayMenuToggleFrame).
+  private drawLegacyPlayMenuControl(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
-    active: boolean,
     time: number
   ): void {
     const phase = resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion());
-    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1);
-    const blinkScale = 0.92 + (phase * 0.08) + (active ? 0.02 : 0);
-    const visualSize = clamp(Math.round(Math.min(this.layout.width, this.layout.height) * 0.085), 36, 40);
-    this.applyLegacyHudIconFrame(
-      this.touchSettingsCogIconImage,
-      MAZER_HUD_SETTINGS_ICON_METRICS,
-      rect.centerX,
-      rect.centerY,
-      visualSize * 1.15 * blinkScale,
+    const blinkAlpha = clamp(0.22 + (phase * 0.78), 0.14, 1);
+    const frame = this.resolveLegacyPlayMenuToggleFrame(rect);
+    drawMenuBurgerGlyph(
+      this.hudGraphics,
+      frame.centerX,
+      frame.centerY,
+      frame.width,
+      0,
+      MENU_DROPDOWN_FOREGROUND,
       blinkAlpha
+    );
+  }
+
+  private resolveLegacyPlayMenuToggleFrame(
+    rect: { left: number; top: number; width: number; height: number }
+  ): VisualRect {
+    const visualSize = clamp(Math.round(Math.min(this.layout.width, this.layout.height) * 0.085), 36, 40);
+    return createVisualRect(
+      Math.round(rect.left + ((rect.width - visualSize) / 2)),
+      Math.round(rect.top + ((rect.height - visualSize) / 2)),
+      visualSize,
+      visualSize
     );
   }
 
@@ -11505,7 +11549,6 @@ export class MenuScene extends Phaser.Scene {
 
   private clearPlayHudImmediately(): void {
     this.hudGraphics.clear();
-    this.touchSettingsCogIconImage.setVisible(false);
     this.hudTouchControlBounds = null;
     this.clearHudTexts();
     this.footerText.setText('');
@@ -11525,6 +11568,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.clear();
     this.clearUi();
     this.menuDropdown.syncVisibility(this.overlay === 'none' && this.mode === 'menu');
+    this.playMenu.syncVisibility(this.isLegacyPlayMenuDropdownView());
     this.overlayScrimCloseBounds = null;
     this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
@@ -11616,6 +11660,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawOverlayPanel(): void {
+    // MAZER-UI-095: under the in-game Menu dropdown the paused maze stays readable (lighter dim, same colour).
+    if (this.isLegacyPlayMenuDropdownView()) {
+      this.overlayGraphics.fillStyle(0x02040a, LEGACY_PLAY_MENU_DIM_ALPHA);
+      this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
+      return;
+    }
     // Same calm animated-backdrop dimmer every overlay uses -- the auth
     // screen used to be fully opaque here specifically so credentials never
     // shared a surface with the moving maze board, but the board itself
@@ -11714,7 +11764,13 @@ export class MenuScene extends Phaser.Scene {
     this.buildLegacySettingsSheetOverlay('menu');
   }
 
+  // MAZER-UI-095: Pause opens on the in-game Menu dropdown; its Settings row swaps to the (trimmed) Settings sheet and
+  // its Guide row lays the Guide on top of whichever is showing.
   private buildPauseOverlay(): void {
+    if (this.isLegacyPlayMenuDropdownView()) {
+      this.buildLegacyPlayMenuOverlay();
+      return;
+    }
     this.buildLegacySettingsSheetOverlay('pause');
   }
 
@@ -11736,13 +11792,11 @@ export class MenuScene extends Phaser.Scene {
         }
         : undefined,
       previewLevelsExpanded: this.previewLevelsExpanded,
-      quitConfirmArmed: context === 'pause' && isLegacyQuitConfirmArmed(this.quitConfirmState, this.time.now),
       rotatePrompt: context === 'pause' && shouldShowLegacyRotateNotice({
         corridorPx: this.layout.tileSize,
         currentLandscape: isLegacyLandscapeViewport(this.layout.width, this.layout.height),
         originLandscape: this.orientationFlipOriginLandscape
       }),
-      settingsExpanded: this.pauseSettingsExpanded,
       signedIn: this.authSnapshot.status === 'authenticated',
       width: this.layout.width
     });
@@ -11797,9 +11851,7 @@ export class MenuScene extends Phaser.Scene {
         this.handleBackAction();
         return;
       case 'TOGGLE_SETTINGS_GROUP':
-        this.pauseSettingsExpanded = !this.pauseSettingsExpanded;
-        this.resetLegacyOverlayScrollState();
-        this.uiDirty = true;
+        // MAZER-UI-095: no sheet has a collapsible Settings group any more; nothing to toggle.
         return;
       case 'PREVIEW_JUMP':
         this.jumpLegacyLevelPreview(command.level);
@@ -12390,6 +12442,16 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGuideBounds = null;
     this.resetLegacyOverlayScrollState();
     this.uiDirty = true;
+    const target = resolveLegacyGuideCloseTarget({
+      openedFromMenu: this.guideOpenedFromMenu,
+      screen: this.mode === 'play' ? 'play' : 'main'
+    });
+    this.guideOpenedFromMenu = false;
+    // MAZER-UI-096: a Guide opened from the main menu's dropdown returns to the main menu, through the same back path
+    // the sheet's own Back to Menu uses. In a game it returns to the paused dropdown (playMenuView is still 'menu').
+    if (target === 'main-menu' && this.overlay === 'options') {
+      this.handleBackAction();
+    }
   }
 
   private resolveLegacyGuideHasKeyboard(): boolean {
@@ -13984,30 +14046,24 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // L6 "Menu A: Dropdown panel" (owner pick 2026-11-19). The controller owns the toggle, panel, rows and scrim; the
-  // scene only supplies textures, fonts and the three destinations (src/render/menuDropdownButtons.ts).
-  private createLegacyMenuDropdown(): LegacyMenuDropdownController {
-    const iconMetrics: Record<LegacyMenuDropdownItemId, LegacyHudIconSourceMetrics> = {
-      leaderboard: MAZER_HUD_LEADERBOARD_ICON_METRICS,
-      profile: MAZER_HUD_PROFILE_ICON_METRICS,
-      settings: MAZER_HUD_SETTINGS_ICON_METRICS
-    };
-    const textures: Record<LegacyMenuDropdownItemId, string> = {
-      leaderboard: MAZER_HUD_LEADERBOARD_TEXTURE_KEY,
-      profile: MAZER_HUD_PROFILE_TEXTURE_KEY,
-      settings: MAZER_HUD_SETTINGS_TEXTURE_KEY
-    };
-    let profileShown = true;
-    return new LegacyMenuDropdownController({
+  // MAZER-UI-095 / MAZER-UI-096: what BOTH Menu dropdowns share, so they look and behave alike: one controller class
+  // (menuDropdownButtons.ts), the same blink, fonts and motion, and the row icons from the one registry
+  // (menuRowIcons.ts). Each screen adds only its row list (legacyMenuRows.ts) and what its rows do.
+  private resolveLegacyMenuDropdownSharedHost<TId extends LegacyMenuRowId>(): Omit<MenuDropdownHost<TId>, 'select'> {
+    return {
       blinkAlpha: (time, active) => clamp(
         0.22 + (resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion()) * 0.78) + (active ? 0.08 : 0),
         0.14,
         1
       ),
+      drawIcon: (graphics, id, centerX, centerY, size, alpha, lit) => {
+        drawMenuRowVectorIcon(graphics, id, centerX, centerY, size, alpha, { soundEnabled: this.settings.soundEnabled }, lit);
+      },
       fontFamily: LEGACY_UI_FONT_FAMILY,
       now: () => this.time.now,
       placeIcon: (image, id, centerX, centerY, size, alpha) => {
-        this.applyLegacyHudIconFrame(image, iconMetrics[id], centerX, centerY, size, alpha);
+        const icon = this.resolveLegacyMenuRowIconTexture(id);
+        this.applyLegacyHudIconFrame(image, icon?.metrics ?? MAZER_HUD_SETTINGS_ICON_METRICS, centerX, centerY, size, alpha);
       },
       prepareText: (text) => {
         this.applyLegacyUiTextCrispness(text);
@@ -14017,19 +14073,35 @@ export class MenuScene extends Phaser.Scene {
         this.uiDirty = true;
       },
       scene: this,
-      select: (id) => {
-        if (id === 'settings') {
-          this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));
-        } else if (id === 'leaderboard') {
-          this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'));
-        } else {
-          // Signed out, a Profile-row sign-in continues to the account page (legacySignInContinuation.ts).
-          withMazerSignInContinuation('account', () => (
-            this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
-          ));
-        }
-      },
-      textureKey: (id) => textures[id],
+      textureKey: (id) => this.resolveLegacyMenuRowIconTexture(id)?.textureKey ?? null
+    };
+  }
+
+  /** The only place a Menu row's registry entry becomes a texture: the three HUD glyphs BootScene bakes (C Star Dust). */
+  private resolveLegacyMenuRowIconTexture(id: LegacyMenuRowId): { textureKey: string; metrics: LegacyHudIconSourceMetrics } | null {
+    const source = MENU_ROW_ICON_SOURCES[id];
+    if (source.kind !== 'hud') {
+      return null;
+    }
+    switch (source.hudIcon) {
+      case 'profile':
+        return { metrics: MAZER_HUD_PROFILE_ICON_METRICS, textureKey: MAZER_HUD_PROFILE_TEXTURE_KEY };
+      case 'leaderboard':
+        return { metrics: MAZER_HUD_LEADERBOARD_ICON_METRICS, textureKey: MAZER_HUD_LEADERBOARD_TEXTURE_KEY };
+      default:
+        return { metrics: MAZER_HUD_SETTINGS_ICON_METRICS, textureKey: MAZER_HUD_SETTINGS_TEXTURE_KEY };
+    }
+  }
+
+  // L6 "Menu A: Dropdown panel" (owner pick 2026-11-19). The controller owns the toggle, panel, rows and scrim; the
+  // scene only supplies the shared host and what each row does. MAZER-UI-096: Guide and Sound are rows here too (out
+  // of Settings), the same as in a game; no pause, so the X just closes.
+  private createLegacyMenuDropdown(): LegacyMenuDropdownController<LegacyMainMenuRowId> {
+    let profileShown = true;
+    return new LegacyMenuDropdownController<LegacyMainMenuRowId>({
+      ...this.resolveLegacyMenuDropdownSharedHost<LegacyMainMenuRowId>(),
+      keepOpenOnSelect: (id) => isLegacyMenuRowToggle(id),
+      select: (id) => this.selectLegacyMainMenuRow(id),
       // Per-frame side effects the retired profile corner button owned: warm the username, and drop/restore the
       // Profile row when the account service goes unavailable/comes back.
       tick: () => {
@@ -14045,6 +14117,139 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  // MAZER-UI-095: the in-game Menu. A second instance of the main menu's dropdown controller (same shared host, panel,
+  // row model, hit zones, timings); the scene supplies the rows (legacyMenuRows.ts via legacyPlayMenu.ts) and what
+  // each row does. The X and a tap outside the panel resume through the existing RESUME_RUN path.
+  private createLegacyPlayMenu(): LegacyMenuDropdownController<LegacyPlayMenuRowId> {
+    return new LegacyMenuDropdownController<LegacyPlayMenuRowId>({
+      ...this.resolveLegacyMenuDropdownSharedHost<LegacyPlayMenuRowId>(),
+      dismissed: () => {
+        // The Resume X sits under the closed Menu button's hit region: this same press must not reach the play-control
+        // handler and reopen the pause (handleLegacyPlayTouchControl swallows a press with this same scene clock reading).
+        this.playMenuDismissedAtMs = this.time.now;
+        this.dispatchUiBridgeCommand({ type: 'RESUME_RUN' }, () => this.applyLegacyPauseCommand('resume'));
+      },
+      keepOpenOnSelect: (id) => shouldLegacyPlayMenuStayOpen(id, {
+        movesMade: this.playCyclePath.length > 1,
+        nowMs: this.time.now,
+        quitState: this.quitConfirmState,
+        resetState: this.playResetConfirmState
+      }),
+      select: (id) => this.selectLegacyPlayMenuRow(id)
+    });
+  }
+
+  // MAZER-UI-096: the main menu's rows. Settings opens the (trimmed) Settings sheet; Guide opens the Guide on that same
+  // overlay and its Close comes straight back here; Sound flips in place (the panel stays open to show On / Off).
+  private selectLegacyMainMenuRow(id: LegacyMainMenuRowId): void {
+    switch (id) {
+      case 'settings':
+        this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));
+        return;
+      case 'guide':
+        this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));
+        if (this.overlay === 'options') {
+          this.settingsGuideOpen = true;
+          this.guideOpenedFromMenu = true;
+          this.resetLegacyOverlayScrollState();
+          this.uiDirty = true;
+        }
+        return;
+      case 'sound':
+        this.applyOverlayToggleFieldChange('soundEnabled');
+        this.uiDirty = true;
+        return;
+      case 'leaderboard':
+        this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'));
+        return;
+      case 'profile':
+        // Signed out, a Profile-row sign-in continues to the account page (legacySignInContinuation.ts).
+        withMazerSignInContinuation('account', () => (
+          this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'account' }, () => this.openSharedAccountSurface())
+        ));
+        return;
+    }
+  }
+
+  private isLegacyPlayMenuDropdownView(): boolean {
+    return this.mode === 'play' && this.overlay === 'pause' && this.playMenuView === 'menu' && !this.settingsGuideOpen;
+  }
+
+  private buildLegacyPlayMenuOverlay(): void {
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    const pause = touchControlLayout.controls.pause;
+    const safeArea = readMazerViewportGeometry().safeArea;
+    if (!this.playMenu.isOpen()) {
+      this.playMenu.open();
+    }
+    const nowMs = this.time.now;
+    const buttons = this.playMenu.buildButtons({
+      items: buildLegacyPlayMenuRows({
+        quitArmed: isLegacyQuitConfirmArmed(this.quitConfirmState, nowMs),
+        resetArmed: isLegacyQuitConfirmArmed(this.playResetConfirmState, nowMs),
+        resetAvailable: resolveLegacyPlayResetAvailability({
+          levelGenerating: this.pendingGenerationRequest !== null,
+          resetPending: hasPendingLegacyResetRequest(this.pendingResetRequest),
+          runCompleted: this.playCompletedAtMs !== null
+        }),
+        soundEnabled: this.settings.soundEnabled
+      }),
+      panelWidth: LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
+      safeArea: { left: safeArea.left, right: safeArea.right },
+      toggle: {
+        closedAction: LEGACY_PLAY_MENU_TOGGLE_ACTION,
+        openAction: LEGACY_PLAY_MENU_RESUME_ACTION,
+        openLabel: LEGACY_PLAY_MENU_RESUME_LABEL
+      },
+      toggleFrame: this.resolveLegacyPlayMenuToggleFrame(pause),
+      toggleHit: createVisualRect(pause.left, pause.top, pause.width, pause.height),
+      viewport: { height: this.layout.height, width: this.layout.width }
+    });
+    this.uiButtons.push(...buttons);
+  }
+
+  private selectLegacyPlayMenuRow(id: LegacyPlayMenuRowId): void {
+    switch (id) {
+      case 'settings':
+        this.playMenuView = 'settings';
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+        return;
+      case 'guide':
+        this.settingsGuideOpen = true;
+        this.guideOpenedFromMenu = true;
+        this.resetLegacyOverlayScrollState();
+        this.uiDirty = true;
+        return;
+      case 'sound':
+        this.applyOverlayToggleFieldChange('soundEnabled');
+        this.uiDirty = true;
+        return;
+      case 'reset-level':
+        this.pressLegacyPlayResetLevel();
+        return;
+      case 'main-menu':
+        this.pressLegacyQuitToMenu();
+        return;
+    }
+  }
+
+  // Menu > Reset level: the existing reset-player path (back to this maze's start, trail and gates reset, run timer
+  // restarted, same level). With no move made it resets at once; after a move the first tap arms the row ("Tap again
+  // to reset", reverts after LEGACY_QUIT_CONFIRM_TIMEOUT_MS) and the second resets. The reset closes the pause.
+  private pressLegacyPlayResetLevel(): void {
+    const press = pressLegacyQuitConfirm(this.playResetConfirmState, {
+      movesMade: this.playCyclePath.length > 1,
+      nowMs: this.time.now
+    });
+    this.playResetConfirmState = press.state;
+    this.uiDirty = true;
+    if (press.outcome === 'armed') {
+      return;
+    }
+    this.dispatchUiBridgeCommand({ type: 'RESET_RUN' }, () => this.applyLegacyPauseCommand('reset-player'));
+  }
+
   private buildLegacyMenuDropdownButtons(): UiButton[] {
     const frame = resolveLegacyHeaderControlFrame({
       height: this.layout.height,
@@ -14057,9 +14262,10 @@ export class MenuScene extends Phaser.Scene {
     });
     // Visual glyph stays 32-40px; the touch target is grown to the 44px floor (legacyHitTarget.ts).
     const hit = resolveLegacyMinHitRect(frame, this.layout);
-    const items = this.authSnapshot.status === 'unavailable'
-      ? LEGACY_MENU_DROPDOWN_ITEMS.filter((item) => item.id !== 'profile')
-      : LEGACY_MENU_DROPDOWN_ITEMS;
+    const items = buildLegacyMenuRows('main', {
+      profileAvailable: this.authSnapshot.status !== 'unavailable',
+      soundEnabled: this.settings.soundEnabled
+    });
     return this.menuDropdown.buildButtons({
       items,
       safeArea: this.layout.headerSafeInset,
@@ -14223,6 +14429,7 @@ export class MenuScene extends Phaser.Scene {
     const previousOverlay = this.overlay;
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;
+    this.guideOpenedFromMenu = false;
     this.overlayGuideBounds = null;
     if (previousOverlay === 'confirm-progression-reset' && kind !== 'confirm-progression-reset') {
       this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
@@ -14233,8 +14440,9 @@ export class MenuScene extends Phaser.Scene {
       this.beginUiTransition('overlay-open');
       this.uiEntrance.begin(this.time.now, this.prefersLegacyReducedMotion());
     }
+    this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
     if (kind === 'pause') {
-      this.pauseSettingsExpanded = false;
+      this.playMenuView = resolveLegacyPlayMenuOpenView('menu');
       this.previewLevelsExpanded = false;
     }
     if (kind === 'options' || kind === 'pause') {
@@ -14272,11 +14480,13 @@ export class MenuScene extends Phaser.Scene {
 
   private closeOverlay(): void {
     this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;
+    this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
     if (this.overlay !== 'none') {
       this.beginUiTransition('overlay-close');
     }
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;
+    this.guideOpenedFromMenu = false;
     this.overlayGuideBounds = null;
     if (this.overlay === 'confirm-progression-reset') {
       this.progressionResetState = INITIAL_LEGACY_PROGRESSION_RESET_STATE;
@@ -14638,6 +14848,22 @@ export class MenuScene extends Phaser.Scene {
     // constructed -- optional chaining makes that a safe no-op, and the
     // bridge's own constructor projects the (by-then-current) auth state.
     this.uiBridge?.refreshProjection('auth-change');
+  }
+
+  // MAZER-UI-100: Reset progress lives on the account page; its hand-back opens the same confirmation here.
+  private consumePendingMazerAccountAction(): void {
+    const step = resolveMazerAccountActionStep({
+      authResolved: !this.authGateAwaitingResolution,
+      pending: peekMazerPendingAccountAction(),
+      signedIn: this.authSnapshot.status === 'authenticated'
+    });
+    // Signed in, the gate's status screen closes on the next transition; wait for it rather than stack on it.
+    if (step === 'drop' || (step === 'open-reset-confirmation' && this.overlay !== 'auth')) {
+      clearMazerPendingAccountAction();
+      if (step === 'open-reset-confirmation') {
+        this.openOverlay('confirm-progression-reset');
+      }
+    }
   }
 
   private hasLegacyPlayAccess(): boolean {
@@ -15128,6 +15354,16 @@ export class MenuScene extends Phaser.Scene {
     // The Guide sits on top of its Settings sheet: back returns to Settings first.
     if (this.settingsGuideOpen && (this.overlay === 'options' || this.overlay === 'pause')) {
       this.closeLegacyGuideSheet();
+      return;
+    }
+    // MAZER-UI-095: the in-game Settings sheet steps back to the Menu dropdown; on the dropdown, back resumes.
+    if (
+      this.overlay === 'pause'
+      && resolveLegacyPlayMenuBack({ guideOpen: false, view: this.playMenuView }) === 'show-menu'
+    ) {
+      this.playMenuView = 'menu';
+      this.resetLegacyOverlayScrollState();
+      this.uiDirty = true;
       return;
     }
     if (this.overlay === 'confirm-progression-reset') {

@@ -19,7 +19,12 @@ import {
   MAZER_AUTH_RETURN_NOTICE_CATEGORY,
   captureAndScrubMazerAuthReturnNotice
 } from '../legacy-runtime/legacyAuthReturnNotice';
+import {
+  captureAndScrubMazerAccountAction,
+  holdMazerPendingAccountAction
+} from '../legacy-runtime/legacyAccountActionHandoff';
 import { bootstrapLegacyRemoteAccountStateForRoute } from '../legacy-runtime/legacyRemoteProgression';
+import { runMazerAccountSignedOutAtBootInBrowser } from './accountActionBoot';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { installLegacyControlHint } from '../render/legacyControlHintOverlay';
 import { runBoundedAccountBootstrap } from './bootAccountBootstrap';
@@ -158,6 +163,15 @@ const boot = async (): Promise<void> => {
   if (authReturnNotice !== null) {
     recordMazerOAuthBootFailure(MAZER_AUTH_RETURN_NOTICE_CATEGORY[authReturnNotice]);
   }
+  // MAZER-UI-100: the account page's Sign out / Reset progress hand back with ?accountAction=. Read once and strip
+  // it; `signed-out` only counts when the page came from the account host, `reset-progress` waits for MenuScene.
+  const accountAction = passwordRecoveryRouteRequested
+    ? null
+    : captureAndScrubMazerAccountAction(window.location, window.history, {
+      ignore: oauthCallbackRequested,
+      referrer: document.referrer
+    });
+  holdMazerPendingAccountAction(accountAction);
   markMazerBootStatus('boot-start');
   // Start the UI font fetch immediately (it is also <link rel=preload>ed in
   // index.html) so it overlaps with the install gate / account bootstrap;
@@ -233,6 +247,11 @@ const boot = async (): Promise<void> => {
       markRedirecting: () => markMazerBootStatus('shared-account-redirect'),
       setTimer: (handler, timeoutMs) => setTimeout(handler, timeoutMs)
     });
+  }
+
+  if (accountAction === 'signed-out') {
+    // MAZER-UI-100: the account session is already gone; end Mazer's own (local only, no host bounce).
+    await runMazerAccountSignedOutAtBootInBrowser();
   }
 
   // MAZER-ACCT-040: a signed-out launch goes straight to the account host's sign-in

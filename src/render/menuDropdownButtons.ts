@@ -2,6 +2,7 @@ import type Phaser from 'phaser';
 import type { LegacyHitRect } from '../legacy-runtime/legacyHitTarget';
 import {
   CLOSED_LEGACY_MENU_DROPDOWN_STATE,
+  LEGACY_MENU_DROPDOWN_DISABLED_ALPHA,
   LEGACY_MENU_DROPDOWN_ICON_SIZE_PX,
   LEGACY_MENU_DROPDOWN_ITEMS,
   LEGACY_MENU_DROPDOWN_LABEL_FONT_PX,
@@ -33,6 +34,8 @@ import { resolveButtonIconPressedTextureKey } from './buttonIcons';
 /** Invisible hit zones (alpha 0.001 so Phaser still hit-tests them); the colour is a theme token, never seen. */
 const HIT_ZONE_FILL = MENU_DROPDOWN_PANEL_FILL;
 const HIT_ZONE_ALPHA = 0.001;
+/** Gap between the open toggle's X and its optional visible label (in-game "Resume"). */
+const OPEN_TOGGLE_LABEL_GAP_PX = 6;
 
 /**
  * L6 main-menu dropdown wiring (Phaser). MenuScene (Wave 5C guarded) only asks this controller for its buttons while
@@ -43,6 +46,11 @@ const HIT_ZONE_ALPHA = 0.001;
  * sits over everything else, so the Start hit zone and the tap-anywhere start never see a tap; the rows (depth 7) sit
  * over the scrim. The scrim also counts as an "other button" for the tap-anywhere exclusion, so even a tap that slips
  * past the object hit test cannot start a run while the panel is open or closing.
+ *
+ * MAZER-UI-095: the in-game Menu is a second instance of this same controller (same panel, rows, hit zones, timings).
+ * It passes options the main menu does not: the open X publishes 'Resume' and shows a visible "Resume" label, a tap on
+ * the X or outside the panel calls `dismissed` (the scene resumes the run), and some rows keep the panel open when
+ * picked (Sound, the two-tap Reset level / Main menu arm). Rows may carry a state word or be disabled.
  */
 
 /** Structural twin of MenuScene's UiButton (kept local so the scene's interface stays private). */
@@ -58,30 +66,53 @@ export interface MenuDropdownUiButton {
   destroy(): void;
 }
 
-export interface MenuDropdownHost {
+export interface MenuDropdownHost<TId extends string = LegacyMenuDropdownItemId> {
   readonly scene: Phaser.Scene;
   readonly fontFamily: string;
   now(): number;
   reducedMotion(): boolean;
   /** Header-family blink alpha for the closed toggle (the same pulse the old corner icons used). */
   blinkAlpha(time: number, active: boolean): number;
-  textureKey(id: LegacyMenuDropdownItemId): string;
+  /** Texture for a row's icon image; null = the row has no image (it is painted by `drawIcon`). */
+  textureKey(id: TId): string | null;
+  /** Optional named frame on that texture (the HUD atlas glyphs). */
+  textureFrame?(id: TId): string | undefined;
   /** Crops, sizes and places a HUD icon image exactly like the header icons. */
-  placeIcon(image: Phaser.GameObjects.Image, id: LegacyMenuDropdownItemId, centerX: number, centerY: number, size: number, alpha: number): void;
+  placeIcon(image: Phaser.GameObjects.Image, id: TId, centerX: number, centerY: number, size: number, alpha: number): void;
+  /** Optional vector icon painter for rows without an image (Guide, Sound, Reset level, Main menu). `lit` = highlighted row (C pressed colours). */
+  drawIcon?(graphics: Phaser.GameObjects.Graphics, id: TId, centerX: number, centerY: number, size: number, alpha: number, lit: boolean): void;
   prepareText(text: Phaser.GameObjects.Text): void;
   /** Runs a row's action (opens Settings, the account surface or the Leaderboard). */
-  select(id: LegacyMenuDropdownItemId): void;
+  select(id: TId): void;
   requestRebuild(): void;
   /** Called every menu frame by the toggle (keeps per-frame menu side effects the retired corner icons owned). */
   tick?(time: number): void;
+  /**
+   * When set, a tap on the X or outside the panel closes it at once and calls this (the in-game menu resumes the run).
+   * Unset (main menu): the panel animates closed and nothing else happens.
+   */
+  dismissed?(): void;
+  /** Rows whose pick leaves the panel open (in-game Sound toggle, the first press of a two-tap row). */
+  keepOpenOnSelect?(id: TId): boolean;
 }
 
-export interface MenuDropdownBuildInput {
+export interface MenuDropdownToggleOptions {
+  /** Name the closed toggle publishes (default 'Menu'). */
+  readonly closedAction?: string;
+  /** Name the open toggle (the X) publishes; default = closedAction. In game this is 'Resume'. */
+  readonly openAction?: string;
+  /** Visible label drawn to the left of the open X (in game: "Resume"). Its touch area joins the toggle's. */
+  readonly openLabel?: string | null;
+}
+
+export interface MenuDropdownBuildInput<TId extends string = LegacyMenuDropdownItemId> {
   toggleFrame: LegacyMenuDropdownRect;
   toggleHit: LegacyHitRect;
   viewport: { width: number; height: number };
   safeArea?: { left?: number; right?: number };
-  items?: readonly LegacyMenuDropdownItem[];
+  items?: readonly LegacyMenuDropdownItem<TId>[];
+  panelWidth?: number;
+  toggle?: MenuDropdownToggleOptions;
 }
 
 export const MENU_DROPDOWN_TOGGLE_DEPTH = 3;
@@ -102,12 +133,12 @@ const hitRect = (rect: LegacyMenuDropdownRect): LegacyHitRect => ({
   width: rect.width
 });
 
-export class LegacyMenuDropdownController {
+export class LegacyMenuDropdownController<TId extends string = LegacyMenuDropdownItemId> {
   private state: LegacyMenuDropdownState = CLOSED_LEGACY_MENU_DROPDOWN_STATE;
   private highlightIndex: number | null = null;
   private closeRebuildPending = false;
 
-  constructor(private readonly host: MenuDropdownHost) {}
+  constructor(private readonly host: MenuDropdownHost<TId>) {}
 
   isOpen(): boolean {
     return this.state.open;
@@ -148,13 +179,13 @@ export class LegacyMenuDropdownController {
 
   toggle(): void {
     if (this.state.open) {
-      this.close();
+      this.dismiss();
     } else {
       this.open();
     }
   }
 
-  /** The scene calls this on every UI rebuild: anything other than the bare menu snaps the panel shut. */
+  /** The scene calls this on every UI rebuild: anything other than the surface that owns the panel snaps it shut. */
   syncVisibility(visible: boolean): void {
     if (!visible && (this.state.open || this.closeRebuildPending)) {
       this.state = CLOSED_LEGACY_MENU_DROPDOWN_STATE;
@@ -163,10 +194,11 @@ export class LegacyMenuDropdownController {
     }
   }
 
-  buildButtons(input: MenuDropdownBuildInput): MenuDropdownUiButton[] {
-    const items = input.items ?? LEGACY_MENU_DROPDOWN_ITEMS;
-    const layout = resolveLegacyMenuDropdownLayout({
+  buildButtons(input: MenuDropdownBuildInput<TId>): MenuDropdownUiButton[] {
+    const items = input.items ?? (LEGACY_MENU_DROPDOWN_ITEMS as unknown as readonly LegacyMenuDropdownItem<TId>[]);
+    const layout = resolveLegacyMenuDropdownLayout<TId>({
       items,
+      panelWidth: input.panelWidth,
       safeArea: input.safeArea,
       toggleFrame: input.toggleFrame,
       toggleHit: input.toggleHit,
@@ -184,13 +216,53 @@ export class LegacyMenuDropdownController {
     return resolveLegacyMenuDropdownProgress(this.state, time, this.host.reducedMotion());
   }
 
-  private createToggle(input: MenuDropdownBuildInput, layout: LegacyMenuDropdownLayout): MenuDropdownUiButton {
+  /** The X or a tap outside: the main menu animates shut; the in-game menu shuts at once and resumes. */
+  private dismiss(): void {
+    if (this.host.dismissed === undefined) {
+      this.close();
+      return;
+    }
+    this.close(true);
+    this.host.dismissed();
+  }
+
+  private createToggle(input: MenuDropdownBuildInput<TId>, panelLayout: LegacyMenuDropdownLayout<TId>): MenuDropdownUiButton {
     const { scene } = this.host;
     const frame = input.toggleFrame;
-    const hit = input.toggleHit;
     const size = Math.min(frame.width, frame.height);
     const centerX = frame.left + (frame.width / 2);
     const centerY = frame.top + (frame.height / 2);
+    const closedAction = input.toggle?.closedAction ?? LEGACY_MENU_DROPDOWN_TOGGLE_ACTION;
+    const openAction = input.toggle?.openAction ?? closedAction;
+    const openLabelText = input.toggle?.openLabel ?? null;
+    // MAZER-UI-095: the in-game X reads "Resume" in words too (right-aligned against the X, row font, accent colour).
+    const openLabel = openLabelText === null
+      ? null
+      : scene.add.text(Math.round(frame.left - OPEN_TOGGLE_LABEL_GAP_PX), Math.round(centerY), openLabelText, {
+        color: toCyberArcadeCssHex(MENU_DROPDOWN_ACCENT),
+        fontFamily: this.host.fontFamily,
+        fontSize: `${LEGACY_MENU_DROPDOWN_LABEL_FONT_PX}px`
+      }).setOrigin(1, 0.5).setDepth(MENU_DROPDOWN_TOGGLE_DEPTH).setVisible(false);
+    if (openLabel !== null) {
+      this.host.prepareText(openLabel);
+    }
+    // While open, the visible label is part of the Resume target: the zone grows left to cover it (never below 44 px).
+    const widen = openLabel !== null && this.state.open;
+    const widenedLeft = widen
+      ? Math.min(input.toggleHit.left, Math.floor(openLabel.x - openLabel.width) - OPEN_TOGGLE_LABEL_GAP_PX)
+      : input.toggleHit.left;
+    const layout: LegacyMenuDropdownLayout<TId> = widen
+      ? {
+        ...panelLayout,
+        toggle: {
+          height: panelLayout.toggle.height,
+          left: widenedLeft,
+          top: panelLayout.toggle.top,
+          width: (panelLayout.toggle.left + panelLayout.toggle.width) - widenedLeft
+        }
+      }
+      : panelLayout;
+    const hit = widen ? hitRect(layout.toggle) : input.toggleHit;
     const background = scene.add.rectangle(hit.centerX, hit.centerY, hit.width, hit.height, HIT_ZONE_FILL, HIT_ZONE_ALPHA);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(MENU_DROPDOWN_TOGGLE_DEPTH);
@@ -228,30 +300,33 @@ export class LegacyMenuDropdownController {
         // MAZER-UI-097: a pressed toggle holds full alpha so C's pressed ring and cyan lines read through the blink.
         graphics.setAlpha(pressed ? 1 : Math.max(this.host.blinkAlpha(time, active), progress)).setScale(1);
       }
+      openLabel?.setAlpha(progress).setVisible(this.state.open && progress > 0.01);
       if (this.closeRebuildPending && !this.isShown(time)) {
         this.closeRebuildPending = false;
         this.host.requestRebuild();
       }
     };
     updateFrame(this.host.now());
+    const action = this.state.open ? openAction : closedAction;
     return {
       background,
       bounds: hitRect(layout.toggle),
       iconOnly: true,
       label,
-      semanticAction: LEGACY_MENU_DROPDOWN_TOGGLE_ACTION,
+      semanticAction: action,
       setActive: (value: boolean) => { active = value; },
-      text: LEGACY_MENU_DROPDOWN_TOGGLE_ACTION,
+      text: action,
       updateFrame,
       destroy: () => {
         graphics.destroy();
         background.destroy();
         label.destroy();
+        openLabel?.destroy();
       }
     };
   }
 
-  private createScrim(input: MenuDropdownBuildInput, layout: LegacyMenuDropdownLayout): MenuDropdownUiButton {
+  private createScrim(input: MenuDropdownBuildInput<TId>, layout: LegacyMenuDropdownLayout<TId>): MenuDropdownUiButton {
     const { scene } = this.host;
     const { width, height } = input.viewport;
     const background = scene.add.rectangle(width / 2, height / 2, width, height, HIT_ZONE_FILL, HIT_ZONE_ALPHA);
@@ -263,12 +338,12 @@ export class LegacyMenuDropdownController {
       if (!this.state.open) {
         return;
       }
-      const tap = resolveLegacyMenuDropdownTap(layout, { x: pointer.worldX, y: pointer.worldY });
+      const tap = resolveLegacyMenuDropdownTap<TId>(layout, { x: pointer.worldX, y: pointer.worldY });
       if (tap.kind === 'row') {
         this.pick(tap.id);
       } else if (tap.kind !== 'panel') {
         // The X, or anywhere outside the panel: close, and nothing else happens (no run starts).
-        this.close();
+        this.dismiss();
       }
     });
     const panelGraphics = scene.add.graphics().setDepth(MENU_DROPDOWN_PANEL_DEPTH);
@@ -306,10 +381,11 @@ export class LegacyMenuDropdownController {
     };
   }
 
-  private createRow(layout: LegacyMenuDropdownLayout, index: number): MenuDropdownUiButton {
+  private createRow(layout: LegacyMenuDropdownLayout<TId>, index: number): MenuDropdownUiButton {
     const { scene } = this.host;
     const row = layout.rows[index]!;
     const rect = row.rect;
+    const disabled = row.item.disabled === true;
     const background = scene.add.rectangle(
       rect.left + (rect.width / 2),
       rect.top + (rect.height / 2),
@@ -319,24 +395,39 @@ export class LegacyMenuDropdownController {
       HIT_ZONE_ALPHA
     );
     background.setDepth(MENU_DROPDOWN_ROW_DEPTH);
-    if (this.state.open) {
+    if (this.state.open && !disabled) {
       background.setInteractive({ useHandCursor: true });
     }
     const iconKey = this.host.textureKey(row.item.id);
-    // MAZER-UI-097: the lit row shows the icon's pressed bake (C: cyan ink), when one exists.
-    const litIconKey = resolveButtonIconPressedTextureKey(iconKey);
-    const icon = scene.add.image(0, 0, iconKey)
-      .setOrigin(0.5, 0.5)
-      .setDepth(MENU_DROPDOWN_ROW_DEPTH)
-      .setVisible(false);
+    const iconFrame = this.host.textureFrame?.(row.item.id);
+    // MAZER-UI-097: the lit row shows the icon's pressed bake (C: cyan ink), when one exists (whole textures only).
+    const litIconKey = iconKey === null || iconFrame !== undefined ? null : resolveButtonIconPressedTextureKey(iconKey);
+    const icon = iconKey === null
+      ? null
+      : scene.add.image(0, 0, iconKey, iconFrame)
+        .setOrigin(0.5, 0.5)
+        .setDepth(MENU_DROPDOWN_ROW_DEPTH)
+        .setVisible(false);
+    const iconGraphics = this.host.drawIcon === undefined ? null : scene.add.graphics().setDepth(MENU_DROPDOWN_ROW_DEPTH);
     const label = scene.add.text(row.labelLeft, row.centerY, row.item.label, {
       color: toCyberArcadeCssHex(MENU_DROPDOWN_FOREGROUND),
       fontFamily: this.host.fontFamily,
       fontSize: `${LEGACY_MENU_DROPDOWN_LABEL_FONT_PX}px`
     }).setOrigin(0, 0.5).setDepth(MENU_DROPDOWN_ROW_DEPTH);
     this.host.prepareText(label);
+    const stateText = row.item.stateText ?? null;
+    const state = stateText === null
+      ? null
+      : scene.add.text(row.stateRight, row.centerY, stateText, {
+        color: toCyberArcadeCssHex(MENU_DROPDOWN_ACCENT),
+        fontFamily: this.host.fontFamily,
+        fontSize: `${LEGACY_MENU_DROPDOWN_LABEL_FONT_PX - 2}px`
+      }).setOrigin(1, 0.5).setDepth(MENU_DROPDOWN_ROW_DEPTH);
+    if (state !== null) {
+      this.host.prepareText(state);
+    }
     const setHighlight = (on: boolean): void => {
-      if (on && this.state.open) {
+      if (on && this.state.open && !disabled) {
         this.highlightIndex = index;
       } else if (!on && this.highlightIndex === index) {
         this.highlightIndex = null;
@@ -345,7 +436,7 @@ export class LegacyMenuDropdownController {
     background.on('pointerover', () => setHighlight(true));
     background.on('pointerout', () => setHighlight(false));
     background.on('pointerdown', () => {
-      if (this.state.open) {
+      if (this.state.open && !disabled) {
         this.pick(row.item.id);
       }
     });
@@ -356,7 +447,7 @@ export class LegacyMenuDropdownController {
       }
       const progress = this.progress(time);
       const offset = resolveLegacyMenuDropdownSlideOffset(progress);
-      const alpha = resolveLegacyMenuDropdownRowAlpha(progress, index);
+      const alpha = resolveLegacyMenuDropdownRowAlpha(progress, index) * (disabled ? LEGACY_MENU_DROPDOWN_DISABLED_ALPHA : 1);
       const lit = this.highlightIndex === index;
       const key = `${alpha.toFixed(3)}|${offset}|${lit}`;
       if (key === drawnKey) {
@@ -367,11 +458,18 @@ export class LegacyMenuDropdownController {
         .setColor(toCyberArcadeCssHex(lit ? MENU_DROPDOWN_ACCENT : MENU_DROPDOWN_FOREGROUND))
         .setAlpha(alpha)
         .setVisible(alpha > 0.01);
-      const wantKey = lit && scene.textures.exists(litIconKey) ? litIconKey : iconKey;
-      if (icon.texture.key !== wantKey) {
-        icon.setTexture(wantKey);
+      state?.setPosition(row.stateRight, row.centerY + offset).setAlpha(alpha).setVisible(alpha > 0.01);
+      if (icon !== null && iconKey !== null) {
+        const wantKey = lit && litIconKey !== null && scene.textures.exists(litIconKey) ? litIconKey : iconKey;
+        if (icon.texture.key !== wantKey) {
+          icon.setTexture(wantKey, iconFrame);
+        }
+        this.host.placeIcon(icon, row.item.id, row.iconCenterX, row.centerY + offset, LEGACY_MENU_DROPDOWN_ICON_SIZE_PX, alpha);
       }
-      this.host.placeIcon(icon, row.item.id, row.iconCenterX, row.centerY + offset, LEGACY_MENU_DROPDOWN_ICON_SIZE_PX, alpha);
+      if (iconGraphics !== null) {
+        iconGraphics.clear();
+        this.host.drawIcon?.(iconGraphics, row.item.id, row.iconCenterX, row.centerY + offset, LEGACY_MENU_DROPDOWN_ICON_SIZE_PX, alpha, lit);
+      }
     };
     updateFrame(this.host.now());
     return {
@@ -383,14 +481,20 @@ export class LegacyMenuDropdownController {
       text: row.item.label,
       updateFrame,
       destroy: () => {
-        icon.destroy();
+        icon?.destroy();
+        iconGraphics?.destroy();
+        state?.destroy();
         background.destroy();
         label.destroy();
       }
     };
   }
 
-  private pick(id: LegacyMenuDropdownItemId): void {
+  private pick(id: TId): void {
+    if (this.host.keepOpenOnSelect?.(id) === true) {
+      this.host.select(id);
+      return;
+    }
     this.close(true);
     this.host.select(id);
   }

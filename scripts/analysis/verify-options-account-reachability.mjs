@@ -202,8 +202,9 @@ const verifyLayout = async ({ baseUrl, browser, viewportLabel, viewport, isMobil
   // Entry point 2 (retired 2026-11-06): the Options header no longer carries
   // a profile/Account icon -- the main menu's top-left icon is the only
   // account entry. Prove that instead: after a real click on Settings and a
-  // real scroll to the bottom, Sign out is still visible and no Account
-  // control exists anywhere in Options.
+  // real scroll to the bottom, the Settings rows are visible, Sign out and
+  // Reset progress are NOT (MAZER-UI-100: they live on the account page,
+  // reached from Profile above), and no Account control exists in Options.
   const context = await browser.newContext({
     deviceScaleFactor: 2,
     hasTouch: isMobile,
@@ -220,10 +221,17 @@ const verifyLayout = async ({ baseUrl, browser, viewportLabel, viewport, isMobil
     await waitForSurface(page, { mode: 'menu', overlay: 'options', timeoutMs: DEFAULT_TIMEOUT_MS });
     const optionsTopSurface = surfaceFromDiagnostics(await readDiagnostics(page));
     const optionsBottomSurface = surfaceFromDiagnostics(await scrollOverlayToBottom(page, { timeoutMs: DEFAULT_TIMEOUT_MS }));
+    const optionsLabels = [optionsTopSurface, optionsBottomSurface]
+      .flatMap((surface) => surface.textLabels.map((entry) => entry.text));
     check(
-      `[${viewportLabel}-options] Options-bottom shows the real Sign out control after real scroll input`,
-      hasTextLabels(optionsBottomSurface, ['Sign out']),
+      `[${viewportLabel}-options] Options-bottom shows the Settings rows after real scroll input`,
+      hasTextLabels(optionsBottomSurface, ['Haptics']),
       `labels=${optionsBottomSurface.textLabels.map((entry) => entry.text).join(', ')}`
+    );
+    check(
+      `[${viewportLabel}-options] Options has no Sign out or Reset progress row (they live only on the account page, MAZER-UI-100)`,
+      !optionsLabels.some((text) => text === 'Sign out' || text === 'Reset progress'),
+      `labels=${optionsLabels.join(', ')}`
     );
     const optionsHasAccountControl = [optionsTopSurface, optionsBottomSurface].some((surface) => (
       surface.buttons.some((button) => button?.semanticAction === 'Account' || button?.text === 'Account')

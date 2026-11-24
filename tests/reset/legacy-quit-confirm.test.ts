@@ -9,8 +9,13 @@ import {
   isLegacyQuitConfirmArmed,
   pressLegacyQuitConfirm
 } from '../../src/legacy-runtime/legacyQuitConfirm';
+import { buildLegacyMenuRows } from '../../src/legacy-runtime/legacyMenuRows';
 import {
-  LEGACY_SETTINGS_SIZES,
+  LEGACY_MENU_DROPDOWN_ROW_HEIGHT_PX,
+  resolveLegacyMenuDropdownLayout
+} from '../../src/legacy-runtime/legacyMenuDropdown';
+import { LEGACY_MIN_HIT_TARGET_PX } from '../../src/legacy-runtime/legacyHitTarget';
+import {
   buildLegacySettingsSheetModel,
   buildLegacySettingsSheetPlan
 } from '../../src/legacy-runtime/legacySettingsSheetPlan';
@@ -45,28 +50,39 @@ describe('quit confirm state machine', () => {
   });
 });
 
-describe('pause sheet row', () => {
-  const quitRow = (armed: boolean) => buildLegacySettingsSheetModel('pause', { quitConfirmArmed: armed })
-    .sections.flatMap((section) => section.rows).find((row) => row.id === 'quit-to-menu')!;
+// MAZER-UI-095: the quit confirm moved from the pause sheet's "Quit to Menu" row to the in-game Menu dropdown's
+// "Main menu" row. Same state machine, same armed copy, same 44 px target; the sheet itself has no quit row now.
+describe('in-game Menu: Main menu row (was the pause sheet row)', () => {
+  const mainMenuRow = (armed: boolean) => buildLegacyMenuRows('play', { quitArmed: armed, soundEnabled: true })
+    .find((row) => row.id === 'main-menu')!;
 
-  test('default row is unchanged; armed row relabels in place with the same command', () => {
-    expect(quitRow(false)).toMatchObject({ command: { type: 'RETURN_HOME' }, emphasis: 'tertiary', label: 'Quit to Menu' });
-    expect(buildLegacySettingsSheetModel('pause').sections.flatMap((s) => s.rows).find((r) => r.id === 'quit-to-menu')!.label).toBe('Quit to Menu');
-    expect(quitRow(true)).toMatchObject({ command: { type: 'RETURN_HOME' }, emphasis: 'danger-outline', label: LEGACY_QUIT_CONFIRM_ARMED_LABEL });
+  test('default row says Main menu; armed row relabels in place', () => {
+    expect(mainMenuRow(false).label).toBe('Main menu');
+    expect(mainMenuRow(true).label).toBe(LEGACY_QUIT_CONFIRM_ARMED_LABEL);
     expect(LEGACY_QUIT_CONFIRM_ARMED_LABEL).toBe('Tap again to quit');
   });
 
   test('the armed row keeps the 44 px touch target and the same position', () => {
-    const items = (armed: boolean) => buildLegacySettingsSheetPlan({
-      context: 'pause', height: 640, quitConfirmArmed: armed, width: 360
-    }).items.find((item) => item.model.id === 'quit-to-menu')!;
-    const idle = items(false);
-    const armed = items(true);
-    expect(armed.model.label).toBe('Tap again to quit');
-    expect(armed.rect.height).toBeGreaterThanOrEqual(LEGACY_SETTINGS_SIZES.actionHeight);
-    expect(armed.rect.height).toBeGreaterThanOrEqual(44);
-    expect(armed.rect.top).toBe(idle.rect.top);
-    expect(armed.rect.height).toBe(idle.rect.height);
+    const viewport = { height: 640, width: 360 };
+    const toggleFrame = { height: 36, left: 312, top: 20, width: 36 };
+    const toggleHit = { height: 44, left: 308, top: 16, width: 44 };
+    const row = (armed: boolean) => resolveLegacyMenuDropdownLayout({
+      items: buildLegacyMenuRows('play', { quitArmed: armed, soundEnabled: true }), toggleFrame, toggleHit, viewport
+    }).rows.find((entry) => entry.item.id === 'main-menu')!;
+    const idle = row(false);
+    const armed = row(true);
+    expect(armed.item.label).toBe('Tap again to quit');
+    expect(armed.rect.height).toBe(LEGACY_MENU_DROPDOWN_ROW_HEIGHT_PX);
+    expect(armed.rect.height).toBeGreaterThanOrEqual(LEGACY_MIN_HIT_TARGET_PX);
+    expect(armed.rect).toEqual(idle.rect);
+  });
+
+  test('the pause sheet has no quit row any more, armed or not', () => {
+    for (const armed of [false, true]) {
+      const ids = buildLegacySettingsSheetPlan({ context: 'pause', height: 640, quitConfirmArmed: armed, width: 360 })
+        .items.map((item) => item.model.id);
+      expect(ids).not.toContain('quit-to-menu');
+    }
   });
 
   test('the menu sheet never shows the quit row, armed or not', () => {

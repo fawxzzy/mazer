@@ -1362,21 +1362,20 @@ export const evaluateAuthStatusAnatomy = (surface) => {
   return { failures, pass: failures.length === 0 };
 };
 
-// Settings is ONE shared sheet (menu + pause, PR #386): a title, a `How to play`
-// row that opens the Guide sub-view, the Reduce Motion and Haptics rows, each with a description line under it (Trail Fade, Trail Shine and Animated Background were removed in MAZER-UI-026; the zoom slider on 2026-11-06) and,
+// Settings is ONE shared sheet (menu + pause, PR #386): a title, the Reduce Motion and Haptics rows, each with a description line under it (Trail Fade, Trail Shine and Animated Background were removed in MAZER-UI-026; the zoom slider on 2026-11-06) and,
 // in the menu context, an Account section. Every label below is a row label in
 // src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
 // asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
 // removed row fails a test instead of silently going stale here. The header
 // affordance (Close pill / `Back to Menu` row) is deliberately NOT listed: it is
 // owned by the sheet header and changes independently of the rows.
+// MAZER-UI-095/096: the `How to play` and Sound rows left the sheet for the Menu dropdown (legacyMenuRows.ts).
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'How to play',
   'Reduce Motion',
   'Haptics'
 ]);
 
-// The Guide sub-view opened from the `How to play` row (legacyGuideContent.ts).
+// The Guide opened from the main-menu dropdown's Guide row (legacyGuideContent.ts, MAZER-UI-096).
 // Title, one heading per guide row and the fixed `Got it` footer. Cross-checked
 // against LEGACY_GUIDE_ROWS / LEGACY_GUIDE_TITLE / LEGACY_GUIDE_CLOSE_LABEL by the
 // same test file.
@@ -1395,7 +1394,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Sound',
   'Got it'
 ]);
-const OPTIONS_GUIDE_OPEN_LABEL = 'How to play';
+const OPTIONS_GUIDE_OPEN_LABEL = 'Guide';
 const OPTIONS_GUIDE_CLOSE_LABEL = 'Got it';
 // The Guide body scrolls on a short viewport and rows scrolled out of the body
 // are not painted, so only the fixed frame (title + `Got it` footer) is
@@ -1410,29 +1409,47 @@ export const resolveOptionsGuideRequiredLabels = (surface) => (
     : OPTIONS_GUIDE_EXPECTED_LABELS
 );
 
-// Pause card (2026-11-06 header/pause lane): title, Resume, Settings (collapsed
-// on every open) and Quit to Menu. There is no Guide card and no inline toggles
-// until Settings is opened; the toggles then render inside the card.
-const PAUSE_CARD_EXPECTED_LABELS = Object.freeze([
-  'Paused',
-  'Resume',
+// MAZER-UI-095: pausing opens the in-game Menu dropdown (legacyMenuRows.ts play rows), not the old Paused card.
+// The rows are dropdown buttons (visual.buttons), not overlay text labels; the Settings row opens the trimmed
+// sheet, whose toggles are asserted after a real click.
+const PAUSE_MENU_EXPECTED_ROWS = Object.freeze([
   'Settings',
-  'Quit to Menu'
+  'Guide',
+  'Sound',
+  'Reset level',
+  'Main menu'
 ]);
+const waitForMenuRowLabels = async (page, rows, timeoutMs) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const buttons = (await readDiagnostics(page)).visual?.buttons ?? [];
+    const drawn = rows.every((row) => buttons.some((button) => (
+      (button?.text === row || button?.semanticAction === row) && isFiniteBounds(button?.labelBounds)
+    )));
+    if (drawn) {
+      return;
+    }
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`In-game Menu rows did not finish drawing (timeout ${timeoutMs}ms).`);
+};
+const hasMenuRowButtons = (surface, rows) => rows.every((row) => (
+  (surface?.buttons ?? surface?.diagnostics?.visual?.buttons ?? []).some((button) => (
+    (button?.text === row || button?.semanticAction === row) && isFiniteBounds(button?.bounds)
+  ))
+));
 const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
   'Reduce Motion',
   'Haptics'
 ]);
 
-// Account section of the Settings sheet (menu context, signed in): Reset
-// progress and Sign out are plain rows at the end of the sheet body, reached by
-// scrolling only when the viewport is too short for the card. There is no docked
-// session action bar any more (it was replaced by the shared sheet, PR #386);
-// 'Account' lives in a different overlay (the profile/username icon button).
+// Bottom of the Settings sheet (menu context, signed in). MAZER-UI-100 moved Reset
+// progress and Sign out to the account page (reached from Profile), so the sheet
+// ends on the Settings group and fits without scrolling on every supported phone.
+// 'Haptics' is a Settings group row that is on screen at the bottom of the sheet.
 // Cross-checked against buildLegacySettingsSheetModel('menu', { signedIn: true }).
 const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
-  'Reset progress',
-  'Sign out'
+  'Haptics'
 ]);
 
 const isAuthGatedMenuSurface = (surface) => (
@@ -1479,8 +1496,16 @@ const clickVisualButton = async (page, label, timeoutMs) => {
   await clickPoint(page, point, label);
 };
 
+// MAZER-UI-096: the Guide is a row of the main-menu dropdown, not of the Settings sheet. Leave Settings through its
+// Back to Menu row, then open the Guide through the real dropdown row (the same overlay hosts it).
 const openGuideFromOptions = async (page, timeoutMs) => {
-  await clickVisualButton(page, OPTIONS_GUIDE_OPEN_LABEL, timeoutMs);
+  await clickVisualButton(page, 'Back to Menu', timeoutMs);
+  await waitForSurface(page, { expectedLabels: [], mode: 'menu', overlay: 'none', timeoutMs });
+  const guidePoint = await revealMenuDropdownActionPoint(page, OPTIONS_GUIDE_OPEN_LABEL, { timeoutMs });
+  if (!guidePoint) {
+    throw new Error(`Missing ${OPTIONS_GUIDE_OPEN_LABEL} menu row (timeout ${timeoutMs}ms).`);
+  }
+  await clickPoint(page, guidePoint, OPTIONS_GUIDE_OPEN_LABEL);
   await waitForSurface(page, {
     expectedLabels: OPTIONS_GUIDE_FRAME_LABELS,
     mode: 'menu',
@@ -1489,8 +1514,11 @@ const openGuideFromOptions = async (page, timeoutMs) => {
   });
 };
 
+// Got it returns to the main menu it was opened from; Settings is reopened for the scroll-to-bottom capture.
 const closeGuideToOptions = async (page, timeoutMs) => {
   await clickVisualButton(page, OPTIONS_GUIDE_CLOSE_LABEL, timeoutMs);
+  await waitForSurface(page, { expectedLabels: [], mode: 'menu', overlay: 'none', timeoutMs });
+  await openOptionsOverlayViaQa(page, timeoutMs);
   await waitForSurface(page, {
     expectedLabels: OPTIONS_BASE_EXPECTED_LABELS,
     mode: 'menu',
@@ -2427,11 +2455,11 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, PAUSE_CARD_EXPECTED_LABELS)
+      hasMenuRowButtons(surfaces.pause, PAUSE_MENU_EXPECTED_ROWS)
         && !hasLabels(surfaces.pause, ['Game Toggles'])
         && !hasLabels(surfaces.pause, ['GUIDE'])
         && (!includeOverlayBottom || hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)),
-      `labels=${labelDetail(surfaces.pause)}; settings-open=${includeOverlayBottom ? labelDetail(surfaces.pauseBottom) : 'skipped for viewport-transition proof'}`
+      `rows=${(surfaces.pause?.buttons ?? []).map((button) => button?.text).join(', ')}; labels=${labelDetail(surfaces.pause)}; settings-open=${includeOverlayBottom ? labelDetail(surfaces.pauseBottom) : 'skipped for viewport-transition proof'}`
     ),
     createCheck(
       'mobile-text-label-bounds',
@@ -2992,10 +3020,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
             id: '02-options', mode: 'menu', overlay: 'options', page, route, timeoutMs, transition
           })
           : null;
-        // The Guide is a sub-view of the Settings sheet: open it through the real
-        // `How to play` row, capture it, then return through its `Got it` footer.
-        // This runs BEFORE the scroll-to-bottom capture below: on a short viewport
-        // the sheet scrolls and the `How to play` row is only on screen at the top.
+        // The Guide: open it through the real main-menu dropdown Guide row, capture
+        // it, then return through its `Got it` footer and reopen Settings for the
+        // scroll-to-bottom capture below (MAZER-UI-096).
         if (transition) {
           optionsGuideSurface = { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true };
         } else {
@@ -3086,12 +3113,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
 
     currentStep = '04-pause';
     await openPauseOverlayViaQa(page, timeoutMs);
+    // The in-game Menu rows fade in one after another; capture once every row label is drawn (labelBounds set).
+    await waitForMenuRowLabels(page, PAUSE_MENU_EXPECTED_ROWS, timeoutMs);
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: transition
-        ? []
-        : PAUSE_CARD_EXPECTED_LABELS,
+      expectedLabels: [],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -3109,8 +3136,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const pauseBottomSurface = transition
       ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
       : await (async () => {
-        // Settings is collapsed on every open: expand it with a real click so
-        // the bottom capture proves the toggles render inside the card.
+        // Open the in-game Menu's Settings row with a real click so the bottom
+        // capture proves the trimmed sheet's toggles render.
         const pauseSettingsPoint = getVisualButtonPoint(pause.diagnostics.visual, 'Settings');
         await clickPoint(page, pauseSettingsPoint, 'Pause Settings');
         await waitForSurface(page, {
