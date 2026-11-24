@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-24T15:32:49.000Z",
+  "updatedAt": "2026-11-24T18:08:36.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 332,
+    "stableIdentityCount": 333,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 115,
+    "openCardCount": 116,
     "completedCardCount": 85,
     "deferredCardCount": 24,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-24T15:32:49.000Z",
-      "appliedEventCount": 544,
-      "lastEventId": "0adfa938f542"
+      "at": "2026-11-24T18:08:36.000Z",
+      "appliedEventCount": 546,
+      "lastEventId": "8244c89737f8"
     },
     "archivedCardCount": 108
   },
@@ -6011,12 +6011,12 @@
     },
     {
       "id": "MAZER-FB-001",
-      "status": "in_progress",
-      "updatedAt": "2026-11-24T15:32:49.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-24T18:08:11.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-FB-001",
       "title": "In-game 1-5 star feedback popup with optional comment",
-      "description": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+      "description": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work. Board update 2026-11-24: Feedback popup merged (PR 701) and live in build main-EpjqCE_C: signed-in Feedback row in the main and pause dropdowns, Card layout, 1-5 pointed stars, optional plain-text note, calm in-flow notices; independent review passed after 4 fixes; headless Chromium and WebKit only, not device checked, real save from the deployed build not yet exercised PR #701 merged (54eca51f). Deployed: production build main-EpjqCE_C. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "medium",
       "dependencies": [
@@ -6026,6 +6026,25 @@
         "Menu row opens a Card popup with no star selected and an optional comment box",
         "Submit saves rating, comment and build id for a signed-in user and shows a plain confirmation; rate limits surface as a gentle notice, never red text",
         "Signed-out players do not see the row; comment text is escaped wherever it is shown"
+      ]
+    },
+    {
+      "id": "MAZER-PERF-017",
+      "status": "review",
+      "updatedAt": "2026-11-24T18:08:36.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-PERF-017",
+      "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
+      "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+      "cardType": "reliability",
+      "priority": "high",
+      "dependencies": [
+        "MAZER-PERF-016"
+      ],
+      "acceptanceCriteria": [
+        "Per-phase frame cost table measured at level 300 with a long trail under phone emulation",
+        "Top cost fixed with a zero-difference pixel check at several device scales",
+        "Remaining costs listed with an options page required before any look-changing fix, and a real iPhone measurement requested"
       ]
     }
   ]
