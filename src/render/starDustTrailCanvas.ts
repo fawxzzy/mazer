@@ -27,6 +27,7 @@ import { chunkTrailSegments, type TrailCanvasSegment } from './navigationCoreTra
 import { drawTrailBloomChunks } from './trailLayersCanvas';
 import { PALETTE_WHITE, mixPaletteRgb } from './trailPalette';
 import { withCosmeticColours } from '../theme/cosmeticScope';
+import { getStarDustTrailRenderOverride } from './starDustRenderOverride';
 
 export const STAR_DUST_TRAIL = Object.freeze({
   /** Distance between sparkle centres along the route, in tiles. */
@@ -431,4 +432,9 @@ const drawStarDustTrailToCanvasContextImpl = (
 
 // MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
 export const drawStarDustToGraphics: typeof drawStarDustToGraphicsImpl = (...args: Parameters<typeof drawStarDustToGraphicsImpl>) => withCosmeticColours(() => drawStarDustToGraphicsImpl(...args));
-export const drawStarDustTrailToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => drawStarDustTrailToCanvasContextImpl(...args));
+// The override is the trail-cost options page's seam (starDustRenderOverride.ts); it is never set in the game.
+export const drawStarDustTrailToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => (getStarDustTrailRenderOverride() ?? drawStarDustTrailToCanvasContextImpl)(...args));
+
+/** Per-sparkle stride and the live scratch of the last placement (the options-page renderer reads it; no copy). */
+export const STAR_DUST_SCRATCH_STRIDE = STRIDE;
+export const getStarDustSparkleScratch = (): Float64Array => sparkleScratch;
