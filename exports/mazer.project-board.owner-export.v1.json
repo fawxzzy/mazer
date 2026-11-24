@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_023216ee64e3",
+  "export_id": "pbe_mazer_owner_registry_2c40b1d30b68",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:023216ee64e3123fe01ec8d088de31a295c367b40946dc3326954391c2276f0b",
-  "generated_at": "2026-11-24T06:07:44.000Z",
+  "source_revision": "sha256:2c40b1d30b689d94fecdb0571036f58d833507669704a627c8f60452cd98334b",
+  "generated_at": "2026-11-24T15:32:49.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:247451692dac42079f89af6fc0747b56d3af9d58b2cce4436b0b36459dae11fc",
-      "observed_at": "2026-11-24T06:07:44.000Z"
+      "revision": "sha256:b684a7f9835b752b2a41d4cf87d8762947d041aa51e3301a910c01dd67565cd5",
+      "observed_at": "2026-11-24T15:32:49.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-24T06:07:44.000Z"
+      "observed_at": "2026-11-24T15:32:49.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-24T06:07:44.000Z"
+      "observed_at": "2026-11-24T15:32:49.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-24T06:07:44.000Z"
+      "observed_at": "2026-11-24T15:32:49.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-24T06:07:44.000Z"
+      "observed_at": "2026-11-24T15:32:49.000Z"
     }
   ],
   "cards": [
@@ -2529,14 +2529,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Edit the username only on the account site; retire leaderboard Edit name",
-        "description": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+        "description": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Rename throttle applied to the live database 2026-11-24 (PR 697, apply file sha 1ab0cf25): first claim free, then 1 rename per 24h and 3 per 7 days, blocked renames return 429; read-back shows trigger, log table with access rules and no public access; existing username functions byte-identical; live rename pair NOT yet run, scratch test was pglite only PR #697 merged (24284e4f). Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T08:08:48.000Z",
+        "updated_at": "2026-11-24T15:32:49.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-047",
         "extensions": {
           "owner_status": "review",
@@ -2547,11 +2547,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-ACCT-047",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T08:08:48.000Z"
+        "source_updated_at": "2026-11-24T15:32:49.000Z"
       },
       "content": {
-        "summary": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Rename throttle applied to the live database 2026-11-24 (PR 697, apply file sha 1ab0cf25): first claim free, then 1 rename per 24h and 3 per 7 days, blocked renames return 429; read-back shows trigger, log table with access rules and no public access; existing username functions byte-identical; live rename pair NOT yet run, scratch test was pglite only PR #697 merged (24284e4f). Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner decided earlier that the username is edited in one place, the account site. Mazer still shows Edit name on the pinned You row and the Choose a username gate. Build the account-site editor if it is missing, then remove the leaderboard editor. Board update 2026-11-20: Leaderboard name editing retired and Profile points to the account site; merged and deployed with the account-site rename; server throttle for the Mazer name still needs owner SQL approval; headless only PR #679 merged (8fdc2ee2). Deployed: production build main-ByXQJ5rO. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Rename throttle applied to the live database 2026-11-24 (PR 697, apply file sha 1ab0cf25): first claim free, then 1 rename per 24h and 3 per 7 days, blocked renames return 429; read-back shows trigger, log table with access rules and no public access; existing username functions byte-identical; live rename pair NOT yet run, scratch test was pglite only PR #697 merged (24284e4f). Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The account site lets a signed-in player change their username with the existing hardened rename path and plain errors",
           "Mazer leaderboard and the Choose a username gate no longer offer Edit name, and point to the account site instead",
@@ -4062,6 +4062,59 @@
           "Each saved skin has an unlock rule in the catalog.",
           "A player can pick an unlocked skin and the choice is remembered.",
           "Locked skins stay non-selectable."
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-fb-001_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-FB-001",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "In-game 1-5 star feedback popup with optional comment",
+        "description": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+        "card_type": "feature",
+        "lifecycle": "in-progress",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-ACCT-047"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-24T15:32:49.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FB-001",
+        "extensions": {
+          "owner_status": "in_progress",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FB-001",
+        "source_status": "current",
+        "source_updated_at": "2026-11-24T15:32:49.000Z"
+      },
+      "content": {
+        "summary": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+        "objective": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+        "acceptance_criteria": [
+          "Menu row opens a Card popup with no star selected and an optional comment box",
+          "Submit saves rating, comment and build id for a signed-in user and shows a plain confirmation; rate limits surface as a gentle notice, never red text",
+          "Signed-out players do not see the row; comment text is escaped wherever it is shown"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -7189,14 +7242,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Game modes shell with Endless and a leaderboard tab per mode",
-        "description": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "description": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Leaderboard mode column applied to the live database on owner approval of the exact file; all 34 existing rows read back as endless; leaderboard reads of the column and a second mode still need code and an owner phone check Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
         "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T16:37:40.000Z",
+        "updated_at": "2026-11-24T07:05:59.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
         "extensions": {
           "owner_status": "review",
@@ -7207,15 +7260,68 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-001",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T16:37:40.000Z"
+        "source_updated_at": "2026-11-24T07:05:59.000Z"
       },
       "content": {
-        "summary": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Leaderboard mode column applied to the live database on owner approval of the exact file; all 34 existing rows read back as endless; leaderboard reads of the column and a second mode still need code and an owner phone check Checked only in headless Chromium, not on a real phone.",
+        "objective": "The current game becomes the Endless mode with all progression kept. A mode registry and a one-tab leaderboard strip are in. The leaderboard mode column is a proposal only; no database change is applied. Board update 2026-11-19: Game modes shell with Endless tab; SQL mode column not applied. Deployed to production; headless-only, phone check pending PR #655 merged (47fad9b4). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Leaderboard mode column applied to the live database on owner approval of the exact file; all 34 existing rows read back as endless; leaderboard reads of the column and a second mode still need code and an owner phone check Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Endless plays exactly like the current game with progression kept",
           "The leaderboard shows one tab per mode and existing scores count as Endless",
           "The database mode column is applied only after the exact SQL is approved"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-mode-002_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-MODE-002",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Mode-select sheet after Play, Endless only",
+        "description": "Play on the main menu opens a Choose a mode sheet with Endless (data unchanged) and a plain More soon slot. Stack layout up to 3 entries, Tiles past 3. No database change; Hazards stays dormant.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-MODE-001"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-24T15:22:31.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-002",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-MODE-002",
+        "source_status": "current",
+        "source_updated_at": "2026-11-24T15:22:31.000Z"
+      },
+      "content": {
+        "summary": "Play on the main menu opens a Choose a mode sheet with Endless (data unchanged) and a plain More soon slot. Stack layout up to 3 entries, Tiles past 3. No database change; Hazards stays dormant.",
+        "objective": "Play on the main menu opens a Choose a mode sheet with Endless (data unchanged) and a plain More soon slot. Stack layout up to 3 entries, Tiles past 3. No database change; Hazards stays dormant.",
+        "acceptance_criteria": [
+          "Play opens a mode sheet listing Endless and a locked More soon slot",
+          "Endless starts through the existing run path and existing progress is untouched",
+          "Hazards stays unreachable and unnamed"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -13240,14 +13346,14 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Update the in-app guide for hazards and menu changes",
-        "description": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "description": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Guide redesigned as an icon glossary with a new In a maze row; merged and deployed; emulated chromium and webkit only, awaiting phone check PR #696 merged (f035d40a). Deployed: production build main-D4otmjLQ. Checked only in headless Chromium, not on a real phone.",
         "card_type": "documentation",
         "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T16:37:40.000Z",
+        "updated_at": "2026-11-24T15:22:31.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-090",
         "extensions": {
           "owner_status": "review",
@@ -13258,11 +13364,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-090",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T16:37:40.000Z"
+        "source_updated_at": "2026-11-24T15:22:31.000Z"
       },
       "content": {
-        "summary": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
-        "objective": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone.",
+        "summary": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Guide redesigned as an icon glossary with a new In a maze row; merged and deployed; emulated chromium and webkit only, awaiting phone check PR #696 merged (f035d40a). Deployed: production build main-D4otmjLQ. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The in-app guide and its icons must match the game: add hazards when they ship by default, and the tap-anywhere menu behavior. Board update 2026-11-19: Guide copy synced: twin stars, edge stars take your colour, Endless mode. Deployed to production; headless-only, phone check pending PR #662 merged (19fe3365). Deployed: production build main-BxI0SzG9. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Guide redesigned as an icon glossary with a new In a maze row; merged and deployed; emulated chromium and webkit only, awaiting phone check PR #696 merged (f035d40a). Deployed: production build main-D4otmjLQ. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Guide text covers hazards and menu tap-anywhere",
           "Guide icons match current visuals",
@@ -17239,9 +17345,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 330,
-    "exported_public_card_count": 330,
-    "exported_open_card_count": 113,
+    "stable_identity_count": 332,
+    "exported_public_card_count": 332,
+    "exported_open_card_count": 115,
     "exported_completed_card_count": 85,
     "exported_deferred_card_count": 24,
     "exported_archived_card_count": 108,

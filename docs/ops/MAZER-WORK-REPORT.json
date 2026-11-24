@@ -3,24 +3,24 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-24T06:07:44.000Z",
+    "registryUpdatedAt": "2026-11-24T15:32:49.000Z",
     "boardSync": {
-      "at": "2026-11-24T06:07:44.000Z",
-      "appliedEventCount": 539,
-      "lastEventId": "b78149fb903b"
+      "at": "2026-11-24T15:32:49.000Z",
+      "appliedEventCount": 544,
+      "lastEventId": "0adfa938f542"
     }
   },
   "counters": {
-    "total": 330,
-    "open": 113,
+    "total": 332,
+    "open": 115,
     "completed": 193,
     "deferred": 24,
     "buckets": {
       "needs-you": 32,
-      "in-review": 58,
+      "in-review": 59,
       "blocked": 8,
       "ready": 1,
-      "in-progress": 1,
+      "in-progress": 2,
       "unclassified": 13,
       "deferred": 24,
       "completed": 193
@@ -2908,7 +2908,7 @@
       "title": "Edit the username only on the account site; retire leaderboard Edit name",
       "status": "review",
       "priority": "high",
-      "prs": "#679",
+      "prs": "#679, #697",
       "note": ""
     },
     {
@@ -3152,6 +3152,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-MODE-002",
+      "title": "Mode-select sheet after Play, Endless only",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#695",
+      "note": ""
+    },
+    {
       "id": "MAZER-MOTION-004",
       "title": "Add a Reduce Motion setting: merged and deployed, crossfade length still open",
       "status": "review",
@@ -3332,7 +3340,7 @@
       "title": "Update the in-app guide for hazards and menu changes",
       "status": "review",
       "priority": "low",
-      "prs": "#662",
+      "prs": "#662, #696",
       "note": ""
     },
     {
@@ -3455,6 +3463,13 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
+    },
+    {
+      "id": "MAZER-FB-001",
+      "title": "In-game 1-5 star feedback popup with optional comment",
+      "status": "in_progress",
+      "priority": "medium",
+      "note": ""
     }
   ],
   "deferred": [
@@ -5063,6 +5078,14 @@
     },
     "MAZER-GEN-033": {
       "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-MODE-002": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-FB-001": {
+      "bucket": "in-progress",
       "sub": null
     }
   }
