@@ -191,6 +191,7 @@ describe('MenuScene interactive-zone inventory', () => {
   const EXPECTED_INTERACTIVE_SITES: Record<string, string> = {
     createButton: 'generic button; front-door Start/Login use the full-screen zone',
     createLegacyAuthActionButton: 'account failure fallback: the one Try again button (44+)',
+    createModeSelectHitZone: 'mode-select sheet card/tile zones (MAZER-MODE-002): every card is >= 44 px tall by plan (legacy-mode-select-plan.test.ts)',
     createToggleSwitchRow: 'toggle card (52+)'
   };
 

@@ -100,6 +100,18 @@ const runCase = async ({ baseUrl, browser, index, targetQueuedMenuRequest }) => 
     throw new Error('START_BUTTON_DIAGNOSTICS_MISSING');
   }
   await page.mouse.click(startButton.bounds.centerX, startButton.bounds.centerY);
+  // MAZER-MODE-002: Play opens the mode-select sheet; tap the Endless card to start the run.
+  await page.waitForFunction((key) => window[key]?.surface?.overlay === 'mode-select' || window[key]?.surface?.mode === 'play', RUNTIME_DIAGNOSTICS_KEY, {
+    timeout: 5_000,
+    polling: 20
+  });
+  // The sheet ignores taps for its input guard window (250 ms) after it opens.
+  await page.waitForTimeout(350);
+  const sheet = await readVisualDiagnostics(page);
+  const endlessCard = sheet?.buttons?.find((button) => button.text === 'Endless' && button.bounds);
+  if (endlessCard?.bounds) {
+    await page.mouse.click(endlessCard.bounds.centerX, endlessCard.bounds.centerY);
+  }
 
   await page.waitForFunction((key) => window[key]?.surface?.mode === 'play', RUNTIME_DIAGNOSTICS_KEY, {
     timeout: 10_000,

@@ -708,6 +708,15 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: a new gate look must paint over the bake's floor painter output, never inside it, so all tile styles stay in step.
 - Not checked: a real phone. Pre-existing failure on origin/main: `type-scale-ratchet.test.ts` (tokens.css font stack), not touched here. #673 and the maze-quality PR (#684, merged) may touch raster fixtures; this PR does not change them.
 
+## 2026-11-24 MAZER-MODE-002: Mode-select sheet after Play (Endless only)
+
+- WHAT changed: Play on the main menu (the START button and tap-to-play) now opens a "Choose a mode" sheet instead of starting the run. It lists Endless (with the player's existing Level and Rank, read only) and one plain locked "More soon" slot; tapping Endless closes the sheet and starts the run through the existing START_RUN path; Back to Menu closes it. Layout is a Stack for up to 3 entries and flips to Tiles past 3 (`resolveLegacyModeSelectVariant`). Pure plan and item model in `src/legacy-runtime/legacyModeSelectPlan.ts`; new overlay kind `mode-select`; one thin hook (`requestLegacyPlayStart`) plus a scene painter in `MenuScene.ts`.
+- WHY: owner decisions 2026-11-24 recorded in `docs/architecture/MAZER-GAME-MODES-PRODUCT-CONTRACT.md` section 13 (sheet shown while Endless is the only mode, no auto-start of the last mode, no named Hazards slot, A Stack now). PR #692 (contract and options page) is folded into this PR.
+- Endless data is untouched: no storage, progression, checkpoint, outbox, network or leaderboard code in the sheet (pinned by `tests/architecture/mode-select-flow-contract.test.ts`); Hazards stays reserved and unreachable; no SQL or database change.
+- QA scripts: `capture-ui-surfaces.mjs` (`clickStartUntilPlay`) and `verify-start-transition-stability.mjs` now tap the Endless card after Start, because Start lands on the sheet.
+- Rule: a new mode needs a registry entry AND a tagline in `LEGACY_MODE_SELECT_TAGLINES` (a test pins it); the list, not the painter, is what changes.
+- Not checked: a real phone, safe areas, the Tiles layout on screen (plan tests only), a signed-in account with real progress (the fixture shows Level 1, Rank E).
+
 ## 2026-11-23 Feedback popup options (draft, not wired in, not applied)
 
 - WHAT: new `src/ui/feedback/*` (reducer, DOM popup, theme map, standalone `feedback-options.html` page) with three layouts built from the Wave 2A kit (card, bottom sheet, compact), plus a DRAFT SQL proposal under `docs/ops/sql-proposals/mazer-feedback-20261123/` and a client plan. `tests/ui/dom-primitives-styles.test.ts` skips `src/ui/feedback` (it is not a shipping import; `tests/ui/feedback-state.test.ts` pins that main.ts and MenuScene.ts do not import it). `legacy-player-message-inventory.test.ts` excludes the two feedback files from the createStatusBanner dormant pin for the same reason.
@@ -721,6 +730,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY: the live `mazer_set_username` has no throttle, and `authenticated` can also write `username` straight to `mazer_profiles`, so the throttle sits on the row UPDATE, not in a new RPC. Guards pin the md5 of the LIVE bodies (set_username `1b1fae6c...`, CRLF; the repo copy md5 differs).
 - Rule: in a plpgsql preflight never use a `'schema.table'::regclass` literal for an object the same file creates; the cast resolves at parse time and aborts a fresh install (42P01). Use `to_regclass()`. The scratch test caught this.
 - Not checked: advisory-lock concurrency (pglite is single-connection), the PG17 cluster harness, any database apply. FawxzzyWeb `delete_account_v2` manifest needs the new table before its next apply.
+## 2026-11-24 Feedback SQL v2 (proposal files only, not applied)
+
+- WHAT: new `docs/ops/sql-proposals/mazer-feedback-20261124-v2/` (apply, rollback, README, hashes, preimage, pglite scratch test) superseding the v1 draft. Signed-in only (NOT_SIGNED_IN), global 100/hour cap on top of 5/hour and 20/day per user, `user_id not null ... on delete cascade`, `lock_timeout` 3s on both files and the function. The v1 README now says superseded.
+- WHY: round 2 review P2s (no lock_timeout on the FK to auth.users, FK missing from the account-delete manifest, owner decisions). Zac delegated the decisions.
+- Rule: any FK to auth.users needs `lock_timeout` in the same transaction and an entry in the delete manifest before it ships; hash and apply LF bytes only.
+- Evidence: pglite 82 checks, plus the PG 17.9 `scratch-pg.mjs pair` run with the non-superuser runner (round 3 review required it), plus the standard preimage pack; logs are committed as `.txt` (the `.log` extension is gitignored).
+- Not checked: any database apply, concurrency under real lock contention, a real phone. No client code changed.
 ## 2026-11-24 Guide option C (Icon glossary) ships as THE Guide
 
 - WHAT: the Guide sheet is now a 4-column icon glossary (new legacyGuideGlossaryPainter.ts): one tile per row (the same Star Dust icon draws as the board), tap a tile to read its copy in the detail panel below, kit primary Got it footer. Rows still come from legacyGuideContent.ts; hazard rows stay flag-gated and the keyboard line still shows on keyboard devices. New row menu-play ("In a maze", 81 chars) covers the in-run menu (Resume = X, Reset level, Main menu). The Menu line stays 81 chars; every copy line is <= 90.
