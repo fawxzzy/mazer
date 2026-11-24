@@ -1,5 +1,6 @@
 import '../dom/primitives.css';
 import './feedbackPopup.css';
+import { FEEDBACK_SCRIM_CLASS, installFeedbackKeyIsolation } from './feedbackKeyIsolation';
 import { createFeedbackPopup, type FeedbackPopupHandle } from './feedbackPopup';
 import type { FeedbackDraft, FeedbackSubmitResult } from './feedbackState';
 import { applyFeedbackTheme } from './feedbackTheme';
@@ -13,7 +14,8 @@ import { applyFeedbackTheme } from './feedbackTheme';
  * module only adds the scrim, the keyboard isolation and the close paths.
  *
  *  - Keyboard: keydown / keyup / keypress stop at the scrim, so a key typed into the note (Space, P, Enter, the arrows)
- *    never reaches the game's window-level handlers behind it. Escape closes. Tab stays inside the card.
+ *    never reaches the game's window-level handlers behind it (feedbackKeyIsolation.ts; capture-phase window listeners
+ *    skip popup targets themselves). Escape closes. Tab stays inside the card.
  *  - Close: "Not now", Escape, and a moment after a successful send. A tap on the dim backdrop closes only a SENT popup
  *    (an accidental tap must never throw away a typed note).
  */
@@ -48,7 +50,7 @@ export const mountFeedbackPopup = (options: FeedbackMountOptions): FeedbackMount
   let autoCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
   const scrim = doc.createElement('div');
-  scrim.className = 'mazer-feedback-scrim mazer-feedback-scrim--card';
+  scrim.className = `${FEEDBACK_SCRIM_CLASS} ${FEEDBACK_SCRIM_CLASS}--card`;
   scrim.dataset.mazerComponent = 'FeedbackScrim';
   applyFeedbackTheme(scrim, options.theme ?? 'default');
 
@@ -84,17 +86,7 @@ export const mountFeedbackPopup = (options: FeedbackMountOptions): FeedbackMount
     }
   }, doc);
 
-  const stop = (event: Event): void => event.stopPropagation();
-  scrim.addEventListener('keyup', stop);
-  scrim.addEventListener('keypress', stop);
-  scrim.addEventListener('keydown', (event) => {
-    event.stopPropagation();
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-      return;
-    }
-    if (event.key !== 'Tab') return;
+  installFeedbackKeyIsolation(scrim, { onEscape: close, onTab: (event) => {
     const items = Array.from(popup.root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((node) => !node.hidden);
     if (items.length === 0) return;
     const first = items[0];
@@ -107,7 +99,7 @@ export const mountFeedbackPopup = (options: FeedbackMountOptions): FeedbackMount
       event.preventDefault();
       first.focus();
     }
-  });
+  } });
   scrim.addEventListener('click', (event) => {
     if (event.target === scrim && popup.getDraft().phase === 'sent') close();
   });

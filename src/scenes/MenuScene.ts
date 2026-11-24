@@ -539,7 +539,6 @@ import {
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionOrdinalSeedComponent,
-  formatLegacyProgressionOrdinal,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionScaleDetail,
   resolveLegacyProgressionTrackIdForSurface,
@@ -2600,6 +2599,8 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
+    // A restarted scene keeps its fields: re-arm the launcher the previous SHUTDOWN destroyed.
+    this.feedbackLauncher.activate();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.feedbackLauncher.destroy());
     // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
     // context on the first real pointerdown/touchend/keydown (no context is built while the setting is off).
@@ -14372,7 +14373,8 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-FB-001: Menu > Feedback. Signed-in only (the row is hidden otherwise). The run stays paused; closing the popup
   // brings back the dropdown it came from (in a game) or the plain main menu.
   private openLegacyFeedback(source: 'menu' | 'pause'): void {
-    const level = Number(formatLegacyProgressionOrdinal(this.progressionState.tracks.player.level));
+    // The raw ordinal string, never formatLegacyProgressionOrdinal: its display form ("1,234") would send no level.
+    const level = this.progressionState.tracks.player.level;
     if (this.feedbackLauncher.open({ gameMode: this.mode, level, source })) {
       this.uiDirty = true;
     }

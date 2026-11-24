@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import { LEGACY_RUNTIME_DIAGNOSTICS_AUTH_FIXTURE_USER_ID } from '../../src/legacy-runtime/legacyAuth';
 import { sanitizeLegacyBuildId } from '../../src/legacy-runtime/legacyBuildId';
+import { formatLegacyProgressionOrdinal } from '../../src/legacy-runtime/legacyProgression';
 import {
   createLegacyFeedbackLauncher,
   isLegacyFeedbackAvailable,
@@ -144,6 +145,21 @@ describe('MAZER-FB-001 build id and context', () => {
     expect(ctx(1, 'Play Mode').gameMode).toBeNull();
     expect(ctx(1, 'x'.repeat(33)).gameMode).toBeNull();
   });
+
+  test('levels from 1000 up are sent (the raw ordinal, never the display string with a thousands separator)', () => {
+    const ctx = (level: unknown) => resolveLegacyFeedbackContext({ gameMode: 'play', level, source: 'menu' }).playerLevel;
+    expect(ctx('1234')).toBe(1234);
+    expect(ctx(1234)).toBe(1234);
+    expect(ctx('1000000')).toBe(1_000_000);
+    expect(ctx('1000001')).toBeNull();
+    // The display form is what broke it: it must never be what the scene hands in.
+    expect(formatLegacyProgressionOrdinal('1234')).not.toBe('1234');
+    expect(ctx(formatLegacyProgressionOrdinal('1234'))).toBeNull();
+    const menu = read('src/scenes/MenuScene.ts');
+    const openFeedback = menu.slice(menu.indexOf('private openLegacyFeedback('), menu.indexOf('private buildLegacyPlayMenuOverlay('));
+    expect(openFeedback).toContain('const level = this.progressionState.tracks.player.level;');
+    expect(openFeedback).not.toContain('formatLegacyProgressionOrdinal(');
+  });
 });
 
 describe('MAZER-FB-001 launcher (menu row only, signed in only, popup loaded on demand)', () => {
@@ -225,6 +241,15 @@ describe('MAZER-FB-001 launcher (menu row only, signed in only, popup loaded on 
     expect(live.isOpen()).toBe(false);
     expect(onClosed2).not.toHaveBeenCalled();
     expect(live.open({ gameMode: 'menu', level: 1, source: 'menu' })).toBe(false);
+
+    // A restarted scene keeps its fields and calls activate() from create(): the row works again.
+    live.activate();
+    expect(live.open({ gameMode: 'menu', level: 1, source: 'menu' })).toBe(true);
+    await flush();
+    expect(mount.mountFeedbackPopup).toHaveBeenCalledTimes(2);
+    mount.close();
+    expect(live.isOpen()).toBe(false);
+    expect(onClosed2).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -275,14 +300,8 @@ describe('MAZER-FB-001 safety of the popup DOM', () => {
     expect(read('src/ui/feedback/feedbackPopup.ts')).toContain('textarea.value');
   });
 
-  test('keys typed into the popup never reach the game behind it, Escape closes, Tab stays inside', () => {
-    const mount = read('src/ui/feedback/feedbackMount.ts');
-    expect(mount).toContain("scrim.addEventListener('keyup', stop)");
-    expect(mount).toContain("scrim.addEventListener('keypress', stop)");
-    expect(mount).toMatch(/addEventListener\('keydown', \(event\) => \{\n\s+event\.stopPropagation\(\);/);
-    expect(mount).toContain("event.key === 'Escape'");
-    expect(mount).toContain("event.key !== 'Tab'");
-  });
+  // Keys typed into the popup never reach the game behind it: proven with real key events in
+  // tests/reset/legacy-feedback-key-isolation.test.ts (bubble-phase game handlers and the capture-phase control hint).
 
   test('a tap on the backdrop never throws away a typed note (it only closes a SENT popup)', () => {
     expect(read('src/ui/feedback/feedbackMount.ts')).toContain("event.target === scrim && popup.getDraft().phase === 'sent'");
@@ -315,7 +334,7 @@ describe('MAZER-FB-001 scene wiring stays minimal and hazard-free', () => {
   test('while the popup is open the paused dropdown and the Settings sheet are not built behind it, and the launcher is cleaned up on shutdown', () => {
     expect(MENU_SCENE).toMatch(/!this\.settingsGuideOpen\n\s+&& !this\.feedbackLauncher\.isOpen\(\);/);
     expect(MENU_SCENE).toMatch(/private buildPauseOverlay\(\): void \{\n\s+if \(this\.feedbackLauncher\.isOpen\(\)\) \{\n\s+return;/);
-    expect(MENU_SCENE).toContain('this.feedbackLauncher.destroy()');
+    expect(MENU_SCENE).toMatch(/this\.feedbackLauncher\.activate\(\);\n\s+this\.events\.once\(Phaser\.Scenes\.Events\.SHUTDOWN, \(\) => this\.feedbackLauncher\.destroy\(\)\);/);
   });
 
   test('there is no auto prompt: nothing but the Feedback row opens the popup', () => {

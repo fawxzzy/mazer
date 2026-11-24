@@ -13,6 +13,7 @@ import type { FeedbackMountHandle, FeedbackMountOptions } from '../ui/feedback/f
 import { resolveLegacyBuildId } from './legacyBuildId';
 import { submitLegacyFeedback } from './legacyFeedbackSubmit';
 import type { LegacyAuthSessionSnapshot } from './legacyAuth';
+import { resolveLegacyProgressionOrdinal } from './legacyProgression';
 
 /** Mirrors the database check: level 0..1000000 (whole number), game_mode ^[a-z][a-z0-9_]{0,31}$. */
 export const LEGACY_FEEDBACK_MAX_LEVEL = 1_000_000;
@@ -28,9 +29,10 @@ export interface LegacyFeedbackContextInput {
 export const resolveLegacyFeedbackContext = (
   input: LegacyFeedbackContextInput
 ): { buildId: string | null; playerLevel: number | null; gameMode: string | null; source: FeedbackSource } => {
-  const level = typeof input.level === 'string' && /^\d{1,7}$/.test(input.level.trim())
-    ? Number(input.level.trim())
-    : typeof input.level === 'number' ? input.level : Number.NaN;
+  // The raw (canonical, lossless) ordinal: never a display string, whose thousands separator ("1,234") would turn
+  // every level from 1000 up into null. Junk becomes null here, never a silent 0.
+  const ordinal = resolveLegacyProgressionOrdinal(typeof input.level === 'string' ? input.level.trim() : input.level);
+  const level = ordinal !== null && ordinal.length <= 7 ? Number(ordinal) : Number.NaN;
   return {
     buildId: resolveLegacyBuildId(),
     gameMode: input.gameMode !== null && GAME_MODE_PATTERN.test(input.gameMode) ? input.gameMode : null,
@@ -61,6 +63,8 @@ export interface LegacyFeedbackLauncher {
   open: (context: LegacyFeedbackContextInput) => boolean;
   /** Closes the popup if open (scene shutdown). Never calls onClosed after destroy. */
   destroy: () => void;
+  /** Re-arms the launcher after a destroy: the scene calls it from create(), since a restarted scene keeps its fields. */
+  activate: () => void;
 }
 
 export const createLegacyFeedbackLauncher = (deps: LegacyFeedbackLauncherDeps): LegacyFeedbackLauncher => {
@@ -79,6 +83,9 @@ export const createLegacyFeedbackLauncher = (deps: LegacyFeedbackLauncherDeps): 
   const send = deps.submit ?? ((payload, auth) => submitLegacyFeedback(payload, auth));
 
   return {
+    activate: () => {
+      destroyed = false;
+    },
     destroy: () => {
       destroyed = true;
       const current = handle;
