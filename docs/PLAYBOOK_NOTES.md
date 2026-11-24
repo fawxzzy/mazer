@@ -724,6 +724,13 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: the popup must not reach a shipping module until a layout is picked; then drop these exclusions and add the inventory rows.
 - Not checked: a real phone, the popup over the real game, any database apply.
 
+## 2026-11-24 Feedback SQL v2 (proposal files only, not applied)
+
+- WHAT: new `docs/ops/sql-proposals/mazer-feedback-20261124-v2/` (apply, rollback, README, hashes, preimage, pglite scratch test) superseding the v1 draft. Signed-in only (NOT_SIGNED_IN), global 100/hour cap on top of 5/hour and 20/day per user, `user_id not null ... on delete cascade`, `lock_timeout` 3s on both files and the function. The v1 README now says superseded.
+- WHY: round 2 review P2s (no lock_timeout on the FK to auth.users, FK missing from the account-delete manifest, owner decisions). Zac delegated the decisions.
+- Rule: any FK to auth.users needs `lock_timeout` in the same transaction and an entry in the delete manifest before it ships; hash and apply LF bytes only.
+- Evidence: pglite 82 checks, plus the PG 17.9 `scratch-pg.mjs pair` run with the non-superuser runner (round 3 review required it), plus the standard preimage pack; logs are committed as `.txt` (the `.log` extension is gitignored).
+- Not checked: any database apply, concurrency under real lock contention, a real phone. No client code changed.
 ## 2026-11-24 Guide option C (Icon glossary) ships as THE Guide
 
 - WHAT: the Guide sheet is now a 4-column icon glossary (new legacyGuideGlossaryPainter.ts): one tile per row (the same Star Dust icon draws as the board), tap a tile to read its copy in the detail panel below, kit primary Got it footer. Rows still come from legacyGuideContent.ts; hazard rows stay flag-gated and the keyboard line still shows on keyboard devices. New row menu-play ("In a maze", 81 chars) covers the in-run menu (Resume = X, Reset level, Main menu). The Menu line stays 81 chars; every copy line is <= 90.

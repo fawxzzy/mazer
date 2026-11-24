@@ -1,0 +1,30 @@
+select jsonb_pretty(jsonb_build_object(
+ 'now', now(),
+ 'session_user', session_user, 'current_user', current_user,
+ 'feedback_table_exists', to_regclass('mazer.mazer_feedback') is not null,
+ 'feedback_fn_exists', to_regprocedure('mazer.mazer_submit_feedback_v1(integer, text, text, integer, text, text)') is not null,
+ 'feedback_fn_by_name', (select jsonb_agg(p.oid::regprocedure::text) from pg_proc p where p.proname ilike '%feedback%'),
+ 'feedback_like_relations', (select jsonb_agg(n.nspname||'.'||c.relname) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relname ilike '%feedback%'),
+ 'references_on_auth_users', jsonb_build_object(
+    'postgres', has_table_privilege('postgres','auth.users','REFERENCES'),
+    'current_user', has_table_privilege(current_user,'auth.users','REFERENCES')),
+ 'auth_users_owner', (select pg_get_userbyid(relowner) from pg_class where oid='auth.users'::regclass),
+ 'existing_mazer_fk_to_auth_users', (select jsonb_agg(conrelid::regclass::text||' '||confdeltype::text) from pg_constraint where contype='f' and confrelid='auth.users'::regclass and connamespace='mazer'::regnamespace),
+ 'service_role_bypassrls', (select rolbypassrls from pg_roles where rolname='service_role'),
+ 'default_acls_mazer', (select jsonb_agg(defaclrole::regrole::text||' '||defaclobjtype::text||' '||defaclacl::text) from pg_default_acl where defaclnamespace='mazer'::regnamespace),
+ 'delete_account_v2', jsonb_build_object(
+    'inner_exists', to_regprocedure('account_private.delete_account_v2(uuid, jsonb, text)') is not null,
+    'api_exists', to_regprocedure('account_api.account_delete_self(text)') is not null,
+    'inner_md5', (select md5(prosrc) from pg_proc where oid = to_regprocedure('account_private.delete_account_v2(uuid, jsonb, text)')),
+    'inner_mentions_feedback', (select prosrc ilike '%mazer_feedback%' from pg_proc where oid = to_regprocedure('account_private.delete_account_v2(uuid, jsonb, text)')),
+    'inner_cr_count', (select length(prosrc) - length(replace(prosrc, chr(13), '')) from pg_proc where oid = to_regprocedure('account_private.delete_account_v2(uuid, jsonb, text)')),
+    'inner_config', (select proconfig from pg_proc where oid = to_regprocedure('account_private.delete_account_v2(uuid, jsonb, text)')),
+    'deletions_audit_rows', (select count(*) from account_private.account_deletions),
+    'deletions_versions', (select jsonb_object_agg(version, n) from (select version, count(*) n from account_private.account_deletions group by version) t)),
+ 'other_tables_naming_auth_users_fk', (select jsonb_agg(conrelid::regclass::text||' '||confdeltype::text order by conrelid::regclass::text) from pg_constraint where contype='f' and confrelid='auth.users'::regclass and connamespace not in ('auth'::regnamespace, 'storage'::regnamespace)),
+ 'open_transactions', (select jsonb_agg(jsonb_build_object('pid', pid, 'state', state, 'xact_age_s', extract(epoch from now()-xact_start)::int, 'app', application_name) ) from pg_stat_activity where xact_start is not null and pid <> pg_backend_pid() and state <> 'idle' and backend_type = 'client backend'),
+ 'ungranted_waits_on_auth_users', (select count(*) from pg_locks where relation = 'auth.users'::regclass and not granted),
+ 'auth_users_total', (select count(*) from auth.users),
+ 'auth_users_created_24h', (select count(*) from auth.users where created_at > now() - interval '24 hours'),
+ 'auth_users_anonymous', (select count(*) from auth.users where is_anonymous)
+)) as preimage;

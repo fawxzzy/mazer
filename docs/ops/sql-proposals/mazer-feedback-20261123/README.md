@@ -1,5 +1,7 @@
 # Proposal: in-game feedback table and submit RPC (2026-11-23)
 
+SUPERSEDED 2026-11-24 by `../mazer-feedback-20261124-v2/` (signed-in only, global cap, cascade FK, lock_timeout). Kept as history; do not apply this version.
+
 Status: PROPOSED, NOT APPLIED. Nothing here ran against Supabase. Applying needs an owner box naming the sha256 of the exact apply file (`../../MAZER-SQL-CHANGE-PROCESS.md`). Client plan: `docs/ui/MAZER-FEEDBACK-POPUP-PLAN-2026-11-23.md`.
 
 Apply file: `apply.sql` (one transaction, new objects only). Rollback: `rollback.sql`. Hashes: `SHA256SUMS.txt` (LF bytes as committed).

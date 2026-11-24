@@ -1,0 +1,90 @@
+### tested_file=apply.sql sha256=6d453fe40a9ae04893373e900fadfa47fac01d85c96788c71f46c66bd69d5cb3
+### tested_file=rollback.sql sha256=de2ce656feb8edd502b0dcd3a9946b689c75c967476d6dca8a594c2b2c10d838
+### pglite 0.5.13 sandbox=pglite-sandbox-l11-20261119
+PGlite 0.5.13 (PostgreSQL 17 wasm), in-memory
+### tested_file=docs/ops/sql-proposals/mazer-feedback-20261124-v2/apply.sql sha256=6d453fe40a9ae04893373e900fadfa47fac01d85c96788c71f46c66bd69d5cb3
+### tested_file=docs/ops/sql-proposals/mazer-feedback-20261124-v2/rollback.sql sha256=de2ce656feb8edd502b0dcd3a9946b689c75c967476d6dca8a594c2b2c10d838
+PASS  preflight aborts when schema mazer is missing  [MAZER_FEEDBACK_PREIMAGE_MISSING_SCHEMA]
+PASS  preflight aborts on a same-name function with another signature (is distinct from, not <>)  [MAZER_FEEDBACK_PREIMAGE_UNEXPECTED_FUNCTION]
+PASS  preflight aborts on a pre-existing mazer_feedback table of any shape  [MAZER_FEEDBACK_PREIMAGE_TABLE_EXISTS]
+PASS  preflight aborts when auth.users is missing  [MAZER_FEEDBACK_PREIMAGE_MISSING_AUTH_USERS]
+PASS  apply runs clean (as superuser postgres in pglite)
+PASS  anon and authenticated have no table privilege  [{"a_sel":false,"a_ins":false,"u_sel":false,"u_ins":false,"u_upd":false,"u_del":false,"s_sel":true,"s_del":true,"s_ins":false,"pub":false,"anon_x":false,"auth_x":true,"rls":true,"forced":false,"pol":0,"secdef":true,"cfg":"{\"search_path=\\\"\\\"\",lock_timeout=3s}","fn_owner":"postgres","tbl_owner":"postgres","fk_action":"c","uid_nn":true}]
+PASS  service_role can select and delete, not insert directly
+PASS  function: public AND anon denied, authenticated allowed (signed in only)
+PASS  RLS on, not forced, zero policies
+PASS  function is SECURITY DEFINER with empty search_path and lock_timeout=3s  [{"search_path=\"\"",lock_timeout=3s}]
+PASS  FK is ON DELETE CASCADE, user_id NOT NULL, function and table share an owner  [["c",true,"postgres","postgres"]]
+PASS  signed-in insert ok -> {"status":"saved"}  [{"status":"saved"}]
+PASS  row has user id from auth.uid, trimmed comment, context  [{"id":"85eaf02c-f5cb-4ba0-9dfc-aa23212ef00e","user_id":"00000000-0000-4000-8000-000000000001","rating":5,"comment":"Love it","build_id":"abc1234","player_level":12,"game_mode":"endless","source":"menu","created_at":"2026-11-24T07:10:37.597Z"}]
+PASS  the RPC has no user-id parameter (cannot file as someone else)
+PASS  rating-only (no comment) saves
+PASS  whitespace-only comment saves
+PASS  null and blank comments are stored as NULL
+PASS  rating 0 rejected  [MAZER_FEEDBACK_BAD_RATING]
+PASS  rating 6 rejected  [MAZER_FEEDBACK_BAD_RATING]
+PASS  rating -1 rejected  [MAZER_FEEDBACK_BAD_RATING]
+PASS  rating 100 rejected  [MAZER_FEEDBACK_BAD_RATING]
+PASS  rating null rejected  [MAZER_FEEDBACK_BAD_RATING]
+PASS  rating 1 and 5 accepted (boundaries)
+PASS  500-char comment accepted
+PASS  501-char comment rejected  [MAZER_FEEDBACK_COMMENT_TOO_LONG]
+PASS  501 chars padded with spaces still rejected
+PASS  500 emoji accepted (cap counts characters, not bytes)
+PASS  rejected calls stored nothing (2 rows for user 3)
+PASS  bad context still saves
+PASS  bad build id / level / mode -> NULL, bad source -> menu  [{"id":"1720a81d-b958-4aef-8aab-027cbc21a4aa","user_id":"00000000-0000-4000-8000-000000000003","rating":3,"comment":null,"build_id":null,"player_level":null,"game_mode":null,"source":"menu","created_at":"2026-11-24T07:10:37.637Z"}]
+PASS  level above cap -> NULL; post_level source and v1.2.3+sha build kept
+PASS  first 5 saved, 6th and 7th rate_limited  [saved,saved,saved,saved,saved,rate_limited,rate_limited]
+PASS  retry_after_seconds in (0, 3600]  [3600]
+PASS  rate-limited calls stored nothing (5 rows)
+PASS  another user is unaffected by user 1 budget
+PASS  after the hour window passes, user 1 can submit again
+PASS  21st within 24h rejected by the daily cap (hour budget is empty)  [{"status":"rate_limited","retry_after_seconds":14340}]
+PASS  hourly cap only: retry is the hourly wait (<= 3600)  [{"status":"rate_limited","retry_after_seconds":3000}]
+PASS  both caps hit: retry is the LONGER daily wait (> 20h)  [{"status":"rate_limited","retry_after_seconds":85800}]
+PASS  after the oldest rows age past 24h the user can submit again
+PASS  anon cannot execute the RPC (permission denied)  [permission denied for function mazer_submit_feedback_v1]
+PASS  authenticated role with no auth.uid() -> MAZER_FEEDBACK_NOT_SIGNED_IN, sqlstate 28000  [{"err":"MAZER_FEEDBACK_NOT_SIGNED_IN","code":"28000"}]
+PASS  the sign-in check comes before validation (rating 0 without uid is still NOT_SIGNED_IN)  [MAZER_FEEDBACK_NOT_SIGNED_IN]
+PASS  superuser without auth.uid() is refused too (the check is on the uid, not the role)
+PASS  refused calls stored nothing
+PASS  setup: 99 rows inside the last hour
+PASS  global cap: the 100th row in the hour is saved (boundary)  [{"status":"saved"}]
+PASS  global cap: the 101st row, from a user with no rows, is rate_limited  [{"status":"rate_limited","retry_after_seconds":60}]
+PASS  global cap: the refused call stored nothing (still 100 rows in the hour)
+PASS  global cap: after rows age past the hour the budget frees up  [{"status":"saved"}]
+PASS  user cap + global cap together: one rate_limited answer with a plausible wait  [{"status":"rate_limited","retry_after_seconds":600}]
+PASS  direct SELECT denied (authenticated user 1)  [permission denied for table mazer_feedback]
+PASS  direct SELECT denied (authenticated user 2)  [permission denied for table mazer_feedback]
+PASS  direct SELECT denied (anon)  [permission denied for table mazer_feedback]
+PASS  direct INSERT denied (own user id)  [permission denied for table mazer_feedback]
+PASS  direct INSERT spoofing another user denied
+PASS  direct UPDATE and DELETE denied
+PASS  MUTANT (grant added by mistake): RLS still returns 0 rows to authenticated  [rows=0]
+PASS  MUTANT: RLS still blocks a direct insert (own row)  [new row violates row-level security policy for table "mazer_feedback"]
+PASS  MUTANT: RLS update touches 0 rows
+PASS  service_role (owner-side read) sees both rows
+PASS  table CHECK rejects rating 0 and 6
+PASS  table CHECK rejects 501-char and empty comment
+PASS  table rejects unknown source and NULL rating
+PASS  table rejects a NULL user_id (signed-in only, NOT NULL)  [null value in column "user_id" of relation "mazer_feedback" violates not-null constraint]
+PASS  table rejects a user id that is not in auth.users (FK)  [insert or update on table "mazer_feedback" violates foreign key constraint "mazer_feedback_user_id_fkey"]
+PASS  RPC works when the owner is not superuser and has no BYPASSRLS (RLS not forced)
+PASS  deleting the auth user deletes that user's feedback (FK on delete cascade) and not other users'
+PASS  re-apply aborts with PREIMAGE_TABLE_EXISTS and leaves the catalog unchanged  [MAZER_FEEDBACK_PREIMAGE_TABLE_EXISTS]
+PASS  rollback with data: function dropped, table KEPT with its row
+PASS  kept table is still unreadable by clients after rollback
+PASS  rollback with empty table: catalog equals the pre-apply catalog
+PASS  apply after rollback works and equals the first post-apply catalog
+PASS  and the function works again
+PASS  apply: lock_timeout=3s and statement_timeout=15s are in force at the end of the transaction  [ok]
+PASS  apply: the timeouts are transaction-local (session setting is back to default)
+PASS  rollback: lock_timeout=3s and statement_timeout=15s are in force  [ok]
+PASS  both files set the timeouts BEFORE the first DDL statement
+PASS  MUTANT: granting EXECUTE to anon aborts the apply (POSTIMAGE_FUNCTION_ACL)  [MAZER_FEEDBACK_POSTIMAGE_FUNCTION_ACL]
+PASS  MUTANT: a different FK action aborts the apply (POSTIMAGE_FOREIGN_KEY)  [MAZER_FEEDBACK_POSTIMAGE_FOREIGN_KEY]
+PASS  MUTANT: a function without lock_timeout aborts the apply (POSTIMAGE_FUNCTION_SHAPE)  [MAZER_FEEDBACK_POSTIMAGE_FUNCTION_SHAPE]
+PASS  MUTANT: a client table grant aborts the apply (POSTIMAGE_CLIENT_TABLE_PRIVILEGE)  [MAZER_FEEDBACK_POSTIMAGE_CLIENT_TABLE_PRIVILEGE]
+
+SUMMARY: 82 passed, 0 failed
