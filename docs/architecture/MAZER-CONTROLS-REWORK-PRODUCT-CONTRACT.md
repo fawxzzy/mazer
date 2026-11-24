@@ -22,7 +22,7 @@ Fact (function and constant names from `src/scenes/MenuScene.ts`, `src/input-hum
 | Release | Pointer up clears the intent and the repeat timer at once. | stop within the current tick |
 | Tap | A tap stays inside the dead zone, so it makes no pull and no step. (Older docs say "short taps are one step"; that was the pre-stick swipe path.) | 0 steps |
 | Haptics (CTRL-001) | One 6 ms pulse per accepted step, 8 ms on a wall bump (throttled), goal pattern; off on iOS (no vibrate call); also off under reduced motion. | not device-checked |
-| Settings | `controlMode` (Stick or Arrows) is persisted and shown, but no code path assigns `playTouchArrowPointerId` a pointer; touch play always uses the floating stick. | needs a browser check to confirm |
+| Settings | `controlMode` (Stick or Arrows) is still persisted (device toggles, remote progress, telemetry, QA diagnostics) but has had no Settings row since 0723a26e and no effect: no code path assigns `playTouchArrowPointerId` a pointer, so touch play always uses the floating stick. | confirmed dead 2026-11-24 (MAZER-UI-093: headless Chrome 390x844 touch drags give the same stick origin and the same moves in both modes), pinned by `tests/reset/legacy-control-mode-setting.test.ts` |
 
 ### Felt problems (each with its evidence)
 
