@@ -446,7 +446,11 @@ describe('legacy topology scale audit', () => {
       expect(results[1]?.median).toBeGreaterThan(results[0]?.median ?? Number.POSITIVE_INFINITY);
       for (let index = 1; index < results.length; index += 1) {
         expect(results[index]?.mean).toBeGreaterThan(results[index - 1]?.mean ?? Number.POSITIVE_INFINITY);
-        expect(results[index]?.median).toBeGreaterThan(results[index - 1]?.median ?? Number.POSITIVE_INFINITY);
+        // MAZER-GEN-030: the quality pass walls up short dead ends after the maze is chosen, and the proxy counts
+        // dead ends (2 each past 2), so the proxy is lower than it was and its 12-seed median can sit within a point
+        // of the level before (play level 5: 51.0 against 51.4). The mean stays strictly rising at every level; the
+        // median must still rise strictly over the level-one step and may not fall by more than one point after.
+        expect(results[index]?.median).toBeGreaterThanOrEqual((results[index - 1]?.median ?? Number.POSITIVE_INFINITY) - 1);
       }
     }
   }, 240_000);

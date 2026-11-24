@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { setMazeQualityPassEnabled } from '../../src/legacy-runtime/legacyMazeQualityPass';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import {
   GEOMETRY_BUDGET_FELT_SATURATION_LEVEL,
@@ -159,7 +160,13 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
     expect(tuned.fringeShortfall).toBe(0);
   });
 
-  test('a ladder maze past the felt saturation is its felt-saturation maze plus the fringe: same base, route and felt class', () => {
+  // MAZER-GEN-030: the quality pass edits each maze on its own (it walls up or bridges short dead ends, differently on
+  // the top maze and on the felt-saturation maze), so the exact floor identity top = felt + fringe is a property of
+  // the tuner and is pinned with the pass switched off. With the pass on, the same bases, start, goal and route hold.
+  for (const qualityPass of [false, true]) {
+  test(`a ladder maze past the felt saturation is its felt-saturation maze plus the fringe: same base, route and felt class (quality pass ${qualityPass ? 'on' : 'off'})`, () => {
+    setMazeQualityPassEnabled(qualityPass);
+    try {
     for (const board of LADDER_BOARDS) {
       let same = 0;
       for (let index = 0; index < 10; index += 1) {
@@ -182,11 +189,17 @@ describe('fringe: zero-felt-cost side stubs past the felt saturation (tuner leve
             const stats = (maze as { stubStats?: { lengthened: number; removed: number; forced: number } }).stubStats;
             return stats === undefined ? 0 : stats.lengthened - stats.removed - stats.forced;
           };
-          expect((countKinds(top.grid).floor - stubDelta(top)) - (countKinds(felt.grid).floor - stubDelta(felt))).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+          if (!qualityPass) {
+            expect((countKinds(top.grid).floor - stubDelta(top)) - (countKinds(felt.grid).floor - stubDelta(felt))).toBe(GEOMETRY_BUDGET_FRINGE_CAP);
+          }
         }
       }
       // Most seeds (the calibration share is 75 percent) hold the whole fringe on the first landing.
-      expect(same).toBeGreaterThanOrEqual(5);
+      expect(same).toBeGreaterThanOrEqual(qualityPass ? 3 : 5);
+    }
+    } finally {
+      setMazeQualityPassEnabled(true);
     }
   });
+  }
 });
