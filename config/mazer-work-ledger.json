@@ -2669,7 +2669,18 @@
       "note": "Measured in PR #488 (open). Cheaper bloom waits on an owner pixel review."
     },
     "MAZER-PERF-006": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 685,
+            "mergedSha": "9e77ce5bd0a8aca9d9cf9a9541e9fd5942fd86f3"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
+      },
       "blocker": {
         "ask": "Reopen only if lag returns.",
         "kind": "deferred-by-owner",
@@ -4637,7 +4648,18 @@
       "filesHint": []
     },
     "MAZER-VIS-057": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 689,
+            "mergedSha": "7c04cea380a99753d97fb2e3a242fc857a36bb34"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
@@ -5035,9 +5057,16 @@
     },
     "MAZER-CTRL-005": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 689,
+            "mergedSha": "7c04cea380a99753d97fb2e3a242fc857a36bb34"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5133,9 +5162,16 @@
     },
     "MAZER-UI-095": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 673,
+            "mergedSha": "14d8b23c725c63787b7d9fc45d46df8d28e9f5f3"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5144,9 +5180,16 @@
     },
     "MAZER-UI-096": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 673,
+            "mergedSha": "14d8b23c725c63787b7d9fc45d46df8d28e9f5f3"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5245,9 +5288,16 @@
     },
     "MAZER-UI-099": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 688,
+            "mergedSha": "d9f885a378a13dd8aebd037aa49f61215ef5b083"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5256,9 +5306,16 @@
     },
     "MAZER-VIS-067": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 686,
+            "mergedSha": "994984d252ab1347c538144ef588bbf3aade1d71"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5267,9 +5324,16 @@
     },
     "MAZER-UI-100": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 673,
+            "mergedSha": "14d8b23c725c63787b7d9fc45d46df8d28e9f5f3"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5278,9 +5342,16 @@
     },
     "MAZER-UI-101": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 686,
+            "mergedSha": "994984d252ab1347c538144ef588bbf3aade1d71"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5289,9 +5360,16 @@
     },
     "MAZER-GEN-030": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 684,
+            "mergedSha": "7255a1e05d9989c32efe6cb454a82a69fab37aeb"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5300,9 +5378,16 @@
     },
     "MAZER-UI-102": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 683,
+            "mergedSha": "3fa748336a5eb531827d136e1027ba2eb2ed5240"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],
@@ -5365,9 +5450,16 @@
     },
     "MAZER-PERF-016": {
       "evidence": {
-        "prs": [],
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 685,
+            "mergedSha": "9e77ce5bd0a8aca9d9cf9a9541e9fd5942fd86f3"
+          }
+        ],
         "headless": true,
-        "deviceChecked": null
+        "deviceChecked": false,
+        "deployedBuild": "main-CqUwzOhy"
       },
       "blocker": null,
       "verify": [],

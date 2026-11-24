@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_8260a5ef661f",
+  "export_id": "pbe_mazer_owner_registry_958e87d283d7",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:8260a5ef661f5d3b669b495b26428e5494a945bd4366f8983dde476cf1963038",
-  "generated_at": "2026-11-20T08:08:52.000Z",
+  "source_revision": "sha256:958e87d283d72f8ea7d563d87bfbfa07a046a0eb92f398a907321d38517b67f7",
+  "generated_at": "2026-11-24T02:40:38.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:a1ad8aa2817a6b61f2bd244cff9d8a0184cb5323c41716e6f21df4b0a33ee19c",
-      "observed_at": "2026-11-20T08:08:52.000Z"
+      "revision": "sha256:5daec8d3bf56fc6b0588cfb415676c5d6d3ff82c8411110eadc3c5b10f63d367",
+      "observed_at": "2026-11-24T02:40:38.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-20T08:08:52.000Z"
+      "observed_at": "2026-11-24T02:40:38.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-20T08:08:52.000Z"
+      "observed_at": "2026-11-24T02:40:38.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-20T08:08:52.000Z"
+      "observed_at": "2026-11-24T02:40:38.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-20T08:08:52.000Z"
+      "observed_at": "2026-11-24T02:40:38.000Z"
     }
   ],
   "cards": [
@@ -3251,24 +3251,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ctrl-005_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-CTRL-005",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make stick and keyboard step at the same speed at every Move Speed",
-        "description": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
+        "description": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one. Board update 2026-11-24: Stick and keyboard step at one speed (151 ms default), leash 56 px; default speed shifts for both; merged and deployed; headless only, awaiting phone check PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T17:23:23.000Z",
+        "updated_at": "2026-11-24T02:40:38.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-005",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -3276,11 +3276,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-CTRL-005",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T17:23:23.000Z"
+        "source_updated_at": "2026-11-24T02:40:38.000Z"
       },
       "content": {
-        "summary": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
-        "objective": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one.",
+        "summary": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one. Board update 2026-11-24: Stick and keyboard step at one speed (151 ms default), leash 56 px; default speed shifts for both; merged and deployed; headless only, awaiting phone check PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "At the default speed the stick steps every 122 ms and the keyboard every 151 ms. One pace should apply to both inputs. Needs an owner pick of which pace is the canonical one. Board update 2026-11-24: Stick and keyboard step at one speed (151 ms default), leash 56 px; default speed shifts for both; merged and deployed; headless only, awaiting phone check PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Stick and keyboard produce the same step interval at each Move Speed",
           "The chosen pace is set by one constant pinned by tests",
@@ -5639,17 +5639,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Maze generation quality: fewer dead stubs, more route choice",
-        "description": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression.",
+        "description": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression. Board update 2026-11-24: Maze quality pass: pruned dead ends plus second routes or loops; merged and deployed; gate levels may keep old dead ends; headless only, awaiting phone check PR #684 merged (7255a1e0). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T01:13:32.000Z",
+        "updated_at": "2026-11-24T02:39:17.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-030",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5657,11 +5657,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-030",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T01:13:32.000Z"
+        "source_updated_at": "2026-11-24T02:39:17.000Z"
       },
       "content": {
-        "summary": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression.",
-        "objective": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression.",
+        "summary": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression. Board update 2026-11-24: Maze quality pass: pruned dead ends plus second routes or loops; merged and deployed; gate levels may keep old dead ends; headless only, awaiting phone check PR #684 merged (7255a1e0). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner finds the mazes feel off: many short useless dead ends and usually only one route to the end tile. Measure real levels, name what is missing, and propose generation rules that feel better while keeping difficulty and progression. Board update 2026-11-24: Maze quality pass: pruned dead ends plus second routes or loops; merged and deployed; gate levels may keep old dead ends; headless only, awaiting phone check PR #684 merged (7255a1e0). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Metrics for levels 1 to 200 every 10 levels from the real generator show dead-end count and length, route count and corridor shape",
           "At least 4 candidate generation rules are shown side by side with today on the live app, with the same metrics",
@@ -8074,26 +8074,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-006_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-006",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Cap the trail canvas backing resolution on 3x phones",
-        "description": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns.",
+        "description": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns. Board update 2026-11-24: Trail canvas backing size capped; merged and deployed; headless only, no real-phone frame trace yet PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "intake",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-PERF-002"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-14T08:02:23.000Z",
+        "updated_at": "2026-11-24T02:39:37.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-006",
         "extensions": {
-          "owner_status": "deferred_candidate",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -8101,11 +8101,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-006",
         "source_status": "current",
-        "source_updated_at": "2026-11-14T08:02:23.000Z"
+        "source_updated_at": "2026-11-24T02:39:37.000Z"
       },
       "content": {
-        "summary": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns.",
-        "objective": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns.",
+        "summary": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns. Board update 2026-11-24: Trail canvas backing size capped; merged and deployed; headless only, no real-phone frame trace yet PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "On 3x phones the trail canvas backing store is very large, which raises the cost of every trail redraw. Plan: cap the backing resolution on 3x phones. This changes how sharp the trail looks, so the owner reviews the pixels before it ships. Not started. Board update 2026-11-14: Deferred 2026-11-14: the lag is gone and a resolution cap softens the trail on 3x phones; reopen only if lag returns. Board update 2026-11-24: Trail canvas backing size capped; merged and deployed; headless only, no real-phone frame trace yet PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The cap and the redraw cost saved are measured",
           "The owner reviews before and after trail pixels on a 3x phone and approves",
@@ -8590,24 +8590,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-perf-016_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-PERF-016",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Full performance pass and a permanent regression guard",
-        "description": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001.",
+        "description": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001. Board update 2026-11-24: Frame-budget guard phase 1 merged and deployed; full-scene draw budget and real-phone trace still open; headless only PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T02:44:36.000Z",
+        "updated_at": "2026-11-24T02:39:49.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-016",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -8615,11 +8615,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-016",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T02:44:36.000Z"
+        "source_updated_at": "2026-11-24T02:39:49.000Z"
       },
       "content": {
-        "summary": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001.",
-        "objective": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001.",
+        "summary": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001. Board update 2026-11-24: Frame-budget guard phase 1 merged and deployed; full-scene draw budget and real-phone trace still open; headless only PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "After the UI lanes land, find and fix everything that makes Mazer laggy or slow (boot, frame cost, trail, stars, menus, long levels, small phones) and add a permanent guard so it stays smooth. Replaces the planning card that reused the id MAZER-PERF-001. Board update 2026-11-24: Frame-budget guard phase 1 merged and deployed; full-scene draw budget and real-phone trace still open; headless only PR #685 merged (9e77ce5b). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "A measured baseline and after table for boot time, steady frame cost and walking frame cost on a throttled phone profile at levels 1, 120 and 300",
           "Every hotspot found is fixed or has a recorded reason and the top three are fixed",
@@ -13338,17 +13338,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "In-game Menu dropdown replaces the Settings button",
-        "description": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused.",
+        "description": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused. Board update 2026-11-24: Menu button and dropdown parity in game and main menu; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T22:56:27.000Z",
+        "updated_at": "2026-11-24T02:39:21.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-095",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13356,11 +13356,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-095",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T22:56:27.000Z"
+        "source_updated_at": "2026-11-24T02:39:21.000Z"
       },
       "content": {
-        "summary": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused.",
-        "objective": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused.",
+        "summary": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused. Board update 2026-11-24: Menu button and dropdown parity in game and main menu; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "In a played game the Settings button becomes a Menu button with a dropdown holding Settings, Guide, a Sound toggle, Reset level and Main menu. The close button of the dropdown is Resume. While the dropdown is open the game is paused. Board update 2026-11-24: Menu button and dropdown parity in game and main menu; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The in-game Settings button is replaced by a Menu button whose dropdown lists Settings, Guide, Sound toggle, Reset level and Main menu, with the X acting as Resume",
           "Opening the dropdown pauses the game and Resume continues it exactly where it was",
@@ -13389,17 +13389,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Main-menu dropdown matches the in-game Menu dropdown",
-        "description": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have.",
+        "description": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have. Board update 2026-11-24: Dropdown rows and Settings trimmed per decisions; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T23:29:56.000Z",
+        "updated_at": "2026-11-24T02:39:27.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-096",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13407,11 +13407,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-096",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T23:29:56.000Z"
+        "source_updated_at": "2026-11-24T02:39:27.000Z"
       },
       "content": {
-        "summary": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have.",
-        "objective": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have.",
+        "summary": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have. Board update 2026-11-24: Dropdown rows and Settings trimmed per decisions; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The main-menu dropdown gets the same changes as the in-game one: Guide as its own row, Sound as a tap-to-toggle row and a Settings row. It keeps Leaderboard and Profile, which the in-game menu does not have. Board update 2026-11-24: Dropdown rows and Settings trimmed per decisions; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The main-menu dropdown has Guide, Sound toggle and Settings rows styled like the in-game menu, plus Leaderboard and Profile",
           "Sound and Guide are removed from the Settings sheet on every screen",
@@ -13542,17 +13542,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Update pass on remaining screens to match the new look",
-        "description": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks.",
+        "description": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks. Board update 2026-11-24: Screens pass: one solid primary per screen, outlined secondary, ghost rows; merged and deployed; dark reset confirm shares one outline colour; headless only, awaiting phone check PR #688 merged (d9f885a3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T00:26:42.000Z",
+        "updated_at": "2026-11-24T02:40:20.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-099",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13560,11 +13560,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-099",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T00:26:42.000Z"
+        "source_updated_at": "2026-11-24T02:40:20.000Z"
       },
       "content": {
-        "summary": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks.",
-        "objective": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks.",
+        "summary": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks. Board update 2026-11-24: Screens pass: one solid primary per screen, outlined secondary, ghost rows; merged and deployed; dark reset confirm shares one outline colour; headless only, awaiting phone check PR #688 merged (d9f885a3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Audit the remaining screens (leaderboard, profile, settings sheet, guide, win and level-complete, HUD, auth) against the new icons, tiles and menu. Owner asked for an update pass where it is deserved. Live-app demo first; no merge until the owner looks. Board update 2026-11-24: Screens pass: one solid primary per screen, outlined secondary, ghost rows; merged and deployed; dark reset confirm shares one outline colour; headless only, awaiting phone check PR #688 merged (d9f885a3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Audit lists every remaining screen with a keep or update verdict and evidence from the live app",
           "Screens marked update get a live-app before and after page that matches the live game except the change under test",
@@ -13593,17 +13593,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Sign out and Reset progress move to the account screen only",
-        "description": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row.",
+        "description": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row. Board update 2026-11-24: Resume pauses the game and Reset level row added; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T00:55:22.000Z",
+        "updated_at": "2026-11-24T02:39:31.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-100",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13611,11 +13611,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-100",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T00:55:22.000Z"
+        "source_updated_at": "2026-11-24T02:39:31.000Z"
       },
       "content": {
-        "summary": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row.",
-        "objective": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row.",
+        "summary": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row. Board update 2026-11-24: Resume pauses the game and Reset level row added; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner wants sign out and reset progress removed from the main-menu Settings and available only from the account screen reached by the Profile button, and the Guide removed from Settings into its own Menu row. Board update 2026-11-24: Resume pauses the game and Reset level row added; merged and deployed; headless only, awaiting phone check PR #673 merged (14d8b23c). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Main-menu Settings no longer shows Sign out, Reset progress or Guide",
           "The account screen from Profile shows Sign out and Reset progress and they work as before with the same confirmations",
@@ -13644,17 +13644,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Played board uses the full screen height",
-        "description": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work.",
+        "description": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work. Board update 2026-11-24: Full height board growth merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T00:55:22.000Z",
+        "updated_at": "2026-11-24T02:40:10.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-101",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13662,11 +13662,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-101",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T00:55:22.000Z"
+        "source_updated_at": "2026-11-24T02:40:10.000Z"
       },
       "content": {
-        "summary": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work.",
-        "objective": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work.",
+        "summary": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work. Board update 2026-11-24: Full height board growth merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner notes the played-game board stops short at the bottom while the bleed-off paths at the bottom get more room than any other side. Investigate whether the board can use the space, tied to the maze size and zoom work. Board update 2026-11-24: Full height board growth merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Investigation explains why the bottom margin is larger than the other sides with measurements at 390x844@3 and 412x915@2.625",
           "A fix or options page shows the board using the available height with the whole maze still visible",
@@ -13695,17 +13695,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Dark mode setting with neon purple UI",
-        "description": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark.",
+        "description": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark. Board update 2026-11-24: Settings Dark mode toggle with neon purple UI; cosmetics keep their colours; merged and deployed; gaps: boot splash, error accents, account site; headless only, awaiting phone check PR #683 merged (3fa74833). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T01:13:32.000Z",
+        "updated_at": "2026-11-24T02:39:12.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-102",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13713,11 +13713,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-102",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T01:13:32.000Z"
+        "source_updated_at": "2026-11-24T02:39:12.000Z"
       },
       "content": {
-        "summary": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark.",
-        "objective": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark.",
+        "summary": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark. Board update 2026-11-24: Settings Dark mode toggle with neon purple UI; cosmetics keep their colours; merged and deployed; gaps: boot splash, error accents, account site; headless only, awaiting phone check PR #683 merged (3fa74833). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner likes the dark neon purple look from the maze size demo and wants it as a Dark mode setting: all UI colours become that neon purple and everything else goes dark. Board update 2026-11-24: Settings Dark mode toggle with neon purple UI; cosmetics keep their colours; merged and deployed; gaps: boot splash, error accents, account site; headless only, awaiting phone check PR #683 merged (3fa74833). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Settings has a Dark mode toggle that switches the whole game to the neon purple on dark look and back",
           "Every screen and the board follow the theme with readable contrast and the setting is remembered",
@@ -16417,24 +16417,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-057_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-057",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Bottom corner stars in landscape and iPads",
-        "description": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset.",
+        "description": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset. Board update 2026-11-24: Landscape corner stars share one inset on phones with a safe area; merged and deployed; simulated safe areas, headless only PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-16T14:26:23.000Z",
+        "updated_at": "2026-11-24T02:40:31.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-057",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -16442,11 +16442,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-057",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T14:26:23.000Z"
+        "source_updated_at": "2026-11-24T02:40:31.000Z"
       },
       "content": {
-        "summary": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset.",
-        "objective": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset.",
+        "summary": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset. Board update 2026-11-24: Landscape corner stars share one inset on phones with a safe area; merged and deployed; simulated safe areas, headless only PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Review of PR 631: iPhone landscape moves bottom stars 20px in while top stay at 0, and iPads with a home indicator also get 20px. Add a landscape test case and decide the right inset. Board update 2026-11-24: Landscape corner stars share one inset on phones with a safe area; merged and deployed; simulated safe areas, headless only PR #689 merged (7c04cea3). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Landscape top and bottom stars are placed consistently",
           "A test covers landscape with a bottom safe area",
@@ -16934,17 +16934,17 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Bleed gate tile easier to see when idle",
-        "description": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles.",
+        "description": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles. Board update 2026-11-24: Lit cap gate tile look merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "high",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-20T00:55:22.000Z",
+        "updated_at": "2026-11-24T02:40:00.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-067",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -16952,11 +16952,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-067",
         "source_status": "current",
-        "source_updated_at": "2026-11-20T00:55:22.000Z"
+        "source_updated_at": "2026-11-24T02:40:00.000Z"
       },
       "content": {
-        "summary": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles.",
-        "objective": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles.",
+        "summary": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles. Board update 2026-11-24: Lit cap gate tile look merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Owner says the idle gate sits inside the board tile and is hard to see. Options on the live app: draw the gate shape over the whole tile, or replace the tile surface entirely, shown on the Starlit Bevel tiles. Board update 2026-11-24: Lit cap gate tile look merged and deployed; headless only, awaiting phone check PR #686 merged (994984d2). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Live-app options page shows at least 4 gate treatments idle and active on Starlit Bevel tiles",
           "Each option reports contrast against the floor and wall and the owner picks one before any build",
@@ -17084,9 +17084,9 @@
   "extensions": {
     "stable_identity_count": 327,
     "exported_public_card_count": 327,
-    "exported_open_card_count": 110,
+    "exported_open_card_count": 111,
     "exported_completed_card_count": 84,
-    "exported_deferred_card_count": 25,
+    "exported_deferred_card_count": 24,
     "exported_archived_card_count": 108,
     "imported_research_candidate_count": 0,
     "research_candidate_exported_count": 0,

@@ -3,26 +3,26 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-20T08:08:52.000Z",
+    "registryUpdatedAt": "2026-11-24T02:40:38.000Z",
     "boardSync": {
-      "at": "2026-11-20T08:08:52.000Z",
-      "appliedEventCount": 523,
-      "lastEventId": "5bb1d99b90d6"
+      "at": "2026-11-24T02:40:38.000Z",
+      "appliedEventCount": 535,
+      "lastEventId": "4e81f866dbe6"
     }
   },
   "counters": {
     "total": 327,
-    "open": 110,
+    "open": 111,
     "completed": 192,
-    "deferred": 25,
+    "deferred": 24,
     "buckets": {
       "needs-you": 33,
-      "in-review": 46,
-      "blocked": 8,
+      "in-review": 57,
+      "blocked": 9,
       "ready": 0,
-      "in-progress": 9,
-      "unclassified": 14,
-      "deferred": 25,
+      "in-progress": 1,
+      "unclassified": 11,
+      "deferred": 24,
       "completed": 192
     },
     "needsYou": {
@@ -37,7 +37,7 @@
       "unrecorded": 0
     },
     "blockedByGroup": {
-      "Zac": 2,
+      "Zac": 3,
       "provider": 0,
       "device": 1,
       "other-card": 5,
@@ -2929,11 +2929,27 @@
       "note": ""
     },
     {
+      "id": "MAZER-GEN-030",
+      "title": "Maze generation quality: fewer dead stubs, more route choice",
+      "status": "review",
+      "priority": "high",
+      "prs": "#684",
+      "note": ""
+    },
+    {
       "id": "MAZER-PERF-013",
       "title": "Smoother loop: fewer redraws, 60 fps cap, and a slightly slower player",
       "status": "review",
       "priority": "high",
       "prs": "#661",
+      "note": ""
+    },
+    {
+      "id": "MAZER-PERF-016",
+      "title": "Full performance pass and a permanent regression guard",
+      "status": "review",
+      "priority": "high",
+      "prs": "#685",
       "note": ""
     },
     {
@@ -2953,6 +2969,22 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-095",
+      "title": "In-game Menu dropdown replaces the Settings button",
+      "status": "review",
+      "priority": "high",
+      "prs": "#673",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-096",
+      "title": "Main-menu dropdown matches the in-game Menu dropdown",
+      "status": "review",
+      "priority": "high",
+      "prs": "#673",
+      "note": ""
+    },
+    {
       "id": "MAZER-UI-097",
       "title": "Button icons switch to the Star Dust set (C)",
       "status": "review",
@@ -2969,6 +3001,30 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-100",
+      "title": "Sign out and Reset progress move to the account screen only",
+      "status": "review",
+      "priority": "high",
+      "prs": "#673",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-101",
+      "title": "Played board uses the full screen height",
+      "status": "review",
+      "priority": "high",
+      "prs": "#686",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-102",
+      "title": "Dark mode setting with neon purple UI",
+      "status": "review",
+      "priority": "high",
+      "prs": "#683",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-064",
       "title": "Board tiles switch to Starlit Bevel (H)",
       "status": "review",
@@ -2982,6 +3038,14 @@
       "status": "review",
       "priority": "high",
       "prs": "#680",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-067",
+      "title": "Bleed gate tile easier to see when idle",
+      "status": "review",
+      "priority": "high",
+      "prs": "#686",
       "note": ""
     },
     {
@@ -3022,6 +3086,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#656, #665",
+      "note": ""
+    },
+    {
+      "id": "MAZER-CTRL-005",
+      "title": "Make stick and keyboard step at the same speed at every Move Speed",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#689",
       "note": ""
     },
     {
@@ -3126,6 +3198,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#671",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-099",
+      "title": "Update pass on remaining screens to match the new look",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#688",
       "note": ""
     },
     {
@@ -3255,6 +3335,14 @@
       "priority": "low",
       "prs": "#640",
       "note": ""
+    },
+    {
+      "id": "MAZER-VIS-057",
+      "title": "Bottom corner stars in landscape and iPads",
+      "status": "review",
+      "priority": "low",
+      "prs": "#689",
+      "note": ""
     }
   ],
   "blocked": {
@@ -3275,6 +3363,15 @@
         "priority": "medium",
         "kind": "deferred-by-owner",
         "ask": "Say when Phase 2 (obstacles and enemies) starts.",
+        "derived": false
+      },
+      {
+        "id": "MAZER-PERF-006",
+        "title": "Cap the trail canvas backing resolution on 3x phones",
+        "status": "review",
+        "priority": "low",
+        "kind": "deferred-by-owner",
+        "ask": "Reopen only if lag returns.",
         "derived": false
       }
     ],
@@ -3350,62 +3447,6 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
-    },
-    {
-      "id": "MAZER-GEN-030",
-      "title": "Maze generation quality: fewer dead stubs, more route choice",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-095",
-      "title": "In-game Menu dropdown replaces the Settings button",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-096",
-      "title": "Main-menu dropdown matches the in-game Menu dropdown",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-100",
-      "title": "Sign out and Reset progress move to the account screen only",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-101",
-      "title": "Played board uses the full screen height",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-102",
-      "title": "Dark mode setting with neon purple UI",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-VIS-067",
-      "title": "Bleed gate tile easier to see when idle",
-      "status": "in_progress",
-      "priority": "high",
-      "note": ""
-    },
-    {
-      "id": "MAZER-UI-099",
-      "title": "Update pass on remaining screens to match the new look",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": ""
     }
   ],
   "deferred": [
@@ -3546,14 +3587,6 @@
       "waitsOn": "Zac"
     },
     {
-      "id": "MAZER-PERF-006",
-      "title": "Cap the trail canvas backing resolution on 3x phones",
-      "status": "deferred_candidate",
-      "priority": "low",
-      "why": "No lag now; the cap would soften the trail.",
-      "waitsOn": "Zac"
-    },
-    {
       "id": "MAZER-PROG-007",
       "title": "Add milestone moments for levels past rank S",
       "status": "deferred_candidate",
@@ -3611,20 +3644,6 @@
     }
   ],
   "unclassified": [
-    {
-      "id": "MAZER-PERF-016",
-      "title": "Full performance pass and a permanent regression guard",
-      "status": "planning",
-      "priority": "high",
-      "lane": null
-    },
-    {
-      "id": "MAZER-CTRL-005",
-      "title": "Make stick and keyboard step at the same speed at every Move Speed",
-      "status": "planning",
-      "priority": "medium",
-      "lane": null
-    },
     {
       "id": "MAZER-GOV-013",
       "title": "Dispatch the Board sync workflow once on GitHub and record the run",
@@ -3684,13 +3703,6 @@
     {
       "id": "MAZER-UI-093",
       "title": "Check whether the Arrows setting does anything",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-057",
-      "title": "Bottom corner stars in landscape and iPads",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4420,8 +4432,8 @@
       "sub": null
     },
     "MAZER-PERF-006": {
-      "bucket": "deferred",
-      "sub": null
+      "bucket": "blocked",
+      "sub": "Zac"
     },
     "MAZER-PERF-007": {
       "bucket": "in-review",
@@ -4836,7 +4848,7 @@
       "sub": null
     },
     "MAZER-VIS-057": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-090": {
@@ -4924,7 +4936,7 @@
       "sub": null
     },
     "MAZER-CTRL-005": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-061": {
@@ -4952,11 +4964,11 @@
       "sub": null
     },
     "MAZER-UI-095": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-096": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-097": {
@@ -4980,27 +4992,27 @@
       "sub": null
     },
     "MAZER-UI-099": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-067": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-100": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-101": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-GEN-030": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-102": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-ACCT-047": {
@@ -5016,7 +5028,7 @@
       "sub": null
     },
     "MAZER-PERF-016": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     }
   }
