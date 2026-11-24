@@ -3,24 +3,24 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-24T15:32:49.000Z",
+    "registryUpdatedAt": "2026-11-24T18:08:36.000Z",
     "boardSync": {
-      "at": "2026-11-24T15:32:49.000Z",
-      "appliedEventCount": 544,
-      "lastEventId": "0adfa938f542"
+      "at": "2026-11-24T18:08:36.000Z",
+      "appliedEventCount": 546,
+      "lastEventId": "8244c89737f8"
     }
   },
   "counters": {
-    "total": 332,
-    "open": 115,
+    "total": 333,
+    "open": 116,
     "completed": 193,
     "deferred": 24,
     "buckets": {
       "needs-you": 32,
-      "in-review": 59,
+      "in-review": 61,
       "blocked": 8,
       "ready": 1,
-      "in-progress": 2,
+      "in-progress": 1,
       "unclassified": 13,
       "deferred": 24,
       "completed": 193
@@ -2952,6 +2952,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-PERF-017",
+      "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
+      "status": "review",
+      "priority": "high",
+      "prs": "#700",
+      "note": ""
+    },
+    {
       "id": "MAZER-PROG-020",
       "title": "Grow the maze board with progression (2-5 more tiles each way)",
       "status": "review",
@@ -3101,6 +3109,14 @@
       "status": "review",
       "priority": "medium",
       "prs": "#672",
+      "note": ""
+    },
+    {
+      "id": "MAZER-FB-001",
+      "title": "In-game 1-5 star feedback popup with optional comment",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#698, #701",
       "note": ""
     },
     {
@@ -3463,13 +3479,6 @@
       "status": "active",
       "priority": "high",
       "note": "PR #474 merged (docs). Ongoing baseline card."
-    },
-    {
-      "id": "MAZER-FB-001",
-      "title": "In-game 1-5 star feedback popup with optional comment",
-      "status": "in_progress",
-      "priority": "medium",
-      "note": ""
     }
   ],
   "deferred": [
@@ -5085,7 +5094,11 @@
       "sub": null
     },
     "MAZER-FB-001": {
-      "bucket": "in-progress",
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-PERF-017": {
+      "bucket": "in-review",
       "sub": null
     }
   }

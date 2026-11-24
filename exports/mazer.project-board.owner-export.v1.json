@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_2c40b1d30b68",
+  "export_id": "pbe_mazer_owner_registry_a154326def4c",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:2c40b1d30b689d94fecdb0571036f58d833507669704a627c8f60452cd98334b",
-  "generated_at": "2026-11-24T15:32:49.000Z",
+  "source_revision": "sha256:a154326def4cd97a71630edfd95897ced0740382f9b30a92f89f106cbd58f5d8",
+  "generated_at": "2026-11-24T18:08:36.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:b684a7f9835b752b2a41d4cf87d8762947d041aa51e3301a910c01dd67565cd5",
-      "observed_at": "2026-11-24T15:32:49.000Z"
+      "revision": "sha256:4433d623ae207c9788a8777414c978ec9c5718275557d555bfbffe3c4189bda3",
+      "observed_at": "2026-11-24T18:08:36.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-24T15:32:49.000Z"
+      "observed_at": "2026-11-24T18:08:36.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-24T15:32:49.000Z"
+      "observed_at": "2026-11-24T18:08:36.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-24T15:32:49.000Z"
+      "observed_at": "2026-11-24T18:08:36.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-24T15:32:49.000Z"
+      "observed_at": "2026-11-24T18:08:36.000Z"
     }
   ],
   "cards": [
@@ -4086,19 +4086,19 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "In-game 1-5 star feedback popup with optional comment",
-        "description": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+        "description": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work. Board update 2026-11-24: Feedback popup merged (PR 701) and live in build main-EpjqCE_C: signed-in Feedback row in the main and pause dropdowns, Card layout, 1-5 pointed stars, optional plain-text note, calm in-flow notices; independent review passed after 4 fixes; headless Chromium and WebKit only, not device checked, real save from the deployed build not yet exercised PR #701 merged (54eca51f). Deployed: production build main-EpjqCE_C. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "in-progress",
+        "lifecycle": "review",
         "priority": "medium",
         "owner": "mazer",
         "dependencies": [
           "MAZER-ACCT-047"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-24T15:32:49.000Z",
+        "updated_at": "2026-11-24T18:08:11.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FB-001",
         "extensions": {
-          "owner_status": "in_progress",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -4106,11 +4106,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FB-001",
         "source_status": "current",
-        "source_updated_at": "2026-11-24T15:32:49.000Z"
+        "source_updated_at": "2026-11-24T18:08:11.000Z"
       },
       "content": {
-        "summary": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
-        "objective": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work.",
+        "summary": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work. Board update 2026-11-24: Feedback popup merged (PR 701) and live in build main-EpjqCE_C: signed-in Feedback row in the main and pause dropdowns, Card layout, 1-5 pointed stars, optional plain-text note, calm in-flow notices; independent review passed after 4 fixes; headless Chromium and WebKit only, not device checked, real save from the deployed build not yet exercised PR #701 merged (54eca51f). Deployed: production build main-EpjqCE_C. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Menu-row Feedback card (layout A), signed-in only, no auto-prompt, none selected on load, 1-5 stars plus optional plain-text comment saved to mazer_feedback through mazer_submit_feedback_v1 with the client build id. Database half applied 2026-11-24; client popup is the remaining work. Board update 2026-11-24: Feedback popup merged (PR 701) and live in build main-EpjqCE_C: signed-in Feedback row in the main and pause dropdowns, Card layout, 1-5 pointed stars, optional plain-text note, calm in-flow notices; independent review passed after 4 fixes; headless Chromium and WebKit only, not device checked, real save from the deployed build not yet exercised PR #701 merged (54eca51f). Deployed: production build main-EpjqCE_C. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Menu row opens a Card popup with no star selected and an optional comment box",
           "Submit saves rating, comment and build id for a signed-in user and shows a plain confirmation; rate limits surface as a gentle notice, never red text",
@@ -8887,6 +8887,59 @@
           "A measured baseline and after table for boot time, steady frame cost and walking frame cost on a throttled phone profile at levels 1, 120 and 300",
           "Every hotspot found is fixed or has a recorded reason and the top three are fixed",
           "An automated budget check in CI fails when frame cost or bundle size regresses past the recorded limits"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-perf-017_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-PERF-017",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
+        "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+        "card_type": "reliability",
+        "lifecycle": "review",
+        "priority": "high",
+        "owner": "mazer",
+        "dependencies": [
+          "MAZER-PERF-016"
+        ],
+        "board_version": 1,
+        "updated_at": "2026-11-24T18:08:36.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
+        "source_status": "current",
+        "source_updated_at": "2026-11-24T18:08:36.000Z"
+      },
+      "content": {
+        "summary": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+        "objective": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+        "acceptance_criteria": [
+          "Per-phase frame cost table measured at level 300 with a long trail under phone emulation",
+          "Top cost fixed with a zero-difference pixel check at several device scales",
+          "Remaining costs listed with an options page required before any look-changing fix, and a real iPhone measurement requested"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -17345,9 +17398,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 332,
-    "exported_public_card_count": 332,
-    "exported_open_card_count": 115,
+    "stable_identity_count": 333,
+    "exported_public_card_count": 333,
+    "exported_open_card_count": 116,
     "exported_completed_card_count": 85,
     "exported_deferred_card_count": 24,
     "exported_archived_card_count": 108,
