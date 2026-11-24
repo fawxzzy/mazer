@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-24T02:40:38.000Z",
+  "updatedAt": "2026-11-24T06:07:44.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 327,
+    "stableIdentityCount": 330,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 111,
-    "completedCardCount": 84,
+    "openCardCount": 113,
+    "completedCardCount": 85,
     "deferredCardCount": 24,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-24T02:40:38.000Z",
-      "appliedEventCount": 535,
-      "lastEventId": "4e81f866dbe6"
+      "at": "2026-11-24T06:07:44.000Z",
+      "appliedEventCount": 539,
+      "lastEventId": "b78149fb903b"
     },
     "archivedCardCount": 108
   },
@@ -1405,12 +1405,12 @@
     },
     {
       "id": "MAZER-HAZ-002",
-      "status": "review",
-      "updatedAt": "2026-11-16T01:06:02.000Z",
+      "status": "completed",
+      "updatedAt": "2026-11-24T04:02:18.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-002",
       "title": "Sign or reject the endless hazard product contract",
-      "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-14: Hazard contract phase 1 signed (owner yes to all 2026-11-14); docs and tests only, hazards stay dormant PR #551 merged (9cb1c34f). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant). Board update 2026-11-16: H0: hazard product contract signed into repo (yes to all four), schedule manifest v1 and graph-contract amendments A1-A6; docs only, merged; flags stay off PR #615 merged (f8d2befe). Deployed: production build none. Checked only in headless Chromium, not on a real phone.",
+      "description": "A draft contract describes how obstacles, enemies and items enter the endless ladder in phases. It is unsigned, and five board cards (difficulty shaping, obstacles, enemies, items, cloak) are covered by it rather than standing alone. Awaiting the owner sign-off. Board update 2026-11-15: Owner confirmed 2026-11-14: phase 1 signed (PR #551, docs and tests only, hazards dormant). Board update 2026-11-16: H0: hazard product contract signed into repo (yes to all four), schedule manifest v1 and graph-contract amendments A1-A6; docs only, merged; flags stay off PR #615 merged (f8d2befe). Deployed: production build none. Checked only in headless Chromium, not on a real phone. Board update 2026-11-24: Owner signed the endless hazard product contract in writing (earlier phase 1 and H0 sign-offs, re-confirmed 2026-11-24); docs and tests only, hazards stay dormant behind flags; covered cards keep their own statuses PR #615 merged (f8d2befe). Deployed: production build main-CqUwzOhy. Checked only in headless Chromium, not on a real phone.",
       "cardType": "governance",
       "priority": "high",
       "dependencies": [],
@@ -5933,6 +5933,61 @@
         "A measured baseline and after table for boot time, steady frame cost and walking frame cost on a throttled phone profile at levels 1, 120 and 300",
         "Every hotspot found is fixed or has a recorded reason and the top three are fixed",
         "An automated budget check in CI fails when frame cost or bundle size regresses past the recorded limits"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-031",
+      "status": "review",
+      "updatedAt": "2026-11-24T06:07:44.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-031",
+      "title": "Keep bleed gates alive past level 140",
+      "description": "Gate levels lost their wrap between levels 100 and 140, so the gate puzzle faded out. Gate levels now keep a wrap route to level 282, the gate-aware search retries wrapped bases, and the maze quality pass runs on gate levels without changing the gate saving. Levels 283 and up stay plain by design.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Gate levels keep a wrap or loop route a gate can guard from level 100 to 282 with cadence unchanged",
+        "Short dead ends on gate levels drop to 3 or fewer while the gate keeps its recorded saving",
+        "Determinism, solvability, level 1 and the golden ladder fixture hold, with only gate levels changed"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-032",
+      "status": "planning",
+      "updatedAt": "2026-11-24T06:07:44.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-032",
+      "title": "Make plateau gates meaningful from level 283",
+      "description": "From level 283 the felt ceiling leaves a bleed gate about one step of saving, so those levels stay plain. Making gates matter there means unpricing the gate saving or raising the felt ceiling, which is an owner decision. Recommended: revisit with the next felt-ceiling change.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-GEN-031"
+      ],
+      "acceptanceCriteria": [
+        "Owner decides whether plateau levels carry gates",
+        "If yes, a gate saves a felt amount and the 905 reverse floor still holds",
+        "Golden ladder fixture changes only for the intended levels"
+      ]
+    },
+    {
+      "id": "MAZER-GEN-033",
+      "status": "planning",
+      "updatedAt": "2026-11-24T06:07:44.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-GEN-033",
+      "title": "Widen gate placement below level 100",
+      "description": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability.",
+      "cardType": "feature",
+      "priority": "low",
+      "dependencies": [
+        "MAZER-GEN-031"
+      ],
+      "acceptanceCriteria": [
+        "Gate levels below 100 carry a gate at a measured higher share",
+        "Cadence and solvability are unchanged",
+        "Golden ladder fixture changes only for gate levels"
       ]
     }
   ]
