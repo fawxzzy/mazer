@@ -1,5 +1,5 @@
 # PG17: rollback.sql must keep the table (and its rows) and drop only the function when rows exist.
-# Run from the repo root after scratch-pg.mjs init + build (see README). Uses a throwaway clone database.
+# Run from the repo root after scratch-pg.mjs init + build (see README, Repeating the PG17 run). Uses a throwaway clone database.
 param([string]$Dir = 'C:\ATLAS\tmp\scratch-pg-feedback-v2')
 $ErrorActionPreference = 'Continue'
 $t = 'docs\ops\sql-proposals\mazer-feedback-20261124-v2'

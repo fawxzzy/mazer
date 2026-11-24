@@ -37,12 +37,22 @@ Known comment inaccuracies (comments only; not edited so the hashed bytes stay t
 - [x] Fresh read-only preimage (above).
 - [x] Review findings of round 2 addressed in files.
 - [x] PG17 `pair` run with the non-superuser runner: passed (see the logs above). Real concurrency and lock contention on a busy `auth.users` are still untested.
-- [ ] Independent review round 3: first pass was HOLD (P1: PG17 run missing; P2: log was gitignored, standard preimage pack not run, Web per-call trigger list lacked the feedback table). All four are fixed in the PR; a re-review is recorded in the PR description.
+- [x] Independent review round 3: first pass was HOLD (P1: PG17 run missing; P2: log was gitignored, standard preimage pack not run, Web per-call trigger list lacked the feedback table). All four were fixed and the delta re-review returned PASS (no blocking findings; apply.sql and rollback.sql bytes unchanged).
 - [ ] Owner box with the sha256 and a post-image read-back: to do.
 - [ ] Real concurrency (the advisory lock and the lock_timeout are untested under real contention): not done.
 
+## Repeating the PG17 run
+```
+node scripts/db-scratch/scratch-pg.mjs init  --dir C:\ATLAS\tmp\scratch-pg-feedback-v2 --port 55440
+node scripts/db-scratch/scratch-pg.mjs build --dir C:\ATLAS\tmp\scratch-pg-feedback-v2 --extra docs/ops/sql-proposals/mazer-feedback-20261124-v2/scratch-test/pg17/app-stub.sql
+node scripts/db-scratch/scratch-pg.mjs pair  --dir C:\ATLAS\tmp\scratch-pg-feedback-v2 --apply docs/ops/sql-proposals/mazer-feedback-20261124-v2/apply.sql --rollback docs/ops/sql-proposals/mazer-feedback-20261124-v2/rollback.sql --seed docs/ops/sql-proposals/mazer-feedback-20261124-v2/scratch-test/pg17/seed.sql --check docs/ops/sql-proposals/mazer-feedback-20261124-v2/scratch-test/pg17/check.sql --reapply --schemas mazer
+powershell -File docs/ops/sql-proposals/mazer-feedback-20261124-v2/scratch-test/pg17/rollback-with-rows.ps1
+node scripts/db-scratch/scratch-pg.mjs stop --dir C:\ATLAS\tmp\scratch-pg-feedback-v2
+```
+Known limits of this run: `check.sql` calls the function as the owner (the client path is shown only by the privilege and schema-USAGE checks), the stub `auth.users` has RLS off, and the `auth` catalog is not compared after rollback.
+
 ## Apply order (when approved)
-1. Re-run `preimage/c_feedback_v2.sql` read-only; if anything differs, stop.
+1. In the minutes before the apply, re-run `preimage/c_feedback_v2.sql` read-only and the standard pack with volatile items (`scripts/db-scratch/run-preimage-pack.ps1 -IncludeVolatile`: runner role, long transactions, waiting locks; the apply takes SHARE ROW EXCLUSIVE on `auth.users`). If anything differs or a long transaction is open, stop.
 2. Apply `apply.sql` (this folder). It is independent of every other pending change.
 3. The FawxzzyWeb delete-manifest file change needs NO apply for this to work (the live delete function is untouched and the cascade handles deletion). It only matters before any future re-apply of the delete SQL, which must happen after this table exists or with the optional entry the Web change adds.
 4. Read back the post-image (the apply asserts it; a read-only catalog query confirms), then the client PR can ship.
