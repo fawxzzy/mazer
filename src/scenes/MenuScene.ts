@@ -133,6 +133,7 @@ import {
 } from '../render/navigationCoreTrail';
 import { resolveTrailGridPathWithHead } from '../render/trailHeadPath';
 import { buildDeviceSnappedTrailPath } from '../render/trailDeviceSnap';
+import { resolveCappedBackingResolution } from '../render/canvasBackingBudget';
 import { resolveEndpointRingBlend } from '../render/playerRingMorph';
 import { TrailPerfectPathCache } from '../render/trailPerfectPathCache';
 import { observeTrailFrameCost, shouldRebuildTrail, type TrailDrawRecord } from '../render/trailRedrawGate';
@@ -10555,9 +10556,11 @@ export class MenuScene extends Phaser.Scene {
     const width = Math.max(1, Math.ceil(bounds.width));
     const height = Math.max(1, Math.ceil(bounds.height));
     const zoomScale = Math.max(1, this.boardZoomContainer.scaleX, this.boardZoomContainer.scaleY);
-    const resolution = Math.min(
-      MAZER_CANVAS_RESOLUTION_MAX * 2,
-      resolveMazerCanvasResolution() * zoomScale
+    // MAZER-PERF-006: the pixel count is capped (src/render/canvasBackingBudget.ts); 1x, 2x and small canvases are untouched.
+    const resolution = resolveCappedBackingResolution(
+      width,
+      height,
+      Math.min(MAZER_CANVAS_RESOLUTION_MAX * 2, resolveMazerCanvasResolution() * zoomScale)
     );
     const backingWidth = Math.max(1, Math.ceil(width * resolution));
     const backingHeight = Math.max(1, Math.ceil(height * resolution));
