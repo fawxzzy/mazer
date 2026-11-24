@@ -79,7 +79,7 @@ describe('MenuScene wiring: pause card', () => {
       section.collapsible ? [section.title as string] : section.rows.map((row) => row.id)
     ));
     // MAZER-UI-095: Guide, Sound and Quit moved to the in-game Menu dropdown (legacyPlayMenu.ts).
-    expect(ids).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+    expect(ids).toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
     expect(model.title).toBe('Settings');
     // Close pill removed (Zac, 2026-11-06): Resume is the exit, so the painter draws no separate close control.
     expect('close' in model).toBe(false);
@@ -116,7 +116,7 @@ describe('MenuScene wiring: pause card', () => {
     expect(scene).toContain("if (kind === 'pause') {\n      this.playMenuView = resolveLegacyPlayMenuOpenView('menu');");
     expect(pause).toContain('if (this.isLegacyPlayMenuDropdownView()) {\n      this.buildLegacyPlayMenuOverlay();');
     expect(buildLegacySettingsSheetPlan({ context: 'pause', height: 844, width: 390 }).items.map((item) => item.model.id))
-      .toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor']);
+      .toEqual(['resume', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);
   });
 
   test('uses existing tokens only (no new free hex colours) and 44 px minimum actions', () => {
