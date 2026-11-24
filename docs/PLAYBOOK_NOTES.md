@@ -722,3 +722,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: any FK to auth.users needs `lock_timeout` in the same transaction and an entry in the delete manifest before it ships; hash and apply LF bytes only.
 - Evidence: pglite 82 checks, plus the PG 17.9 `scratch-pg.mjs pair` run with the non-superuser runner (round 3 review required it), plus the standard preimage pack; logs are committed as `.txt` (the `.log` extension is gitignored).
 - Not checked: any database apply, concurrency under real lock contention, a real phone. No client code changed.
+## 2026-11-24 Guide option C (Icon glossary) ships as THE Guide
+
+- WHAT: the Guide sheet is now a 4-column icon glossary (new legacyGuideGlossaryPainter.ts): one tile per row (the same Star Dust icon draws as the board), tap a tile to read its copy in the detail panel below, kit primary Got it footer. Rows still come from legacyGuideContent.ts; hazard rows stay flag-gated and the keyboard line still shows on keyboard devices. New row menu-play ("In a maze", 81 chars) covers the in-run menu (Resume = X, Reset level, Main menu). The Menu line stays 81 chars; every copy line is <= 90.
+- Scaffolding removed: the options picker bar, dark-boot bypass, variant painters and their test are deleted; src/boot/main.ts is identical to main, so no route or flag ships.
+- Tests: drift test gains a glossary-copy block (<= 90 chars, one glyph per row), sheet-plan "tall desktop" height 1300 -> 1400 (one more row), five scene-source pins retargeted from MenuScene to the painter, inventory test and doc gain the menu-play row, capture script expects "In a maze".
+- Baseline (clean origin/main 10464c39, compared, not guessed): board-sync, project-board-owner-export, playbook-adoption-evidence (2 tests) and playbook-verification-report fail the same way there; unrelated and untouched here.
+- Checked: phone-shot chromium and webkit at 390x844, 320x568, 820x1180, default and dark, every PNG read; tile tap switches the panel; Got it closes. Not checked: a real phone.
