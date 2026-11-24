@@ -7,7 +7,9 @@ import {
 import {
   resolveHeldStepEarliestAtMs,
   resolveHeldStepFreshWaitMs,
-  resolveHeldStepRetargetWaitMs
+  resolveHeldStepRetargetWaitMs,
+  resolveKeyboardStepAnchorMs,
+  resolveKeyboardStepFloorBaseMs
 } from '../../src/legacy-runtime/legacyHeldStepCadence';
 import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
 import {
@@ -264,5 +266,59 @@ describe('held-step cadence rules', () => {
     expect(resolveHeldStepFreshWaitMs(2000, 50, 1000, 151)).toBe(50);
     expect(resolveHeldStepFreshWaitMs(2000, 50, null, 151)).toBe(50);
     expect(resolveHeldStepFreshWaitMs(Number.NaN, 50, 1000, 151)).toBe(50);
+  });
+});
+
+describe('MAZER-CTRL-005 keyboard step anchor (held keys chain off the ideal step time)', () => {
+  const MAX_LATE = 24;
+
+  it('anchor: a step that fires a frame late is credited to its ideal time, so lateness does not compound', () => {
+    // Last ideal step at 1000, interval 151 -> next ideal 1151; the key repeat lands at 1160 (9 ms late).
+    expect(resolveKeyboardStepAnchorMs(1160, 1000, 1000, 151, MAX_LATE)).toBe(1151);
+    // Exactly on time.
+    expect(resolveKeyboardStepAnchorMs(1151, 1000, 1000, 151, MAX_LATE)).toBe(1151);
+  });
+
+  it('anchor: a step later than the max-late window, or earlier than ideal, or after a pause, anchors at now', () => {
+    expect(resolveKeyboardStepAnchorMs(1151 + MAX_LATE + 1, 1000, 1000, 151, MAX_LATE)).toBe(1151 + MAX_LATE + 1);
+    expect(resolveKeyboardStepAnchorMs(1100, 1000, 1000, 151, MAX_LATE)).toBe(1100);
+    expect(resolveKeyboardStepAnchorMs(5000, 1000, 1000, 151, MAX_LATE)).toBe(5000);
+  });
+
+  it('anchor: the first step, a bad interval or no history anchor at now', () => {
+    expect(resolveKeyboardStepAnchorMs(500, null, null, 151, MAX_LATE)).toBe(500);
+    expect(resolveKeyboardStepAnchorMs(500, 400, 400, 0, MAX_LATE)).toBe(500);
+    expect(resolveKeyboardStepAnchorMs(500, 400, 400, Number.NaN, MAX_LATE)).toBe(500);
+  });
+
+  it('floor base: the anchor replaces the real step time only when it is the same step and within the late window', () => {
+    // Real step at 1009 (9 ms late of ideal 1000) -> floor counts from the ideal time.
+    expect(resolveKeyboardStepFloorBaseMs(1009, 1000, MAX_LATE)).toBe(1000);
+    // Anchor older than the real step (a different step took place since) -> real time.
+    expect(resolveKeyboardStepFloorBaseMs(1009, 1010, MAX_LATE)).toBe(1009);
+    // Real step far past its anchor (the anchor is stale) -> real time.
+    expect(resolveKeyboardStepFloorBaseMs(1100, 1000, MAX_LATE)).toBe(1100);
+    expect(resolveKeyboardStepFloorBaseMs(1009, null, MAX_LATE)).toBe(1009);
+    expect(resolveKeyboardStepFloorBaseMs(null, 1000, MAX_LATE)).toBeNull();
+  });
+
+  it('a held key on a 60 Hz frame grid keeps the profile interval instead of rounding up to the next frame each step', () => {
+    const interval = 151;
+    const frame = 1000 / 60;
+    let anchor: number | null = null;
+    let last: number | null = null;
+    const steps: number[] = [];
+    // Each step is allowed on the first frame at or past (base + interval).
+    let now = 0;
+    for (let i = 0; i < 40; i += 1) {
+      const base = last === null ? null : resolveKeyboardStepFloorBaseMs(last, anchor, MAX_LATE);
+      const due = base === null ? now : base + interval;
+      now = Math.ceil(due / frame - 1e-9) * frame;
+      anchor = resolveKeyboardStepAnchorMs(now, last, anchor, interval, MAX_LATE);
+      last = now;
+      steps.push(now);
+    }
+    const period = (steps[steps.length - 1]! - steps[0]!) / (steps.length - 1);
+    expect(Math.abs(period - interval)).toBeLessThan(1);
   });
 });

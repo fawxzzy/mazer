@@ -3,7 +3,7 @@
  *
  * Today's floating stick plants its centre (the "anchor") where the thumb lands and never moves it, so a long drag
  * leaves the hand far from the anchor and a reversal needs the finger to travel all the way back. This controller
- * keeps the same anchor-at-touch-down, but once the finger is farther than the LEASH (about 90 CSS px on a phone)
+ * keeps the same anchor-at-touch-down, but once the finger is farther than the LEASH (56 CSS px on a phone)
  * the anchor is dragged along behind the finger:
  *
  *   excess = max(0, distance(anchor, finger) - leash)
@@ -16,7 +16,7 @@
  *
  * MAZER-CTRL-003 option B (Zac picked it 2026-11-19, docs/ops/MAZER-CONTROLS-OPTIONS-2026-11-19.html): this is now the
  * default stick. The device-local Settings toggle stays (see legacyFloatingAnchorPreference.ts) so a player can switch
- * back to the fixed anchor; the leash is the options page's B default (90 px), still unfelt on a real phone. Tune with `npx vite-node scripts/legacy/floating-anchor-harness.ts` (prints trajectories for scripted paths).
+ * back to the fixed anchor; the leash is 56 px (MAZER-CTRL-005; was the options page's 90 px guess), still unfelt on a real phone. Tune with `npx vite-node scripts/legacy/floating-anchor-harness.ts` (prints trajectories for scripted paths).
  */
 
 export interface FloatingAnchorPoint {
@@ -34,11 +34,15 @@ export interface FloatingAnchorConfig {
 }
 
 /**
- * Option B's 90 px leash, as inches on a phone-class screen (90 / 160 CSS px per inch, about 0.56 in): close to the
- * contract's "a reversal costs no more than about 0.4 inch" goal while a normal one-tile drag never moves the anchor.
+ * The leash, as inches on a phone-class screen: 56 / 160 CSS px per inch = 0.35 in = 56 CSS px (MAZER-CTRL-005).
+ * Option B's first guess was 90 px; the floating-anchor harness (quick-reversal, 160 px/in) put a reversal at 1.08 in with
+ * 90 px and 0.92 in with 56 px, and a reversal costs roughly the leash plus the dead zone (12 px), so 90 px was 102 px
+ * of thumb travel back. 56 px is the smallest leash that is still no smaller than the stick's max pull radius on every
+ * screen (33 px on a 393 px phone, 56 px on an iPad: deadzone + 0.6 * (ring radius - deadzone)), so the thumb can still
+ * pull the full distance before the anchor starts to follow, and a normal one-tile drag never moves the anchor.
  * Kept as a named constant so the harness and tests can vary it.
  */
-export const FLOATING_ANCHOR_LEASH_INCHES = 90 / 160;
+export const FLOATING_ANCHOR_LEASH_INCHES = 56 / 160;
 export const FLOATING_ANCHOR_EASE_MS = 140;
 export const FLOATING_ANCHOR_MAX_STEP_MS = 100;
 

@@ -5,7 +5,7 @@
  *
  * VISUAL ONLY. Nothing here feeds movement. The game still resolves every pull to an axis exactly as before
  * (src/input-human/touch.ts resolveStickMovementIntent: the larger of |dx| and |dy| wins, the other axis is the
- * fallback candidate), with the same floating anchor (90 px leash, 140 ms ease), the same constant speed and the
+ * fallback candidate), with the same floating anchor (56 px leash, 140 ms ease), the same constant speed and the
  * same Arrows setting. The lit sector is a read of the TRUE drag angle in 8 sectors of 45 degrees:
  *  - a cardinal sector (right, down, left, up) is lit while the pull is within 22.5 degrees of that axis; there the
  *    game's primary axis is always that same axis;

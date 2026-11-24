@@ -21,7 +21,8 @@ type Scene = Record<string, unknown> & {
 const proto = MenuScene.prototype as unknown as Record<string, (...args: unknown[]) => unknown>;
 const call = <T>(scene: Scene, name: string, ...args: unknown[]): T => proto[name]!.call(scene, ...args) as T;
 
-const STICK_REPEAT_MS = 122;
+// MAZER-CTRL-005: the stick repeats at the keyboard interval (no stick cap on the repeat).
+const STICK_REPEAT_MS = 151;
 const KEYBOARD_REPEAT_MS = 151;
 
 const createScene = () => {

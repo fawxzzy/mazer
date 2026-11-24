@@ -1276,9 +1276,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay('repeat')");
     expect(menuSceneSource).toContain('repeatInitialDelayMs: movementSpeedProfile.initialDelayMs');
     expect(menuSceneSource).toContain('repeatIntervalMs: movementSpeedProfile.repeatIntervalMs');
-    expect(menuSceneSource).toContain('stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS');
+    // MAZER-CTRL-005: the stick has no repeat-interval cap; it steps at the keyboard pace.
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS');
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
-    expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
+    expect(menuSceneSource).toContain('movementDelayMs = profile.repeatIntervalMs;');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
     // The compass idea, and later the timer that took its old centered top
     // HUD slot, were both removed from the app entirely -- no HUD timer

@@ -274,21 +274,24 @@ describe('edge marker stations', () => {
     }
   });
 
-  test('the scene feeds the stations the viewport plus the bottom safe area (rounding signal and bottom corner band, read only in edgeCornerAnchor.ts), no header-control avoidance', () => {
+  test('the scene feeds the stations the viewport plus the bottom, left and right safe areas (rounding signal and bottom corner band, read only in edgeCornerAnchor.ts), no header-control avoidance', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const start = source.indexOf('private resolveLegacyEdgeStations()');
-    const body = source.slice(start, source.indexOf('\n  }', start));
+    const body = source.slice(start, source.indexOf('\n  }', start)).replace(/\s+/g, ' ');
     // The viewport size plus the canvas resolution (which only decides where the backing store ends): MAZER-VIS-043. MAZER-VIS-056:
     // the bottom safe area tells edgeCornerAnchor.ts the bottom corners are rounded display corners. MAZER-VIS-068: it also lifts the two
     // bottom CORNER stars clear of that band (edgeCornerAnchor.ts resolveEdgeCornerBottomHiddenBand); it never moves any other station.
-    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height, safeAreaBottom: readMazerViewportGeometry().safeArea.bottom }, resolveMazerCanvasResolution());');
-    expect(body).not.toMatch(/safeArea\.(top|left|right)/);
+    // MAZER-VIS-057: the left and right safe areas only tell edgeCornerAnchor.ts a short landscape view is a notch-class phone (its top
+    // corners are rounded display corners too); the top safe area is still never read.
+    expect(body).toContain('const safeArea = readMazerViewportGeometry().safeArea;');
+    expect(body).toContain('return resolveEdgeStations({ width: this.layout.width, height: this.layout.height, safeAreaBottom: safeArea.bottom, safeAreaLeft: safeArea.left, safeAreaRight: safeArea.right }, resolveMazerCanvasResolution());');
+    expect(body).not.toMatch(/safeArea\.top/);
     expect(body).not.toContain('resolveHeaderControlRects');
     const markers = readFileSync(resolve(process.cwd(), 'src/render/edgeMarkers.ts'), 'utf8');
     expect(markers).not.toContain('clearStationOfControls');
     expect(markers).not.toContain('resolveHeaderControlRects');
     // Only the declared field: edgeMarkers.ts never reads or subtracts a safe area itself (edgeCornerAnchor.ts interprets it).
-    expect(markers).not.toMatch(/safeArea(?!Bottom\?: number;)/);
+    expect(markers).not.toMatch(/safeArea(?!(Bottom|Left|Right)\?: number;)/);
   });
 
 

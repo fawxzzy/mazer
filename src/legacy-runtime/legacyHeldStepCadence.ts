@@ -87,3 +87,48 @@ export const resolveHeldStepRetargetWaitMs = (input: HeldStepRetargetInput): num
   }
   return null;
 };
+
+/**
+ * MAZER-CTRL-005 (2026-11-23): the keyboard's step floor, chained off the previous step's IDEAL time instead of the
+ * time it actually landed, exactly like the held-touch repeat (legacyRepeatCadence.ts). A step lands on a frame
+ * boundary, so measuring the next interval from the late landing compounded the lateness into the period: a 151 ms
+ * interval really stepped every 166.7 ms at 60 Hz (6.0 cells/s against the 6.6 the setting says), while the stick
+ * stepped every 151. One pace for both inputs needs one rule.
+ *
+ * `anchorAtMs` is the ideal time of the last keyboard step (null when there is none). It only counts while the last
+ * accepted step of ANY input landed within `maxLateMs` of it; otherwise the real landing time wins (a stick step, a
+ * hitch, a stall or a long rest re-anchors the cadence, never bursts to catch up).
+ */
+export const resolveKeyboardStepFloorBaseMs = (
+  lastStepAtMs: number | null,
+  anchorAtMs: number | null,
+  maxLateMs: number
+): number | null => {
+  if (!isFiniteNumber(lastStepAtMs)) {
+    return null;
+  }
+  if (isFiniteNumber(anchorAtMs) && lastStepAtMs >= anchorAtMs && lastStepAtMs - anchorAtMs <= maxLateMs) {
+    return anchorAtMs;
+  }
+  return lastStepAtMs;
+};
+
+/**
+ * The anchor to remember after a keyboard step lands at `nowMs`: the time the step was first allowed (its ideal time)
+ * when it landed within `maxLateMs` of that, otherwise `nowMs` itself.
+ */
+export const resolveKeyboardStepAnchorMs = (
+  nowMs: number,
+  lastStepAtMs: number | null,
+  anchorAtMs: number | null,
+  repeatIntervalMs: number,
+  maxLateMs: number
+): number => {
+  const base = resolveKeyboardStepFloorBaseMs(lastStepAtMs, anchorAtMs, maxLateMs);
+  if (base === null || !isFiniteNumber(repeatIntervalMs) || repeatIntervalMs <= 0) {
+    return nowMs;
+  }
+  const idealAtMs = base + repeatIntervalMs;
+  const lateMs = nowMs - idealAtMs;
+  return lateMs >= 0 && lateMs <= maxLateMs ? idealAtMs : nowMs;
+};

@@ -702,7 +702,12 @@ import {
   scaleLegacyMovementDelayMs
 } from '../legacy-runtime/legacyMovementSpeed';
 import { resolveDriftCorrectedRepeatWaitMs, resolveRepeatMaxLateMs } from '../legacy-runtime/legacyRepeatCadence';
-import { resolveHeldStepFreshWaitMs, resolveHeldStepRetargetWaitMs } from '../legacy-runtime/legacyHeldStepCadence';
+import {
+  resolveHeldStepFreshWaitMs,
+  resolveHeldStepRetargetWaitMs,
+  resolveKeyboardStepAnchorMs,
+  resolveKeyboardStepFloorBaseMs
+} from '../legacy-runtime/legacyHeldStepCadence';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -1604,11 +1609,13 @@ const LEGACY_OVERLAY_SCROLL_MOMENTUM_FRICTION_PER_MS = 0.994;
 const LEGACY_OVERLAY_SCROLL_MOMENTUM_STOP_PX_PER_MS = 0.02;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
+// Held-key repeats are rate-limited by the step floor, not by the OS key-repeat grid: the gate only drops event floods.
+const LEGACY_PLAY_KEYBOARD_REPEAT_GATE_MIN_MS = 42;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
-// Stick caps follow the same owner-requested step-rate factor as the profile, or stick players would see no change.
+// Stick caps on the hold-start and turn delays follow the same owner-requested step-rate factor as the profile. The stick has
+// NO cap on the repeat interval (MAZER-CTRL-005): at full deflection it steps at the keyboard pace, profile.repeatIntervalMs.
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
-const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = scaleLegacyMovementDelayMs(104);
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = scaleLegacyMovementDelayMs(144);
 const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;
 const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;
@@ -1940,6 +1947,8 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchRepeatFiredDueAtMs: number | null = null;
   // When the last accepted play step landed: a fresh step never comes sooner than one interval after it (legacyHeldStepCadence.ts).
   private lastLegacyPlayStepAtMs: number | null = null;
+  // The ideal time of the last keyboard step, so keyboard steps chain off it like the held-touch repeat (MAZER-CTRL-005).
+  private lastLegacyPlayKeyboardStepAnchorMs: number | null = null;
   private playKeyboardBufferedVector: { deltaX: number; deltaY: number } | null = null;
   private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
@@ -3956,7 +3965,8 @@ export class MenuScene extends Phaser.Scene {
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
             stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
             stickPointerActive: this.playTouchStickPointerId !== null,
-            stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS,
+            // MAZER-CTRL-005: the stick has no repeat cap any more; its ceiling is the profile interval itself.
+            stickRepeatIntervalMaxMs: movementSpeedProfile.repeatIntervalMs,
             stickRetargetDelayMs: LEGACY_PLAY_STICK_RETARGET_STEP_MS,
             stickTurnDelayMaxMs: LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS,
             turnDelayMs: movementSpeedProfile.turnDelayMs,
@@ -5010,7 +5020,7 @@ export class MenuScene extends Phaser.Scene {
     if (
       action === null
       || !this.playKeyboardRepeatGate.accept(action, this.time.now, {
-        moveRepeatMinIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs
+        moveRepeatMinIntervalMs: LEGACY_PLAY_KEYBOARD_REPEAT_GATE_MIN_MS
       })
     ) {
       return true;
@@ -5037,7 +5047,11 @@ export class MenuScene extends Phaser.Scene {
     return resolveHeldStepFreshWaitMs(
       this.time.now,
       delayMs,
-      this.lastLegacyPlayStepAtMs,
+      resolveKeyboardStepFloorBaseMs(
+        this.lastLegacyPlayStepAtMs,
+        this.lastLegacyPlayKeyboardStepAnchorMs ?? null,
+        resolveRepeatMaxLateMs(this.game?.loop?.actualFps ?? 60)
+      ),
       this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs
     );
   }
@@ -5478,9 +5492,8 @@ export class MenuScene extends Phaser.Scene {
           : profile.initialDelayMs;
         break;
       case 'repeat':
-        movementDelayMs = stickActive
-          ? Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)
-          : profile.repeatIntervalMs;
+        // One pace for every input (MAZER-CTRL-005): the stick repeats at the keyboard interval.
+        movementDelayMs = profile.repeatIntervalMs;
         break;
       case 'turn':
         movementDelayMs = stickActive
@@ -5547,11 +5560,9 @@ export class MenuScene extends Phaser.Scene {
   // already uses) keeps it honest at every speed instead of only the one it
   // happened to be tuned for.
   private resolveLegacyPlayerVisualMoveDurationMs(): number {
-    // Derived from the live repeat interval (stick-capped) and never longer than it; see playerMotionTiming.ts.
+    // Derived from the live repeat interval (the same for keyboard and stick) and never longer than it; see playerMotionTiming.ts.
     return resolvePlayerGlideDurationMs({
-      repeatIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs,
-      stickActive: this.playTouchStickPointerId !== null,
-      stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS
+      repeatIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs
     });
   }
 
@@ -5857,7 +5868,16 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.tryMovePlayerFromInput(deltaX, deltaY);
+    const anchorMs = resolveKeyboardStepAnchorMs(
+      this.time.now,
+      this.lastLegacyPlayStepAtMs,
+      this.lastLegacyPlayKeyboardStepAnchorMs ?? null,
+      this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs,
+      resolveRepeatMaxLateMs(this.game?.loop?.actualFps ?? 60)
+    );
+    if (this.tryMovePlayerFromInput(deltaX, deltaY)) {
+      this.lastLegacyPlayKeyboardStepAnchorMs = anchorMs;
+    }
   }
 
   private handleOverlayFieldInput(event: KeyboardEvent): boolean {
@@ -9214,7 +9234,14 @@ export class MenuScene extends Phaser.Scene {
   // ONLY (no safe area, no header-control avoidance): the kites sit behind all UI.
   private resolveLegacyEdgeStations(): ReadonlyArray<EdgeStation> {
     // The painted canvas ends at round(css * resolution) / resolution: the diamonds' outer tips touch THAT edge (MAZER-VIS-043).
-    return resolveEdgeStations({ width: this.layout.width, height: this.layout.height, safeAreaBottom: readMazerViewportGeometry().safeArea.bottom }, resolveMazerCanvasResolution());
+    const safeArea = readMazerViewportGeometry().safeArea;
+    return resolveEdgeStations({
+      width: this.layout.width,
+      height: this.layout.height,
+      safeAreaBottom: safeArea.bottom,
+      safeAreaLeft: safeArea.left,
+      safeAreaRight: safeArea.right
+    }, resolveMazerCanvasResolution());
   }
 
   // All 8 beams, both directions, in one place. Drawn into spawnLaserGraphics
