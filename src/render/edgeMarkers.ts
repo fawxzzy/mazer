@@ -104,6 +104,9 @@ export interface EdgeViewport {
   readonly height: number;
   /** env(safe-area-inset-bottom), css px (viewportGeometry.ts). > 0: the bottom corners are rounded display corners (MAZER-VIS-056). */
   readonly safeAreaBottom?: number;
+  /** env(safe-area-inset-left / right), css px: with a short landscape viewport they mark a notch-class phone whose top corners are rounded too (MAZER-VIS-057). */
+  readonly safeAreaLeft?: number;
+  readonly safeAreaRight?: number;
 }
 
 export interface EdgeStation {

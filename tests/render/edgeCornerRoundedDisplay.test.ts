@@ -6,6 +6,7 @@ import {
   EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX,
   EDGE_CORNER_ROUNDED_TIP_INSET_PX,
   hasRoundedBottomCorners,
+  isRoundedLandscapePhoneViewport,
   resolveEdgeCornerBottomHiddenBand,
   resolveEdgeCornerBottomTipInset,
   resolveEdgeCornerTipInset,
@@ -410,4 +411,160 @@ describe('bottom corner stars clear the real (continuous, up to R66) display cor
       }
     }
   }, 60_000);
+});
+
+/**
+ * MAZER-VIS-057: corner stars on landscape phones and iPads. A landscape iPhone hides the status bar, so all four canvas corners are
+ * rounded display corners (portrait only has the bottom two); the page reports that as a safe area (home indicator at the bottom,
+ * the notch side left or right). The top stars used the square-corner rule (inset 0) while the bottom pair cleared R66, so on a
+ * landscape phone the top pair was cut off and the pair placement disagreed. iPads keep the square top corners (their status bar stays
+ * on screen) but report a bottom safe area, so their bottom pair already clears it (VIS-068).
+ */
+const LANDSCAPE_PHONES = [
+  { name: 'iPhone 14 landscape 844x390', width: 844, height: 390, safeAreaBottom: 21, safeAreaLeft: 47, safeAreaRight: 47 },
+  { name: 'iPhone 16 landscape 852x393', width: 852, height: 393, safeAreaBottom: 21, safeAreaLeft: 59, safeAreaRight: 59 },
+  { name: 'iPhone 16 Pro Max landscape 932x430', width: 932, height: 430, safeAreaBottom: 21, safeAreaLeft: 59, safeAreaRight: 59 },
+  { name: 'iPhone SE-class notch side only 812x375', width: 812, height: 375, safeAreaBottom: 0, safeAreaLeft: 44, safeAreaRight: 0 },
+  { name: 'home indicator only 844x390', width: 844, height: 390, safeAreaBottom: 21, safeAreaLeft: 0, safeAreaRight: 0 }
+] as const;
+const IPADS = [
+  { name: 'iPad portrait 820x1180', width: 820, height: 1180, safeAreaBottom: 20 },
+  { name: 'iPad landscape 1180x820', width: 1180, height: 820, safeAreaBottom: 20 },
+  { name: 'iPad Pro 13 landscape 1366x1024', width: 1366, height: 1024, safeAreaBottom: 20 },
+  { name: 'iPad mini portrait 744x1133', width: 744, height: 1133, safeAreaBottom: 20 }
+] as const;
+const ALL_CORNERS: ReadonlyArray<ScreenCorner> = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+
+const cornerDepth = (points: ReadonlyArray<Point>, viewport: Viewport, radius: number, corners: ReadonlyArray<ScreenCorner>): number => Math.max(
+  ...corners.flatMap((corner) => points.map((point) => (
+    resolveContinuousCornerHiddenDepth(toCornerLocal(point, corner, viewport.width, viewport.height), radius)
+  )))
+);
+
+const isCornerStation = (station: EdgeStation): boolean => station.isCorner;
+
+describe('MAZER-VIS-057 landscape phones and iPads', () => {
+  test.each(LANDSCAPE_PHONES)('$name: a landscape phone with a safe area has rounded top corners too, with the same tip inset as the bottom', (phone) => {
+    const viewport = { ...phone };
+    expect(isRoundedLandscapePhoneViewport(viewport)).toBe(true);
+    expect(resolveEdgeCornerTipInset(viewport)).toBe(EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX);
+    const stations = resolveEdgeStations(viewport);
+    const top = stations.filter((station) => isCornerStation(station) && station.side === 'top');
+    const bottom = stations.filter((station) => isCornerStation(station) && station.side === 'bottom');
+    expect(top).toHaveLength(2);
+    expect(bottom).toHaveLength(2);
+    for (const station of [...top, ...bottom]) {
+      // Whole-screen symmetry of the side inset: every corner star sits the same distance from its side edge.
+      expect(Math.min(station.x, phone.width - station.x), `station ${station.id} side inset`).toBeCloseTo(top[0]!.x, 6);
+    }
+    // The top stars sit the shared tip inset from the top edge (the bottom stars rise further for the home indicator, VIS-068).
+    const polygon = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(top[0]!, 1), 1);
+    expect(Math.min(...polygon.map((point) => point.y)), 'top star tip distance from the top edge').toBeGreaterThanOrEqual(EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX - 1.5);
+  });
+
+  test.each(LANDSCAPE_PHONES)('$name: at rest, 75% and 100% no painted point of any corner star is hidden by a continuous R48-R66 corner, inside the canvas', (phone) => {
+    const viewport = { ...phone };
+    const stations = resolveEdgeStations(viewport).filter(isCornerStation);
+    expect(stations).toHaveLength(4);
+    for (const station of stations) {
+      for (const scale of SCALES) {
+        const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
+        const samples = polygonSamples(painted);
+        const label = `station ${station.id}@${scale}`;
+        expectInsideCanvas(painted, viewport, label);
+        for (const radius of CONTINUOUS_RADII) {
+          expect(cornerDepth(samples, viewport, radius, ALL_CORNERS), `${label} continuous R${radius}`).toBeLessThanOrEqual(0);
+        }
+        if (phone.safeAreaBottom > 0 && station.side === 'bottom') {
+          expect(Math.max(...painted.map((point) => point.y)), `${label} above the bottom safe area`).toBeLessThanOrEqual(phone.height - phone.safeAreaBottom);
+        }
+      }
+    }
+  });
+
+  test.each(LANDSCAPE_PHONES)('$name: across the whole orbit lap no corner-area star is hidden by a continuous R66 corner or leaves the canvas', (phone) => {
+    const viewport = { ...phone };
+    let checks = 0;
+    for (let index = 0; index <= 360; index += 1) {
+      const phase = (index / 360) * Math.PI * 2;
+      for (const station of resolveOrbitingEdgeStations(viewport, phase)) {
+        const box = (EDGE_CORNER_DISPLAY_RADIUS_PX * 1.53) + 16;
+        const nearSide = station.x < box || phone.width - station.x < box;
+        const nearTopOrBottom = station.y < box || phone.height - station.y < box;
+        if (!nearSide || !nearTopOrBottom) {
+          continue;
+        }
+        for (const scale of SCALES) {
+          const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
+          const label = `phase ${phase.toFixed(4)} id ${station.id}@${scale}`;
+          expectInsideCanvas(painted, viewport, label);
+          expect(cornerDepth(painted, viewport, EDGE_CORNER_DISPLAY_RADIUS_PX, ALL_CORNERS), label).toBeLessThanOrEqual(0);
+          checks += 1;
+        }
+      }
+    }
+    expect(checks).toBeGreaterThan(200);
+  }, 60_000);
+
+  test.each(LANDSCAPE_PHONES)('$name: real pixels at DPR 3: no lit pixel of a corner star (rest and full size) lies in a hidden R66 corner', (phone) => {
+    const viewport = { ...phone };
+    const resolution = resolveMazerCanvasResolution(3);
+    const stations = resolveEdgeStations(viewport, resolution).filter(isCornerStation);
+    for (const station of stations) {
+      for (const scale of [EDGE_DIAMOND_REST_SCALE, 1]) {
+        const lit = litPixelCentres(station, scale, resolution);
+        expect(lit.length, `id ${station.id}@${scale} lit`).toBeGreaterThan(20);
+        const hidden = lit.filter((centre) => (
+          cornerDepth([centre], viewport, EDGE_CORNER_DISPLAY_RADIUS_PX, ALL_CORNERS) > 0
+          || centre.x < 0 || centre.y < 0 || centre.x > phone.width || centre.y > phone.height
+        ));
+        expect(hidden.length, `id ${station.id}@${scale}`).toBe(0);
+      }
+    }
+  }, 60_000);
+
+  test('a landscape window that reports no safe area, desktop, small phones and tablets keep the square top corners', () => {
+    for (const viewport of [
+      { width: 844, height: 390 },
+      { width: 844, height: 390, safeAreaBottom: 0, safeAreaLeft: 0, safeAreaRight: 0 },
+      { width: 844, height: 390, safeAreaBottom: Number.NaN },
+      { width: 1280, height: 720 },
+      { width: 1280, height: 720, safeAreaBottom: 0 },
+      { width: 1920, height: 1080, safeAreaLeft: 0, safeAreaRight: 0 }
+    ]) {
+      expect(isRoundedLandscapePhoneViewport(viewport), JSON.stringify(viewport)).toBe(false);
+      expect(resolveEdgeCornerTipInset(viewport), JSON.stringify(viewport)).toBe(0);
+    }
+    // A portrait phone with a bottom safe area is not a landscape phone: its top corners keep the VIS-054 rule.
+    expect(isRoundedLandscapePhoneViewport({ width: 390, height: 844, safeAreaBottom: 34 })).toBe(false);
+    expect(resolveEdgeCornerTipInset({ width: 390, height: 844, safeAreaBottom: 34 })).toBe(EDGE_CORNER_ROUNDED_TIP_INSET_PX);
+    // A tablet reports a bottom safe area in landscape but is not a phone: the top stars stay on the corner.
+    for (const ipad of IPADS) {
+      expect(isRoundedLandscapePhoneViewport(ipad), ipad.name).toBe(false);
+    }
+  });
+
+  test.each(IPADS)('$name: the top stars stay on the square corner, the bottom stars clear the home-indicator band, nothing leaves the canvas', (ipad) => {
+    const viewport = { width: ipad.width, height: ipad.height, safeAreaBottom: ipad.safeAreaBottom };
+    expect(resolveEdgeCornerTipInset(viewport)).toBe(0);
+    const stations = resolveEdgeStations(viewport);
+    for (const station of stations.filter(isCornerStation)) {
+      for (const scale of SCALES) {
+        const painted = resolveEdgeMarkerPaintedPolygon(anchorStationToOuterTip(station, scale), scale);
+        const label = `${ipad.name} station ${station.id}@${scale}`;
+        expectInsideCanvas(painted, viewport, label);
+        if (station.side === 'bottom') {
+          expect(Math.max(...painted.map((point) => point.y)), `${label} above the bottom safe area`).toBeLessThanOrEqual(ipad.height - ipad.safeAreaBottom);
+          expect(cornerDepth(painted, viewport, EDGE_CORNER_DISPLAY_RADIUS_PX, BOTTOM_CORNERS), `${label} R66`).toBeLessThanOrEqual(0);
+        } else {
+          // Square top corners: the tip is on the corner, as before.
+          expect(Math.min(...painted.map((point) => point.y)), `${label} top`).toBeGreaterThanOrEqual(-1e-9);
+        }
+      }
+    }
+    // Left and right pairs mirror each other.
+    const [left, right] = [stations[4]!, stations[6]!].sort((a, b) => a.x - b.x) as [EdgeStation, EdgeStation];
+    expect(left.x).toBeCloseTo(ipad.width - right.x, 6);
+    expect(left.y).toBeCloseTo(right.y, 6);
+  });
 });

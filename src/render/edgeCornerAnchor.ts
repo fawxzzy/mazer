@@ -40,6 +40,9 @@ export interface EdgeCornerViewport {
    * view runs down to a home-indicator display edge, so its BOTTOM corners are the phone's physical rounded corners (MAZER-VIS-056).
    */
   readonly safeAreaBottom?: number;
+  /** env(safe-area-inset-left / right), css px. Only used to tell a landscape phone with a notch-class display from a square-cornered one (MAZER-VIS-057). */
+  readonly safeAreaLeft?: number;
+  readonly safeAreaRight?: number;
 }
 
 /**
@@ -68,14 +71,39 @@ export const isRoundedDisplayViewport = (viewport?: EdgeCornerViewport): boolean
   && viewport.height >= EDGE_CORNER_ROUNDED_MIN_HEIGHT_PX
 );
 
+/** MAZER-VIS-057: a landscape viewport shorter than this (css px) is a phone, not a tablet or a desktop window (iPhone Pro Max is 430 tall in landscape, the smallest iPad 744). */
+export const EDGE_CORNER_LANDSCAPE_PHONE_MAX_HEIGHT_EXCLUSIVE_PX = 500;
+
+const isPositiveFinite = (value: number | undefined): boolean => value !== undefined && Number.isFinite(value) && value > 0;
+
+/**
+ * MAZER-VIS-057: true for a LANDSCAPE phone whose page reports any safe-area inset (bottom home indicator, or the left/right notch side).
+ * A landscape iPhone hides the status bar, so the canvas runs to the top edge and ALL FOUR canvas corners are the display's rounded
+ * corners, not just the bottom two (portrait keeps its status bar above the canvas, VIS-056). The measured safe area is the signal
+ * (as in VIS-056/068); a landscape window that reports none (desktop, browser tab, square-cornered phone, tests) is unchanged. iPads
+ * (landscape height >= 500) are excluded: their status bar stays on screen, so their top corners keep the square-corner rule.
+ */
+export const isRoundedLandscapePhoneViewport = (viewport?: EdgeCornerViewport): boolean => (
+  viewport !== undefined
+  && Number.isFinite(viewport.width)
+  && Number.isFinite(viewport.height)
+  && viewport.width > viewport.height
+  && viewport.height < EDGE_CORNER_LANDSCAPE_PHONE_MAX_HEIGHT_EXCLUSIVE_PX
+  && (isPositiveFinite(viewport.safeAreaBottom) || isPositiveFinite(viewport.safeAreaLeft) || isPositiveFinite(viewport.safeAreaRight))
+);
+
 /**
  * Per-axis distance from the screen corner to a corner diamond's outer tip: EDGE_CORNER_ROUNDED_TIP_INSET_PX (16) on a tall
- * rounded-display phone, 0 for everything else (desktop, 360 wide and under, 375x667 square-cornered phones, landscape) and for
- * callers that pass no viewport.
+ * rounded-display phone; EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX (20, the same as the bottom stars) on a landscape phone that reports
+ * a safe area (MAZER-VIS-057: top and bottom stars are placed the same way there); 0 for everything else (desktop, 360 wide and
+ * under, 375x667 square-cornered phones, landscape windows with no safe area, iPads) and for callers that pass no viewport.
  */
-export const resolveEdgeCornerTipInset = (viewport?: EdgeCornerViewport): number => (
-  isRoundedDisplayViewport(viewport) ? EDGE_CORNER_ROUNDED_TIP_INSET_PX : EDGE_CORNER_TIP_INSET_PX
-);
+export const resolveEdgeCornerTipInset = (viewport?: EdgeCornerViewport): number => {
+  if (isRoundedLandscapePhoneViewport(viewport)) {
+    return EDGE_CORNER_ROUNDED_BOTTOM_TIP_INSET_PX;
+  }
+  return isRoundedDisplayViewport(viewport) ? EDGE_CORNER_ROUNDED_TIP_INSET_PX : EDGE_CORNER_TIP_INSET_PX;
+};
 
 /**
  * MAZER-VIS-056: true when the view's BOTTOM corners are a phone's rounded display corners. The measured signal first: a bottom safe
@@ -86,6 +114,8 @@ export const resolveEdgeCornerTipInset = (viewport?: EdgeCornerViewport): number
 export const hasRoundedBottomCorners = (viewport?: EdgeCornerViewport): boolean => (
   (viewport?.safeAreaBottom !== undefined && Number.isFinite(viewport.safeAreaBottom) && viewport.safeAreaBottom > 0)
   || isRoundedDisplayViewport(viewport)
+  // MAZER-VIS-057: a landscape phone whose only reported inset is the notch side still has rounded bottom corners.
+  || isRoundedLandscapePhoneViewport(viewport)
 );
 
 /**
