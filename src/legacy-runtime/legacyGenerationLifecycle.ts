@@ -34,6 +34,7 @@ import {
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetTarget,
+  resolveGeometryBudgetGateWrapFloor,
   resolveGeometryBudgetWrapRungs
 } from './legacyGeometryBudget';
 import { LEGACY_EMPTY_LOOP_PLAN, type LegacyLoopPlan } from './legacyMazeLoops';
@@ -639,6 +640,14 @@ export const resolveLegacyAdaptiveUnderTargetScale = (scale: number): number => 
 // plain maze still beats an off-window one, and above the 0.5 of a coin-flip landing).
 const WRAP_LOST_RANK_PENALTY = 0.75;
 
+// MAZER-GEN-031: rank of a landed base of a gate level that carries no priced gate (its wrap saves nothing, or no tile
+// can guard it): a gate outranks a coin-flip landing (0.5), a gateless landing is below 1 either way, so an on-window
+// maze without a gate still beats an off-window one.
+const GATE_MISSED_RANK_PENALTY = 0.6;
+const GATE_MISSED_TIE_RANK_PENALTY = 0.4;
+// Bases at the end of the budget that stay plain on a gate level that keeps its wrap.
+const GATE_PLAIN_FALLBACK_BASES = 4;
+
 // Selection for geometry-budget profiles (progression levels 2..LAST_BUDGET_LEVEL).
 // There is no target-complexity search and no pressure/adaptive retry: those
 // would resize the board and swap the profile, which the budget ladder forbids,
@@ -685,14 +694,19 @@ const selectLegacyGeometryBudgetMaze = (
   const profileRungs = generationProfile.requiredOppositeBorderConnections.horizontal
     ? 2
     : (generationProfile.requiredOppositeBorderConnections.vertical ? 1 : 0);
-  const wrapRungs = Math.min(
-    profileRungs,
-    Math.max(0, Math.trunc(selectionOptions.wrapRungs ?? resolveGeometryBudgetWrapRungs(feltLevel, seed)))
-  );
-  const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
   // MAZER-GEN-024: a gate level's wrap is closed until lit, so the tuner prices the gate's detour (the gate is
   // placed after tuning, on the same cadence, attachLegacyBleedGates). Other levels pass nothing: unchanged.
   const gateLevel = isBleedGateLevel(budgetLevel);
+  // MAZER-GEN-031: a gate level past the fade start keeps a wrap for its gate to guard, even where the level's
+  // profile owns none (a forced wrapRungs option is taken as given, capped by the profile, as before).
+  const gateKeepsWrap = resolveGeometryBudgetGateWrapFloor(feltLevel, gateLevel) > 0;
+  const wrapRungs = selectionOptions.wrapRungs === undefined
+    ? Math.max(
+      gateKeepsWrap ? 1 : 0,
+      Math.min(profileRungs, Math.max(0, Math.trunc(resolveGeometryBudgetWrapRungs(feltLevel, seed))))
+    )
+    : Math.min(profileRungs, Math.max(0, Math.trunc(selectionOptions.wrapRungs)));
+  const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
   const profileWithRungs = (rungs: number): LegacyMazeGenerationProfile => (
     rungs === profileRungs
       ? generationProfile
@@ -715,7 +729,9 @@ const selectLegacyGeometryBudgetMaze = (
     const candidateSeed = resolveGeometryBudgetCandidateSeed(seed, feltLevel, index);
     // The rolled wraps are tried on the first few bases only; a base that cannot land
     // with them (priced, they raise the raw target) is retried plain.
-    const baseRungs = index < GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS ? wrapRungs : 0;
+    // MAZER-GEN-031: a gate level that must keep its wrap tries wrapped bases for most of the budget (the last few
+    // bases stay plain so the ladder can still land when no wrapped base does).
+    const baseRungs = index < (gateKeepsWrap ? GEOMETRY_BUDGET_BASE_CANDIDATES - GATE_PLAIN_FALLBACK_BASES : GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS) ? wrapRungs : 0;
     const baseProfile = profileWithRungs(baseRungs);
     // Every maze is double-lured and held to the reverse floor of its level and wrap rungs
     // (legacyGeometryBudget.ts).
@@ -751,7 +767,10 @@ const selectLegacyGeometryBudgetMaze = (
     // wearing a wrap profile, so a base that carries its wrap properly is preferred; it is the choice only
     // when every base in the budget is such a maze.
     const wrapLost = (base.islandStats?.base ?? 0) > 0 && baseRungs > 0;
-    const rank = (tieBiased ? distance + 0.5 : distance) + (wrapLost ? WRAP_LOST_RANK_PENALTY : 0);
+    // MAZER-GEN-031: a gate level past the fade keeps trying bases (up to the budget) until one lands with a gate.
+    const gateMissed = gateKeepsWrap && tuned !== null && tuned.pricedBleedGate === null;
+    const gateRankPenalty = gateMissed && distance === 0 ? (tieBiased ? GATE_MISSED_TIE_RANK_PENALTY : GATE_MISSED_RANK_PENALTY) : 0;
+    const rank = (tieBiased ? distance + 0.5 : distance) + (wrapLost ? WRAP_LOST_RANK_PENALTY : gateRankPenalty);
     if (selectedMaze === null || rank < selectedRank) {
       // Only a maze that becomes the selection is assembled (route, wrap diagnostics): a base that
       // missed its window or floor is discarded for the price of the tuning alone.
@@ -761,7 +780,7 @@ const selectLegacyGeometryBudgetMaze = (
       selectedDistance = distance;
       selectedRank = rank;
     }
-    if (distance === 0 && !wrapLost && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
+    if (distance === 0 && !wrapLost && !gateMissed && (!tieBiased || index >= GEOMETRY_BUDGET_TIE_RETRY_BASES - 1)) {
       break;
     }
   }
@@ -904,7 +923,16 @@ const applyQualityPassToMaze = (
   const loopConnectors = maze.loopStats === undefined ? [] : (maze.generationBuildTrace?.decoyTiles ?? []).slice(0, maze.loopStats.cells);
   const savings = (maze.loopStats?.saved ?? 0) + (maze.wrapStats?.saved ?? 0);
   const floor = maze.reverseStats?.floor ?? 0;
-  const pass = applyMazeQualityPass(maze, level, seed, floor > 0 ? floor + savings : 0, fringe, loopConnectors);
+  // MAZER-GEN-031: on a gate level every edit must leave the gate landing again with exactly the saving it was priced at
+  // (gated and ungated), so the pass cleans the maze edit by edit and the gate's puzzle is untouched.
+  const pricedGate = gateDecidedMazes.has(maze) ? maze.bleedGates?.[0] : undefined;
+  const keepsGate = pricedGate === undefined
+    ? undefined
+    : (grid: boolean[][]): boolean => {
+      const placement = placeLegacyBleedGateWithHint({ width: maze.width, height: maze.height, grid, start: maze.start, goal: maze.goal }, pricedGate);
+      return placement !== null && placement.gate.gatedSaving === pricedGate.gatedSaving && placement.gate.ungatedSaving === pricedGate.ungatedSaving;
+    };
+  const pass = applyMazeQualityPass(maze, level, seed, floor > 0 ? floor + savings : 0, fringe, loopConnectors, keepsGate);
   if (!pass.changed) { return maze; }
   const routed = resolveLegacyShortestPath(pass.grid, maze.start, maze.goal, 'direct-floor');
   const next: Omit<LegacyMazeSnapshot, 'generation'> = { ...maze, grid: pass.grid, solutionPath: routed.found ? routed.path : maze.solutionPath };

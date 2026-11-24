@@ -131,7 +131,11 @@ export const applyMazeQualityPass = (
   keep: ReadonlyArray<{ readonly x: number; readonly y: number }> = [],
   // The tuner's loop connector cells: the savings it recorded are measured with these closed, so the maze seen with
   // them closed (felt steps, torus and planar route) is held exactly as well.
-  loopConnectors: ReadonlyArray<{ readonly x: number; readonly y: number }> = []
+  loopConnectors: ReadonlyArray<{ readonly x: number; readonly y: number }> = [],
+  // MAZER-GEN-031: one more invariant every edit must keep, checked on the grid as it would be after the edit. A gate
+  // level passes the check that its gate still lands with exactly the saving the tuner priced (legacyGenerationLifecycle.ts),
+  // so the pass runs on gate levels edit by edit instead of being thrown away whole.
+  accept?: (grid: boolean[][]) => boolean
 ): QualityPassResult => {
   const { width, height } = maze;
   const size = width * height;
@@ -143,6 +147,15 @@ export const applyMazeQualityPass = (
     for (let x = 0; x < width; x += 1) { if (maze.grid[y]?.[x] === true) { open[(y * width) + x] = 1; } }
   }
   const original = open.slice();
+  const toGrid = (): boolean[][] => {
+    const rows: boolean[][] = [];
+    for (let y = 0; y < height; y += 1) {
+      const row: boolean[] = [];
+      for (let x = 0; x < width; x += 1) { row.push(open[(y * width) + x] === 1); }
+      rows.push(row);
+    }
+    return rows;
+  };
   const kept = new Set<number>(keep.map((point) => (point.y * width) + point.x));
   const explorer = createFeltExplorer(width, height);
   const nb = explorer.neighbors;
@@ -209,7 +222,8 @@ export const applyMazeQualityPass = (
       if (view.steps !== baseClosed.steps || view.torus !== baseClosed.torus || view.planar !== baseClosed.planar) { return false; }
     }
     if (reverseFloor > 0) { const back = explorer.run(open, g, s); if (!back.reachedGoal || back.steps < reverseFloor) { return false; } }
-    return stubCount() <= baseStubs;
+    if (stubCount() > baseStubs) { return false; }
+    return accept === undefined || accept(toGrid());
   };
   const makes2x2 = (c: number): boolean => {
     const x = xOf(c); const y = yOf(c);
