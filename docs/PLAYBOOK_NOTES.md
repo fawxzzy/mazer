@@ -720,4 +720,5 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT: new `docs/ops/sql-proposals/mazer-feedback-20261124-v2/` (apply, rollback, README, hashes, preimage, pglite scratch test) superseding the v1 draft. Signed-in only (NOT_SIGNED_IN), global 100/hour cap on top of 5/hour and 20/day per user, `user_id not null ... on delete cascade`, `lock_timeout` 3s on both files and the function. The v1 README now says superseded.
 - WHY: round 2 review P2s (no lock_timeout on the FK to auth.users, FK missing from the account-delete manifest, owner decisions). Zac delegated the decisions.
 - Rule: any FK to auth.users needs `lock_timeout` in the same transaction and an entry in the delete manifest before it ships; hash and apply LF bytes only.
-- Not checked: any database apply, the PG17 harness, concurrency, a real phone. No client code changed.
+- Evidence: pglite 82 checks, plus the PG 17.9 `scratch-pg.mjs pair` run with the non-superuser runner (round 3 review required it), plus the standard preimage pack; logs are committed as `.txt` (the `.log` extension is gitignored).
+- Not checked: any database apply, concurrency under real lock contention, a real phone. No client code changed.

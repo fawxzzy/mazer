@@ -5,8 +5,10 @@ Status: PROPOSED, NOT APPLIED. Nothing here ran against Supabase (the only live 
 Supersedes `../mazer-feedback-20261123/` (v1, kept as history; do NOT apply v1). Round 2 review of v1 found no P1 and three P2s; this folder answers all three.
 
 Apply file: `apply.sql` (one transaction, new objects only). Rollback: `rollback.sql`. Hashes: `SHA256SUMS.txt` (LF bytes as committed; hash and apply only LF bytes).
-Scratch evidence: `scratch-test/feedbacktest.cjs` (run: `PGLITE_SANDBOX=<dir with @electric-sql/pglite 0.5.13> node feedbacktest.cjs <repo root>`), log `scratch-test/run-pglite.log` (sha256 headers inside, 82 checks, 0 failed).
-Live read-only preimage (2026-11-24 07:06Z): `preimage/c_feedback_v2.sql` (read-only SQL) and `preimage/c_feedback_v2.json` (its output).
+Scratch evidence: `scratch-test/feedbacktest.cjs` (run: `PGLITE_SANDBOX=<dir with @electric-sql/pglite 0.5.13> node feedbacktest.cjs <repo root>`), log `scratch-test/run-pglite.txt` (sha256 headers inside, 82 checks, 0 failed; the original `.log` name is gitignored).
+PostgreSQL 17.9 run with the repo harness (`scripts/db-scratch/scratch-pg.mjs pair`, non-superuser runner `postgres`, `auth.users` owned by a stub `supabase_auth_admin`), added after review round 3 found the pglite superuser run was not the repo-required test: `scratch-test/pg17/run-pg17-pair.txt` (apply clean, second apply refused by its own guard, rollback clean, catalog after rollback equals catalog before; plus `check.sql`: signed-out refused, 5/hour cap, cascade, privileges) and `scratch-test/pg17/run-pg17-rollback-with-rows.txt` (rollback with one row present keeps the table and drops only the function). Stub and inputs: `scratch-test/pg17/`. The stub is a reduced shape (one stand-in cascading table), not a full copy of the live mazer schema.
+Live read-only preimage (2026-11-24 07:06Z): `preimage/c_feedback_v2.sql` (read-only SQL) and `preimage/c_feedback_v2.json` (its output). Standard preimage pack (`run-preimage-pack.ps1`, schemas mazer + account_private, 07:32Z, with `EVIDENCE.txt` hashes): `preimage/pack/`; no `mazer_feedback` object appears in it.
+Known comment inaccuracies (comments only; not edited so the hashed bytes stay the tested bytes): `apply.sql` line 7 says "row locks", they are table-level ROW EXCLUSIVE locks on `auth.users`; adding the FK takes SHARE ROW EXCLUSIVE, which also waits behind autovacuum and any writer. Apply in a quiet window; a wait over 3 s aborts with nothing changed. A `55P03` from the advisory-lock wait must be treated by the client as a generic error, not as `rate_limited`.
 
 ## What changed from v1
 - Review P2 (a): the foreign key to `auth.users` takes a SHARE ROW EXCLUSIVE lock on `auth.users`. `apply.sql` and `rollback.sql` now start with `set local lock_timeout = '3s'` and `set local statement_timeout = '15s'`, so a blocked apply fails fast and changes nothing instead of queueing sign-ins. The function also carries `lock_timeout=3s`. Tests prove both settings are in force at the end of each transaction and that the post-image assertions abort when they are wrong.
@@ -34,9 +36,10 @@ Live read-only preimage (2026-11-24 07:06Z): `preimage/c_feedback_v2.sql` (read-
 - [x] Scratch test of apply and rollback, catalog equality, abort tests, mutants (pglite 0.5.13, 82 checks, 0 failed).
 - [x] Fresh read-only preimage (above).
 - [x] Review findings of round 2 addressed in files.
-- [ ] Independent review round 3: see the PR.
+- [x] PG17 `pair` run with the non-superuser runner: passed (see the logs above). Real concurrency and lock contention on a busy `auth.users` are still untested.
+- [ ] Independent review round 3: first pass was HOLD (P1: PG17 run missing; P2: log was gitignored, standard preimage pack not run, Web per-call trigger list lacked the feedback table). All four are fixed in the PR; a re-review is recorded in the PR description.
 - [ ] Owner box with the sha256 and a post-image read-back: to do.
-- [ ] PG17 harness run and real concurrency (the advisory lock and the lock_timeout are untested under real contention): not done.
+- [ ] Real concurrency (the advisory lock and the lock_timeout are untested under real contention): not done.
 
 ## Apply order (when approved)
 1. Re-run `preimage/c_feedback_v2.sql` read-only; if anything differs, stop.

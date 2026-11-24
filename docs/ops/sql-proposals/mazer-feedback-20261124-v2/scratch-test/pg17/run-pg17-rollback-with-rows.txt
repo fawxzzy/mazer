@@ -1,0 +1,61 @@
+# PostgreSQL 17.9 scratch (scripts/db-scratch/scratch-pg.mjs), run 2026-11-24, runner role postgres (non-superuser), auth.users owned by supabase_auth_admin
+# apply.sql sha256 6d453fe40a9ae04893373e900fadfa47fac01d85c96788c71f46c66bd69d5cb3
+# rollback.sql sha256 de2ce656feb8edd502b0dcd3a9946b689c75c967476d6dca8a594c2b2c10d838
+# scratch-test\pg17/app-stub.sql sha256 2e215e83654aefdbcc1b5a9b2d29060780065cbe67f378b3840329b54a806f40
+# scratch-test\pg17/seed.sql sha256 71a519de42b8a50dfa963855dd1bb961e656d45af018910da1d16997401611b1
+# scratch-test\pg17/check.sql sha256 861725f6a946daa886a90a1b514c31c3698579c2f7d3c0b49f453595313a4569
+# command: scratch-test/pg17/rollback-with-rows.ps1 (apply, submit one row, rollback; expect table kept)
+
+DROP DATABASE
+node.exe : NOTICE:  database "fb_rows" does not exist, skipping
+At C:\ATLAS\tmp\worktrees\mazer-feedback-v2-20261124\docs\ops\sql-proposals\mazer-feedback-20261124-v2\scratch-test\pg1
+7\rollback-with-rows.ps1:7 char:36
++ ... e, $argv) { & node scripts\db-scratch\scratch-pg.mjs psql --dir $Dir  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (NOTICE:  databa...exist, skipping:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+CREATE DATABASE
+INSERT 0 2
+BEGIN
+SET
+SET
+DO
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+DO
+COMMIT
+              set_config              | mazer_submit_feedback_v1 
+--------------------------------------+--------------------------
+ 00000000-0000-0000-0000-0000000000a2 | {"status": "saved"}
+(1 row)
+
+--- rollback with one row present
+BEGIN
+SET
+SET
+DROP FUNCTION
+DO
+COMMIT
+node.exe : psql:C:/ATLAS/tmp/worktrees/mazer-feedback-v2-20261124/docs/ops/sql-proposals/mazer-feedback-20261124-v2/rol
+lback.sql:35: NOTICE:  MAZER_FEEDBACK_ROLLBACK_KEPT_TABLE rows=1
+At C:\ATLAS\tmp\worktrees\mazer-feedback-v2-20261124\docs\ops\sql-proposals\mazer-feedback-20261124-v2\scratch-test\pg1
+7\rollback-with-rows.ps1:7 char:36
++ ... e, $argv) { & node scripts\db-scratch\scratch-pg.mjs psql --dir $Dir  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (psql:C:/ATLAS/t...PT_TABLE rows=1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+--- after rollback (expect table_rows=1, function_exists=f)
+table_rows=1|function_exists=false
+DROP DATABASE
