@@ -1,4 +1,3 @@
-import '../legacy-runtime/legacyGuideOptionsDarkBoot';
 import '../theme/themeBoot';
 import Phaser from 'phaser';
 import '../styles/base.css';
@@ -38,8 +37,6 @@ import { runMazerSignedOutHandoffAtBoot } from './signedOutHandoffBoot';
 import { runMazerOAuthContinuationAtBoot } from './oauthContinuationBoot';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
-import { installGuideOptionsBar } from '../legacy-runtime/legacyGuideOptionsBar';
-import { isGuideOptionsRoute } from '../legacy-runtime/legacyGuideOptionsPainter';
 import {
   installMazerProductionServiceWorker,
   installMazerServiceWorkerControllerReload,
@@ -223,7 +220,7 @@ const boot = async (): Promise<void> => {
   const forceInstallGate = new URLSearchParams(window.location.search).get('forceInstallGate') === '1';
   if (shouldRunMazerInstallGateForBoot({
     forceInstallGate,
-    isLocalhostRuntime: isLocalhostRuntime() || isGuideOptionsRoute(),
+    isLocalhostRuntime: isLocalhostRuntime(),
     legalRouteRequested: legalRoute !== null,
     passwordRecoveryRequested: passwordRecoveryRouteRequested
   })) {
@@ -278,7 +275,6 @@ const boot = async (): Promise<void> => {
   attachMazerGameToWindow(game);
   installMazerAccessibilitySurface(document, game.canvas);
   installLegacyControlHint(window, game);
-  installGuideOptionsBar();
   viewportGeometry.subscribe((geometry) => {
     if (game) {
       syncMazerGameToViewport(game, geometry);

@@ -69,7 +69,7 @@ const exportsOf = (module: string): Record<string, unknown> | null => {
 
 describe('guide structure', () => {
   test('rows are unique, ordered and short enough to wrap in two lines at 14px on 320 wide', () => {
-    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'sound']);
+    expect(LEGACY_GUIDE_ROWS.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play', 'sound']);
     expect(new Set(LEGACY_GUIDE_ROWS.map((r) => r.id)).size).toBe(LEGACY_GUIDE_ROWS.length);
     for (const r of LEGACY_GUIDE_ROWS) {
       expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
@@ -410,7 +410,7 @@ describe('guide icons are tied to the draw functions the board uses', () => {
 
   test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, bleed-gate, levels, online and menu share a board draw; move and sound are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play']);
     expect(byStatus('guide-local')).toEqual(['move', 'sound']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
@@ -425,17 +425,18 @@ describe('the scene paints exactly what the guide data declares', () => {
   };
 
   test('every glyph the data names has a draw case in the scene, and nothing else is drawn', () => {
-    const icon = method('private drawLegacyGuideIcon(');
+    const icon = method('\n  drawLegacyGuideIcon(');
     const drawn = [...icon.matchAll(/case '([a-z-]+)':/g)].map((m) => m[1]).sort();
     // Slice H6: the hazard rows (shown only while the hazard layer is on) are drawn by the same method.
-    const declared = [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph).sort();
+    // menu and menu-play share the burger glyph, so the declared set is deduplicated.
+    const declared = [...new Set([...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph))].sort();
     expect(drawn).toEqual(declared);
   });
 
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
-    const icon = method('private drawLegacyGuideIcon(');
+    const icon = method('\n  drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");
@@ -474,12 +475,15 @@ describe('the scene paints exactly what the guide data declares', () => {
 
   test('the scene holds no guide copy of its own: rows come from the data, headings and text both', () => {
     const guide = method('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
+    const painter = read('src/legacy-runtime/legacyGuideGlossaryPainter.ts');
     for (const r of [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS]) {
       expect(MENU_SCENE, r.id).not.toContain(r.text);
       expect(guide).not.toContain(`'${r.heading}'`);
     }
-    expect(guide).toContain('row.heading,');
-    expect(guide).toContain('row.text,');
+    // The scene hands the data model to the glossary painter, which reads each row's heading and text.
+    expect(guide).toContain('paintGuideGlossarySheet(this, model)');
+    expect(painter).toContain('row.heading,');
+    expect(painter).toContain('row.text,');
     expect(MENU_SCENE).not.toContain(buildLegacyGuideKeyboardLine());
   });
 
@@ -494,5 +498,32 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(MENU_SCENE).not.toContain('createLegacyOptionsGuideHeaderButton');
     expect(MENU_SCENE).not.toContain('overlayGuideExpanded');
     expect(MENU_SCENE).not.toMatch(/'begin at gold'|'reach the star'|'touch and drag anywhere'/);
+  });
+});
+
+describe('guide glossary copy (Guide option C, 2026-11-23)', () => {
+  test('every Guide row keeps its copy within the 90-character cap, hazard rows included', () => {
+    for (const r of [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS]) {
+      expect(r.text.length, r.id).toBeLessThanOrEqual(90);
+    }
+  });
+
+  test('the Menu pair names every menu row, including the two only a running maze has', () => {
+    const menu = LEGACY_GUIDE_ROWS.find((r) => r.id === 'menu')!.text;
+    const play = LEGACY_GUIDE_ROWS.find((r) => r.id === 'menu-play')!.text;
+    for (const name of ['Settings', 'Guide', 'Sound', 'Profile', 'Leaderboard']) {
+      expect(menu).toContain(name);
+    }
+    expect(play).toContain('Reset level');
+    expect(play).toContain('Main menu');
+    expect(play.length).toBeLessThanOrEqual(90);
+  });
+
+  test('the glossary grid is four tiles across: 12 rows fill 3 lines, all 16 (hazards on) fill 4', async () => {
+    const painter = await import('../../src/legacy-runtime/legacyGuideGlossaryPainter');
+    expect(painter.GUIDE_GLOSSARY_COLUMNS).toBe(4);
+    const line = painter.GUIDE_GLOSSARY_TILE_HEIGHT + painter.GUIDE_GLOSSARY_TILE_GAP;
+    expect(painter.resolveGuideGlossaryGridHeight(LEGACY_GUIDE_ROWS.length) + painter.GUIDE_GLOSSARY_TILE_GAP).toBe(3 * line);
+    expect(painter.resolveGuideGlossaryGridHeight(LEGACY_GUIDE_ROWS.length + LEGACY_GUIDE_HAZARD_ROWS.length) + painter.GUIDE_GLOSSARY_TILE_GAP).toBe(4 * line);
   });
 });

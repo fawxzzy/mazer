@@ -159,7 +159,7 @@ import {
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
-import { getGuideOptionsState, isGuideOptionsRoute, paintGuideOptionsSheet } from '../legacy-runtime/legacyGuideOptionsPainter';
+import { paintGuideGlossarySheet, resetGuideGlossarySelection } from '../legacy-runtime/legacyGuideGlossaryPainter';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
 import { HazardMomentView } from '../render/hazardMomentRenderer';
 import {
@@ -435,12 +435,7 @@ import {
   type LegacyGuideGlyph,
   type LegacyGuideIconSpec
 } from '../legacy-runtime/legacyGuideContent';
-import {
-  LEGACY_GUIDE_SHEET_SIZES,
-  buildLegacyGuideSheetPlan,
-  resolveLegacyGuideKeyboardLineHeight,
-  resolveLegacyGuideRowHeight
-} from '../legacy-runtime/legacyGuideSheetPlan';
+import { LEGACY_GUIDE_SHEET_SIZES } from '../legacy-runtime/legacyGuideSheetPlan';
 import {
   INITIAL_LEGACY_PROGRESSION_RESET_STATE,
   LEGACY_PROGRESSION_RESET_ARM_DELAY_MS,
@@ -12317,149 +12312,17 @@ export class MenuScene extends Phaser.Scene {
   // buildLegacyGuideSheetPlan. Icons call the board's own draw functions where
   // the content module says they are shared (goal star, perimeter diamond).
   private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void {
-    if (this.guideOptionsVariant() !== null) {
-      this.buildGuideOptionsOverlay(context);
-      return;
-    }
     const model = buildLegacyGuideSheetModel(context, {
       hasKeyboard: this.resolveLegacyGuideHasKeyboard(),
       // Slice H6: met + live hazard kinds while the layer is on; [] (the unchanged sheet) while off.
       hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? []
     });
-    const sizes = LEGACY_GUIDE_SHEET_SIZES;
-    const safeArea = readMazerViewportGeometry().safeArea;
-    const measure = (itemWidth: number): number[] => {
-      // Measure at the exact wrap width the painter uses: it passes the column width plus the
-      // 16 px text padding that addLegacySheetWrappedText and measureLegacySheetWrappedLines both subtract.
-      const copyWidth = Math.max(1, itemWidth - sizes.badgeSize - sizes.badgeTextGap) + 16;
-      const heights = model.rows.map((row) => resolveLegacyGuideRowHeight(
-        this.measureLegacySheetWrappedLines(row.text, copyWidth, sizes.copyFontSize)
-      ));
-      if (model.keyboardLine !== null) {
-        heights.push(resolveLegacyGuideKeyboardLineHeight(
-          this.measureLegacySheetWrappedLines(model.keyboardLine, itemWidth + 16, sizes.copyFontSize)
-        ));
-      }
-      return heights;
-    };
-    const planInput = { height: this.layout.height, safeArea, width: this.layout.width };
-    let plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(Number.MAX_SAFE_INTEGER) });
-    // Measure at the real column width (the rail gutter narrows it when the
-    // body scrolls), then re-plan from the real heights.
-    plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(plan.itemWidth) });
-    plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(plan.itemWidth) });
-    const heights = measure(plan.itemWidth);
-
-    this.overlayMovementSpeedSliderBounds = null;
-    this.drawLegacySheetCard(plan.card);
-    this.createOverlayTitle(plan.title.text, plan.title.centerY);
-    this.overlayGuideBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
-
-    const scrollMetrics = this.applyLegacySheetScroll(plan.scrollRailViewport, plan.contentHeight, plan.scrollable);
-    const scrollOffset = scrollMetrics?.offset ?? 0;
-    const viewport = plan.bodyViewport;
-    const accentFor = (glyph: LegacyGuideGlyph): number => this.resolveLegacyGuideAccent(glyph);
-    // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
-    // partly scrolled out is clipped at the viewport edge instead of vanishing.
-    let guideGraphics: Phaser.GameObjects.Graphics = this.overlayGraphics;
-    let guideMask: Phaser.Display.Masks.GeometryMask | null = null;
-    if (plan.scrollable) {
-      guideGraphics = this.add.graphics();
-      this.overlayGuideGraphics = guideGraphics;
-      const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);
-      maskGraphics.fillStyle(0xffffff, 1);
-      maskGraphics.fillRect(viewport.left, viewport.top, viewport.width, viewport.height);
-      guideMask = maskGraphics.createGeometryMask();
-      guideGraphics.setMask(guideMask);
-      this.overlayGuideMaskGraphics = maskGraphics;
-      this.overlayGuideMask = guideMask;
-    }
-    const masked = <T extends Phaser.GameObjects.Text>(text: T): T => {
-      if (guideMask !== null) {
-        text.setMask(guideMask);
-      }
-      return text;
-    };
-    const itemVisible = (index: number): boolean => {
-      const top = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
-      const height = heights[index] ?? 0;
-      return top < viewport.top + viewport.height && top + height > viewport.top;
-    };
-
-    model.rows.forEach((row, index) => {
-      if (!itemVisible(index)) {
-        return;
-      }
-      const rowTop = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
-      const rowHeight = heights[index] ?? sizes.rowMinHeight;
-      const accent = accentFor(row.icon.glyph);
-      const badgeCenterX = viewport.left + (sizes.badgeSize / 2);
-      const badgeCenterY = rowTop + (rowHeight / 2);
-      this.drawLegacyGuideIcon(row.icon, badgeCenterX, badgeCenterY, accent, guideGraphics);
-      const textLeft = viewport.left + sizes.badgeSize + sizes.badgeTextGap;
-      const textWidth = Math.max(1, plan.itemWidth - sizes.badgeSize - sizes.badgeTextGap);
-      const copyLines = Math.max(1, Math.round((rowHeight - (sizes.rowPaddingY * 2) - sizes.headingLineHeight) / sizes.copyLineHeight));
-      const blockHeight = sizes.headingLineHeight + (copyLines * sizes.copyLineHeight);
-      const blockTop = rowTop + ((rowHeight - blockHeight) / 2);
-      masked(this.addLegacySheetWrappedText(
-        row.heading,
-        textLeft - 8,
-        blockTop + (sizes.headingLineHeight / 2),
-        textWidth + 16,
-        toCyberArcadeCssHex(accent),
-        sizes.headingFontSize,
-        sizes.headingFontSize,
-        1,
-        { alpha: 1, bold: true }
-      ));
-      masked(this.addLegacySheetWrappedText(
-        row.text,
-        textLeft - 8,
-        blockTop + sizes.headingLineHeight + ((copyLines * sizes.copyLineHeight) / 2),
-        textWidth + 16,
-        toCyberArcadeCssHex(cyberArcadeMaterial.rail.white),
-        sizes.copyFontSize,
-        sizes.copyFontSize,
-        copyLines + 1,
-        { alpha: 0.92 }
-      ));
-    });
-
-    if (model.keyboardLine !== null) {
-      const index = model.rows.length;
-      if (itemVisible(index)) {
-        const top = viewport.top + (plan.itemTops[index] ?? 0) - scrollOffset;
-        masked(this.addLegacySheetWrappedText(
-          model.keyboardLine,
-          viewport.left - 8,
-          top + ((heights[index] ?? 0) / 2),
-          plan.itemWidth + 16,
-          toCyberArcadeCssHex(cyberArcadeMaterial.rail.muted),
-          sizes.copyFontSize,
-          sizes.copyFontSize,
-          3,
-          { alpha: 0.92 }
-        ));
-      }
-    }
-
-    if (scrollMetrics !== null) {
-      this.drawLegacyOverlayScrollFacade(scrollMetrics);
-    }
-
-    this.uiButtons.push(this.createLegacyAuthActionButton(
-      plan.footer.left + (plan.footer.width / 2),
-      plan.footer.top + (plan.footer.height / 2),
-      plan.footer.width,
-      plan.footer.height,
-      model.closeLabel,
-      () => this.closeLegacyGuideSheet(),
-      'primary'
-    ));
+    const card = paintGuideGlossarySheet(this, model);
+    this.overlayGuideBounds = createVisualRect(card.left, card.top, card.width, card.height);
   }
 
-  // Guide icon accent per glyph (shared by the shipped Guide and the redesign options).
-  private resolveLegacyGuideAccent(glyph: LegacyGuideGlyph): number {
+  // Guide icon accent per glyph (used by the Guide painter).
+  resolveLegacyGuideAccent(glyph: LegacyGuideGlyph): number {
     const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
     switch (glyph) {
       case 'goal-star': return cyberArcadeMaterial.signal.goal;
@@ -12480,22 +12343,13 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // Guide redesign options (2026-11-23): `?guideOptions=A|B|C` swaps the Guide painter. Null on every normal route.
-  private guideOptionsVariant(): string | null {
-    return isGuideOptionsRoute() ? getGuideOptionsState().variant : null;
-  }
-
-  private buildGuideOptionsOverlay(_context: LegacySettingsContext): void {
-    const card = paintGuideOptionsSheet(this);
-    this.overlayGuideBounds = createVisualRect(card.left, card.top, card.width, card.height);
-  }
-
   private closeLegacyGuideSheet(): void {
     if (!this.settingsGuideOpen) {
       return;
     }
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
+    resetGuideGlossarySelection();
     this.resetLegacyOverlayScrollState();
     this.uiDirty = true;
     const target = resolveLegacyGuideCloseTarget({
@@ -12539,7 +12393,7 @@ export class MenuScene extends Phaser.Scene {
   //   edge-marker  -> drawEdgeMarker (shared)
   //   touch-stick / player-block -> guide-local
   //   miniatures of the same shapes and tokens (see the status/reasonId there).
-  private drawLegacyGuideIcon(
+  drawLegacyGuideIcon(
     icon: LegacyGuideIconSpec,
     centerX: number,
     centerY: number,

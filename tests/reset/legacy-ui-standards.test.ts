@@ -188,6 +188,7 @@ describe('320 px clipping guards (Wave 5C)', () => {
     expect(source).toContain('private addLegacySheetWrappedText(');
     expect(source).toContain('text.setWordWrapWidth(Math.max(1, width - 16), true);');
     expect(source).toContain('LEGACY_SETTINGS_SIZES.labelMinFontSize');
-    expect(source).toContain('sizes.copyFontSize,\n        sizes.copyFontSize,');
+    // Guide option C: the glossary painter wraps its copy at the same 14 px sheet size.
+    expect(normalizeSourceLineEndings(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGuideGlossaryPainter.ts'), 'utf8'))).toContain('S.copyFontSize, S.copyFontSize');
   });
 });
