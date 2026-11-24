@@ -21,7 +21,8 @@ const MEASURED_HEIGHTS = [
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
-  // L6: the Menu row (three lines at the top right) sits between Online and Sound.
+  // L6: the Menu row (three lines at the top right) sits between Online and Sound; the In a maze row follows it.
+  resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideRowHeight(2),
   resolveLegacyGuideKeyboardLineHeight(2)
@@ -56,8 +57,8 @@ describe('guide sheet plan', () => {
   );
 
   test('a tall desktop shows the whole guide; 320x568 scrolls and keeps Got it pinned', () => {
-    // 1300 tall: with the Wrap gate row (MAZER-L10) and the Menu row (L6) the whole guide needs ~1232 px (1100 before both).
-    const wide = buildLegacyGuideSheetPlan({ height: 1300,itemHeights: MEASURED_HEIGHTS, width: 1280 });
+    // 1400 tall: with the Wrap gate row (MAZER-L10), the Menu row (L6) and the In a maze row the whole list needs ~1330 px (1100 before).
+    const wide = buildLegacyGuideSheetPlan({ height: 1400,itemHeights: MEASURED_HEIGHTS, width: 1280 });
     expect(wide.scrollable).toBe(false);
     expect(wide.maxScrollOffset).toBe(0);
     const narrow = buildLegacyGuideSheetPlan({ height: 568, itemHeights: MEASURED_HEIGHTS, width: 320 });

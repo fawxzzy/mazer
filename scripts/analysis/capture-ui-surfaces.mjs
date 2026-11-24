@@ -1391,6 +1391,7 @@ const OPTIONS_GUIDE_EXPECTED_LABELS = Object.freeze([
   'Levels',
   'Online',
   'Menu',
+  'In a maze',
   'Sound',
   'Got it'
 ]);

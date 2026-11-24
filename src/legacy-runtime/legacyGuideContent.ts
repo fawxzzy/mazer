@@ -69,7 +69,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'menu' | 'sound' | LegacyGuideHazardRowId;
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'menu' | 'menu-play' | 'sound' | LegacyGuideHazardRowId;
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -239,6 +239,20 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     },
     id: 'menu',
     text: 'Three lines, top right: Settings (Dark mode), Guide, Sound, Profile, Leaderboard.'
+  },
+  {
+    heading: 'In a maze',
+    icon: {
+      badge: 'circle',
+      boardDraw: { module: 'src/render/menuDropdownArt.ts', symbol: 'drawMenuBurgerGlyph' },
+      chipDraw: null,
+      glyph: 'menu-burger',
+      lane: null,
+      reasonId: 'menu-legend-calls-header-burger-draw',
+      status: 'shared-with-board'
+    },
+    id: 'menu-play',
+    text: 'The same menu pauses the run. Reset level restarts the maze, Main menu leaves it.'
   },
   {
     heading: 'Sound',

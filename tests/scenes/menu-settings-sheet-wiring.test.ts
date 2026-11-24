@@ -53,9 +53,13 @@ describe('MenuScene wiring: one shared Settings sheet', () => {
   test('the guide is built from the content module, and the Got it footer closes it', () => {
     const guide = method('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
     expect(guide).toContain('buildLegacyGuideSheetModel(context,');
-    expect(guide).toContain('model.rows.forEach(');
-    expect(guide).toContain('model.closeLabel,');
-    expect(guide).toContain('() => this.closeLegacyGuideSheet(),\n      \'primary\'');
+    // Guide option C: the glossary painter paints every model row as a tile and owns the Got it footer.
+    const painter = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGuideGlossaryPainter.ts'), 'utf8').replace(/\r\n/g, '\n');
+    expect(guide).toContain('paintGuideGlossarySheet(this, model)');
+    expect(painter).toContain('rows.forEach(');
+    expect(painter).toContain('model.closeLabel,');
+    expect(painter).toContain('() => host.closeLegacyGuideSheet(),');
+    expect(painter).toContain("'primary'");
     // no guide copy is hard-coded in the scene: it lives in legacyGuideContent.ts only.
     expect(guide).not.toMatch(/Reach the star|green block|green rounded block|Touch and hold|glowing line|colour-shifting line|play marker on a ringed tile|Some mazes wrap|Each cleared maze/);
   });
