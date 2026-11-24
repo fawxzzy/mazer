@@ -1450,14 +1450,19 @@ const LEGACY_PLAYER_MESSAGE_TOAST_ROW_POOL = 3;
 // statistically the hardest to land a precise tap on.
 /** Scene-owned fills and label colours for the kit's action-button chrome (MAZER-UI-015); stroke and label colour live in the kit. */
 const LEGACY_ACTION_BUTTON_FILL: Readonly<Record<LegacyButtonFillKey, number>> = Object.freeze({
-  primary: 0x063a28,
+  // MAZER-UI-099: primary is the solid brand mint; ghost draws no fill (the factory skips the panel).
+  primary: cyberArcadeMaterial.rail.mint,
   control: 0x07131d,
-  dangerFilled: 0x260f1a
+  dangerFilled: 0x260f1a,
+  none: 0x000000
 });
 const LEGACY_ACTION_BUTTON_TEXT: Readonly<Record<LegacyButtonTextKey, string>> = Object.freeze({
   bright: '#ecfff5',
   soft: '#d7f7ee',
-  signOut: '#ffdce6'
+  signOut: '#ffdce6',
+  // Dark ink on the mint primary (the canvas token), and the mint link colour of the box-less ghost button.
+  ink: toCyberArcadeCssHex(cyberArcadeMaterial.substrate.field),
+  link: toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint)
 });
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
@@ -11955,7 +11960,9 @@ export class MenuScene extends Phaser.Scene {
               ? 'danger'
               : model.emphasis === 'danger-outline'
                 ? 'danger-outline'
-                : 'secondary'
+                : model.emphasis === 'tertiary'
+                  ? 'ghost'
+                  : 'secondary'
         ));
         return;
       case 'disclosure':
@@ -12828,7 +12835,8 @@ export class MenuScene extends Phaser.Scene {
       plan.exit.height,
       plan.exitLabel,
       () => this.handleBackAction(),
-      'primary'
+      // MAZER-UI-099: one primary per surface. A state action (Retry / Sign in) takes the primary slot.
+      plan.stateBlock?.action != null ? 'secondary' : 'primary'
     ));
 
     if (plan.modeTabs !== null) {
@@ -13182,7 +13190,7 @@ export class MenuScene extends Phaser.Scene {
     const buttonLeftCenter = cardLeft + (cardWidth / 2);
     const addButton = (
       label: string,
-      tone: 'danger' | 'primary',
+      tone: 'danger' | 'primary' | 'secondary',
       onClick: () => void,
       disabled: boolean
     ): void => {
@@ -13202,7 +13210,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (confirmView !== null) {
       const [cancelButton, confirmButton] = confirmView.buttons;
-      addButton(cancelButton.label, 'primary', () => this.handleBackAction(), state.phase === 'working');
+      addButton(cancelButton.label, 'secondary', () => this.handleBackAction(), state.phase === 'working');
       addButton(
         state.phase === 'working' ? copy.working : confirmButton.label,
         'danger',
@@ -13657,9 +13665,11 @@ export class MenuScene extends Phaser.Scene {
   ): UiButton {
     const chrome = this.add.graphics();
     const explicitlyDisabled = options.disabled === true;
-    const unifiedAuthDockButton = this.overlay === 'auth' && (tone === 'primary' || tone === 'danger');
-    const unifiedAuthPrimary = unifiedAuthDockButton && tone === 'primary';
-    const unifiedAuthDanger = unifiedAuthDockButton && tone === 'danger';
+    // MAZER-UI-099: the gate's primary action ("Sign in") is the shared solid-mint kit button like every other
+    // sheet; only the destructive dock keeps its own pale pill.
+    const unifiedAuthDockButton = this.overlay === 'auth' && tone === 'danger';
+    const unifiedAuthPrimary = this.overlay === 'auth' && tone === 'primary';
+    const unifiedAuthDanger = unifiedAuthDockButton;
     // Keep the primary auth action available so an attempted empty/invalid
     // submit can reveal the field-level red outline contract. The only hard
     // disabled state is an in-flight provider request, which prevents double
@@ -13714,6 +13724,14 @@ export class MenuScene extends Phaser.Scene {
         chrome.strokePath();
         return;
       }
+      if (kitTone.chrome.fillKey === 'none') {
+        // Ghost: no box. A faint mint wash only while pressed/hovered so the 44px target still answers a tap.
+        if (active && !explicitlyDisabled) {
+          chrome.fillStyle(colors.stroke, 0.12);
+          chrome.fillRoundedRect(x - (width / 2), y - (height / 2), width, height, LEGACY_UI_CONTROL_RADIUS);
+        }
+        return;
+      }
       this.drawLegacyCyberPanel(chrome, {
         active: !explicitlyDisabled && (active || kitTone.chrome.litWhenIdle),
         alpha: explicitlyDisabled ? 0.42 : 1,
@@ -13743,7 +13761,7 @@ export class MenuScene extends Phaser.Scene {
         color: colors.text,
         fontFamily: unifiedAuthDockButton ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
         fontSize: `${fontSize}px`,
-        fontStyle: unifiedAuthDockButton ? '600' : 'normal',
+        fontStyle: unifiedAuthDockButton ? '600' : (kitTone.variant === 'primary' ? 'bold' : 'normal'),
         letterSpacing: unifiedAuthDockButton ? fontSize * 0.01 : 0
       }
     )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(explicitlyDisabled ? 0.45 : (unifiedAuthDisabled ? 0.68 : 0.96));
@@ -13875,7 +13893,7 @@ export class MenuScene extends Phaser.Scene {
       {
       fontFamily: this.overlay === 'auth' ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
       fontSize: `${fontSize}px`,
-      color: this.overlay === 'auth' ? '#f5f5f7' : '#6bc96f'
+      color: this.overlay === 'auth' ? '#f5f5f7' : toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint)
     })).setOrigin(0.5).setDepth(3);
     this.uiTexts.push(label);
   }

@@ -40,12 +40,32 @@ describe('legacy button kit', () => {
 
   test('migration ratchet: the action-button factory surfaces draw from the kit table (flip entries as surfaces migrate)', () => {
     expect(LEGACY_BUTTON_MAP.filter((entry) => entry.chromeViaKit).map((entry) => entry.id).sort()).toEqual(
-      ['auth-secondary', 'guide', 'reset-progress', 'sign-out']
+      ['auth-secondary', 'auth-submit', 'guide', 'guide-got-it', 'leaderboard-back', 'leaderboard-retry', 'preview-jump-row', 'reset-progress', 'sheet-exit', 'sign-out']
     );
   });
 
+  test('the three emphasis levels are visibly different: solid fill, outlined dark fill, no fill', () => {
+    const primary = resolveLegacyActionTone('primary').chrome;
+    const secondary = resolveLegacyActionTone('secondary').chrome;
+    const ghost = resolveLegacyActionTone('ghost').chrome;
+    expect(new Set([primary.fillKey, secondary.fillKey, ghost.fillKey]).size).toBe(3);
+    expect(new Set([primary.textKey, secondary.textKey, ghost.textKey]).size).toBe(3);
+    expect(LEGACY_BUTTON_KIT.primary.filled).toBe(true);
+    expect(LEGACY_BUTTON_KIT.secondary.bordered).toBe(true);
+    expect(LEGACY_BUTTON_KIT.ghost).toMatchObject({ filled: false, bordered: false });
+  });
+
+  test('every kit button keeps the 44 px minimum target', () => {
+    for (const variant of LEGACY_BUTTON_VARIANTS) {
+      expect(LEGACY_BUTTON_KIT[variant].minWidthPx).toBeGreaterThanOrEqual(44);
+      expect(LEGACY_BUTTON_KIT[variant].minHeightPx).toBeGreaterThanOrEqual(44);
+    }
+  });
+
   test('action tones resolve to a kit variant and keep the pre-kit colours', () => {
-    expect(resolveLegacyActionTone('primary')).toMatchObject({ variant: 'primary', chrome: { fillKey: 'primary', textKey: 'bright', litWhenIdle: true } });
+    // MAZER-UI-099: primary is the solid mint fill with dark ink and no idle glow (never confusable with the outlined secondary).
+    expect(resolveLegacyActionTone('primary')).toMatchObject({ variant: 'primary', chrome: { fillKey: 'primary', textKey: 'ink', litWhenIdle: false } });
+    expect(resolveLegacyActionTone('ghost')).toMatchObject({ variant: 'ghost', chrome: { fillKey: 'none', textKey: 'link', litWhenIdle: false } });
     expect(resolveLegacyActionTone('secondary')).toMatchObject({ variant: 'secondary', chrome: { fillKey: 'control', textKey: 'soft', litWhenIdle: false } });
     expect(resolveLegacyActionTone('danger')).toMatchObject({ variant: 'danger', chrome: { fillKey: 'dangerFilled', textKey: 'signOut' } });
     expect(resolveLegacyActionTone('danger-outline')).toMatchObject({ variant: 'danger', chrome: { fillKey: 'control', textKey: 'signOut' } });

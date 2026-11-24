@@ -88,7 +88,7 @@
   ],
   "legacy/color/text.title": [
    {
-    "file": "src/scenes/MenuScene.ts"
+    "file": "src/theme/tokens.css"
    }
   ],
   "legacy/color/text.danger": [

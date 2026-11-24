@@ -23,9 +23,9 @@ export interface LegacyButtonVariantSpec {
 }
 
 export const LEGACY_BUTTON_KIT: Readonly<Record<LegacyButtonVariant, LegacyButtonVariantSpec>> = Object.freeze({
-  primary: { variant: 'primary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: true, bordered: false, use: 'The one main action on a surface (Start, Login, Sign in)' },
-  secondary: { variant: 'secondary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Other actions (Guide, Install, Back, Close)' },
-  ghost: { variant: 'ghost', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Quiet text actions (Skip, Not now)' },
+  primary: { variant: 'primary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: true, bordered: false, use: 'The one main action on a surface, solid mint (Back to Menu, Got it, Retry, Sign in)' },
+  secondary: { variant: 'secondary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Other actions, dark with an outline (Next level, Back to Menu beside a Retry)' },
+  ghost: { variant: 'ghost', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Quiet text actions, no box (Jump to level rows, Skip, Not now)' },
   danger: { variant: 'danger', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Destructive actions (Sign out, Reset progress)' },
   icon: { variant: 'icon', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Icon-only controls (Settings cog, close x)' }
 });
@@ -36,8 +36,8 @@ export const LEGACY_BUTTON_KIT: Readonly<Record<LegacyButtonVariant, LegacyButto
  * is look-neutral. `danger` has a filled (Sign out) and an outline (Reset progress) emphasis.
  */
 export type LegacyButtonEmphasis = 'filled' | 'outline';
-export type LegacyButtonTextKey = 'bright' | 'soft' | 'signOut';
-export type LegacyButtonFillKey = 'primary' | 'control' | 'dangerFilled';
+export type LegacyButtonTextKey = 'bright' | 'soft' | 'signOut' | 'ink' | 'link';
+export type LegacyButtonFillKey = 'primary' | 'control' | 'dangerFilled' | 'none';
 export interface LegacyButtonChromeSpec {
   /** Which scene-owned fill the button uses (MenuScene holds the values so the design-token evidence keeps citing it). */
   readonly fillKey: LegacyButtonFillKey;
@@ -48,19 +48,23 @@ export interface LegacyButtonChromeSpec {
   readonly litWhenIdle: boolean;
 }
 
-export const LEGACY_BUTTON_CHROME: Readonly<Record<'primary' | 'secondary' | 'dangerFilled' | 'dangerOutline', LegacyButtonChromeSpec>> = Object.freeze({
-  primary: Object.freeze({ fillKey: 'primary', stroke: cyberArcadeMaterial.rail.mint, textKey: 'bright', litWhenIdle: true }),
+export const LEGACY_BUTTON_CHROME: Readonly<Record<'primary' | 'secondary' | 'ghost' | 'dangerFilled' | 'dangerOutline', LegacyButtonChromeSpec>> = Object.freeze({
+  // MAZER-UI-099 (owner pick): the primary button is a solid mint fill with dark ink, so it is never mistaken for the
+  // outlined secondary or the box-less ghost.
+  primary: Object.freeze({ fillKey: 'primary', stroke: cyberArcadeMaterial.rail.mint, textKey: 'ink', litWhenIdle: false }),
+  ghost: Object.freeze({ fillKey: 'none', stroke: cyberArcadeMaterial.rail.mint, textKey: 'link', litWhenIdle: false }),
   secondary: Object.freeze({ fillKey: 'control', stroke: cyberArcadeMaterial.rail.cyan, textKey: 'soft', litWhenIdle: false }),
   dangerFilled: Object.freeze({ fillKey: 'dangerFilled', stroke: cyberArcadeMaterial.signal.goal, textKey: 'signOut', litWhenIdle: false }),
   dangerOutline: Object.freeze({ fillKey: 'control', stroke: cyberArcadeMaterial.signal.goal, textKey: 'signOut', litWhenIdle: false })
 });
 
-export type LegacyActionTone = 'primary' | 'secondary' | 'danger' | 'danger-outline';
+export type LegacyActionTone = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline';
 
 /** The factory's tone names are the kit variants plus the danger emphasis. */
 export const resolveLegacyActionTone = (tone: LegacyActionTone): { variant: LegacyButtonVariant; chrome: LegacyButtonChromeSpec } => {
   switch (tone) {
     case 'primary': return { variant: 'primary', chrome: LEGACY_BUTTON_CHROME.primary };
+    case 'ghost': return { variant: 'ghost', chrome: LEGACY_BUTTON_CHROME.ghost };
     case 'danger': return { variant: 'danger', chrome: LEGACY_BUTTON_CHROME.dangerFilled };
     case 'danger-outline': return { variant: 'danger', chrome: LEGACY_BUTTON_CHROME.dangerOutline };
     default: return { variant: 'secondary', chrome: LEGACY_BUTTON_CHROME.secondary };
@@ -86,7 +90,7 @@ export const LEGACY_TOGGLE_ROW: LegacyToggleRowSpec = Object.freeze({
  */
 export interface LegacyButtonMapping {
   readonly id: string;
-  readonly surface: 'front-door' | 'menu' | 'auth' | 'install' | 'settings' | 'guide';
+  readonly surface: 'front-door' | 'menu' | 'auth' | 'install' | 'settings' | 'guide' | 'leaderboard';
   readonly variant: LegacyButtonVariant;
   readonly chromeViaKit: boolean;
 }
@@ -98,7 +102,12 @@ export const LEGACY_BUTTON_MAP: readonly LegacyButtonMapping[] = Object.freeze([
   { id: 'guide', surface: 'settings', variant: 'secondary', chromeViaKit: true },
   { id: 'sign-out', surface: 'settings', variant: 'danger', chromeViaKit: true },
   { id: 'reset-progress', surface: 'settings', variant: 'danger', chromeViaKit: true },
-  { id: 'auth-submit', surface: 'auth', variant: 'primary', chromeViaKit: false },
+  { id: 'auth-submit', surface: 'auth', variant: 'primary', chromeViaKit: true },
+  { id: 'sheet-exit', surface: 'settings', variant: 'primary', chromeViaKit: true },
+  { id: 'guide-got-it', surface: 'guide', variant: 'primary', chromeViaKit: true },
+  { id: 'leaderboard-retry', surface: 'leaderboard', variant: 'primary', chromeViaKit: true },
+  { id: 'leaderboard-back', surface: 'leaderboard', variant: 'secondary', chromeViaKit: true },
+  { id: 'preview-jump-row', surface: 'settings', variant: 'ghost', chromeViaKit: true },
   { id: 'auth-secondary', surface: 'auth', variant: 'secondary', chromeViaKit: true },
   { id: 'install', surface: 'install', variant: 'secondary', chromeViaKit: false },
   { id: 'overlay-close', surface: 'menu', variant: 'icon', chromeViaKit: false }

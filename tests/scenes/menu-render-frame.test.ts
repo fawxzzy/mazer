@@ -1918,8 +1918,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(clearUiSource).toContain('for (const graphic of this.uiGraphics) {');
     expect(clearUiSource).toContain('graphic.destroy();');
     expect(clearUiSource).toContain('this.uiGraphics = [];');
-    expect(menuSceneSource).toContain("const unifiedAuthDockButton = this.overlay === 'auth' && (tone === 'primary' || tone === 'danger');");
-    expect(menuSceneSource).toContain("const unifiedAuthDanger = unifiedAuthDockButton && tone === 'danger';");
+    // MAZER-UI-099: the gate's primary action draws through the shared kit chrome; only the danger dock keeps the pale pill.
+    expect(menuSceneSource).toContain("const unifiedAuthDockButton = this.overlay === 'auth' && tone === 'danger';");
+    expect(menuSceneSource).toContain("const unifiedAuthPrimary = this.overlay === 'auth' && tone === 'primary';");
+    expect(menuSceneSource).toContain('const unifiedAuthDanger = unifiedAuthDockButton;');
     expect(menuSceneSource).toContain('if (unifiedAuthDockButton) {');
     expect(menuSceneSource).toContain('const accentColor = unifiedAuthDanger ? cyberArcadeMaterial.signal.goal : LEGACY_PLAY_TOUCH_ACCENT;');
     expect(menuSceneSource).not.toContain("text: 'Log out'");
