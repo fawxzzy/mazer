@@ -626,6 +626,13 @@ import {
   type LegacyLeaderboardOverlayPlan
 } from '../legacy-runtime/legacyLeaderboardOverlayPlan';
 import {
+  buildLegacyModeSelectPlan,
+  readLegacyModeSelectPreviewFlags,
+  type LegacyModeSelectItem,
+  type LegacyModeSelectPlan,
+  type LegacyModeSelectRect
+} from '../legacy-runtime/legacyModeSelectPlan';
+import {
   buildLegacyLeaderboardViewModel,
   resolveLegacyLeaderboardRequest,
   resolveLegacyLeaderboardTierColor,
@@ -773,6 +780,8 @@ import { dismissInstallSurface, getInstallSurfaceState, promptInstallSurface } f
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
+// DESIGN-OPTIONS PROTOTYPE (not shipped): ?modeSelectPreview=A|B|C turns the Play tap into a mode-select sheet.
+const MODE_SELECT_FLAGS = readLegacyModeSelectPreviewFlags(typeof window === 'undefined' ? '' : window.location.search);
 type LegacyMenuStaticDrawLifecyclePhase = 'idle' | 'building' | 'settled' | 'deconstructing';
 type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';
 type RuntimeGenerationStage = NonNullable<LegacyMazeSnapshot['generation']>['executionPlan'][number];
@@ -1891,6 +1900,8 @@ export class MenuScene extends Phaser.Scene {
   private mode: RuntimeMode = 'menu';
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
+  private modeSelectIndex = MODE_SELECT_FLAGS.index;
+  private modeSelectAutoOpened = false;
   // Wave 3A live command/state bridge -- see src/state/uiLegacyBridge.ts.
   // Null only before create() installs it and after shutdown destroys it.
   private uiBridge: UiLegacyBridge | null = null;
@@ -3370,6 +3381,18 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public update(time: number, delta: number): void {
+    if (
+      MODE_SELECT_FLAGS.variant !== null
+      && MODE_SELECT_FLAGS.autoOpen
+      && !this.modeSelectAutoOpened
+      && time > 1500
+      && this.mode === 'menu'
+      && this.overlay === 'none'
+      && this.hasLegacyPlayAccess()
+    ) {
+      this.modeSelectAutoOpened = true;
+      this.openOverlay('mode-select');
+    }
     if (this.floatingAnchor?.active === true) {
       this.advanceLegacyFloatingAnchor(time);
     }
@@ -5097,7 +5120,7 @@ export class MenuScene extends Phaser.Scene {
     })) {
       return false;
     }
-    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+    this.requestLegacyPlayStart();
     return true;
   }
 
@@ -11658,7 +11681,7 @@ export class MenuScene extends Phaser.Scene {
               isPhoneWidth ? Math.max(primaryButtonWidth, this.layout.width) : primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
-              () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
+              () => this.requestLegacyPlayStart(),
               // Harness/diagnostics keep addressing this action as 'Start' (the visible label changed).
               { explicitHitZone: true, semanticAction: 'Start' }
             )
@@ -11689,6 +11712,9 @@ export class MenuScene extends Phaser.Scene {
         break;
       case 'leaderboard':
         this.buildLeaderboardOverlay();
+        break;
+      case 'mode-select':
+        this.buildModeSelectOverlay();
         break;
     }
 
@@ -12836,6 +12862,262 @@ export class MenuScene extends Phaser.Scene {
     }
     this.uiTexts.push(label);
     return label;
+  }
+
+  // DESIGN-OPTIONS PROTOTYPE (not shipped). Contract section 9: Play opens the mode-select sheet; choosing
+  // Endless starts the run exactly as Play does today. The three layouts share one plan module and one item model.
+  private requestLegacyPlayStart(): void {
+    if (MODE_SELECT_FLAGS.variant !== null && this.mode === 'menu') {
+      this.openOverlay('mode-select');
+      return;
+    }
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+  }
+
+  private resolveModeSelectItems(): LegacyModeSelectItem[] {
+    const track = this.progressionState.tracks.player;
+    // Sample numbers (clearly labelled on the options page) because a fresh QA account has no saved level.
+    const level = MODE_SELECT_FLAGS.sample ? 37 : Number(track.level);
+    const rank = MODE_SELECT_FLAGS.sample ? 'C' : String(track.rank);
+    return [
+      {
+        id: 'endless',
+        label: 'Endless',
+        playable: true,
+        stats: [{ label: 'Level', value: String(level) }, { label: 'Rank', value: rank }],
+        tagline: 'Every level harder than the last'
+      },
+      { id: 'hazards', label: 'Hazards', playable: false, stats: [], tagline: 'Obstacles and enemies' },
+      { id: 'future', label: 'More soon', playable: false, stats: [], tagline: 'New modes land here' }
+    ];
+  }
+
+  private startModeSelectItem(item: LegacyModeSelectItem): void {
+    if (!item.playable) {
+      return;
+    }
+    this.closeOverlay();
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+  }
+
+  private createModeSelectHitZone(rect: LegacyModeSelectRect, text: string, onClick: () => void): UiButton {
+    const cx = rect.left + (rect.width / 2);
+    const cy = rect.top + (rect.height / 2);
+    const background = this.add.rectangle(cx, cy, rect.width, rect.height, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerdown', onClick);
+    const label = this.add.text(cx, cy, '', { fontSize: '1px' }).setVisible(false);
+    return {
+      background,
+      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      },
+      label,
+      setActive: () => undefined,
+      text
+    };
+  }
+
+  private paintModeSelectLock(cx: number, cy: number, color: number, alpha: number): void {
+    const g = this.overlayGraphics;
+    g.lineStyle(2, color, alpha);
+    g.beginPath();
+    g.arc(cx, cy - 3, 5, Math.PI, 0, false);
+    g.strokePath();
+    g.fillStyle(color, alpha);
+    g.fillRoundedRect(cx - 7, cy - 3, 14, 11, 3);
+  }
+
+  private paintModeSelectGlyph(id: string, cx: number, cy: number, color: number, alpha: number): void {
+    const g = this.overlayGraphics;
+    if (id === 'endless') {
+      // A corridor with a star at its end: the one-line summary of Endless.
+      g.lineStyle(3, color, alpha);
+      g.beginPath();
+      g.moveTo(cx - 22, cy + 10);
+      g.lineTo(cx - 6, cy + 10);
+      g.lineTo(cx - 6, cy - 8);
+      g.lineTo(cx + 14, cy - 8);
+      g.strokePath();
+      g.fillStyle(color, alpha);
+      g.fillCircle(cx + 20, cy - 8, 4);
+      return;
+    }
+    if (id === 'hazards') {
+      g.lineStyle(3, color, alpha);
+      g.strokeRoundedRect(cx - 12, cy - 12, 24, 24, 5);
+      g.beginPath();
+      g.moveTo(cx - 6, cy - 6);
+      g.lineTo(cx + 6, cy + 6);
+      g.moveTo(cx + 6, cy - 6);
+      g.lineTo(cx - 6, cy + 6);
+      g.strokePath();
+      return;
+    }
+    g.lineStyle(3, color, alpha);
+    g.beginPath();
+    g.moveTo(cx - 10, cy);
+    g.lineTo(cx + 10, cy);
+    g.moveTo(cx, cy - 10);
+    g.lineTo(cx, cy + 10);
+    g.strokePath();
+  }
+
+  private paintModeSelectCardChrome(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): { accent: number; textColor: number; alpha: number } {
+    const material = cyberArcadeMaterial;
+    const g = this.overlayGraphics;
+    const accent = item.playable ? material.rail.mint : material.rail.muted;
+    const lit = item.playable && selected;
+    g.fillStyle(accent, lit ? 0.14 : (item.playable ? 0.07 : 0.04));
+    g.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, LEGACY_UI_CONTROL_RADIUS);
+    const lockedSelected = selected && !item.playable;
+    g.lineStyle(lit || lockedSelected ? 2 : 1, accent, lit ? 0.85 : (lockedSelected ? 0.75 : (item.playable ? 0.45 : 0.3)));
+    g.strokeRoundedRect(rect.left + 0.5, rect.top + 0.5, rect.width - 1, rect.height - 1, LEGACY_UI_CONTROL_RADIUS);
+    return { accent, alpha: item.playable ? 1 : 0.6, textColor: item.playable ? 0xecfff5 : material.rail.muted };
+  }
+
+  private formatModeSelectStats(item: LegacyModeSelectItem): string {
+    return item.stats.map((stat) => `${stat.label} ${stat.value}`).join('   ');
+  }
+
+  private paintModeSelectStackCard(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
+    const material = cyberArcadeMaterial;
+    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
+    const textLeft = rect.left + 68;
+    this.paintModeSelectGlyph(item.id, rect.left + 36, rect.top + (rect.height / 2), chrome.accent, chrome.alpha);
+    this.addLegacyLeaderboardText(textLeft, rect.top + 26, item.label, chrome.textColor, 18, 0, rect.width - 68 - 44, { bold: true });
+    this.addLegacyLeaderboardText(textLeft, rect.top + 49, item.tagline, material.rail.muted, 12, 0, rect.width - 68 - 44);
+    if (item.playable) {
+      this.addLegacyLeaderboardText(textLeft, rect.top + 71, this.formatModeSelectStats(item), material.rail.mint, 12, 0, rect.width - 68 - 44, { bold: true });
+      this.addLegacyLeaderboardText(rect.left + rect.width - 22, rect.top + (rect.height / 2), '>', material.rail.mint, 22, 0.5, 24, { bold: true });
+    } else {
+      this.addLegacyLeaderboardText(textLeft, rect.top + 71, 'Coming soon', material.rail.muted, 12, 0, rect.width - 68 - 44, { bold: true });
+      this.paintModeSelectLock(rect.left + rect.width - 26, rect.top + (rect.height / 2), material.rail.muted, 0.8);
+    }
+  }
+
+  private paintModeSelectPagerCard(rect: LegacyModeSelectRect, item: LegacyModeSelectItem): void {
+    const material = cyberArcadeMaterial;
+    const chrome = this.paintModeSelectCardChrome(rect, item, true);
+    const cx = rect.left + (rect.width / 2);
+    this.paintModeSelectGlyph(item.id, cx, rect.top + 42, chrome.accent, chrome.alpha);
+    this.addLegacyLeaderboardText(cx, rect.top + 88, item.label, chrome.textColor, 26, 0.5, rect.width - 112, { bold: true });
+    this.addLegacyLeaderboardText(cx, rect.top + 114, item.tagline, material.rail.muted, 13, 0.5, rect.width - 112);
+    if (item.playable) {
+      const half = rect.width / 4;
+      item.stats.forEach((stat, index) => {
+        const sx = rect.left + (rect.width / 2) + ((index === 0 ? -1 : 1) * half * 0.8);
+        this.addLegacyLeaderboardText(sx, rect.top + 160, stat.value, material.rail.mint, 30, 0.5, 80, { bold: true });
+        this.addLegacyLeaderboardText(sx, rect.top + 190, stat.label.toUpperCase(), material.rail.muted, 11, 0.5, 80, { bold: true });
+      });
+    } else {
+      this.paintModeSelectLock(cx, rect.top + 166, material.rail.muted, 0.8);
+      this.addLegacyLeaderboardText(cx, rect.top + 196, 'Coming soon', material.rail.muted, 13, 0.5, rect.width - 112, { bold: true });
+    }
+  }
+
+  private paintModeSelectTile(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
+    const material = cyberArcadeMaterial;
+    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
+    const cx = rect.left + (rect.width / 2);
+    this.paintModeSelectGlyph(item.id, cx, rect.top + 36, chrome.accent, chrome.alpha);
+    this.addLegacyLeaderboardText(cx, rect.top + 82, item.label, chrome.textColor, 17, 0.5, rect.width - 16, { bold: true });
+    if (item.playable) {
+      this.addLegacyLeaderboardText(cx, rect.top + 108, this.formatModeSelectStats(item).replace('Level ', 'Lv '), material.rail.mint, 13, 0.5, rect.width - 16, { bold: true });
+    } else {
+      this.paintModeSelectLock(cx, rect.top + 112, material.rail.muted, 0.8);
+    }
+    this.addLegacyLeaderboardText(cx, rect.top + 136, item.playable ? 'Tap to select' : 'Coming soon', material.rail.muted, 11, 0.5, rect.width - 16);
+  }
+
+  private buildModeSelectOverlay(): void {
+    const variant = MODE_SELECT_FLAGS.variant ?? 'stack';
+    const items = this.resolveModeSelectItems();
+    const plan: LegacyModeSelectPlan = buildLegacyModeSelectPlan(
+      variant,
+      items,
+      this.modeSelectIndex,
+      this.layout.width,
+      this.layout.height,
+      readMazerViewportGeometry().safeArea
+    );
+    const material = cyberArcadeMaterial;
+    this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+
+    for (const entry of plan.items) {
+      const select = (): void => {
+        this.modeSelectIndex = entry.index;
+        if (variant === 'stack' && entry.item.playable) {
+          this.startModeSelectItem(entry.item);
+          return;
+        }
+        this.uiDirty = true;
+      };
+      if (variant === 'stack') {
+        this.paintModeSelectStackCard(entry.rect, entry.item, entry.item.playable);
+        if (entry.item.playable) {
+          this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
+        }
+      } else if (variant === 'pager') {
+        this.paintModeSelectPagerCard(entry.rect, entry.item);
+      } else {
+        this.paintModeSelectTile(entry.rect, entry.item, entry.selected);
+        this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
+      }
+    }
+
+    if (plan.pager !== null) {
+      const step = (delta: number): void => {
+        this.modeSelectIndex = (plan.items[0]!.index + delta + items.length) % items.length;
+        this.uiDirty = true;
+      };
+      for (const dot of plan.pager.dots) {
+        this.overlayGraphics.fillStyle(dot.active ? material.rail.mint : material.rail.muted, dot.active ? 1 : 0.45);
+        this.overlayGraphics.fillCircle(dot.cx, dot.cy, dot.active ? 4 : 3);
+      }
+      this.addLegacyLeaderboardText(plan.pager.prev.left + 24, plan.pager.prev.top + 24, '<', material.rail.mint, 26, 0.5, 30, { bold: true });
+      this.addLegacyLeaderboardText(plan.pager.next.left + 24, plan.pager.next.top + 24, '>', material.rail.mint, 26, 0.5, 30, { bold: true });
+      this.uiButtons.push(this.createModeSelectHitZone(plan.pager.prev, 'Previous mode', () => step(-1)));
+      this.uiButtons.push(this.createModeSelectHitZone(plan.pager.next, 'Next mode', () => step(1)));
+    }
+
+    if (plan.detail !== null) {
+      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
+      const d = plan.detail;
+      this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.4);
+      this.overlayGraphics.lineBetween(d.left, d.top + 0.5, d.left + d.width, d.top + 0.5);
+      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 20, current.playable ? `${current.label}: ${current.tagline}` : `${current.label}: not playable yet`, 0xecfff5, 13, 0.5, d.width, { bold: true });
+      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 44, current.playable ? 'Your level and score live in this mode.' : 'Not playable yet. Your Endless progress is unaffected.', material.rail.muted, 12, 0.5, d.width);
+    }
+
+    if (plan.play !== null) {
+      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        plan.play.rect.left + (plan.play.rect.width / 2),
+        plan.play.rect.top + (plan.play.rect.height / 2),
+        plan.play.rect.width,
+        plan.play.rect.height,
+        plan.play.label,
+        () => this.startModeSelectItem(current),
+        plan.play.disabled ? 'secondary' : 'primary',
+        undefined,
+        { disabled: plan.play.disabled }
+      ));
+    }
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.back.left + (plan.back.width / 2),
+      plan.back.top + (plan.back.height / 2),
+      plan.back.width,
+      plan.back.height,
+      plan.backLabel,
+      () => this.handleBackAction(),
+      'secondary'
+    ));
   }
 
   private buildLeaderboardOverlay(): void {
