@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
-  drawStarDustTrailToCanvasContext,
+  drawStarDustTrailFullToCanvasContext,
   type StarDustDrawOptions,
   type StarDustSegment
 } from '../../src/render/starDustTrailCanvas';
@@ -120,7 +120,7 @@ describe('plan painter at SHIPPED_PLAN is today\'s draw', () => {
     const shipped = loggingContext();
     const plan = loggingContext();
     const options = { ...OPTIONS, animated };
-    const a = drawStarDustTrailToCanvasContext(shipped.ctx, route(), options);
+    const a = drawStarDustTrailFullToCanvasContext(shipped.ctx, route(), options);
     const b = drawStarDustWithPlan(plan.ctx, route(), options, SHIPPED_PLAN);
     expect(b).toBe(a);
     expect(a).toBeGreaterThan(50);
@@ -132,12 +132,19 @@ describe('plan painter at SHIPPED_PLAN is today\'s draw', () => {
     expect(TRAIL_PERF_RUNS.filter((r) => r.engine === 'chromium').length).toBeGreaterThanOrEqual(2);
     const a = describeTrailPerfMeasurement('A');
     expect(a).toHaveLength(2);
-    expect(a[0]).toMatch(/^WebKit: walk \d+ vs \d+, \d+ vs \d+ ms; idle /);
-    expect(describeTrailPerfMeasurement('shipped')[1]).not.toContain('vs');
+    expect(a[0]).toMatch(/^WebKit: walk \d\.\d\d( to \d\.\d\d)?x Before; idle \d\.\d\d( to \d\.\d\d)?x \(\d+ runs\)$/);
+    // Ratios are against Before from the same run: run 1's A walk 249.7 / 326.6 = 0.76 is inside the WebKit range.
+    const [low, high] = a[0]!.match(/walk ([\d.]+)(?: to ([\d.]+))?x/)!.slice(1).map((v) => Number(v));
+    expect(low).toBeLessThanOrEqual(0.77);
+    expect(high ?? low).toBeGreaterThanOrEqual(0.76);
+    expect(describeTrailPerfMeasurement('CA')).toHaveLength(2);
+    expect(describeTrailPerfMeasurement('CA')[0]).toMatch(/^WebKit: walk .*x Before; idle .*x \(\d+ runs\)$/);
+    expect(describeTrailPerfMeasurement('shipped')[1]).toMatch(/^Chromium 4x: walk \d+ to \d+ ms; idle \d+ to \d+ ms \(\d+ runs\)$/);
   });
 
-  test('the variant table: Today plus three options, unknown ids fall back to Today', () => {
-    expect(TRAIL_PERF_VARIANTS.map((v) => v.id)).toEqual(['shipped', 'A', 'B', 'C']);
+  test('the variant table: Before, the three options and the shipped C + A; unknown ids fall back to Before', () => {
+    expect(TRAIL_PERF_VARIANTS.map((v) => v.id)).toEqual(['shipped', 'A', 'B', 'C', 'CA']);
+    expect(findTrailPerfVariant('CA').plan).toMatchObject({ bloom: 'coarse', thread: 'coarse', coarseBloomGain: 2.5 });
     expect(findTrailPerfVariant('nope').id).toBe('shipped');
     expect(findTrailPerfVariant('C').plan.bodyCache).not.toBeNull();
     for (const v of TRAIL_PERF_VARIANTS) expect(v.look.length).toBeGreaterThan(20);

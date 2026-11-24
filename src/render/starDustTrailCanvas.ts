@@ -27,7 +27,6 @@ import { chunkTrailSegments, type TrailCanvasSegment } from './navigationCoreTra
 import { drawTrailBloomChunks } from './trailLayersCanvas';
 import { PALETTE_WHITE, mixPaletteRgb } from './trailPalette';
 import { withCosmeticColours } from '../theme/cosmeticScope';
-import { getStarDustTrailRenderOverride } from './starDustRenderOverride';
 
 export const STAR_DUST_TRAIL = Object.freeze({
   /** Distance between sparkle centres along the route, in tiles. */
@@ -85,6 +84,12 @@ export interface StarDustDrawOptions {
   animated: boolean;
   /** How far (px) Trail Fade has moved the route's start since the level began: keeps sparkles fixed on the floor. */
   originAdvancePx: number;
+  /**
+   * MAZER-PERF-017 cached trail (starDustTrailCache.ts): the WHOLE route's length (px) when `segments` is only its older
+   * part. Sizes still taper by age along the whole route, and the slice's far end is not the route's end, so no sparkle
+   * is placed on it (the next slice places that one). Unset: the segments are the whole route, as before.
+   */
+  routeLengthPx?: number;
 }
 
 /** Largest distance (css px) a sparkle reaches past the route, keyline included: the trail canvas's padding. */
@@ -150,7 +155,7 @@ const segmentStart = (segment: StarDustSegment, fallback: number): number => (
  */
 export const placeStarDustSparkles = (
   segments: readonly StarDustSegment[],
-  options: Pick<StarDustDrawOptions, 'tileSize' | 'timeMs' | 'animated' | 'originAdvancePx'>
+  options: Pick<StarDustDrawOptions, 'tileSize' | 'timeMs' | 'animated' | 'originAdvancePx' | 'routeLengthPx'>
 ): number => {
   const k = STAR_DUST_TRAIL;
   const tile = options.tileSize;
@@ -171,6 +176,11 @@ export const placeStarDustSparkles = (
   if (!(total > 0)) {
     return 0;
   }
+  // A slice of a longer route: ages run over the whole route and the slice's last point is not the route's end.
+  const sliceOfLonger = Number.isFinite(options.routeLengthPx) && options.routeLengthPx! > total + 1e-9;
+  if (sliceOfLonger) {
+    total = options.routeLengthPx!;
+  }
   ensureScratch(Math.ceil(total / spacing) + 2);
 
   let count = 0;
@@ -183,7 +193,7 @@ export const placeStarDustSparkles = (
     if (!(len > 0)) {
       continue;
     }
-    const last = i === segments.length - 1;
+    const last = i === segments.length - 1 && !sliceOfLonger;
     let index = Math.ceil((d0 + advance) / spacing - 1e-9);
     for (;;) {
       const d = (index * spacing) - advance;
@@ -432,8 +442,13 @@ const drawStarDustTrailToCanvasContextImpl = (
 
 // MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
 export const drawStarDustToGraphics: typeof drawStarDustToGraphicsImpl = (...args: Parameters<typeof drawStarDustToGraphicsImpl>) => withCosmeticColours(() => drawStarDustToGraphicsImpl(...args));
-// The override is the trail-cost options page's seam (starDustRenderOverride.ts); it is never set in the game.
-export const drawStarDustTrailToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => (getStarDustTrailRenderOverride() ?? drawStarDustTrailToCanvasContextImpl)(...args));
+/**
+ * The whole trail repainted in one pass, every layer of every sparkle: the painter the game used until MAZER-PERF-017's
+ * cached trail. The game now draws through drawStarDustTrailToCanvasContext in starDustTrailCache.ts (older trail cached,
+ * live head painted per frame); this one stays as the reference the cache is checked against, and as the "Before" row of
+ * the trail-cost options page.
+ */
+export const drawStarDustTrailFullToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => drawStarDustTrailToCanvasContextImpl(...args));
 
 /** Per-sparkle stride and the live scratch of the last placement (the options-page renderer reads it; no copy). */
 export const STAR_DUST_SCRATCH_STRIDE = STRIDE;

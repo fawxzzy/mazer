@@ -1,8 +1,9 @@
 /**
  * Options-page seam for the star-dust trail draw (MAZER-PERF-017 follow-up, trail cost options). Dormant in the game:
- * nothing in a shipping entry sets it, so `drawStarDustTrailToCanvasContext` always runs the shipped draw. Only the dev
- * page `trail-perf-options.html` (not a build input) installs a renderer here, to show cheaper variants on the real
- * scene with the real trail. Pinned by tests/architecture/trail-perf-options-dormant.test.ts.
+ * nothing in a shipping entry sets it, so `drawStarDustTrailToCanvasContext` (starDustTrailCache.ts) always runs the
+ * game's cached painter (C + A, owner pick 2026-11-24). Only the dev page `trail-perf-options.html` (not a build input)
+ * installs a renderer here, to compare the other painters (the full repaint "Before", A, B, C) on the real scene with the
+ * real trail. Pinned by tests/architecture/trail-perf-options-dormant.test.ts.
  */
 import type { StarDustDrawOptions, StarDustSegment } from './starDustTrailCanvas';
 

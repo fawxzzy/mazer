@@ -182,7 +182,7 @@ describe('trail rebuild: canvas work per rebuild (long route, 3x phone)', () => 
 
   test('star dust: bounded strokes and fills, keylines in one path', async () => {
     const doc = freshDocument();
-    const { drawStarDustTrailToCanvasContext } = await import('../../src/render/starDustTrailCanvas');
+    const { drawStarDustTrailFullToCanvasContext } = await import('../../src/render/starDustTrailCanvas');
     const { chunkTrailSegments } = await import('../../src/render/navigationCoreTrailCanvas');
     const segments = buildSegments();
     const chunks = chunkTrailSegments(segments).length;
@@ -201,7 +201,7 @@ describe('trail rebuild: canvas work per rebuild (long route, 3x phone)', () => 
       animated: true,
       originAdvancePx: 0
     };
-    const sparkles = drawStarDustTrailToCanvasContext(target.ctx, segments, dust);
+    const sparkles = drawStarDustTrailFullToCanvasContext(target.ctx, segments, dust);
     const scratch = doc.created[0];
     const strokes = target.count('stroke') + (scratch?.count('stroke') ?? 0);
     const fills = target.count('fill');
@@ -213,6 +213,38 @@ describe('trail rebuild: canvas work per rebuild (long route, 3x phone)', () => 
     // Sparkle count is bounded by the route length, not by how many frames have run (see STAR_DUST_TRAIL).
     expect(sparkles).toBeLessThanOrEqual(segments.length);
     expect(target.count('save')).toBe(target.count('restore'));
+  });
+
+  test('star dust, cached (the game painter since MAZER-PERF-017 C + A): a walking frame repaints only the head', async () => {
+    const doc = freshDocument();
+    const { createStarDustTrailCache, STAR_DUST_TRAIL_CACHE } = await import('../../src/render/starDustTrailCache');
+    const segments = buildSegments();
+    const dust: StarDustDrawOptions = {
+      originX: 0, originY: 0, tileSize: tile, coreWidth: 5, glowWidth: 12, glowAlphaRatio: 0.5, glowBlurPx: GLOW_BLUR_PX,
+      keylineColor: 0xffffff, keylineAlpha: 1, timeMs: 1000, animated: true, originAdvancePx: 0
+    };
+    const cache = createStarDustTrailCache();
+    cache(targetCanvas().ctx, segments, dust); // builds the cached layer
+    const offscreenStrokes = (): number => doc.created.reduce((sum, c) => sum + c.count('stroke'), 0);
+    const strokesBefore = offscreenStrokes();
+    const createdBefore = doc.created.length;
+    const frame = targetCanvas();
+    const sparkles = cache(frame.ctx, segments, { ...dust, timeMs: 1100 });
+    expect(cache.stats).toMatchObject({ bodyRebuilds: 1, headPaints: 2 });
+    // The walking frame makes no canvas; its blurred strokes go to the (reused) downscaled bloom scratch.
+    expect(doc.created.length).toBe(createdBefore);
+    const scratchStrokes = offscreenStrokes() - strokesBefore;
+    // Measured: 8-16 tiles of head = 25-50 live sparkles; coarse bloom + thread one piece per tile (~16 + 16 strokes) +
+    // one keyline stroke; fills = live sparkles + the cached ones under the head's glow (~10). A full paint at this
+    // length is ~2,400 strokes and ~450 fills (the test above).
+    const maxHeadTiles = STAR_DUST_TRAIL_CACHE.headTiles + STAR_DUST_TRAIL_CACHE.rebuildAfterTiles;
+    expect(sparkles).toBeLessThanOrEqual(Math.ceil(maxHeadTiles / 0.34) + 2);
+    expect(frame.count('stroke') + scratchStrokes).toBeLessThanOrEqual((2 * (maxHeadTiles + 2)) + 4);
+    expect(frame.count('fill')).toBeLessThanOrEqual(sparkles + 40);
+    // One blit of the cached layer at a whole device pixel (no resampling) plus the head bloom's upscale.
+    expect(frame.count('drawImage')).toBeLessThanOrEqual(2);
+    expect(createdBefore).toBeLessThanOrEqual(3); // cached layer + the two bloom scratches (full and coarse)
+    expect(frame.count('save')).toBe(frame.count('restore'));
   });
 });
 
