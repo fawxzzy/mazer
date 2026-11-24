@@ -229,7 +229,10 @@ export const readStarDustSparkle = (index: number): { x: number; y: number; radi
   };
 };
 
-const traceStar = (ctx: CanvasRenderingContext2D, base: number, ox: number, oy: number, waist: number): void => {
+/** Where a star outline is traced: the context's own path or a Path2D (both implement CanvasPath). */
+type StarPathSink = Pick<CanvasPath, 'moveTo' | 'lineTo' | 'closePath'>;
+
+const traceStar = (ctx: StarPathSink, base: number, ox: number, oy: number, waist: number): void => {
   const data = sparkleScratch;
   const x = data[base]! - ox;
   const y = data[base + 1]! - oy;
@@ -249,6 +252,36 @@ const traceStar = (ctx: CanvasRenderingContext2D, base: number, ox: number, oy: 
     }
   }
   ctx.closePath();
+};
+
+/** Sparkles per Path2D batch in the keyline path (see traceKeylinePath). */
+export const STAR_DUST_KEYLINE_BATCH = 64;
+
+/**
+ * MAZER-PERF-017: the keyline path for the first `count` placed sparkles, built as Path2D batches joined with addPath, or
+ * null when Path2D is unavailable (the caller then traces into the context path, as before).
+ *
+ * Why: Chromium's closePath costs time in proportion to the path it closes (measured in Chrome 158: one path of 4000
+ * eight-point stars took 161 ms with closePath, 6 ms without). With every keyline in one path, the keyline pass grew
+ * with the SQUARE of the sparkle count, which is what made long trails lag (L300 at 390x844@3, 4x CPU throttle: about
+ * half of every trail rebuild). Each batch now closes only its own few subpaths, so the cost is linear. addPath with no
+ * transform appends the same verbs and points in the same order, and it is still one stroke, so overlapping keylines
+ * are painted once as before: the pixels are identical (getImageData diff 0, scripts/analysis/check-star-dust-keyline-equivalence.mjs).
+ */
+const traceKeylinePath = (count: number, ox: number, oy: number, waist: number): Path2D | null => {
+  if (typeof Path2D !== 'function') {
+    return null;
+  }
+  const path = new Path2D();
+  for (let first = 0; first < count; first += STAR_DUST_KEYLINE_BATCH) {
+    const batch = new Path2D();
+    const end = Math.min(count, first + STAR_DUST_KEYLINE_BATCH);
+    for (let i = first; i < end; i += 1) {
+      traceStar(batch, i * STRIDE, ox, oy, waist);
+    }
+    path.addPath(batch);
+  }
+  return path;
 };
 
 /** The subset of Phaser.GameObjects.Graphics the static star-dust legend paints with. */
@@ -366,13 +399,20 @@ const drawStarDustTrailToCanvasContextImpl = (
     // 3. every keyline in one path, one stroke (same colour and alpha for all).
     ctx.lineJoin = 'miter';
     ctx.miterLimit = 4;
-    ctx.beginPath();
-    for (let i = 0; i < count; i += 1) {
-      traceStar(ctx, i * STRIDE, ox, oy, k.waistRatio);
+    const keylinePath = traceKeylinePath(count, ox, oy, k.waistRatio);
+    if (!keylinePath) {
+      ctx.beginPath();
+      for (let i = 0; i < count; i += 1) {
+        traceStar(ctx, i * STRIDE, ox, oy, k.waistRatio);
+      }
     }
     ctx.lineWidth = resolveStarDustKeylineWidth(options.tileSize);
     ctx.strokeStyle = rgba(options.keylineColor, k.keylineAlpha * Math.max(0, Math.min(1, options.keylineAlpha)));
-    ctx.stroke();
+    if (keylinePath) {
+      ctx.stroke(keylinePath);
+    } else {
+      ctx.stroke();
+    }
 
     // 4. fills, oldest first so the newer (larger) sparkles sit on top.
     for (let i = 0; i < count; i += 1) {
