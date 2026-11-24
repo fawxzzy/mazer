@@ -131,11 +131,23 @@ describe('feedback popup isolation', () => {
     expect(css).toMatch(/--compact \.mazer-feedback__star\s*\{[\s\S]*?height:\s*44px/);
   });
 
-  it('is a proposal only: not a shipping build entry, not imported by the game', () => {
+  it('MAZER-FB-001: the options page is still not a build entry, and the popup stays out of the boot bundle (only a dynamic import loads it)', () => {
     expect(vite).not.toContain('feedback-options');
     const mainSource = readFileSync(resolve(ROOT, 'src/boot/main.ts'), 'utf8');
     const menuSource = readFileSync(resolve(ROOT, 'src/scenes/MenuScene.ts'), 'utf8');
+    const launcherSource = readFileSync(resolve(ROOT, 'src/legacy-runtime/legacyFeedbackLauncher.ts'), 'utf8');
     expect(mainSource).not.toContain('ui/feedback');
     expect(menuSource).not.toContain('ui/feedback');
+    // The launcher imports the DOM mount only as a type and through import(); the state module is the only static value import.
+    expect(launcherSource).toContain("import('../ui/feedback/feedbackMount')");
+    expect(launcherSource).toMatch(/import type \{[^}]*\} from '\.\.\/ui\/feedback\/feedbackMount'/);
+    expect(launcherSource).not.toMatch(/^import \{[^}]*\} from '\.\.\/ui\/feedback\/(feedbackMount|feedbackPopup)'/m);
+  });
+
+  it('signed_out is a calm in-flow notice that keeps the draft', () => {
+    const sending = reduceFeedbackDraft({ ...createFeedbackDraft(), rating: 4, comment: 'hi' }, { type: 'submit' });
+    const back = reduceFeedbackDraft(sending, { type: 'result', result: { status: 'signed_out' } });
+    expect(back).toMatchObject({ comment: 'hi', phase: 'editing', rating: 4 });
+    expect(back.notice).toEqual({ message: FEEDBACK_COPY.signedOutNotice, tone: 'info' });
   });
 });

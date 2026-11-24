@@ -1,8 +1,27 @@
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// MAZER-FB-001: the build id the in-game feedback popup sends with a rating (mazer.mazer_feedback.build_id, which the
+// database accepts only as ^[A-Za-z0-9._+-]{1,64}$). The short commit sha of the build: the deploy platform's sha when
+// present, else the local checkout's, else null (the client then sends no build id; a rating is never lost over it).
+const resolveBuildId = (): string | null => {
+  let sha = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').trim();
+  if (sha === '') {
+    try {
+      sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      sha = '';
+    }
+  }
+  return /^[0-9a-f]{7,64}$/i.test(sha) ? sha.slice(0, 12).toLowerCase() : null;
+};
+
 export default defineConfig({
+  define: {
+    __MAZER_BUILD_ID__: JSON.stringify(resolveBuildId())
+  },
   build: {
     chunkSizeWarningLimit: 1300,
     reportCompressedSize: false,
