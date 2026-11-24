@@ -92,6 +92,8 @@ jobs:
           tests/render/menu-play-label-attention.test.ts
           tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
+          tests/render/type-scale-ratchet.test.ts
+          tests/mazeV2/adapters.test.ts
           --maxWorkers=1
 
       - name: Verify progression, RPC, leaderboard, and UI boundaries
