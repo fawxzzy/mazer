@@ -38,8 +38,8 @@ export const CONTROLLER_HALO_TEXTURE_KEYS = Object.freeze({
 
 type HaloImage = Phaser.GameObjects.Image;
 
-/** Look A's 90 px leash; the first bake before any touch-down has reported the display's real leash. */
-const DEFAULT_LEASH_BAKE_PX = 90;
+/** The default 56 px leash (legacyFloatingAnchor.ts); the first bake before any touch-down has reported the display's real leash. */
+const DEFAULT_LEASH_BAKE_PX = 56;
 
 export class ControllerHaloView {
   private readonly state: ControllerHaloState = createControllerHaloState();

@@ -8,7 +8,7 @@ export const LEGACY_MOVEMENT_PACE_PROFILE_VERSION = 'legacy-movement-pace-v2';
 
 /**
  * Owner request (Zac, 2026-11-12): the player moves a little slower overall and at one constant speed. Step rate is
- * this factor times the previous rate, so repeat interval, hold-start delay and the touch-stick caps are divided by it.
+ * this factor times the previous rate, so repeat interval, hold-start delay and the touch-stick hold-start and turn caps are divided by it (the stick repeat cap is gone, MAZER-CTRL-005: stick and keyboard both step at the repeat interval).
  * Applied once, in scaleLegacyMovementDelayMs; level and pace never change the speed.
  *
  * 2026-11-19 (Zac: "player feels faster, maybe slow ~5%"): 0.92 -> 0.85. The held-touch steps used to land on whole frames

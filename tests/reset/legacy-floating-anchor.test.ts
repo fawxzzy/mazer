@@ -42,12 +42,12 @@ describe('floating anchor: inch from CSS px and DPR', () => {
     expect(resolveCssPxPerInch({ coarsePointer: true, devicePixelRatio: Number.NaN })).toBe(130);
   });
 
-  test('the leash is the option B 90 px on a phone by default, scaled into logical px when the canvas is scaled', () => {
-    expect(FLOATING_ANCHOR_LEASH_INCHES).toBeCloseTo(0.5625, 6);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 }).leashPx).toBeCloseTo(90, 6);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, logicalPerCssPx: 0.5 }).leashPx).toBeCloseTo(45, 6);
+  test('the leash is 56 px (0.35 in) on a phone by default, scaled into logical px when the canvas is scaled', () => {
+    expect(FLOATING_ANCHOR_LEASH_INCHES).toBeCloseTo(0.35, 6);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 }).leashPx).toBeCloseTo(56, 6);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, logicalPerCssPx: 0.5 }).leashPx).toBeCloseTo(28, 6);
     expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: 0.75 }).leashPx).toBe(120);
-    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: -2 }).leashPx).toBeCloseTo(90, 6);
+    expect(resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3, leashInches: -2 }).leashPx).toBeCloseTo(56, 6);
   });
 });
 
@@ -150,7 +150,7 @@ describe('floating anchor: controller', () => {
     expect(cost!).toBeLessThanOrEqual((CONFIG.leashPx / 160) + 0.6);
   });
 
-  test('option B default (90 px leash on a phone): a reversal costs well under the 1-inch leash it replaces', () => {
+  test('default leash (56 px on a phone): a reversal costs well under the 1-inch leash it replaces', () => {
     const config = resolveFloatingAnchorConfig({ coarsePointer: true, devicePixelRatio: 3 });
     const path = HARNESS_PATHS.find((p) => p.name === 'quick-reversal')!;
     const fixedLeash = measureReversalCostInches(simulateHarnessPath(path, CONFIG, 160), 160, 0.1)!;

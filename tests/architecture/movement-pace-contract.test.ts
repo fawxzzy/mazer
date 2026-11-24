@@ -19,7 +19,8 @@ describe('movement pace architecture contract', () => {
     expect(source).not.toContain('levelAdjustment');
     expect(source).not.toContain('paceAdjustment');
     expect(menuScene).toContain('private resolveLegacyPlayMovementSpeedProfile()');
-    expect(menuScene).toContain('moveRepeatMinIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs');
+    expect(menuScene).toContain('moveRepeatMinIntervalMs: LEGACY_PLAY_KEYBOARD_REPEAT_GATE_MIN_MS');
+    expect(menuScene).toContain('movementDelayMs = profile.repeatIntervalMs;');
     expect(menuScene).toContain('const profile = this.resolveLegacyPlayMovementSpeedProfile();');
   });
 });
