@@ -159,6 +159,7 @@ import {
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
+import { getGuideOptionsState, isGuideOptionsRoute, paintGuideOptionsSheet } from '../legacy-runtime/legacyGuideOptionsPainter';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
 import { HazardMomentView } from '../render/hazardMomentRenderer';
 import {
@@ -12316,6 +12317,10 @@ export class MenuScene extends Phaser.Scene {
   // buildLegacyGuideSheetPlan. Icons call the board's own draw functions where
   // the content module says they are shared (goal star, perimeter diamond).
   private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void {
+    if (this.guideOptionsVariant() !== null) {
+      this.buildGuideOptionsOverlay(context);
+      return;
+    }
     const model = buildLegacyGuideSheetModel(context, {
       hasKeyboard: this.resolveLegacyGuideHasKeyboard(),
       // Slice H6: met + live hazard kinds while the layer is on; [] (the unchanged sheet) while off.
@@ -12353,26 +12358,7 @@ export class MenuScene extends Phaser.Scene {
     const scrollMetrics = this.applyLegacySheetScroll(plan.scrollRailViewport, plan.contentHeight, plan.scrollable);
     const scrollOffset = scrollMetrics?.offset ?? 0;
     const viewport = plan.bodyViewport;
-    const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
-    const accentFor = (glyph: LegacyGuideGlyph): number => {
-      switch (glyph) {
-        case 'goal-star': return cyberArcadeMaterial.signal.goal;
-        case 'start-marker': return cyberArcadeMaterial.signal.start;
-        case 'player-block': return cyberArcadeMaterial.signal.player;
-        case 'touch-stick': return cyberArcadeMaterial.rail.mint;
-        case 'trail-swatch': return playerPalette.trailColor;
-        case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
-        case 'bleed-gate': return BLEED_GATE_LIT;
-        case 'level-numeral': return playerPalette.playerCoreColor;
-        case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
-        case 'menu-burger': return MENU_DROPDOWN_ACCENT;
-        case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
-        case 'hazard-gate':
-        case 'hazard-sentry':
-        case 'hazard-hunter':
-        case 'hazard-shard': return resolveGuideHazardAccent(glyph);
-      }
-    };
+    const accentFor = (glyph: LegacyGuideGlyph): number => this.resolveLegacyGuideAccent(glyph);
     // The body scrolls under a geometry mask (the guide is pure text and icons), so a row that is
     // partly scrolled out is clipped at the viewport edge instead of vanishing.
     let guideGraphics: Phaser.GameObjects.Graphics = this.overlayGraphics;
@@ -12470,6 +12456,38 @@ export class MenuScene extends Phaser.Scene {
       () => this.closeLegacyGuideSheet(),
       'primary'
     ));
+  }
+
+  // Guide icon accent per glyph (shared by the shipped Guide and the redesign options).
+  private resolveLegacyGuideAccent(glyph: LegacyGuideGlyph): number {
+    const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
+    switch (glyph) {
+      case 'goal-star': return cyberArcadeMaterial.signal.goal;
+      case 'start-marker': return cyberArcadeMaterial.signal.start;
+      case 'player-block': return cyberArcadeMaterial.signal.player;
+      case 'touch-stick': return cyberArcadeMaterial.rail.mint;
+      case 'trail-swatch': return playerPalette.trailColor;
+      case 'edge-marker': return cyberArcadeMaterial.rail.cyan;
+      case 'bleed-gate': return BLEED_GATE_LIT;
+      case 'level-numeral': return playerPalette.playerCoreColor;
+      case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
+      case 'menu-burger': return MENU_DROPDOWN_ACCENT;
+      case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
+      case 'hazard-gate':
+      case 'hazard-sentry':
+      case 'hazard-hunter':
+      case 'hazard-shard': return resolveGuideHazardAccent(glyph);
+    }
+  }
+
+  // Guide redesign options (2026-11-23): `?guideOptions=A|B|C` swaps the Guide painter. Null on every normal route.
+  private guideOptionsVariant(): string | null {
+    return isGuideOptionsRoute() ? getGuideOptionsState().variant : null;
+  }
+
+  private buildGuideOptionsOverlay(_context: LegacySettingsContext): void {
+    const card = paintGuideOptionsSheet(this);
+    this.overlayGuideBounds = createVisualRect(card.left, card.top, card.width, card.height);
   }
 
   private closeLegacyGuideSheet(): void {
