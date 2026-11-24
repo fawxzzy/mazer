@@ -1722,7 +1722,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
 
-    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard';");
+    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset' | 'leaderboard' | 'mode-select';");
     expect(authSource).toContain('createClient(config.url, config.anonKey');
     expect(authSource).toContain('autoRefreshToken: true');
     expect(authSource).toContain('lock: runLegacyAuthJsLock');
@@ -1793,9 +1793,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Now routes through the Wave 3A bridge first (bridge.dispatch(START_RUN)),
     // falling back to the same real startPlayMode() call only if the bridge
     // rejects or is unavailable.
-    expect(menuSceneSource).toContain(
-      'startLabel,\n              () => this.dispatchUiBridgeCommand({ type: \'START_RUN\' }, () => this.startPlayMode()),'
-    );
+    // MAZER-MODE-002: Start now goes through the one requestLegacyPlayStart hook, which opens the mode-select sheet
+    // from the menu and otherwise keeps the same bridge START_RUN dispatch (pinned in mode-select-flow-contract.test.ts).
+    expect(menuSceneSource).toContain('startLabel,\n              () => this.requestLegacyPlayStart(),');
     expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
     expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");

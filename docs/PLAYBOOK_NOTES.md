@@ -707,3 +707,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Decisions: portrait phones only (desktop and landscape unchanged: 45x27 and 25x51 stay); safe areas and controls clear are kept; felt/difficulty targets are scale based, so a grown grid is slightly less dense; no fixture regeneration was needed. Measured: 390x844 L1 15x33 (tile 24.5, 10 px top and bottom), L30 17x39 (4 px).
 - Rule: a new gate look must paint over the bake's floor painter output, never inside it, so all tile styles stay in step.
 - Not checked: a real phone. Pre-existing failure on origin/main: `type-scale-ratchet.test.ts` (tokens.css font stack), not touched here. #673 and the maze-quality PR (#684, merged) may touch raster fixtures; this PR does not change them.
+
+## 2026-11-24 MAZER-MODE-002: Mode-select sheet after Play (Endless only)
+
+- WHAT changed: Play on the main menu (the START button and tap-to-play) now opens a "Choose a mode" sheet instead of starting the run. It lists Endless (with the player's existing Level and Rank, read only) and one plain locked "More soon" slot; tapping Endless closes the sheet and starts the run through the existing START_RUN path; Back to Menu closes it. Layout is a Stack for up to 3 entries and flips to Tiles past 3 (`resolveLegacyModeSelectVariant`). Pure plan and item model in `src/legacy-runtime/legacyModeSelectPlan.ts`; new overlay kind `mode-select`; one thin hook (`requestLegacyPlayStart`) plus a scene painter in `MenuScene.ts`.
+- WHY: owner decisions 2026-11-24 recorded in `docs/architecture/MAZER-GAME-MODES-PRODUCT-CONTRACT.md` section 13 (sheet shown while Endless is the only mode, no auto-start of the last mode, no named Hazards slot, A Stack now). PR #692 (contract and options page) is folded into this PR.
+- Endless data is untouched: no storage, progression, checkpoint, outbox, network or leaderboard code in the sheet (pinned by `tests/architecture/mode-select-flow-contract.test.ts`); Hazards stays reserved and unreachable; no SQL or database change.
+- QA scripts: `capture-ui-surfaces.mjs` (`clickStartUntilPlay`) and `verify-start-transition-stability.mjs` now tap the Endless card after Start, because Start lands on the sheet.
+- Rule: a new mode needs a registry entry AND a tagline in `LEGACY_MODE_SELECT_TAGLINES` (a test pins it); the list, not the painter, is what changes.
+- Not checked: a real phone, safe areas, the Tiles layout on screen (plan tests only), a signed-in account with real progress (the fixture shows Level 1, Rank E).

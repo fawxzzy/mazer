@@ -2,7 +2,7 @@
 
 Status: product contract plus a shell. It names the game today "Endless", adds a mode registry and a one-tab leaderboard strip, and proposes (never applies) a database column. It adds no new mode, no obstacle, no enemy, no route and no flag, and nothing about how Endless plays changes. It grants no merge, deploy, database, provider, credential or DNS authority.
 
-Amended 2026-11-23 (lane "mode select", DESIGN ONLY): sections 8 to 13 add the mode-select menu that opens after Play, what is per-mode versus global, the lossless move of today's single-mode saves into Endless, the plug-in procedure for the next mode, the locked slot style, and a data-model sketch. The mode-select sheet is NOT built in this repo state: three layout options exist only as a flag-gated prototype branch (section 9) for the owner to pick from, and the pick is still open. Sections 1 to 7 are unchanged except where marked "(amended)".
+Amended 2026-11-23 (design) and 2026-11-24 (build, MAZER-MODE-002): sections 8 to 13 add the mode-select sheet that opens after Play, what is per-mode versus global, the lossless move of today's single-mode saves into Endless, the plug-in procedure for the next mode, the locked slot style, and a data-model sketch. As of 2026-11-24 the sheet IS built (Stack layout, Endless plus one plain locked "More soon" slot) and the owner picks are recorded in section 13; the per-mode storage and database parts (sections 10 and 12) are still design only and nothing in them is applied. Sections 1 to 7 are unchanged except where marked "(amended)".
 
 Owner decisions recorded (Zac, 2026-11-18/19, lane plan `MAZER-LANES-2026-11-18`, section L11 and "Decisions from Zac"): the current gameplay becomes Endless with all progression preserved; obstacles and enemies stay out of Endless and get their own future mode (set up only, do not build); the leaderboard gets one tab per mode; the leaderboard `mode` column is approved IN PRINCIPLE, the exact scratch-tested SQL is shown before any apply; existing scores become Endless.
 
@@ -42,32 +42,32 @@ Obstacles and enemies become their own mode (working name `hazards`), with their
 
 ## 6. Out of scope here (amended)
 
-Any second mode, any database apply, any change to ranking or rank letters, the hazard lab. The mode picker and per-mode storage that this section used to exclude are now designed (sections 8 to 12) but still not built: the build belongs to its own card after the owner picks a layout (section 9) and answers section 13.
+Any second mode, any database apply, any change to ranking or rank letters, the hazard lab. The mode-select sheet is built (MAZER-MODE-002, section 8); per-mode storage (section 10) and the database column (section 12) are still not built or applied.
 
 ## 7. Evidence (headless; nothing checked on a real phone)
 
 `tests/reset/legacy-game-modes.test.ts` (registry, reserved slot unreachable, tab shell in each body, layout, no mode field in requests), the existing leaderboard view/plan/fixture tests, and a phone-emulated screenshot of the Leaderboard sheet.
 
-## 8. Mode-select flow (amended 2026-11-23, DESIGN ONLY)
+## 8. Mode-select flow (built 2026-11-24, MAZER-MODE-002)
 
-- Order: sign-in gate, main menu, **Play** (the START_RUN button and the tap-to-play prompt both go through one entry point), then the **mode-select sheet**, then the chosen mode's run. Back to Menu is always present and always closes the sheet with no state change.
-- The sheet lists the registry modes in registry order, then locked slots (section 11). Endless is the first and only playable entry today.
-- While Endless is the only playable mode the sheet is a deliberate extra tap. Whether to ship it before the second mode exists, or to skip straight into Endless until then, is an owner decision (section 13, Q1). The launch flag `?mode=play` (straight into play) keeps skipping the sheet; deep links never land on it.
-- Each entry shows the mode name, one plain tagline and that mode's own stats (Endless: Level and Rank). Nothing global is shown inside an entry.
-- Choosing a mode starts that mode's run exactly as Play does today. The chosen mode id is remembered as the "last mode" (a global convenience, section 10) and nothing else changes.
-- The sheet is a pure plan module plus a scene painter in the same pattern as the other overlays; it is added in a new `src/legacy-runtime/*` module (Wave 5C: no new behavior inside `MenuScene.ts` beyond a thin hook).
+- Order: sign-in gate, main menu, **Play** (the START button and the tap-to-play prompt both go through one hook, `requestLegacyPlayStart` in `MenuScene.ts`), then the **mode-select sheet**, then the chosen mode's run. Back to Menu is always present and closes the sheet with no state change.
+- The sheet lists the registry modes in registry order, then one plain locked slot (section 11). Endless is the first and only playable entry today. The sheet is shown even while Endless is the only mode (owner decision, section 13 Q1); there is no auto-start of the last mode (Q3).
+- Each entry shows the mode name, one plain tagline and that mode's own stats (Endless: Level and Rank, read from the existing progression, never written by the sheet).
+- Choosing Endless closes the sheet and starts the run through the existing `START_RUN` path, so progression, checkpoint, outbox and leaderboard behave exactly as before.
+- The launch flag `?mode=play` and in-run restarts do not open the sheet; the sheet only opens from the menu surface.
+- Code: pure layout plan and item model in `src/legacy-runtime/legacyModeSelectPlan.ts`; overlay kind `'mode-select'` in `legacyOverlayRouting.ts`; a thin scene painter in `MenuScene.ts`. Tests: `tests/reset/legacy-mode-select-plan.test.ts`, `tests/architecture/mode-select-flow-contract.test.ts`.
 
-## 9. Layout options (owner picks one; NOT built)
+## 9. Layout (decided 2026-11-24: A Stack now, flips to C Tiles past 3 entries)
 
-All three were built as real app UI behind `?modeSelectPreview=A|B|C` on a throwaway prototype branch (`claude/modes-proto-20261123`, never merged) and captured in the real Phaser canvas, light and dark, Chromium and WebKit emulation. The options page is `docs/ops/MAZER-MODE-SELECT-OPTIONS-2026-11-23.html`.
+Three layouts were prototyped as real app UI on a throwaway branch (never merged) and compared on the options page `docs/ops/MAZER-MODE-SELECT-OPTIONS-2026-11-23.html`. The owner delegated the pick; the decision:
 
-| Option | What it is | Taps to start Endless | Scales to | Weakness |
+| Option | What it is | Taps to start Endless | Scales to | Status |
 |---|---|---|---|---|
-| A Stack | One card per mode; tap a card to start it. Locked cards sit below, muted. | 1 | about 4 modes | Becomes a scroll list after about 4 entries |
-| B Pager | One large mode panel with arrows and dots, plus a Play button. | 1 (Play) when Endless is first | about 5 modes | Hides the other modes behind arrows and dots |
-| C Tiles | 2-column grid of tiles, a detail strip for the selected mode, a Play button. | 2 (tile, Play) | 8 or more modes | Needs two taps even for the only playable mode |
+| A Stack | One card per mode; tap a playable card to start it. The locked slot sits below, muted. | 1 | up to 3 entries | **Built; in use up to 3 entries** |
+| C Tiles | 2-column grid of tiles, a detail strip for the selected mode, a Play button. | 2 (tile, Play) | 8 or more modes | **Built in the plan module; used automatically past 3 entries** |
+| B Pager | One large panel with arrows and dots, plus a Play button. | 1 | about 5 modes | Dropped: hides modes behind arrows and scales worst |
 
-Recommendation: **A Stack now**, and move to **C Tiles** when the mode count passes 3 entries (playable plus locked). A is the fewest taps while the list is short and reads like the existing menu sheets, and the plan module is data-driven so the move to C is a variant swap, not a rewrite. B loses: it hides modes behind arrows and scales worst.
+The variant is chosen by entry count only (`resolveLegacyModeSelectVariant`: Stack for 3 or fewer entries, Tiles above), so adding the next mode is a list change and the flip to Tiles needs no rewrite. Entries counted are playable plus locked.
 
 ## 10. Per-mode versus global data
 
@@ -85,12 +85,12 @@ Recommendation: **A Stack now**, and move to **C Tiles** when the mode count pas
 
 Rule: if a value changes how a score is earned or ranked it is per mode; if it changes how the app looks or sounds, or who the player is, it is global.
 
-## 11. Locked and coming-soon slots
+## 11. Locked and coming-soon slots (amended 2026-11-24)
 
-- A reserved slot (today `hazards`, plus a generic "More soon" placeholder) is drawn as a card or tile of the same size as a playable one, with a padlock glyph, muted colors, the label "Coming soon" and a one-line neutral tagline.
-- It has **no Play action** (the button reads "Coming soon", disabled, secondary tone) and it never starts anything, shows a leaderboard tab or writes data.
-- Copy makes no promise of a date or of what the mode contains beyond the registry tagline. The slot states that Endless progress is unaffected.
-- A slot becomes a playable entry only when its card adds it to the registry (plug-in procedure below); the reserved list and the registry never both contain the same id.
+- One plain locked slot is drawn after the playable modes: same size as a playable card, muted colors, a padlock, the name **More soon** and the line "New modes land here". It does **not** name Hazards or any future mode (owner decision, Q4); `hazards` stays in the reserved list in `legacyGameModes.ts` and is never shown.
+- It has no Play action (a Stack locked card is not tappable; the Tiles Play button reads "Locked", disabled, secondary tone) and it never starts anything, shows a leaderboard tab or writes data.
+- Copy makes no promise of a date or of what a mode will contain.
+- A slot becomes a playable entry only when its card adds the mode to the registry (plug-in procedure below), which also needs a tagline in `LEGACY_MODE_SELECT_TAGLINES` (a test pins this).
 
 ## 12. Data-model sketch (NOT applied, NOT built)
 
@@ -119,14 +119,15 @@ Re-run evidence for phase 1 on 2026-11-23, current main `56043a17`: the pinned `
 
 One card per mode, in this order: (1) move its id from the reserved list into `LEGACY_GAME_MODES` with name, tagline and Guide copy; (2) its rules and ladder module; (3) its storage keys through `resolveModeStorageKey`; (4) its server table and functions (own SQL change process, owner box); (5) its leaderboard tab becomes interactive; (6) its mode-select entry turns from a locked slot into a playable one; (7) tests for each step and a phone-emulated capture. The hazards mode additionally needs the reconciliation named in section 5.
 
-## 13. Open questions for the owner
+## 13. Decisions recorded (owner delegated the picks, 2026-11-24: "get it all done, make ur best choices")
 
-- Q1. Show the mode-select sheet while Endless is the only playable mode, or skip straight into Endless until the second mode is real?
-- Q2. Layout pick: A Stack (recommended), B Pager or C Tiles; and whether to auto-switch to C past 3 entries.
-- Q3. Once more than one mode is playable, should Play auto-start the last chosen mode with the sheet reachable from a "Modes" menu entry?
-- Q4. Show a named locked slot (`Hazards`) before its mode is committed, or only a generic "More soon"? The prototype shows both.
-- Q5. Achievements are not built; confirm they should be per mode with an account-wide total.
+- Q1. Show the sheet while Endless is the only mode? **Yes**, shown after Play every time (the owner asked for it).
+- Q2. Layout? **A Stack now**, **C Tiles** automatically past 3 entries; B Pager dropped (section 9).
+- Q3. Auto-start the last chosen mode? **No.** Play always opens the sheet; the "last mode" convenience in section 10 stays unbuilt.
+- Q4. Named locked slot? **No.** A plain "More soon" slot only; Hazards is not named anywhere in the UI.
+- Q5. Achievements? **Per mode, with one account-wide total.** Design only; no table, column or UI is added by this change.
+- Still open (not asked of the owner yet): when the second mode's card starts, the per-mode storage shape (section 10) and the leaderboard `mode` column apply (MODE-001 SQL proposal) are decided and applied in that card, not here.
 
-## 14. Evidence for sections 8 to 13 (headless; nothing checked on a real phone)
+## 14. Evidence for sections 8 to 13 (headless emulation; nothing checked on a real phone)
 
-Prototype branch `claude/modes-proto-20261123` (flag-gated, default off, never merged): `src/legacy-runtime/legacyModeSelectPlan.ts`, a thin `MenuScene.ts` hook and `tests/reset/legacy-mode-select-plan.test.ts` (18 tests: five phone viewports per layout with 44 px targets and no overflow, locked Play disabled, flag parser). Headless click flow in Chromium: Play opens the sheet, Back to Menu closes it, choosing Endless starts play, in all three layouts. Captures in Chromium and WebKit, light and dark, with labelled sample stats (Level 37, Rank C) because local progression fails closed to Level 1 for a fresh fixture account. Not checked: a real iPhone, safe areas, any signed-in real account, any database.
+Built in MAZER-MODE-002 (branch `claude/mode-select-20261124`). Playwright flow in Chromium and WebKit, default and dark-mode themes, 390x844, 360x640 and 768x1024: tap Play opens the sheet, Back to Menu closes it, tap Endless starts play, no console errors; the sheet itself changes no progression, checkpoint or outbox storage key (only the generic `mazer.cycle-telemetry.v1` counter moves, as for any overlay). Captures live under the ATLAS scratch folder `tmp/phone-shot/mode-select-20261124`. The fresh fixture account has no saved progression, so captures show Level 1, Rank E. Not checked: a real iPhone, safe areas, a signed-in real account with progress, the Tiles layout on screen (it is covered by plan tests only), any database.

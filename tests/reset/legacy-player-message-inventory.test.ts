@@ -77,6 +77,8 @@ const MENU = 'src/scenes/MenuScene.ts';
 const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: MENU, literal: 'Progression reset.', kind: 'routed-inline', route: 'move copy into LEGACY_PROGRESSION_MESSAGE_COPY; id progression.player.reset already routed' },
   { file: MENU, literal: 'Runtime diagnostics authenticated fixture.', kind: 'fixture', route: 'none (QA fixture)' },
+  { file: MENU, literal: 'Your level and score live in this mode.', kind: 'static', route: 'mode-select sheet tile detail copy (MAZER-MODE-002); static explainer, no status routing' },
+  { file: MENU, literal: 'Locked for now. Your Endless progress is unaffected.', kind: 'static', route: 'mode-select sheet locked-tile detail copy (MAZER-MODE-002); static explainer, no status routing' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Mazer is ready.', kind: 'static', route: 'static a11y live region; never updated today' },
   { file: 'src/legacy-runtime/legacyAuth.ts', literal: 'Account connected.', kind: 'raw-status', route: 'LEGACY_AUTH_MESSAGE_COPY.accountConnected (info is set on the snapshot with no render site)' },
