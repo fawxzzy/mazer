@@ -103,7 +103,7 @@ describe('player locator wiring in MenuScene', () => {
     expect(glow).toBeGreaterThan(-1);
     expect(marker).toBeGreaterThan(glow);
     const shared = readFileSync(resolve(process.cwd(), 'src/render/sparkPlayerSkin.ts'), 'utf8').replace(/\r\n?/g, '\n');
-    const draw = shared.slice(shared.indexOf('export const drawSparkPlayer'));
+    const draw = shared.slice(shared.indexOf('const drawSparkPlayerImpl'));
     expect(draw.indexOf('pingKitePath(')).toBeGreaterThan(-1);
     expect(draw.indexOf('facet(g,')).toBeGreaterThan(draw.indexOf('pingKitePath('));
   });

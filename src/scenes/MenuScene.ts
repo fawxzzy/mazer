@@ -22,6 +22,8 @@ import {
   resolveBoardTileStyleFromSearch
 } from '../render/boardTileLayer';
 import { StartPinwheelLayer, usesStartPinwheelLayer } from '../render/startPinwheelLayer';
+import { withCosmeticColours } from '../theme/cosmeticScope';
+import { readDarkModePreference, writeDarkModePreference } from '../legacy-runtime/legacyDarkModePreference';
 import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../render/hudIconAtlas';
 import { MazeRevealDriver, resolveMazeMarkerAlpha, type MazeRevealClock } from '../render/mazeRevealDriver';
 import { centerOfCell, drawBoardMarkers, type BoardTileDock } from '../render/boardTileBake';
@@ -1913,6 +1915,9 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-L9: device-local Settings > Floating anchor (default on since CTRL-003 option B). When on, the controller
   // drags playFloatingStickOrigin behind a far finger (src/legacy-runtime/legacyFloatingAnchor.ts).
   private floatingAnchorEnabled = true;
+  // MAZER-UI-102: Settings > Dark mode. The theme itself is installed at boot (src/theme/themeBoot.ts); this mirrors the
+  // stored switch for the row, and flipping it saves and reloads so every baked piece is built under one theme.
+  private darkModeEnabled = false;
   private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
     coarsePointer: true,
     devicePixelRatio: 3
@@ -2442,6 +2447,7 @@ export class MenuScene extends Phaser.Scene {
     this.loadPersistedLegacyAuthSnapshot();
     this.loadPersistedLegacyGameToggleSettings();
     this.floatingAnchorEnabled = readLegacyFloatingAnchorPreference(this.resolveBrowserLocalStorage());
+    this.darkModeEnabled = readDarkModePreference(this.resolveBrowserLocalStorage());
     this.loadPersistedMazeCycleTelemetryHistory();
     this.loadPersistedLegacyProgressionState();
     this.applyBootstrappedLegacyAccountState();
@@ -5103,6 +5109,17 @@ export class MenuScene extends Phaser.Scene {
     );
     this.floatingAnchor.up();
     this.uiDirty = true;
+  }
+
+  private toggleLegacyDarkMode(): void {
+    const next = !this.darkModeEnabled;
+    if (!writeDarkModePreference(this.resolveBrowserLocalStorage(), next)) {
+      return;
+    }
+    this.darkModeEnabled = next;
+    this.uiDirty = true;
+    // Short beat so the switch visibly flips, then a reload applies the theme to everything at once.
+    this.time.delayedCall(160, () => window.location.reload());
   }
 
   private clearLegacyPlayFloatingStick(): void {
@@ -8323,8 +8340,11 @@ export class MenuScene extends Phaser.Scene {
             tileSize,
             progress
           })) {
-            this.boardDynamicGraphics.fillStyle(glowColor, rect.alpha);
-            this.boardDynamicGraphics.fillRect(rect.x, rect.y, rect.width, rect.height);
+            // MAZER-UI-102: the bleed glow is the player's colour, a cosmetic: dark mode leaves it alone.
+            withCosmeticColours(() => {
+              this.boardDynamicGraphics.fillStyle(glowColor, rect.alpha);
+              this.boardDynamicGraphics.fillRect(rect.x, rect.y, rect.width, rect.height);
+            });
           }
         }
       }
@@ -11902,6 +11922,17 @@ export class MenuScene extends Phaser.Scene {
             onClick: () => this.toggleLegacyFloatingAnchor(),
             rect,
             stateText: (this.floatingAnchorEnabled ? model.onLabel : model.offLabel) ?? ''
+          }));
+          return;
+        }
+        if (model.settingKey === 'darkMode') {
+          this.uiButtons.push(this.createToggleSwitchRow({
+            checked: this.darkModeEnabled,
+            item,
+            label: model.label,
+            onClick: () => this.toggleLegacyDarkMode(),
+            rect,
+            stateText: (this.darkModeEnabled ? model.onLabel : model.offLabel) ?? ''
           }));
           return;
         }

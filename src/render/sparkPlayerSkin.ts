@@ -29,6 +29,7 @@ import { PLAYER_LOCATOR, resolvePingRingProgress, resolvePlayerLocatorMetrics } 
 import { samplePlayerColour } from './playerColour';
 import { PALETTE_WHITE, mixPaletteRgb, type IridescentTrailSample, type TrailPaletteHeadSample } from './trailPalette';
 import type { StartDirection } from './startDirection';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export const SPARK_PLAYER = Object.freeze({
   /** Kite points, as shares of the tile: the nose stays inside the tile at the top of a breath. */
@@ -291,7 +292,7 @@ export interface SparkDrawInput {
 }
 
 /** Paints the ping (behind), the keyline, then the four facets. The shadowBlur glow is a canvas the scene puts under it. */
-export const drawSparkPlayer = (g: SparkGraphics, f: SparkFrame, input: SparkDrawInput): void => {
+const drawSparkPlayerImpl = (g: SparkGraphics, f: SparkFrame, input: SparkDrawInput): void => {
   const alpha = Math.max(0, Math.min(1, input.alpha));
   if (alpha <= 0) {
     return;
@@ -389,7 +390,7 @@ const fillKiteShadow = (
 };
 
 /** The kite's two soft glow layers (wide bloom, tight core glow) into the player-glow canvas. Caller clears first. */
-export const drawSparkGlowToCanvasContext = (
+const drawSparkGlowToCanvasContextImpl = (
   ctx: CanvasRenderingContext2D,
   f: SparkFrame,
   options: SparkGlowDrawOptions
@@ -401,3 +402,7 @@ export const drawSparkGlowToCanvasContext = (
   ctx.shadowColor = 'transparent';
   ctx.restore();
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawSparkPlayer: typeof drawSparkPlayerImpl = (...args: Parameters<typeof drawSparkPlayerImpl>) => withCosmeticColours(() => drawSparkPlayerImpl(...args));
+export const drawSparkGlowToCanvasContext: typeof drawSparkGlowToCanvasContextImpl = (...args: Parameters<typeof drawSparkGlowToCanvasContextImpl>) => withCosmeticColours(() => drawSparkGlowToCanvasContextImpl(...args));

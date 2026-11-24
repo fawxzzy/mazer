@@ -94,6 +94,7 @@ import {
   drawContactRipple,
   drawDiamondFill
 } from './edgeBeamArt';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export type EdgeSide = 'top' | 'right' | 'bottom' | 'left';
 export type EdgeStationId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -763,7 +764,7 @@ const tracePolygon = (graphics: EdgeGraphics, vertices: ReadonlyArray<EdgePoint>
   graphics.closePath();
 };
 
-export const drawEdgeMarker = (
+const drawEdgeMarkerImpl = (
   graphics: EdgeGraphics,
   station: EdgeStation,
   state: EdgeMarkerState
@@ -799,7 +800,7 @@ export const drawEdgeMarker = (
  * on its orbit at its state's phase (state.spinRad); phase 0 draws it on its
  * rest station untouched.
  */
-export const drawEdgeMarkers = (
+const drawEdgeMarkersImpl = (
   graphics: EdgeGraphics,
   stations: ReadonlyArray<EdgeStation>,
   states: ReadonlyArray<EdgeMarkerState>
@@ -1005,7 +1006,7 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
 };
 
 /** One beam per diamond (bloom + ramped body + flowing stream + pulsing head + contact ripple), plus the landing poof. */
-export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): EdgeBeamsGeometry => {
+const drawEdgeBeamsImpl = (graphics: EdgeGraphics, input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const geometry = resolveEdgeBeams(input);
   const dpr = input.devicePixelRatio ?? 1;
   const clockMs = resolveBeamClockMs(input);
@@ -1032,3 +1033,8 @@ export const drawEdgeBeams = (graphics: EdgeGraphics, input: EdgeBeamsInput): Ed
   });
   return geometry;
 };
+
+// MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
+export const drawEdgeMarker: typeof drawEdgeMarkerImpl = (...args: Parameters<typeof drawEdgeMarkerImpl>) => withCosmeticColours(() => drawEdgeMarkerImpl(...args));
+export const drawEdgeMarkers: typeof drawEdgeMarkersImpl = (...args: Parameters<typeof drawEdgeMarkersImpl>) => withCosmeticColours(() => drawEdgeMarkersImpl(...args));
+export const drawEdgeBeams: typeof drawEdgeBeamsImpl = (...args: Parameters<typeof drawEdgeBeamsImpl>) => withCosmeticColours(() => drawEdgeBeamsImpl(...args));

@@ -5094,6 +5094,285 @@
       "verify": [],
       "lane": null,
       "filesHint": []
+    },
+    "MAZER-UI-094": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 671,
+            "mergedSha": "668adb86874362882e7a3269a3eaadb22e13c2fc"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-CwpiCAu6"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CTRL-006": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 672,
+            "mergedSha": "7a41883acf08b1605e864e72a990c29f5a87be88"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-095": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-096": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-097": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 674,
+            "mergedSha": "62b7e0b73599ec78afb99a56b83577086344f505"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-064": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 675,
+            "mergedSha": "99f2abde87cb2af7d6a7c862891ecdae2156c7fa"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-065": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 680,
+            "mergedSha": "4a33ac011e359a969d17eb7f6cc878231c2258a4"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-098": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 678,
+            "mergedSha": "cc7a2de54d1600d15077c6f81bf45bd964e3f22b"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-066": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 676,
+            "mergedSha": "fb49f8327cb3a464001d9a8f9d24253aa7fc0497"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-099": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-067": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-100": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-101": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-030": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-102": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ACCT-047": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 679,
+            "mergedSha": "8fdc2ee2b9470148daa154865c3c421ae5e80cd2"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-CTRL-007": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 677,
+            "mergedSha": "9cee15557631e06b243a01cb04a5ceb711bf0b0f"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-VIS-068": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 676,
+            "mergedSha": "fb49f8327cb3a464001d9a8f9d24253aa7fc0497"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-ByXQJ5rO"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-PERF-016": {
+      "evidence": {
+        "prs": [],
+        "headless": true,
+        "deviceChecked": null
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
     }
   }
 }

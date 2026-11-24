@@ -53,7 +53,7 @@ describe('settings sheet model', () => {
     const pauseGroup = pause.sections.find((section) => section.id === 'settings')!;
     expect(menuGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
     expect(pauseGroup.rows).toBe(LEGACY_SETTINGS_GROUP_ROWS);
-    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'floating-anchor']);
+    expect(LEGACY_SETTINGS_GROUP_ROWS.map((r) => r.id)).toEqual(['how-to-play', 'reduce-motion', 'haptics', 'sound', 'floating-anchor', 'dark-mode']);
   });
 
   test('titles, overlay ids and collapse behaviour per context', () => {
@@ -136,7 +136,8 @@ describe('settings sheet model', () => {
       ['Reduce Motion', 'On', 'System'],
       ['Haptics', 'On', 'Off'],
       ['Sound effects', 'On', 'Off'],
-      ['Floating anchor', 'On', 'Off']
+      ['Floating anchor', 'On', 'Off'],
+      ['Dark mode', 'On', 'Off']
     ]);
     for (const toggle of toggles) {
       expect(toggle.label).not.toContain(':');
@@ -306,6 +307,7 @@ describe('settings sheet plan specifics', () => {
       'haptics',
       'sound',
       'floating-anchor',
+      'dark-mode',
       'quit-to-menu'
     ]);
   });
@@ -320,6 +322,7 @@ describe('settings sheet plan specifics', () => {
       'haptics',
       'sound',
       'floating-anchor',
+      'dark-mode',
       'account-heading',
       'reset-progress',
       'sign-out'
@@ -503,7 +506,7 @@ describe('settings row description rule (MAZER-UI-026)', () => {
       expect(rows.map((r) => r.label)).not.toContain(retired);
     }
     expect([...new Set(rows.map((r) => r.settingKey).filter((k) => k !== null))].sort())
-      .toEqual(['floatingAnchorControls', 'hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
+      .toEqual(['darkMode', 'floatingAnchorControls', 'hapticsEnabled', 'soundEnabled', 'toggleReducedMotion']);
   });
 
   test('a row without a description cannot be typed as a setting row (compile-time rule)', () => {
