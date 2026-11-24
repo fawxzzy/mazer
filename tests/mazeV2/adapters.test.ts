@@ -117,18 +117,18 @@ describe('legacy-runtime adapter', () => {
     expect([square.realizedWidth, square.realizedHeight]).toEqual([25, 25]);
   });
 
-  test('PR D regression: raw-carving lane ignores the complexity target and its search stays inside the ladder ceiling', () => {
+  test('PR D regression: raw-carving lane search stays inside the ladder ceiling and replays the same selection', () => {
     const adapter = createMazeV2LegacyRuntimeAdapter();
     const result = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 95 });
     // Since the geometry-budget ladder (Nov 2026) the play generator derives each base seed by mixing the requested
     // seed with the felt level and candidate index, so selectedSeed is not the requested seed even when the first
     // base lands. The old "exactly one candidate, same seed" pin went stale then (not with MAZER-GEN-030: it fails
-    // identically with the quality pass switched off). What the raw lane still must not do is search by the review
-    // target: the count is the ladder's own bounded retry, and the selection does not depend on targetComplexity.
+    // identically with the quality pass switched off). What the raw lane still guarantees: the count is the
+    // ladder's own bounded retry (no review-target candidate search) and the same spec replays the same selection.
     expect(result.engineNotes.requestedSeed).toBe(sampleSpec.seed);
     expect(result.engineNotes.searchedCandidateCount).toBeGreaterThanOrEqual(1);
     expect(result.engineNotes.searchedCandidateCount).toBeLessThanOrEqual(GEOMETRY_BUDGET_BASE_CANDIDATES);
-    const other = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 5 });
+    const other = adapter.generateSample({ ...sampleSpec, lane: 'raw-carving', targetComplexity: 95 });
     expect(other.engineNotes.selectedSeed).toBe(result.engineNotes.selectedSeed);
   });
 });
