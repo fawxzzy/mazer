@@ -15,7 +15,12 @@ import {
 } from '../../src/render/starDustRenderOverride';
 
 const ROOT = join(__dirname, '..', '..');
-const PAGE_ONLY = [join('src', 'render', 'trailPerf') + sep, join('src', 'render', 'starDustRenderOverride.ts')];
+const PAGE_ONLY = [
+  join('src', 'render', 'trailPerf') + sep,
+  join('src', 'render', 'starDustRenderOverride.ts'),
+  // board-cost-options.html reuses the trail harness (board-cost-options-dormant.test.ts guards that page).
+  join('src', 'render', 'boardPerf') + sep
+];
 
 const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
