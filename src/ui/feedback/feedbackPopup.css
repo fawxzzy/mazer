@@ -1,0 +1,290 @@
+/*
+ * In-game feedback popup (proposal). Uses only the shared design tokens and the kit primitives in
+ * src/ui/dom/primitives.css (solid mint primary Submit, quiet Not now, StatusBanner notice). The dark theme is the
+ * device-local neon-purple look: feedbackTheme.ts remaps the same token names from DARK_THEME_TOKENS (no colour literal here).
+ */
+
+.mazer-feedback-scrim {
+  align-items: center;
+  background: color-mix(in srgb, var(--mazer-token-color-overlay-scrim) 82%, transparent);
+  box-sizing: border-box;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  position: fixed;
+}
+
+.mazer-feedback-scrim--sheet {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.mazer-feedback-scrim--compact {
+  align-items: flex-start;
+  padding-top: max(72px, env(safe-area-inset-top, 0px));
+}
+
+.mazer-feedback,
+.mazer-feedback * {
+  box-sizing: border-box;
+}
+
+.mazer-feedback {
+  background: var(--mazer-token-color-bg-panel);
+  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-subtle);
+  border-radius: var(--mazer-token-radius-sheet, 16px);
+  color: var(--mazer-token-color-text-primary);
+  display: grid;
+  font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  gap: var(--mazer-token-spacing-16, 16px);
+  max-width: 360px;
+  padding: var(--mazer-token-spacing-24, 24px) var(--mazer-token-spacing-20, 20px) var(--mazer-token-spacing-20, 20px);
+  width: 100%;
+}
+
+.mazer-feedback[hidden],
+.mazer-feedback [hidden] {
+  display: none !important;
+}
+
+.mazer-feedback__title {
+  font: 700 1.3rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mazer-feedback__rate {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+  justify-items: center;
+}
+
+.mazer-feedback__stars {
+  display: flex;
+  gap: var(--mazer-token-spacing-4, 4px);
+  justify-content: center;
+}
+
+.mazer-feedback__star {
+  align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: var(--mazer-token-radius-control, 8px);
+  color: var(--mazer-token-color-line-normal);
+  cursor: pointer;
+  display: inline-flex;
+  height: 52px;
+  justify-content: center;
+  padding: 0;
+  touch-action: manipulation;
+  width: 52px;
+}
+
+.mazer-feedback__star:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info);
+  outline-offset: 2px;
+}
+
+.mazer-feedback__star-icon {
+  fill: none;
+  height: 40px;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  width: 40px;
+}
+
+.mazer-feedback__star.is-on {
+  color: var(--mazer-token-color-semantic-reward);
+}
+
+.mazer-feedback__star.is-on .mazer-feedback__star-icon {
+  fill: currentColor;
+}
+
+.mazer-feedback__star:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.mazer-feedback__word {
+  color: var(--mazer-token-color-text-primary);
+  font: 600 1rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  margin: 0;
+  min-height: 1.2em;
+}
+
+.mazer-feedback__word.is-hint {
+  color: var(--mazer-token-color-text-muted);
+  font-weight: 400;
+}
+
+.mazer-feedback__note {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+.mazer-feedback__note-label {
+  color: var(--mazer-token-color-text-muted);
+  font: 500 0.85rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+}
+
+.mazer-feedback__textarea {
+  appearance: none;
+  background: transparent;
+  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-normal);
+  border-radius: var(--mazer-token-radius-control, 8px);
+  color: var(--mazer-token-color-text-primary);
+  font: 400 1rem/1.35 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  min-height: 76px;
+  padding: var(--mazer-token-spacing-12, 12px);
+  resize: none;
+  width: 100%;
+}
+
+.mazer-feedback__textarea::placeholder {
+  color: var(--mazer-token-color-text-disabled);
+}
+
+.mazer-feedback__textarea:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info);
+  outline-offset: 2px;
+}
+
+.mazer-feedback__counter {
+  color: var(--mazer-token-color-text-muted);
+  font: 500 0.75rem/1 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  justify-self: end;
+}
+
+.mazer-feedback__counter:empty {
+  display: none;
+}
+
+.mazer-feedback__notice-slot:empty {
+  display: none;
+}
+
+.mazer-feedback__banner {
+  border-color: var(--mazer-token-color-line-normal);
+  font: 400 0.9rem/1.3 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+}
+
+.mazer-feedback__banner.mazer-status-banner--success {
+  border-color: var(--mazer-token-color-semantic-energy);
+}
+
+.mazer-feedback__actions {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+.mazer-feedback__submit,
+.mazer-feedback__dismiss {
+  min-height: 48px;
+  width: 100%;
+}
+
+/* Submit starts disabled (no star yet). The kit greys the label to text-disabled, which is unreadable on the mint or
+   purple fill; keep the dark label and let the opacity say "not yet". */
+.mazer-feedback .mazer-feedback__submit:disabled {
+  color: var(--mazer-token-color-bg-canvas);
+  opacity: 0.55;
+}
+
+/* A: card. Centered, title left, stars centered, note always visible, Submit full width, Not now underneath. */
+.mazer-feedback--card .mazer-feedback__head {
+  text-align: center;
+}
+
+/* B: bottom sheet. Pinned to the bottom edge, bigger stars across the width, the note is folded until asked for. */
+.mazer-feedback--sheet {
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: var(--mazer-token-radius-sheet, 16px) var(--mazer-token-radius-sheet, 16px) 0 0;
+  border-right: 0;
+  max-width: none;
+  padding-bottom: max(var(--mazer-token-spacing-24, 24px), env(safe-area-inset-bottom, 0px));
+}
+
+.mazer-feedback__grab {
+  background: var(--mazer-token-color-line-normal);
+  border-radius: 999px;
+  height: 4px;
+  justify-self: center;
+  opacity: 0.6;
+  width: 40px;
+}
+
+.mazer-feedback--sheet .mazer-feedback__head {
+  text-align: center;
+}
+
+.mazer-feedback--sheet .mazer-feedback__stars {
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+.mazer-feedback--sheet .mazer-feedback__star {
+  height: 58px;
+  width: 58px;
+}
+
+.mazer-feedback--sheet .mazer-feedback__star-icon {
+  height: 46px;
+  width: 46px;
+}
+
+.mazer-feedback__add-note {
+  justify-self: center;
+}
+
+/* C: compact. Smaller card near the top, stars left with the word beside them, Submit and Not now side by side. */
+.mazer-feedback--compact {
+  gap: var(--mazer-token-spacing-12, 12px);
+  padding: var(--mazer-token-spacing-16, 16px);
+}
+
+.mazer-feedback--compact .mazer-feedback__title {
+  font-size: 1.1rem;
+}
+
+.mazer-feedback--compact .mazer-feedback__rate {
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-items: start;
+}
+
+.mazer-feedback--compact .mazer-feedback__stars {
+  gap: 0;
+  margin-left: -6px;
+}
+
+.mazer-feedback--compact .mazer-feedback__star {
+  height: 44px;
+  width: 44px;
+}
+
+.mazer-feedback--compact .mazer-feedback__star-icon {
+  height: 34px;
+  width: 34px;
+}
+
+.mazer-feedback--compact .mazer-feedback__actions {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+
+.mazer-feedback--compact .mazer-feedback__textarea {
+  min-height: 60px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mazer-feedback__star {
+    transition: color var(--mazer-token-motion-press, 140ms) ease, transform var(--mazer-token-motion-press, 140ms) ease;
+  }
+
+  .mazer-feedback__star:active:not(:disabled) {
+    transform: scale(0.92);
+  }
+}

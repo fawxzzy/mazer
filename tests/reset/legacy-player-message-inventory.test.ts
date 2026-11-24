@@ -547,7 +547,7 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
       { name: 'resolveLegacyOverlayMovementSpeedMessage', excluded: [MESSAGE_MODULE] },
       { name: 'resolveLegacyOverlayFieldCommitMessage', excluded: [MESSAGE_MODULE] },
       { name: 'LEGACY_OVERLAY_MESSAGE_COPY', excluded: [MESSAGE_MODULE] },
-      { name: 'createStatusBanner', excluded: ['src/ui/dom/StatusBanner.ts', 'src/ui/dom/index.ts'] }
+      { name: 'createStatusBanner', excluded: ['src/ui/dom/StatusBanner.ts', 'src/ui/dom/index.ts', 'src/ui/feedback/feedbackPopup.ts', 'src/ui/feedback/feedbackOptionsMain.ts'] }
     ];
     for (const { name, excluded } of dormant) {
       expect(

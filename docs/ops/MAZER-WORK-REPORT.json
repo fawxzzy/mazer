@@ -3,35 +3,35 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-24T02:40:38.000Z",
+    "registryUpdatedAt": "2026-11-24T06:07:44.000Z",
     "boardSync": {
-      "at": "2026-11-24T02:40:38.000Z",
-      "appliedEventCount": 535,
-      "lastEventId": "4e81f866dbe6"
+      "at": "2026-11-24T06:07:44.000Z",
+      "appliedEventCount": 539,
+      "lastEventId": "b78149fb903b"
     }
   },
   "counters": {
-    "total": 327,
-    "open": 111,
-    "completed": 192,
+    "total": 330,
+    "open": 113,
+    "completed": 193,
     "deferred": 24,
     "buckets": {
-      "needs-you": 33,
-      "in-review": 57,
-      "blocked": 9,
-      "ready": 0,
+      "needs-you": 32,
+      "in-review": 58,
+      "blocked": 8,
+      "ready": 1,
       "in-progress": 1,
-      "unclassified": 11,
+      "unclassified": 13,
       "deferred": 24,
-      "completed": 192
+      "completed": 193
     },
     "needsYou": {
-      "decisions": 6,
+      "decisions": 5,
       "checks": 27
     },
     "completedByTier": {
       "device": 3,
-      "headless": 100,
+      "headless": 101,
       "source-only": 35,
       "no-device-surface": 54,
       "unrecorded": 0
@@ -40,24 +40,12 @@
       "Zac": 3,
       "provider": 0,
       "device": 1,
-      "other-card": 5,
+      "other-card": 4,
       "unknown": 0
     }
   },
   "needsYou": {
     "decisions": [
-      {
-        "id": "MAZER-HAZ-002",
-        "title": "Sign or reject the endless hazard product contract",
-        "status": "review",
-        "priority": "high",
-        "kind": "decision",
-        "ask": "Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?",
-        "recommendation": "Read the draft and sign it if you still want difficulty to come from hazards: it is the only lever past level 268 that keeps zoom and board size frozen.",
-        "context": "The draft contract for obstacles, enemies and items is unsigned; five cards are covered by it.",
-        "prs": "#551, #615",
-        "verify": []
-      },
       {
         "id": "MAZER-PROG-005",
         "title": "Decide what happens past level 198 so levels keep getting harder",
@@ -801,6 +789,17 @@
       }
     ],
     "headless": [
+      {
+        "id": "MAZER-HAZ-002",
+        "title": "Sign or reject the endless hazard product contract",
+        "status": "completed",
+        "priority": "high",
+        "date": "2026-11-24",
+        "tier": "headless",
+        "prs": "#551, #615",
+        "deployedBuild": "main-CqUwzOhy",
+        "updatedAt": "2026-11-24T04:02:18.000Z"
+      },
       {
         "id": "MAZER-ACCT-007",
         "title": "Give accounts made on the account site a Mazer profile",
@@ -3137,6 +3136,14 @@
       "note": ""
     },
     {
+      "id": "MAZER-GEN-031",
+      "title": "Keep bleed gates alive past level 140",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#693",
+      "note": ""
+    },
+    {
       "id": "MAZER-MODE-001",
       "title": "Game modes shell with Endless and a leaderboard tab per mode",
       "status": "review",
@@ -3416,15 +3423,6 @@
         "derived": false
       },
       {
-        "id": "MAZER-PROG-019",
-        "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
-        "status": "planning",
-        "priority": "medium",
-        "kind": "dependency",
-        "ask": "Waits on MAZER-HAZ-002 (review).",
-        "derived": true
-      },
-      {
         "id": "MAZER-HAZ-008",
         "title": "Plan hazard introduction and contact moments",
         "status": "review",
@@ -3437,7 +3435,17 @@
     "unknown": []
   },
   "ready": {
-    "queue": [],
+    "queue": [
+      {
+        "id": "MAZER-PROG-019",
+        "title": "Revisit ladder length after the no-stub rule: another cost-free lever or hazards",
+        "status": "planning",
+        "priority": "medium",
+        "filesHint": [],
+        "waves": [],
+        "warnings": []
+      }
+    ],
     "menuSceneCards": []
   },
   "inProgress": [
@@ -3668,6 +3676,20 @@
     {
       "id": "MAZER-FLOW-019",
       "title": "Show the build stamp in Settings",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-GEN-032",
+      "title": "Make plateau gates meaningful from level 283",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-GEN-033",
+      "title": "Widen gate placement below level 100",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4024,8 +4046,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-HAZ-002": {
-      "bucket": "needs-you",
-      "sub": "decision"
+      "bucket": "completed",
+      "sub": "headless"
     },
     "MAZER-HAZ-003": {
       "bucket": "deferred",
@@ -4524,8 +4546,8 @@
       "sub": "no-device-surface"
     },
     "MAZER-PROG-019": {
-      "bucket": "blocked",
-      "sub": "other-card"
+      "bucket": "ready",
+      "sub": null
     },
     "MAZER-ACCT-036": {
       "bucket": "needs-you",
@@ -5029,6 +5051,18 @@
     },
     "MAZER-PERF-016": {
       "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GEN-031": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-GEN-032": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-GEN-033": {
+      "bucket": "unclassified",
       "sub": null
     }
   }

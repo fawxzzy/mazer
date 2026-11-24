@@ -862,20 +862,14 @@
           {
             "repo": "fawxzzy/mazer",
             "number": 615,
-            "mergedSha": "f8d2befe"
+            "mergedSha": "f8d2befea86218da3902f9e25b00d0ab9b09b6ff"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "none"
+        "deployedBuild": "main-CqUwzOhy"
       },
-      "blocker": {
-        "kind": "owner-decision",
-        "summary": "The draft contract for obstacles, enemies and items is unsigned; five cards are covered by it.",
-        "unblockedBy": "Zac",
-        "ask": "Sign or reject the endless hazard contract (obstacles, enemies and items in phases)?",
-        "recommendation": "Read the draft and sign it if you still want difficulty to come from hazards: it is the only lever past level 268 that keeps zoom and board size frozen."
-      },
+      "blocker": null,
       "verify": [],
       "lane": "owner-only",
       "filesHint": []
@@ -5461,6 +5455,38 @@
         "deviceChecked": false,
         "deployedBuild": "main-CqUwzOhy"
       },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-031": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 693,
+            "mergedSha": "12d4378fcc4c1fae6ff62677551aaa612b9f9955"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "main-DQvACNbo"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-032": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-GEN-033": {
+      "evidence": null,
       "blocker": null,
       "verify": [],
       "lane": null,
