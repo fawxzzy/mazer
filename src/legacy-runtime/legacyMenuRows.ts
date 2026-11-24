@@ -19,14 +19,15 @@ export type LegacyMenuScreen = 'main' | 'play';
 
 /** Rows both screens show first, in this order. */
 export const LEGACY_SHARED_MENU_ROW_IDS = ['settings', 'guide', 'sound'] as const;
-export const LEGACY_MAIN_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'profile', 'leaderboard'] as const;
-export const LEGACY_PLAY_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'reset-level', 'main-menu'] as const;
+export const LEGACY_MAIN_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'profile', 'leaderboard', 'feedback'] as const;
+export const LEGACY_PLAY_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'feedback', 'reset-level', 'main-menu'] as const;
 
 export type LegacyMainMenuRowId = (typeof LEGACY_MAIN_MENU_ROW_IDS)[number];
 export type LegacyPlayMenuRowId = (typeof LEGACY_PLAY_MENU_ROW_IDS)[number];
 export type LegacyMenuRowId = LegacyMainMenuRowId | LegacyPlayMenuRowId;
 
 export const LEGACY_MENU_ROW_LABELS: Readonly<Record<LegacyMenuRowId, string>> = Object.freeze({
+  feedback: 'Feedback',
   guide: 'Guide',
   leaderboard: 'Leaderboard',
   'main-menu': 'Main menu',
@@ -41,6 +42,7 @@ export const LEGACY_MENU_ROW_LABELS: Readonly<Record<LegacyMenuRowId, string>> =
  * name of the retired corner button, so harnesses keep finding it.
  */
 export const LEGACY_MENU_ROW_SEMANTIC_ACTIONS: Readonly<Record<LegacyMenuRowId, string>> = Object.freeze({
+  feedback: 'Feedback',
   guide: 'Guide',
   leaderboard: 'Leaderboard',
   'main-menu': 'Main menu',
@@ -63,24 +65,26 @@ export interface LegacyMenuRowsState {
   readonly soundEnabled: boolean;
   /** Main menu: Profile is dropped while the account service is unavailable. Default true. */
   readonly profileAvailable?: boolean;
+  /** MAZER-FB-001: the Feedback row is shown only to a signed-in player (menu row only, no auto prompt). Default false. */
+  readonly feedbackAvailable?: boolean;
   /** In a game: Reset level is drawn dim and ignores taps when false. Default true. */
   readonly resetAvailable?: boolean;
   readonly resetArmed?: boolean;
   readonly quitArmed?: boolean;
 }
 
-export function resolveLegacyMenuRowIds(screen: 'main', state?: Pick<LegacyMenuRowsState, 'profileAvailable'>): readonly LegacyMainMenuRowId[];
-export function resolveLegacyMenuRowIds(screen: 'play', state?: Pick<LegacyMenuRowsState, 'profileAvailable'>): readonly LegacyPlayMenuRowId[];
+type LegacyRowAvailability = Pick<LegacyMenuRowsState, 'profileAvailable' | 'feedbackAvailable'>;
+export function resolveLegacyMenuRowIds(screen: 'main', state?: LegacyRowAvailability): readonly LegacyMainMenuRowId[];
+export function resolveLegacyMenuRowIds(screen: 'play', state?: LegacyRowAvailability): readonly LegacyPlayMenuRowId[];
 export function resolveLegacyMenuRowIds(
   screen: LegacyMenuScreen,
-  state: Pick<LegacyMenuRowsState, 'profileAvailable'> = {}
+  state: LegacyRowAvailability = {}
 ): readonly LegacyMenuRowId[] {
-  if (screen === 'play') {
-    return LEGACY_PLAY_MENU_ROW_IDS;
-  }
-  return state.profileAvailable === false
-    ? LEGACY_MAIN_MENU_ROW_IDS.filter((id) => id !== 'profile')
-    : LEGACY_MAIN_MENU_ROW_IDS;
+  const ids: readonly LegacyMenuRowId[] = screen === 'play' ? LEGACY_PLAY_MENU_ROW_IDS : LEGACY_MAIN_MENU_ROW_IDS;
+  return ids.filter((id) => (
+    (id !== 'profile' || screen === 'play' || state.profileAvailable !== false)
+    && (id !== 'feedback' || state.feedbackAvailable === true)
+  ));
 }
 
 const buildRow = <TId extends LegacyMenuRowId>(id: TId, state: LegacyMenuRowsState): LegacyMenuDropdownItem<TId> => {

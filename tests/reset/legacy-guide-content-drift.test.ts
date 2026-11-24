@@ -156,7 +156,9 @@ describe('guide copy only names things that exist', () => {
     for (const item of LEGACY_MENU_DROPDOWN_ITEMS) {
       expect(row('menu').text, item.id).toContain(item.label);
     }
-    expect(row('menu').text).toMatch(/three lines, top right/i);
+    expect(row('menu').text).toMatch(/top right/i);
+    // MAZER-FB-001: the signed-in-only Feedback row is named too (it is not in the default, signed-out item list).
+    expect(row('menu').text).toContain('Signed in: Feedback.');
     expect(row('online').text).not.toMatch(/icon/);
     expect(MENU_SCENE).not.toContain('createLegacyMenuLeaderboardButton');
     expect(MENU_SCENE).not.toContain('createLegacyMenuProfileButton');

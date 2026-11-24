@@ -19,6 +19,7 @@ import {
   shouldShowLegacyControlHint,
   type LegacyControlHintFacts
 } from '../legacy-runtime/legacyControlHint.ts';
+import { isInsideFeedbackPopup } from '../ui/feedback/feedbackKeyIsolation.ts';
 
 export const LEGACY_CONTROL_HINT_ELEMENT_ID = 'mazer-control-hint';
 const POLL_MS = 250;
@@ -139,6 +140,8 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
   };
 
   const onKey = (event: KeyboardEvent): void => {
+    // Capture phase runs before the feedback scrim can stop the event: a key typed into the note is not game input.
+    if (isInsideFeedbackPopup(event.target)) return;
     if (event.isTrusted && event.key.length > 0 && event.key !== 'Unidentified') noteInput('keys');
     if (el !== null && isLegacyControlHintMoveKey(event.key)) hide(true);
   };

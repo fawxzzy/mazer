@@ -16,6 +16,7 @@ import {
  *   Profile      profile   (baked HUD texture; main menu only)
  *   Leaderboard  leaderboard (baked HUD texture; main menu only)
  *   Guide        guide     (Graphics)
+ *   Feedback     feedback  (Graphics; signed-in only, MAZER-FB-001)
  *   Sound        soundOn / soundOff by the current setting (Graphics; Sound off has no spark, per the set)
  *   Reset level  reset     (Graphics; in-game only)
  *   Main menu    home      (Graphics; in-game only)
@@ -32,6 +33,7 @@ export type MenuRowIconSource =
   | { readonly kind: 'vector'; readonly iconId: ButtonIconId; readonly offIconId?: ButtonIconId };
 
 export const MENU_ROW_ICON_SOURCES: Readonly<Record<LegacyMenuRowId, MenuRowIconSource>> = Object.freeze({
+  feedback: { iconId: 'feedback', kind: 'vector' },
   guide: { iconId: 'guide', kind: 'vector' },
   leaderboard: { hudIcon: 'leaderboard', kind: 'hud' },
   'main-menu': { iconId: 'home', kind: 'vector' },

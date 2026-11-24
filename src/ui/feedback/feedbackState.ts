@@ -1,7 +1,7 @@
 /**
- * In-game feedback popup: pure state and copy (no DOM, no network). PROPOSAL, not wired into the shipping
- * entrypoint. See docs/ui/MAZER-FEEDBACK-POPUP-PLAN-2026-11-23.md and
- * docs/ops/sql-proposals/mazer-feedback-20261123/.
+ * In-game feedback popup: pure state and copy (no DOM, no network). MAZER-FB-001: wired into the Menu dropdown by
+ * src/legacy-runtime/legacyFeedbackLauncher.ts (signed-in only, menu row only, no auto prompt). See
+ * docs/ui/MAZER-FEEDBACK-POPUP-PLAN-2026-11-23.md and docs/ops/sql-proposals/mazer-feedback-20261124-v2/.
  *
  * Rules this module pins:
  *  - the popup always opens with NO star selected (rating 0) and Submit disabled until a star is picked;
@@ -44,6 +44,7 @@ export const FEEDBACK_COPY = Object.freeze({
   /** Offline or a failed call: the draft stays, nothing is lost. */
   failedNotice: 'Could not send. Your rating and note are kept, so try again in a minute.',
   offlineNotice: 'You are offline. Your rating and note are kept, so send it once you are back online.',
+  signedOutNotice: 'You are signed out. Sign in again to send this. Your rating and note are kept until you close this.',
   rateLimitedNotice: (retryAfterSeconds: number): string => {
     const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
     return `You have sent a few already. Try again in about ${minutes} min.`;
@@ -76,6 +77,8 @@ export type FeedbackSubmitResult =
   | { status: 'saved' }
   | { status: 'rate_limited'; retryAfterSeconds: number }
   | { status: 'offline' }
+  /** The session ended while the popup was open (the RPC is signed-in only). */
+  | { status: 'signed_out' }
   | { status: 'failed' };
 
 export const canSubmitFeedback = (draft: FeedbackDraft): boolean => (
@@ -105,7 +108,9 @@ export const reduceFeedbackDraft = (draft: FeedbackDraft, event: FeedbackEvent):
       }
       const message = result.status === 'rate_limited'
         ? FEEDBACK_COPY.rateLimitedNotice(result.retryAfterSeconds)
-        : result.status === 'offline' ? FEEDBACK_COPY.offlineNotice : FEEDBACK_COPY.failedNotice;
+        : result.status === 'offline'
+          ? FEEDBACK_COPY.offlineNotice
+          : result.status === 'signed_out' ? FEEDBACK_COPY.signedOutNotice : FEEDBACK_COPY.failedNotice;
       return { ...draft, phase: 'editing', notice: { tone: 'info', message } };
     }
   }

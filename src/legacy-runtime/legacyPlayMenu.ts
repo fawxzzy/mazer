@@ -7,6 +7,7 @@
  *   Settings     opens the existing in-game Settings sheet (now only Reduce Motion, Haptics, the floating anchor)
  *   Guide        opens the Guide (moved out of Settings)
  *   Sound        tap to toggle; the row shows On / Off and the panel stays open (moved out of Settings)
+ *   Feedback     opens the 1-5 star feedback popup (signed-in only, MAZER-FB-001; the run stays paused)
  *   Reset level  puts you back at this maze's start (the existing reset-player path); two taps after a move
  *   Main menu    leaves the run (moved out of Settings); two taps after a move, as before
  *
@@ -69,6 +70,8 @@ export interface LegacyPlayMenuRowsInput {
   readonly resetAvailable: boolean;
   readonly resetArmed: boolean;
   readonly quitArmed: boolean;
+  /** MAZER-FB-001: Feedback row, signed-in players only. Default false (row hidden). */
+  readonly feedbackAvailable?: boolean;
 }
 
 export const buildLegacyPlayMenuRows = (
