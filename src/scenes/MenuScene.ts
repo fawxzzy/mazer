@@ -358,6 +358,7 @@ import {
   type LegacyMainMenuRowId,
   type LegacyMenuRowId
 } from '../legacy-runtime/legacyMenuRows';
+import { createLegacyFeedbackLauncher, isLegacyFeedbackAvailable } from '../legacy-runtime/legacyFeedbackLauncher';
 import { LegacyMenuDropdownController, type MenuDropdownHost } from '../render/menuDropdownButtons';
 import {
   IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE,
@@ -538,6 +539,7 @@ import {
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionOrdinalSeedComponent,
+  formatLegacyProgressionOrdinal,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionScaleDetail,
   resolveLegacyProgressionTrackIdForSurface,
@@ -1973,6 +1975,13 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-UI-102: Settings > Dark mode. The theme itself is installed at boot (src/theme/themeBoot.ts); this mirrors the
   // stored switch for the row, and flipping it saves and reloads so every baked piece is built under one theme.
   private darkModeEnabled = false;
+  // MAZER-FB-001: the Menu's Feedback row opens the 1-5 star popup (a DOM modal, loaded on demand). While it is open
+  // the pause surfaces behind it are not built (see isLegacyPlayMenuDropdownView / buildPauseOverlay).
+  private readonly feedbackLauncher = createLegacyFeedbackLauncher({
+    getAuthSnapshot: () => this.authSnapshot,
+    isDarkTheme: () => this.darkModeEnabled,
+    onClosed: () => { this.uiDirty = true; }
+  });
   private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
     coarsePointer: true,
     devicePixelRatio: 3
@@ -2591,6 +2600,7 @@ export class MenuScene extends Phaser.Scene {
     // MAZER-MOTION-011: after update (every rebuildUi path has run) so freshly built objects never show one frame at rest.
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, this.applyUiEntrance, this));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.feedbackLauncher.destroy());
     // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
     // context on the first real pointerdown/touchend/keydown (no context is built while the setting is off).
     const disposeAudioUnlock = installLegacyAudioUnlock(
@@ -11821,6 +11831,9 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-UI-095: Pause opens on the in-game Menu dropdown; its Settings row swaps to the (trimmed) Settings sheet and
   // its Guide row lays the Guide on top of whichever is showing.
   private buildPauseOverlay(): void {
+    if (this.feedbackLauncher.isOpen()) {
+      return;
+    }
     if (this.isLegacyPlayMenuDropdownView()) {
       this.buildLegacyPlayMenuOverlay();
       return;
@@ -14269,6 +14282,7 @@ export class MenuScene extends Phaser.Scene {
   // of Settings), the same as in a game; no pause, so the X just closes.
   private createLegacyMenuDropdown(): LegacyMenuDropdownController<LegacyMainMenuRowId> {
     let profileShown = true;
+    let feedbackShown = false;
     return new LegacyMenuDropdownController<LegacyMainMenuRowId>({
       ...this.resolveLegacyMenuDropdownSharedHost<LegacyMainMenuRowId>(),
       keepOpenOnSelect: (id) => isLegacyMenuRowToggle(id),
@@ -14282,6 +14296,11 @@ export class MenuScene extends Phaser.Scene {
         const shown = this.authSnapshot.status !== 'unavailable';
         if (shown !== profileShown) {
           profileShown = shown;
+          this.uiDirty = true;
+        }
+        const feedbackNow = isLegacyFeedbackAvailable(this.authSnapshot);
+        if (feedbackNow !== feedbackShown) {
+          feedbackShown = feedbackNow;
           this.uiDirty = true;
         }
       }
@@ -14333,6 +14352,9 @@ export class MenuScene extends Phaser.Scene {
       case 'leaderboard':
         this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'));
         return;
+      case 'feedback':
+        this.openLegacyFeedback('menu');
+        return;
       case 'profile':
         // Signed out, a Profile-row sign-in continues to the account page (legacySignInContinuation.ts).
         withMazerSignInContinuation('account', () => (
@@ -14343,7 +14365,17 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private isLegacyPlayMenuDropdownView(): boolean {
-    return this.mode === 'play' && this.overlay === 'pause' && this.playMenuView === 'menu' && !this.settingsGuideOpen;
+    return this.mode === 'play' && this.overlay === 'pause' && this.playMenuView === 'menu' && !this.settingsGuideOpen
+      && !this.feedbackLauncher.isOpen();
+  }
+
+  // MAZER-FB-001: Menu > Feedback. Signed-in only (the row is hidden otherwise). The run stays paused; closing the popup
+  // brings back the dropdown it came from (in a game) or the plain main menu.
+  private openLegacyFeedback(source: 'menu' | 'pause'): void {
+    const level = Number(formatLegacyProgressionOrdinal(this.progressionState.tracks.player.level));
+    if (this.feedbackLauncher.open({ gameMode: this.mode, level, source })) {
+      this.uiDirty = true;
+    }
   }
 
   private buildLegacyPlayMenuOverlay(): void {
@@ -14363,6 +14395,7 @@ export class MenuScene extends Phaser.Scene {
           resetPending: hasPendingLegacyResetRequest(this.pendingResetRequest),
           runCompleted: this.playCompletedAtMs !== null
         }),
+        feedbackAvailable: isLegacyFeedbackAvailable(this.authSnapshot),
         soundEnabled: this.settings.soundEnabled
       }),
       panelWidth: LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
@@ -14395,6 +14428,9 @@ export class MenuScene extends Phaser.Scene {
       case 'sound':
         this.applyOverlayToggleFieldChange('soundEnabled');
         this.uiDirty = true;
+        return;
+      case 'feedback':
+        this.openLegacyFeedback('pause');
         return;
       case 'reset-level':
         this.pressLegacyPlayResetLevel();
@@ -14434,6 +14470,7 @@ export class MenuScene extends Phaser.Scene {
     // Visual glyph stays 32-40px; the touch target is grown to the 44px floor (legacyHitTarget.ts).
     const hit = resolveLegacyMinHitRect(frame, this.layout);
     const items = buildLegacyMenuRows('main', {
+      feedbackAvailable: isLegacyFeedbackAvailable(this.authSnapshot),
       profileAvailable: this.authSnapshot.status !== 'unavailable',
       soundEnabled: this.settings.soundEnabled
     });

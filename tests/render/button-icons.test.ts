@@ -63,10 +63,10 @@ const recordingGraphics = (): { graphics: MenuBurgerGraphics & Parameters<typeof
 };
 
 describe('one icon module: C Star Dust', () => {
-  test('is the C set and covers every dropdown/HUD row (19 rows plus menuOpen)', () => {
+  test('is the C set and covers every dropdown/HUD row (20 rows plus menuOpen; feedback added by MAZER-FB-001)', () => {
     expect(BUTTON_ICON_SET_ID).toBe('star-dust-c');
-    expect(BUTTON_ICON_IDS).toHaveLength(20);
-    for (const id of ['menu', 'menuOpen', 'resume', 'settings', 'guide', 'soundOn', 'soundOff', 'reset', 'home', 'leaderboard', 'profile', 'pause', 'back', 'close', 'signIn', 'eye', 'eyeOff', 'check', 'share', 'install']) {
+    expect(BUTTON_ICON_IDS).toHaveLength(21);
+    for (const id of ['menu', 'menuOpen', 'resume', 'settings', 'guide', 'soundOn', 'soundOff', 'reset', 'home', 'leaderboard', 'profile', 'pause', 'back', 'close', 'signIn', 'eye', 'eyeOff', 'check', 'share', 'install', 'feedback']) {
       expect(isButtonIconId(id), id).toBe(true);
     }
     expect(isButtonIconId('nope')).toBe(false);

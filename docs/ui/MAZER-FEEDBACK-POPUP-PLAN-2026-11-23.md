@@ -1,6 +1,15 @@
 # Mazer in-game feedback popup: plan and options (2026-11-23)
 
-Status: PROPOSED. Options page and SQL draft only. Nothing is wired into the game, nothing was applied to any database, nothing is deployed.
+Status (2026-11-24, MAZER-FB-001): BUILT, in review. The picked layout (A, Card) is wired into the game as a menu-row entry. The SQL side (`mazer.mazer_submit_feedback_v1(integer,text,text,integer,text,text)`) is applied and live (see `docs/ops/sql-proposals/mazer-feedback-20261124-v2/`). Nothing is deployed from this branch until the PR merges, and nothing was checked on a real phone.
+
+What the build does (settled decisions):
+- Entry: a signed-in-only **Feedback** row in the Menu dropdown, on both the main menu and the in-game pause menu. No auto-prompt anywhere. The row is hidden when signed out.
+- The popup loads on demand (`legacyFeedbackLauncher.ts` -> dynamic import of `feedbackMount.ts`), so it is not in the boot bundle. Keys typed in the note stop at the scrim and never reach the game; Escape and "Not now" close; a tap on the backdrop closes only a sent popup.
+- `build_id` comes from the Vite-injected `__MAZER_BUILD_ID__` constant (git sha), validated against the database pattern. Level and mode are clamped to the function's limits.
+- Every failure (rate limit, offline, signed out, server error) is a gentle in-flow notice that keeps the draft; there is never red text.
+- QA without the database: `?runtimeDiagnostics=1&authFixture=authenticated[&feedbackFixture=saved|failed|limited|offline|signed_out]` answers from a stub and sends nothing.
+
+Original proposal text follows (kept for the decision record).
 
 Ask (Zac): a simple pop-up with a 1-5 star rating, an OPTIONAL text field and a Submit button; it opens with NO star selected; submissions are saved in the database.
 
