@@ -31,7 +31,7 @@ import { resolvePlayerCoreAlphaScale, shouldDrawEndpointMarker } from '../render
 import { isGoalStarSpinning, resolveGoalStarRotation } from '../render/goalStarSpin';
 import { drawLegacyBleedGateLayer } from '../render/bleedGateSceneLayer';
 import { BLEED_GATE_LIT, drawBleedGatePlan, resolveBleedGateDrawPlan } from '../render/bleedGateRenderer';
-import { resolveBoardTileGates } from '../render/bleedGateTileLook';
+import { BLEED_GATE_PLATE, resolveBoardTileGates } from '../render/bleedGateTileLook';
 import {
   hasLegacyBleedGates,
   isLegacyBleedGateAnimating,
@@ -342,6 +342,7 @@ import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
+import { resolveLegacyFullHeightGrowth } from '../legacy-runtime/legacyBoardFullHeight';
 import { shouldUseLegacyBrowserMobileParity } from '../legacy-runtime/legacyBrowserMobileParity';
 import {
   resolveLegacyPathVisualStyle,
@@ -12533,15 +12534,19 @@ export class MenuScene extends Phaser.Scene {
         );
         return;
       case 'bleed-gate':
-        // MAZER-L10: the board's own gate draw (src/render/bleedGateRenderer.ts), lit and still.
+        // MAZER-L10: the board's own gate draw (src/render/bleedGateRenderer.ts). MAZER-VIS-067: the sleeping gate,
+        // still: the pale plate (a disc, to sit in the round badge) with the ink ring and chevrons on it.
+        graphics.fillStyle(BLEED_GATE_PLATE, 1);
+        graphics.fillCircle(centerX, centerY, badgeRadius * 0.92);
         drawBleedGatePlan(graphics, resolveBleedGateDrawPlan({
           axis: 'horizontal',
           centerX,
           centerY,
           tileSize: badgeRadius * 2.2,
-          activation: 1,
+          activation: 0,
           timeSec: 0,
-          reducedMotion: true
+          reducedMotion: true,
+          lit: false
         }));
         return;
       case 'level-numeral': {
@@ -15089,9 +15094,26 @@ export class MenuScene extends Phaser.Scene {
       this.resolveLegacyProgressionScaleOptionsForMode(mode)
     );
     // MAZER-VIS-052: only the menu demo skips the budget ladder (more bleed-off paths).
-    return mode === 'menu'
-      ? resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction, sizeRule })
-      : resolveLegacyMazeGenerationProfileForProgression(track, { fraction, sizeRule });
+    if (mode === 'menu') {
+      return resolveLegacyMenuDemoMazeGenerationProfileForProgression(track, { fraction, sizeRule });
+    }
+    const profile = resolveLegacyMazeGenerationProfileForProgression(track, { fraction, sizeRule });
+    // MAZER-UI-101 full height: grow the played grid until it fills the screen height (legacyBoardFullHeight.ts).
+    const geometry = readMazerViewportGeometry();
+    const playScale = this.resolveLegacyProgressionScaleForMode(mode);
+    const gridGrowth = resolveLegacyFullHeightGrowth({
+      viewport: {
+        width: geometry.fullBleed.width,
+        height: geometry.fullBleed.height,
+        safeArea: geometry.safeArea,
+        browserMobileParity: this.resolveLegacyBrowserMobileParity(geometry.fullBleed.width, geometry.fullBleed.height)
+      },
+      scale: playScale,
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode, playScale),
+      minGridAxis: profile.minGridAxis,
+      boardScaleSetting: this.settings.scale
+    });
+    return gridGrowth.rows > 0 || gridGrowth.cols > 0 ? { ...profile, gridGrowth } : profile;
   }
 
   private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number {

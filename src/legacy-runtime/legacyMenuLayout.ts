@@ -603,9 +603,14 @@ export const resolveLegacyMenuLayout = (
     Math.min(marginedBoardWidthTarget, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
   );
   const cleanPhoneInsetPad = LEGACY_PHONE_CLEAN_SAFE_INSET * 2;
+  // MAZER-UI-101: the inset pad is part of the board's height (snappedBoardHeight adds it below), so a
+  // height-bound clean-phone play board counts it inside the height bound. Before this the board came out
+  // one pad (14 px) taller than laneBoardLimit whenever height was the binding axis and ran under the
+  // bottom safe edge. Width-bound boards are untouched (the term only matters for the smaller axis).
+  const playHeightInsetPad = isPlaySurface && options.useFloatingTouchControls === true ? cleanPhoneInsetPad : 0;
   const cleanPhoneTileSize = Math.min(
     (cleanPhoneBoardWidth - cleanPhoneInsetPad) / Math.max(1, mazeWidth),
-    marginedBoardHeightTarget / Math.max(1, mazeHeight)
+    (marginedBoardHeightTarget - playHeightInsetPad) / Math.max(1, mazeHeight)
   );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
@@ -634,8 +639,14 @@ export const resolveLegacyMenuLayout = (
   const menuBoardCenterOffset = !isPlaySurface
     ? Math.max(0, (menuBoardZoneHeight - snappedBoardHeight) / 2)
     : 0;
+  // MAZER-UI-101: a floating-controls play board is centred in the room between the top margin and the
+  // bottom reserve (laneBoardLimit), so its leftover is split top and bottom instead of all landing below
+  // the board. The non-floating play lane keeps its pinned top (its controls sit under the board).
+  const playBoardCenterOffset = isPlaySurface && options.useFloatingTouchControls === true
+    ? Math.max(0, (laneBoardLimit - snappedBoardHeight) / 2)
+    : 0;
   const boardTop = Math.round(
-    isPlaySurface ? playTopBoardMargin : (menuBoardZoneTop + menuBoardCenterOffset)
+    isPlaySurface ? playTopBoardMargin + playBoardCenterOffset : (menuBoardZoneTop + menuBoardCenterOffset)
   );
   const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait

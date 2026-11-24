@@ -6,9 +6,10 @@
 // fades out under a travelling ring. The board bake already shows the opened path from the moment the gate
 // is lit (legacyBleedGateState.ts, resolveLegacyBleedGateViewGrid), so the cover is what makes it draw in.
 //
-// MAZER-VIS-063: the gate tile's darker floor and its idle corner brackets are in the board bake; a LIT gate's
-// brackets (cyan, breathing on the ring's pulse clock) are stroked here, under the ring, on the redraws that
-// already repaint the ring. The ring itself is drawn exactly as before.
+// MAZER-VIS-063 / MAZER-VIS-067: the gate tile's surface is in the board bake (a sleeping gate: the pale plate; a
+// lit gate: the darker floor); a LIT gate's corner brackets (cyan, breathing on the ring's pulse clock) are
+// stroked here, under the ring, on the redraws that already repaint the ring. A sleeping gate has no brackets and
+// its ring is ink on the plate (`lit: false`); a lit gate's ring is the Pulse ring as before.
 
 import {
   readLegacyBleedGateTriggeredAtMs,
@@ -115,7 +116,8 @@ export const drawLegacyBleedGateLayer = (graphics: BleedGateGraphics, input: Ble
       tileSize,
       activation: state.activation,
       timeSec: nowMs / 1000,
-      reducedMotion
+      reducedMotion,
+      lit
     }), alpha);
     drew = true;
   }

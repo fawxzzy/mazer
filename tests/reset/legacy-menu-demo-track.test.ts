@@ -89,6 +89,8 @@ const bindScene = (scene: MenuDemoSceneHarness): void => {
     'recordMazeCycleCompletion',
     'resolveLegacyProgressionScaleForMode',
     'resolveLegacyMazeGenerationProfileForMode',
+    // MAZER-UI-101: the play profile asks the scene for the full-height grid growth, which reads this.
+    'resolveLegacyBrowserMobileParity',
     'resolveLegacyTargetComplexityForMode',
     'createFreshLegacyMenuGenerationSeed',
     'createFreshLegacyPlayGenerationSeed'
