@@ -13,7 +13,7 @@
  * What it does (Chromium via Playwright, built preview server, no fake clock, no stepping):
  *   1. loads ?authFixture=authenticated with cleared localStorage (level 1 = straight corridor)
  *      and confirms the "Player Skill Lv 01" diagnostics label;
- *   2. presses Start with a real Enter key, waits for input to unlock;
+ *   2. presses Start with a real Enter key (opens the mode sheet) and Enter again (starts Endless), waits for input to unlock;
  *   3. drives the player to the goal by HOLDING the arrow key (repeated real keydown events,
  *      like OS key repeat);
  *   4. samples every animation frame (in-page rAF) and a screenshot every ~150 ms for the
@@ -159,6 +159,10 @@ const runViewport = async (browser, baseUrl, viewport, evidenceDir) => {
 
   // Real Start: focus the canvas and press a real Enter key.
   await page.evaluate(() => document.querySelector('canvas').focus());
+  await page.keyboard.press('Enter');
+  // MAZER-MODE-002: Enter opens the mode-select sheet; wait out its 250 ms input guard, then Enter starts Endless.
+  await page.waitForFunction(() => window.__MAZER_GAME__.scene.getScene('MenuScene').overlay === 'mode-select', null, { timeout: 30_000, polling: 50 });
+  await page.waitForTimeout(350);
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => {
     const s = window.__MAZER_GAME__.scene.getScene('MenuScene');
