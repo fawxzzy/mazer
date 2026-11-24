@@ -109,6 +109,10 @@ export interface LegacyMazeGenerationProfile {
   // (legacyGeometryBudget.ts, resolveGeometryBudgetBoardFeltPermille). Set only on size-rule-2 play profiles,
   // whose late boards outgrow the board the felt ladder was calibrated on. Absent keeps every target exactly.
   feltScalesWithBoard?: true;
+  // MAZER-UI-101: extra grid cells (even counts, so every axis stays odd) added to the grid the scale and aspect
+  // ratio resolve to, so a play board fills the screen height (legacyBoardFullHeight.ts picks them from the
+  // real layout). Absent or 0/0 keeps the grid exactly.
+  gridGrowth?: { rows: number; cols: number };
   // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
   // bands can request as few as 1.
   minCheckpoints: number;
@@ -354,6 +358,19 @@ const resolveMinGridAxis = (minAxis: number | undefined): number => (
     ? clampInteger(minAxis, LEGACY_MIN_GRID_AXIS, LEGACY_DEFAULT_MIN_GRID_AXIS)
     : LEGACY_DEFAULT_MIN_GRID_AXIS
 );
+// MAZER-UI-101: growth counts are whole even numbers (an odd count would make an axis even, and the generator
+// drops one cell off an even axis) clamped to 0..LEGACY_GRID_GROWTH_MAX; null when neither axis grows.
+export const LEGACY_GRID_GROWTH_MAX = 60;
+const resolveGridGrowth = (growth: { rows?: number; cols?: number } | undefined): { rows: number; cols: number } | null => {
+  const axis = (value: number | undefined): number => (
+    typeof value === 'number' && Number.isFinite(value)
+      ? Math.floor(clampInteger(value, 0, LEGACY_GRID_GROWTH_MAX) / 2) * 2
+      : 0
+  );
+  const rows = axis(growth?.rows);
+  const cols = axis(growth?.cols);
+  return rows > 0 || cols > 0 ? { rows, cols } : null;
+};
 export const LEGACY_JOURNEY_MAX_LEGS = 4;
 const LEGACY_MAX_SCALE = 150;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
@@ -413,6 +430,8 @@ export const normalizeLegacyMazeGenerationProfile = (
       : {}
   ),
   ...(profile?.feltScalesWithBoard === true ? { feltScalesWithBoard: true as const } : {}),
+  // Same rule: only materialised when it grows the grid, so every other profile keeps its exact prior shape.
+  ...(resolveGridGrowth(profile?.gridGrowth) !== null ? { gridGrowth: resolveGridGrowth(profile?.gridGrowth)! } : {}),
   minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,

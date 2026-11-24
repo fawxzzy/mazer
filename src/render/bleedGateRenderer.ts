@@ -12,20 +12,25 @@
 
 import type { BleedAxis } from '../legacy-runtime/legacyBleedPaths';
 import { phaserMaterialAliases } from '../theme/tokens';
+import { BLEED_GATE_TILE_PLATE_INK } from './palette';
 
 // Theme tokens (MAZER-UI-013): asleep is the muted text grey, lit is the info cyan (the options page's
 // #3d5a64 / #7ff3ff, mapped to the nearest registry colours).
 export const BLEED_GATE_DULL = phaserMaterialAliases['text.muted'];
 export const BLEED_GATE_LIT = phaserMaterialAliases['semantic.info'];
 
+/** MAZER-VIS-067: a sleeping gate's ring and chevrons are ink, so they read on the pale plate under them. */
+export const BLEED_GATE_IDLE_INK = BLEED_GATE_TILE_PLATE_INK;
+
 const DESIGN_TILE = 39;
-const RING_RADIUS_SHARE = 0.36;
+// MAZER-VIS-067 (Lit cap): the ring sits a touch inside the plate (was 0.36) and the chevrons are 10 % larger.
+const RING_RADIUS_SHARE = 0.34;
 const DASH_PX = 7;
 const GAP_PX = 5;
 const RING_LINE_PX = 2.2;
 const DASH_SPIN_PX_PER_S = 30;
-const ARROW_SPREAD_PX = 8;
-const ARROW_SIZE_PX = 4.6;
+const ARROW_SPREAD_PX = 8 * 1.1;
+const ARROW_SIZE_PX = 4.6 * 1.1;
 const ARROW_LINE_PX = 2.6;
 const ARROW_SLIDE_PX = 1.8;
 const ARROW_SLIDE_RATE = 8;
@@ -83,6 +88,11 @@ export const resolveBleedGateDrawPlan = (input: {
   activation: number;
   timeSec: number;
   reducedMotion?: boolean;
+  /**
+   * MAZER-VIS-067: false = the gate has not been walked over, so its tile is the pale plate and the ring is ink.
+   * True or absent: the ring mixes dull -> lit cyan with `activation` (a lit gate sits on the dark floor).
+   */
+  lit?: boolean;
 }): BleedGateDrawPlan => {
   const { axis, centerX, centerY, tileSize } = input;
   const a = Math.max(0, Math.min(1, input.activation));
@@ -90,7 +100,7 @@ export const resolveBleedGateDrawPlan = (input: {
   const t = input.timeSec * motion;
   const scale = tileSize / DESIGN_TILE;
   const radius = RING_RADIUS_SHARE * tileSize;
-  const color = mixBleedGateColor(BLEED_GATE_DULL, BLEED_GATE_LIT, a);
+  const color = input.lit === false ? BLEED_GATE_IDLE_INK : mixBleedGateColor(BLEED_GATE_DULL, BLEED_GATE_LIT, a);
 
   // Dashes along the circumference, shifted by the spin (dash offset -t*30*a, in design px).
   const circumference = 2 * Math.PI * radius;

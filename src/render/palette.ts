@@ -861,6 +861,12 @@ export const BLEED_GATE_TILE_FLOOR = 0x1f3a38;
 /** MAZER-VIS-063: bleed gate idle corner brackets, the owner's options-page pick C (src/render/bleedGateTileLook.ts). */
 export const BLEED_GATE_TILE_BRACKET = 0xf2fbfa;
 
+/** MAZER-VIS-067: sleeping bleed gate tile, option B "Lit cap": a pale mint plate over the whole tile (src/render/bleedGateTileLook.ts). */
+export const BLEED_GATE_TILE_PLATE = 0xdff7f1;
+
+/** MAZER-VIS-067: the sleeping gate's ring and chevrons, ink on the pale plate (the lit gate mixes it to cyan on the dark floor). */
+export const BLEED_GATE_TILE_PLATE_INK = 0x0b1a18;
+
 /**
  * MAZER-VIS-064: board tile set H "Starlit Bevel", the owner's options-page pick (2026-11-19, round 2), painted by
  * src/render/boardTileBake.ts (style 'starlit'). Floor vs wall 4.18:1, gate vs floor 2.71:1, gate vs wall 1.54:1.

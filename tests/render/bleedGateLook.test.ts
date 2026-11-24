@@ -1,12 +1,16 @@
-// MAZER-VIS-063: the gate tile's look (darker floor + corner brackets) around an UNCHANGED Pulse ring.
+// MAZER-VIS-063 / MAZER-VIS-067: the gate tile's look. A lit gate: darker floor + corner brackets around the Pulse ring.
+// A sleeping gate (Lit cap): a pale plate over the whole tile, no brackets, the ring and chevrons in ink.
 import { describe, expect, test } from 'vitest';
 import { generateLadderMaze, LADDER_BOARDS } from '../../scripts/analysis/lib/progressionLadderSampling';
 import { BLEED_GATE_FIRST_LEVEL } from '../../src/legacy-runtime/legacyBleedGates';
 import { BLEED_GATE_ANIMATION_MS, syncLegacyBleedGatePassOver } from '../../src/legacy-runtime/legacyBleedGateState';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import {
+  BLEED_GATE_DULL,
+  BLEED_GATE_IDLE_INK,
   BLEED_GATE_LIT,
   BLEED_GATE_PULSE_RATE,
+  mixBleedGateColor,
   drawBleedGatePlan,
   resolveBleedGateDrawPlan,
   type BleedGateGraphics
@@ -17,6 +21,7 @@ import {
   BLEED_GATE_BRACKET_IDLE,
   BLEED_GATE_BRACKET_LIT,
   BLEED_GATE_FLOOR,
+  BLEED_GATE_PLATE,
   resolveBleedGateBrackets,
   resolveBleedGateBracketStyle,
   resolveBoardTileGates
@@ -73,18 +78,48 @@ const ringLog = (): string => {
   return log.join('\n');
 };
 
-describe('the Pulse ring is unchanged by the gate look', () => {
-  test('ring draw calls match the pre-change ring output exactly (fingerprint taken on main 6944c999)', () => {
-    expect(fingerprint(ringLog())).toBe('0e668ce7067074');
+describe('the Pulse ring under the Lit cap look', () => {
+  // The ring draw calls changed on purpose in MAZER-VIS-067 (radius 0.36 -> 0.34 of the tile, chevrons x1.1); this
+  // fingerprint is the new baseline for a lit gate (no `lit` flag), so any later drift is caught.
+  test('ring draw calls match the Lit cap baseline (re-baselined for MAZER-VIS-067)', () => {
+    expect(fingerprint(ringLog())).toBe('0a637b3a3f972a');
+  });
+
+  test('ring radius is 0.34 of the tile; the chevrons are 10 % larger than before (8 px spread, 4.6 px size at a 39 px tile)', () => {
+    const plan = resolveBleedGateDrawPlan({ axis: 'horizontal', centerX: 0, centerY: 0, tileSize: 39, activation: 0, timeSec: 0, reducedMotion: true });
+    expect(plan.radius).toBeCloseTo(0.34 * 39, 9);
+    const size = 4.6 * 1.1;
+    const tip = (8 * 1.1) + (size / 2);
+    expect(plan.chevrons[1]!.points[1]!.x).toBeCloseTo(tip, 9);
+    expect(plan.chevrons[1]!.points[0]!.y).toBeCloseTo(-size, 9);
+  });
+
+  test('a sleeping gate (lit: false) draws ink; a lit or unspecified gate mixes dull to cyan as before', () => {
+    const base = { axis: 'horizontal' as const, centerX: 0, centerY: 0, tileSize: 20, timeSec: 0 };
+    expect(resolveBleedGateDrawPlan({ ...base, activation: 0, lit: false }).color).toBe(BLEED_GATE_IDLE_INK);
+    expect(resolveBleedGateDrawPlan({ ...base, activation: 0, lit: true }).color).toBe(BLEED_GATE_DULL);
+    expect(resolveBleedGateDrawPlan({ ...base, activation: 1, lit: true }).color).toBe(BLEED_GATE_LIT);
+    expect(resolveBleedGateDrawPlan({ ...base, activation: 0.4 }).color).toBe(mixBleedGateColor(BLEED_GATE_DULL, BLEED_GATE_LIT, 0.4));
+    // geometry does not depend on the flag
+    expect({ ...resolveBleedGateDrawPlan({ ...base, activation: 0, lit: false }), color: 0 })
+      .toEqual({ ...resolveBleedGateDrawPlan({ ...base, activation: 0, lit: true }), color: 0 });
   });
 });
 
-describe('gate tile colours (Zac pick 2026-11-19: C + D)', () => {
-  test('dark floor #1F3A38, idle brackets #F2FBFA, lit brackets the ring lit cyan #6BE8E1', () => {
+describe('gate tile colours (Zac picks: 2026-11-19 C + D for a lit gate; 2026-11-23 Lit cap for a sleeping gate)', () => {
+  test('plate #DFF7F1 with ink #0B1A18; lit: dark floor #1F3A38, brackets fade from #F2FBFA to the ring lit cyan #6BE8E1', () => {
+    expect(BLEED_GATE_PLATE).toBe(0xdff7f1);
+    expect(BLEED_GATE_IDLE_INK).toBe(0x0b1a18);
     expect(BLEED_GATE_FLOOR).toBe(0x1f3a38);
     expect(BLEED_GATE_BRACKET_IDLE).toBe(0xf2fbfa);
     expect(BLEED_GATE_BRACKET_LIT).toBe(BLEED_GATE_LIT);
     expect(BLEED_GATE_LIT).toBe(0x6be8e1);
+  });
+
+  test('the sleeping plate is far lighter than the corridor chip and the ink ring reads strongly on it', () => {
+    expect(luminance(BLEED_GATE_PLATE)).toBeGreaterThan(luminance(BOARD_CHIP_FILL));
+    expect(contrast(BLEED_GATE_PLATE, BOARD_CHIP_FILL)).toBeGreaterThan(2.5);
+    expect(contrast(BLEED_GATE_IDLE_INK, BLEED_GATE_PLATE)).toBeGreaterThan(12);
   });
 
   test('the dark floor is darker than the chip but above the wall void; the brackets stand out on it', () => {
@@ -188,7 +223,7 @@ describe('corner bracket geometry', () => {
 });
 
 describe('bracket style', () => {
-  test('asleep: idle white at full alpha (what the bake shows); lit: cyan breathing on the ring pulse clock', () => {
+  test('the instant a gate lights: pale at full alpha; lit: cyan breathing on the ring pulse clock', () => {
     expect(resolveBleedGateBracketStyle({ activation: 0, timeSec: 1.3 })).toEqual({ color: BLEED_GATE_BRACKET_IDLE, alpha: 1 });
     const alphas: number[] = [];
     for (let t = 0; t < 1 / BLEED_GATE_PULSE_RATE; t += 0.005) {
@@ -213,10 +248,11 @@ const bake = (input: BoardTileBakeInput) => {
   return { result, log: surface.rec.log };
 };
 
-describe('board bake: gate floor and idle brackets', () => {
+describe('board bake: sleeping plate, lit floor, no baked brackets', () => {
   const grid = corridorGrid();
   const gate = { x: 12, y: 20 };
   const darkFill = `set fillStyle=${cssRgb(BLEED_GATE_FLOOR)}`;
+  const plateFill = `set fillStyle=${cssRgb(BLEED_GATE_PLATE)}`;
   const whiteStroke = `set strokeStyle=${cssRgb(BLEED_GATE_BRACKET_IDLE)}`;
 
   test('a gateless board keeps its hash; gates and their lit state change it', () => {
@@ -229,36 +265,44 @@ describe('board bake: gate floor and idle brackets', () => {
     expect(lit).not.toBe(idle);
   });
 
-  test('chip style: the gate fill is painted dark and an idle gate gets four white brackets in one stroke', () => {
-    const { log } = bake(inputFor(grid, { gates: [gate], style: 'chip' }));
-    expect(log).toContain(darkFill);
-    const white = log.indexOf(whiteStroke);
-    expect(white).toBeGreaterThan(-1);
-    const after = log.slice(white);
-    expect(after.filter((entry) => entry === 'stroke()')).toHaveLength(1);
-    expect(after.filter((entry) => entry.startsWith('moveTo('))).toHaveLength(4);
-    expect(log.slice(0, white)).toContain('set lineCap=butt');
-  });
+  for (const style of ['chip', 'starlit', 'trace'] as const) {
+    test(`${style} style: a sleeping gate is one plate over its tile and gets no baked brackets and no dark floor`, () => {
+      const { log } = bake(inputFor(grid, { gates: [gate], style }));
+      expect(log).toContain(plateFill);
+      expect(log).not.toContain(darkFill);
+      expect(log).not.toContain(whiteStroke);
+      // the plate is the LAST fill: it covers whatever the floor painter drew under the gate
+      const plate = log.lastIndexOf(plateFill);
+      expect(log.slice(plate).filter((entry) => entry.startsWith('set fillStyle='))).toHaveLength(1);
+      expect(log.slice(plate).filter((entry) => entry === 'fill()')).toHaveLength(1);
+    });
 
-  test('a lit gate keeps the dark floor but its brackets are left to the live layer', () => {
-    const { log } = bake(inputFor(grid, { gates: [{ ...gate, lit: true }], style: 'chip' }));
-    expect(log).toContain(darkFill);
-    expect(log).not.toContain(whiteStroke);
-  });
+    test(`${style} style: a lit gate has the dark floor (chip and starlit) and no plate; its brackets are left to the live layer`, () => {
+      const { log } = bake(inputFor(grid, { gates: [{ ...gate, lit: true }], style }));
+      expect(log).not.toContain(plateFill);
+      expect(log).not.toContain(whiteStroke);
+      if (style !== 'trace') {
+        expect(log.some((entry) => entry.startsWith('set fillStyle=') && entry.includes(`${style === 'chip' ? cssRgb(BLEED_GATE_FLOOR) : cssRgb(0x1b3532)}`))).toBe(true);
+      }
+    });
+  }
 
   test('no gates: no gate paint', () => {
     const { log } = bake(inputFor(grid));
     expect(log).not.toContain(darkFill);
+    expect(log).not.toContain(plateFill);
     expect(log).not.toContain(whiteStroke);
   });
 
-  test('the bracket plans the scene uses are the ones the bake strokes (fractional DPR)', () => {
-    const input = inputFor(grid, { gates: [gate], devicePixelRatio: 2.625, tileSize: 14.72 });
-    const plan = computeBleedGateBracketPlans(input).get('12,20')!;
-    expect(plan.brackets).toHaveLength(4);
+  test('mixed gates: only the sleeping one is a plate (the lit one is a floor); the live bracket plans are still computed for both (fractional DPR)', () => {
+    const other = { x: 12, y: 21 };
+    const input = inputFor(grid, { gates: [gate, { ...other, lit: true }], devicePixelRatio: 2.625, tileSize: 14.72, style: 'chip' });
+    const plans = computeBleedGateBracketPlans(input);
+    expect(plans.get('12,20')!.brackets).toHaveLength(4);
+    expect(plans.get('12,21')!.brackets).toHaveLength(4);
     const { log } = bake(input);
-    const moves = log.slice(log.indexOf(whiteStroke)).filter((entry) => entry.startsWith('moveTo('));
-    expect(moves).toEqual(plan.brackets.map((bracket) => `moveTo(${bracket[0]!.x},${bracket[0]!.y})`));
+    expect(log).toContain(plateFill);
+    expect(log).toContain(darkFill);
   });
 
   test('resolveBoardTileGates maps gates and their lit state', () => {
@@ -279,7 +323,7 @@ describe('scene layer: lit brackets under the unchanged ring', () => {
   })();
   const plan = resolveBleedGateBrackets({ tile: tileOf(20, 2, 0), tileSize: 20, scale: 1, ringOuterRadius: ringOuter(20) });
 
-  test('asleep: only the ring is drawn live (idle brackets are baked)', () => {
+  test('asleep: only the ring is drawn live, in ink (no brackets; the plate is baked)', () => {
     const run = { ...gated, bleedGates: [...gated.bleedGates!] };
     const gate = run.bleedGates[0]!;
     const plans = new Map([[`${gate.x},${gate.y}`, plan]]);
@@ -289,6 +333,8 @@ describe('scene layer: lit brackets under the unchanged ring', () => {
     const withPlans = recordCalls();
     drawLegacyBleedGateLayer(withPlans.graphics, { ...base, brackets: { origin: { x: 5, y: 7 }, plans } });
     expect(withPlans.log).toEqual(without.log);
+    // the ring strokes are the ink colour on the plate
+    expect(without.log.filter((call) => call.startsWith('lineStyle(')).every((call) => call.includes(`,${BLEED_GATE_IDLE_INK},`))).toBe(true);
   });
 
   test('lit: four cyan brackets first, then exactly the ring calls drawn without brackets', () => {

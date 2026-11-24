@@ -184,7 +184,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     text: 'Some mazes wrap around open edges. Edge stars fill with your colour as beams hit.'
   },
   {
-    // MAZER-L10: the bleed gate (Gate D "Pulse ring"). The icon is the board's own gate draw, lit and still.
+    // MAZER-L10: the bleed gate (Gate D "Pulse ring"). MAZER-VIS-067: the icon is the board's own SLEEPING gate: the pale plate and the ink ring, still.
     heading: 'Wrap gate',
     icon: {
       badge: 'circle',
@@ -196,7 +196,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'bleed-gate',
-    text: 'Later mazes hide a wrap behind a dashed ring. Walk over the ring to open it.'
+    text: 'Later mazes hide a wrap behind a pale tile with a dashed ring. Walk onto it to open it.'
   },
   {
     heading: 'Levels',

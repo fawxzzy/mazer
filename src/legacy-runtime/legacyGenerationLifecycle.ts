@@ -46,6 +46,7 @@ import { FELT_TIE_DEVIATION_LIMIT_PERCENT, FELT_WRAP_PRICE_PERCENT, tuneMazeFelt
 import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { LEGACY_BOARD_SIZE_RULE2_CAP_SCALE, resolveLegacyBoardDimensions } from './legacyBoardScale';
+import { applyLegacyGridGrowth } from './legacyBoardFullHeight';
 import { resolveLegacyMazeComplexity } from './legacyProgression';
 import { legacyTuning } from '../config/tuning';
 
@@ -559,7 +560,12 @@ const buildLegacyRuntimeMazeForMode = (
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const resolvedShortcutCount = budget.shortcutStageEnabled ? budget.shortcutCount : 0;
-  const { width, height } = resolveLegacyMazeDimensionsForScale(scale, aspectRatio);
+  // MAZER-UI-101: profile.gridGrowth (full-height play boards) adds whole rows/columns to the resolved grid.
+  const { width, height } = applyLegacyGridGrowth(
+    resolveLegacyMazeDimensionsForScale(scale, aspectRatio),
+    profile.gridGrowth,
+    profile.minGridAxis
+  );
   return buildKind === 'menu-generated'
     ? createLegacyGeneratedMenuMaze(width, height, seed, resolvedShortcutCount, profile)
     : createLegacyMaze(width, height, seed, resolvedShortcutCount, profile);

@@ -15,6 +15,7 @@ import {
   resolveBoardTileStyle
 } from '../../src/render/boardTileStyle';
 import { getContrastRatio, STARLIT_BEVEL_TILE } from '../../src/render/palette';
+import { BLEED_GATE_FLOOR, BLEED_GATE_PLATE } from '../../src/render/bleedGateTileLook';
 import { braidedMazeGrid, createRecordingSurface, inputFor as fixtureInput } from './support/boardTileFixtures';
 import { RasterContext, type Rgba } from './support/rasterContext';
 
@@ -111,8 +112,8 @@ describe.each(CASES)('Starlit pixels: tile %f css px at DPR %f', (tileSize, dpr)
 
 describe('Starlit gate tiles', () => {
   const gate: BoardCell & { lit?: boolean } = { x: 4, y: 3 };
-  test.each(CASES)('tile %f at DPR %f: dark gate face inside a shade ring, no floor bevel on the gate', (tileSize, dpr) => {
-    const i = input(tileSize, dpr, { gates: [gate] });
+  test.each(CASES)('tile %f at DPR %f: a lit gate is a dark gate face inside a shade ring, no floor bevel on the gate', (tileSize, dpr) => {
+    const i = input(tileSize, dpr, { gates: [{ ...gate, lit: true }] });
     const r = raster(i);
     const t = computeChipTileAt(i, gate)!;
     const f = t.fill;
@@ -120,6 +121,28 @@ describe('Starlit gate tiles', () => {
     expect(same(at(r, i, f.left + (f.width / 2), f.top + (f.height / 2)), rgb(STARLIT_BEVEL_TILE.gate))).toBe(true);
     // the top edge of a gate tile is the shade ring, never the floor highlight
     expect(same(at(r, i, f.left + (f.width / 2), f.top + (band / 2)), rgb(STARLIT_BEVEL_TILE.shade))).toBe(true);
+  });
+});
+
+describe('Starlit sleeping gate tile (MAZER-VIS-067 Lit cap)', () => {
+  const gate: BoardCell & { lit?: boolean } = { x: 4, y: 3 };
+  test.each(CASES)('tile %f at DPR %f: the whole tile is the pale plate, rim and bevel included', (tileSize, dpr) => {
+    const i = input(tileSize, dpr, { gates: [gate] });
+    const r = raster(i);
+    const t = computeChipTileAt(i, gate)!;
+    const plate = rgb(BLEED_GATE_PLATE);
+    // centre, and one device pixel inside the tile edge at the middle of each side (the rim zone)
+    const step = 1 / dpr;
+    expect(same(at(r, i, t.left + (t.width / 2), t.top + (t.height / 2)), plate)).toBe(true);
+    expect(same(at(r, i, t.left + (t.width / 2), t.top + (step / 2)), plate)).toBe(true);
+    expect(same(at(r, i, t.left + (t.width / 2), t.top + t.height - (step / 2)), plate)).toBe(true);
+    expect(same(at(r, i, t.left + (step / 2), t.top + (t.height / 2)), plate)).toBe(true);
+    expect(same(at(r, i, t.left + t.width - (step / 2), t.top + (t.height / 2)), plate)).toBe(true);
+  });
+
+  test('a sleeping gate is much lighter than the floor around it; a lit gate is darker', () => {
+    expect(getContrastRatio(BLEED_GATE_PLATE, STARLIT_BEVEL_TILE.floor)).toBeGreaterThan(3);
+    expect(getContrastRatio(BLEED_GATE_FLOOR, STARLIT_BEVEL_TILE.floor)).toBeGreaterThan(2);
   });
 });
 

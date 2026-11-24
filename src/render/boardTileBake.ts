@@ -55,8 +55,8 @@ import {
 import { resolveSharedBorderColor } from './playerColour';
 import { resolveBleedGateDrawPlan } from './bleedGateRenderer';
 import {
-  BLEED_GATE_BRACKET_IDLE,
   BLEED_GATE_FLOOR,
+  BLEED_GATE_PLATE,
   resolveBleedGateBrackets,
   type BleedGateBracketPlan
 } from './bleedGateTileLook';
@@ -141,8 +141,9 @@ export interface BoardTileDock {
 }
 
 /**
- * MAZER-VIS-063: a bleed gate's tile. Every gate tile gets the darker gate floor; a gate that is not lit yet also
- * gets its idle corner brackets baked in (a lit gate's brackets breathe, so the scene draws those live).
+ * MAZER-VIS-063 / MAZER-VIS-067: a bleed gate's tile. A gate that is not lit yet is the pale plate (painted over
+ * the whole tile, no brackets); a lit gate gets the darker gate floor (its brackets breathe, so the scene draws
+ * those live).
  */
 export interface BoardTileGate {
   x: number;
@@ -1151,34 +1152,25 @@ export const computeBleedGateBracketPlans = (input: BoardTileBakeInput): Map<str
   return plans;
 };
 
-const paintGateBrackets = (
+/**
+ * MAZER-VIS-067 (B "Lit cap"): a gate that is not lit yet is a pale plate over its whole tile (rim included),
+ * rounded like the corridor chip there. Painted last, over whatever the floor painter drew for that tile; the
+ * ring and chevrons are drawn live on top (ink, bleedGateRenderer.ts).
+ */
+const paintGatePlates = (
   p: Painter,
-  n: NormalizedInput,
   gates: readonly { gate: BoardTileGate; chip: ChipTileGeometry }[]
 ): void => {
   const idle = gates.filter((entry) => entry.gate.lit !== true);
   if (idle.length === 0) {
     return;
   }
-  // Butt caps and miter joins: what Phaser Graphics strokes with, so the live (lit) brackets match the baked ones.
-  p.caps('butt', 'miter');
-  p.strokeStyle(cssRgb(BLEED_GATE_BRACKET_IDLE));
-  let width = -1;
+  p.fillStyle(cssRgb(BLEED_GATE_PLATE));
+  p.begin();
   for (const { chip } of idle) {
-    const plan = gateBracketPlanOf(n, chip);
-    if (plan.lineWidth !== width) {
-      width = plan.lineWidth;
-      p.lineWidth(width);
-    }
-    p.begin();
-    for (const bracket of plan.brackets) {
-      const [first, ...rest] = bracket;
-      if (!first) continue;
-      p.move(first.x, first.y);
-      for (const point of rest) p.line(point.x, point.y);
-    }
-    p.stroke();
+    p.roundedRect(chip.left, chip.top, chip.width, chip.height, chip.radii);
   }
+  p.fill();
 };
 
 export function bakeBoardTiles<TCanvas = unknown>(
@@ -1205,7 +1197,8 @@ export function bakeBoardTiles<TCanvas = unknown>(
     paintTraceFloor(p, n, layout, style, base);
   } else {
     const chips = base.map((tile) => chipGeometryOf(n, tile, style));
-    const gateChips = gates.map((entry) => entry.chip);
+    // Only a LIT gate gets the darker floor; a sleeping gate's plate is painted over the finished floor below.
+    const gateChips = gates.filter((entry) => entry.gate.lit === true).map((entry) => entry.chip);
     if (n.style === 'starlit') {
       paintStarlitFloor(p, n, layout, style, chips, gateChips);
     } else {
@@ -1213,7 +1206,7 @@ export function bakeBoardTiles<TCanvas = unknown>(
     }
     paintChipDocks(p, layout, style);
   }
-  paintGateBrackets(p, n, gates);
+  paintGatePlates(p, gates);
 
   p.alpha(1);
   p.transform(1, 0, 0, 1, 0, 0);

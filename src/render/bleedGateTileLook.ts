@@ -7,8 +7,15 @@
 //        lit cyan and breathe on the ring's own pulse clock.
 // The ring (dashes, chevrons, spin, slide, pulse rings, halo, colours) is not touched here.
 //
-// Cost: the dark floor and the idle brackets are part of the board bake (boardTileBake.ts), so a sleeping gate
-// costs nothing per frame. Only a LIT gate draws its four brackets in the dynamic layer, on the same redraws
+// MAZER-VIS-067 "Lit cap" (Zac's pick, 2026-11-23) changes the SLEEPING gate only, so it is easy to spot from
+// across the maze while it still reads as a gate: the tile is a pale mint plate (#DFF7F1) over the whole tile,
+// following the corridor's rounded corners, with the Pulse ring and chevrons in ink (#0B1A18) on it, the ring a
+// little smaller (0.34 of the tile, was 0.36) and the chevrons 10 % larger. The sleeping gate's corner brackets are
+// dropped (the plate is the marker). A LIT gate keeps the D look above: the dark floor, the cyan brackets that
+// breathe, the cyan ring and its pulse rings.
+//
+// Cost: the plate and the dark floor are part of the board bake (boardTileBake.ts), so a sleeping gate costs
+// nothing per frame. Only a LIT gate draws its four brackets in the dynamic layer, on the same redraws
 // that already repaint its ring (bleedGateSceneLayer.ts); no new redraw is scheduled.
 //
 // Geometry comes from the options page's 100-unit tile (a 92-unit chip): bracket corner 8 units inside the
@@ -22,11 +29,13 @@
 
 import type { BoardCell, BoardTileGate } from './boardTileBake';
 import { mixBleedGateColor, BLEED_GATE_LIT, BLEED_GATE_PULSE_RATE } from './bleedGateRenderer';
-import { BLEED_GATE_TILE_BRACKET, BLEED_GATE_TILE_FLOOR } from './palette';
+import { BLEED_GATE_TILE_BRACKET, BLEED_GATE_TILE_FLOOR, BLEED_GATE_TILE_PLATE } from './palette';
 
-/** D: the gate tile's floor (the chip fill inside the rim). The rim keeps the board's normal lit edge. */
+/** D: a LIT gate tile's floor (the chip fill inside the rim). The rim keeps the board's normal lit edge. */
 export const BLEED_GATE_FLOOR = BLEED_GATE_TILE_FLOOR;
-/** C: the corner brackets while the gate sleeps. */
+/** MAZER-VIS-067 B "Lit cap": a SLEEPING gate tile's plate, painted over the whole tile (rim included). */
+export const BLEED_GATE_PLATE = BLEED_GATE_TILE_PLATE;
+/** The colour a lit gate's brackets start from (they mix to the lit cyan as the gate's activation runs 0 -> 1). */
 export const BLEED_GATE_BRACKET_IDLE = BLEED_GATE_TILE_BRACKET;
 /** C: the corner brackets once the gate is lit (the ring's own lit cyan, token semantic.info #6be8e1). */
 export const BLEED_GATE_BRACKET_LIT = BLEED_GATE_LIT;
@@ -140,8 +149,8 @@ export const resolveBleedGateBrackets = (input: {
 };
 
 /**
- * Colour and alpha of the brackets. Asleep (activation 0): the idle colour at full alpha, exactly what the bake
- * shows, so the hand-off from the baked brackets to the drawn ones is seamless. Lit: the colour mixes to cyan
+ * Colour and alpha of a LIT gate's brackets (a sleeping gate has none). At activation 0 (the instant the gate
+ * lights): the pale idle colour at full alpha. Lit: the colour mixes to cyan
  * with the ring's activation and the alpha breathes on the ring's pulse clock (brightest as each pulse ring
  * leaves the gate). Reduce Motion: no breathing.
  */
