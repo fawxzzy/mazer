@@ -146,6 +146,9 @@ describe('type scale source ratchet (shipped src + index.html)', () => {
       normaliseStack(TYPE_BODY_FACE),
       normaliseStack(TYPE_DISPLAY_FACE),
       'Space Grotesk, ui-sans-serif, system-ui',
+      // index.html #mazer-boot-fallback (Auth Surface v2 static fallback, #600): a plain stack on purpose, no var(),
+      // because the CSS bundle may be missing. Same faces as the body face with a shorter system tail.
+      'Space Grotesk, ui-sans-serif, system-ui, sans-serif',
       'Space Grotesk',
       'Oxanium'
     ]);
