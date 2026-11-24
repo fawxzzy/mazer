@@ -342,7 +342,8 @@ export const buildLegacySettingsSheetModel = (
         id: 'preview-jump',
         rows: preview.checkpoints.map((level) => row(`preview-jump-${level}`, 'action', `Level ${level}`, {
           command: { type: 'PREVIEW_JUMP', level },
-          emphasis: level === preview.level ? 'primary' : 'tertiary'
+          // MAZER-UI-099: one solid-mint primary per sheet (Resume); the row you are on is the outlined secondary.
+          emphasis: level === preview.level ? 'secondary' : 'tertiary'
         })),
         title: 'Jump to level'
       }
