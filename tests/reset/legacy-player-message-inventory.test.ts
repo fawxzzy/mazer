@@ -88,6 +88,7 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/ui/dom/MazerSwitch.ts', literal: 'Off', kind: 'static', route: 'primitive state label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Info', kind: 'static', route: 'primitive tone label' },
   { file: 'src/ui/dom/StatusBanner.ts', literal: 'Error', kind: 'static', route: 'primitive tone label' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The same menu pauses the run. Reset level restarts the maze, Main menu leaves it.', kind: 'static', route: 'Guide row copy (the In a maze row, pinned to the Guide data module)' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Reach the spinning twin stars to clear the maze.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The spinning pinwheel on the first tile is where you set off.', kind: 'static', route: 'Guide (How to play) sheet row copy (Start row, added with the Chip board wiring; pinwheel wording MAZER-VIS-065); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'You are the colour-shifting spark. It points the way you move.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },

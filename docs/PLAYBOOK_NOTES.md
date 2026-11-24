@@ -714,3 +714,11 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY: Zac asked for a simple star-rating popup with an optional note, saved to the database. Options first, SQL drafted only (needs a second review, a live preimage and an owner box naming the sha256).
 - Rule: the popup must not reach a shipping module until a layout is picked; then drop these exclusions and add the inventory rows.
 - Not checked: a real phone, the popup over the real game, any database apply.
+
+## 2026-11-24 Guide option C (Icon glossary) ships as THE Guide
+
+- WHAT: the Guide sheet is now a 4-column icon glossary (new legacyGuideGlossaryPainter.ts): one tile per row (the same Star Dust icon draws as the board), tap a tile to read its copy in the detail panel below, kit primary Got it footer. Rows still come from legacyGuideContent.ts; hazard rows stay flag-gated and the keyboard line still shows on keyboard devices. New row menu-play ("In a maze", 81 chars) covers the in-run menu (Resume = X, Reset level, Main menu). The Menu line stays 81 chars; every copy line is <= 90.
+- Scaffolding removed: the options picker bar, dark-boot bypass, variant painters and their test are deleted; src/boot/main.ts is identical to main, so no route or flag ships.
+- Tests: drift test gains a glossary-copy block (<= 90 chars, one glyph per row), sheet-plan "tall desktop" height 1300 -> 1400 (one more row), five scene-source pins retargeted from MenuScene to the painter, inventory test and doc gain the menu-play row, capture script expects "In a maze".
+- Baseline (clean origin/main 10464c39, compared, not guessed): board-sync, project-board-owner-export, playbook-adoption-evidence (2 tests) and playbook-verification-report fail the same way there; unrelated and untouched here.
+- Checked: phone-shot chromium and webkit at 390x844, 320x568, 820x1180, default and dark, every PNG read; tile tap switches the panel; Got it closes. Not checked: a real phone.

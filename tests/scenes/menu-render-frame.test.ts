@@ -147,7 +147,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('createLegacyOptionsSessionActionBar');
     expect(menuSceneSource).not.toContain("'GUIDE',");
     expect(guideSource).toContain('buildLegacyGuideSheetModel(context,');
-    expect(guideSource).toContain('buildLegacyGuideSheetPlan({');
+    // Guide option C (2026-11-23): the scene hands the model to the glossary painter, which plans the sheet.
+    expect(guideSource).toContain('paintGuideGlossarySheet(this, model)');
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGuideGlossaryPainter.ts'), 'utf8')).toContain('buildLegacyGuideSheetPlan({');
     expect(guideSource).not.toContain('includeCompassRow');
     expect(guideSource).not.toContain("'begin at gold'");
     expect(guideSource).not.toContain("'Player • green trail'");
@@ -156,7 +158,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
-    expect(menuSceneSource).toContain('private drawLegacyGuideIcon(');
+    expect(menuSceneSource).toContain('  drawLegacyGuideIcon(');
     expect(menuSceneSource).toContain('private createLegacySheetHeading(');
     expect(menuSceneSource).not.toContain("label: 'High Contrast'");
   });
@@ -2139,8 +2141,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // Slice H6 adds the met hazard kinds (always [] while the hazard layer is off, so the rows are unchanged).
     expect(menuSceneSource.replace(/\r\n/g, '\n')).toContain('const model = buildLegacyGuideSheetModel(context, {\n      hasKeyboard: this.resolveLegacyGuideHasKeyboard(),');
     expect(menuSceneSource).toContain('hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? []');
-    expect(menuSceneSource).toContain('let plan = buildLegacyGuideSheetPlan({ ...planInput, itemHeights: measure(Number.MAX_SAFE_INTEGER) });');
-    expect(menuSceneSource).toContain('model.closeLabel,');
+    expect(menuSceneSource).toContain('paintGuideGlossarySheet(this, model)');
+    expect(readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGuideGlossaryPainter.ts'), 'utf8')).toContain('model.closeLabel,');
     expect(menuSceneSource).toContain('private closeLegacyGuideSheet(): void {');
     expect(menuSceneSource).not.toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
     expect(menuSceneSource).not.toContain("'begin at gold'");
