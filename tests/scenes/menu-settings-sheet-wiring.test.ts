@@ -75,7 +75,7 @@ describe('MenuScene wiring: Reset progress', () => {
     const back = method('private handleBackAction(): void');
     expect(back).toContain("if (this.progressionResetState.phase === 'working') {\n        return;");
     const confirm = method('private buildProgressionResetConfirmationOverlay(): void');
-    expect(confirm).toContain("addButton(cancelButton.label, 'primary', () => this.handleBackAction(), state.phase === 'working');");
+    expect(confirm).toContain("addButton(cancelButton.label, 'secondary', () => this.handleBackAction(), state.phase === 'working');");
     expect(confirm).toContain('() => this.confirmLegacyProgressionReset(),');
   });
 
