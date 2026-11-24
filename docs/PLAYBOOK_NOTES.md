@@ -724,6 +724,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: the popup must not reach a shipping module until a layout is picked; then drop these exclusions and add the inventory rows.
 - Not checked: a real phone, the popup over the real game, any database apply.
 
+## 2026-11-24 Username rename throttle SQL proposal (MAZER-ACCT-047, draft, not applied)
+
+- WHAT: new `docs/ops/sql-proposals/mazer-username-throttle-20261124/` (apply.sql, rollback.sql, README, SHA256SUMS, pglite scratch test and log, live-body fixtures). A BEFORE UPDATE OF username trigger plus a log table: after the free first claim from a generated handle, 1 change per 24h and 3 per 7 days per account; blocked attempts raise SQLSTATE PT429 (HTTP 429 through PostgREST; a plain 54000 would be HTTP 500) `MAZER_USERNAME_RATE_LIMITED` with DETAIL `retry_after_seconds=<n> window=day|week`. No client change is needed before apply: the account site already maps 429 to its rate notice (unverified on the live API).
+- WHY: the live `mazer_set_username` has no throttle, and `authenticated` can also write `username` straight to `mazer_profiles`, so the throttle sits on the row UPDATE, not in a new RPC. Guards pin the md5 of the LIVE bodies (set_username `1b1fae6c...`, CRLF; the repo copy md5 differs).
+- Rule: in a plpgsql preflight never use a `'schema.table'::regclass` literal for an object the same file creates; the cast resolves at parse time and aborts a fresh install (42P01). Use `to_regclass()`. The scratch test caught this.
+- Not checked: advisory-lock concurrency (pglite is single-connection), the PG17 cluster harness, any database apply. FawxzzyWeb `delete_account_v2` manifest needs the new table before its next apply.
 ## 2026-11-24 Feedback SQL v2 (proposal files only, not applied)
 
 - WHAT: new `docs/ops/sql-proposals/mazer-feedback-20261124-v2/` (apply, rollback, README, hashes, preimage, pglite scratch test) superseding the v1 draft. Signed-in only (NOT_SIGNED_IN), global 100/hour cap on top of 5/hour and 20/day per user, `user_id not null ... on delete cascade`, `lock_timeout` 3s on both files and the function. The v1 README now says superseded.

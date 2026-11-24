@@ -1,0 +1,86 @@
+PGlite 0.5.13 (PostgreSQL 17 wasm), in-memory
+### tested_file=docs/ops/sql-proposals/mazer-username-throttle-20261124/apply.sql sha256=1ab0cf2571ecf74c2ddeffd0b23922b124c48ffa0bed136c7674e34dbc77c309
+### tested_file=docs/ops/sql-proposals/mazer-username-throttle-20261124/rollback.sql sha256=38f306e98d643c518b6a05ec9a84fd405f05652845620e937720184c295bbf1e
+### fixture=docs/ops/sql-proposals/mazer-username-throttle-20261124/scratch-test/live-bodies.json sha256=fc69569b16f450fab1a258ac59117cf4aacf6d772ff4ae6b2117e35d2e10586d
+PASS  fixture: set_username body md5 is the pin 1b1fae6c (CRLF kept)
+PASS  fixture: enforce_username_origin md5 is the pin 15faddd6
+PASS  fixture: protect_leaderboard_hidden md5 is the pin a2d34bf2
+PASS  repo copy of set_username differs from live (record only)  [repo(LF)=4646e17787259205270ccafa388506f7 live(LF)=52aad54b788b197b4a47f2fdaffc7055 live(stored)=1b1fae6c5de66380e55f2f096f2de5cb]
+PASS  preflight aborts: schema mazer missing  [MAZER_THROTTLE_PREIMAGE_MISSING_SCHEMA]
+PASS  preflight aborts: set_username body drifted (one char added)  [MAZER_THROTTLE_PREIMAGE_SET_USERNAME_DRIFT: f188441439dccc3ab106e0a3ae1f4769]
+PASS  preflight aborts: set_username missing  [MAZER_THROTTLE_PREIMAGE_SET_USERNAME_DRIFT: missing]
+PASS  preflight aborts: origin trigger function drifted  [MAZER_THROTTLE_PREIMAGE_ORIGIN_TRIGGER_DRIFT: 8de754cac5d3f1216ba09c104c9b3ca8]
+PASS  preflight aborts: hidden-protect function drifted  [MAZER_THROTTLE_PREIMAGE_HIDDEN_TRIGGER_DRIFT: 8de754cac5d3f1216ba09c104c9b3ca8]
+PASS  preflight aborts: an unexpected extra trigger on the profile table  [MAZER_THROTTLE_PREIMAGE_UNEXPECTED_TRIGGERS: mazer_enforce_username_origin_before_update,m]
+PASS  preflight aborts: a same-name table with another shape  [MAZER_THROTTLE_PREIMAGE_UNEXPECTED_TABLE_SHAPE]
+PASS  preflight aborts: same-name table, right columns, but no cascading FK / primary key  [MAZER_THROTTLE_PREIMAGE_UNEXPECTED_TABLE_CONSTRAINTS]
+PASS  preflight aborts: a same-name function with another signature  [MAZER_THROTTLE_PREIMAGE_UNEXPECTED_FUNCTION]
+PASS  preflight aborts: username column missing from profiles  [MAZER_THROTTLE_PREIMAGE_PROFILE_COLUMNS]
+PASS  apply runs clean as the non-superuser applier  [ok]
+PASS  lock_timeout / statement_timeout were transaction-local (session back to default)  [lock_timeout=0]
+PASS  apply text sets local lock_timeout 3s
+PASS  log table: RLS on, no policy, ACL only the owner  [{owner_pg=arwdDxtm/owner_pg}]
+PASS  trigger function: definer, search_path empty, ACL only the owner  [{owner_pg=X/owner_pg}]
+PASS  profile table now has 3 triggers
+PASS  the three guarded live bodies are byte-identical after apply
+PASS  authenticated cannot select on the new objects  [permission denied for table mazer_username_changes]
+PASS  authenticated cannot insert on the new objects  [permission denied for table mazer_username_changes]
+PASS  authenticated cannot delete on the new objects  [permission denied for table mazer_username_changes]
+PASS  authenticated cannot call function on the new objects  [permission denied for function mazer_throttle_username_change]
+PASS  anon cannot read the log table
+PASS  service_role has no grant on the log table (bypassrls does not bypass privileges)
+PASS  RPC invalid name (1 char) still 22023 MAZER_USERNAME_INVALID  [22023]
+PASS  RPC invalid characters still 22023
+PASS  RPC account mismatch still 28000  [28000]
+PASS  RPC without a profile row still P0002 MAZER_PROFILE_MISSING  [P0002]
+PASS  RPC without a JWT (auth.uid() null) is not executable for the superuser path either way: account mismatch 28000  [28000]
+PASS  same-name call returns the name, nothing logged
+PASS  claimed account: first change succeeds and is logged
+PASS  rename also moved display_name (live body behaviour kept)
+PASS  second change within 24h: SQLSTATE PT429 MAZER_USERNAME_RATE_LIMITED  [PT429 MAZER_USERNAME_RATE_LIMITED]
+PASS  block detail carries retry_after_seconds (~24h) and window=day  [retry_after_seconds=86400 window=day]
+PASS  blocked attempt changed nothing and logged nothing
+PASS  same-name call while blocked still succeeds (no budget burn, no error)
+PASS  invalid name while blocked is still 22023 (validation first)  [22023]
+PASS  direct UPDATE of username by the owner is throttled too (PT429)  [PT429 MAZER_USERNAME_RATE_LIMITED]
+PASS  direct UPDATE of other columns is unaffected while rename-blocked
+PASS  upsert (INSERT ... ON CONFLICT DO UPDATE SET username) hits the same throttle  [PT429 MAZER_USERNAME_RATE_LIMITED]
+PASS  another user cannot write someone's row (RLS: 0 rows, nothing logged)
+PASS  after 23h still blocked, retry_after about 1h  [3600]
+PASS  after 25h the change is allowed and logged (2 rows)
+PASS  third change inside 7 days is allowed (day window clear)
+PASS  fourth change inside 7 days: blocked, window=week, retry = oldest-of-three + 7d (about 3.9 days here)  [retry_after_seconds=334800 window=week]
+PASS  weekly block changed nothing
+PASS  once the oldest of the three leaves the 7-day window the change is allowed
+PASS  ...and it is gone after that change (rename allowed or blocked-no-prune is distinguished)  [planted=1 rename=ok old_rows=0]
+PASS  generated handle: first claim is free, not logged, origin becomes claimed  [{"username":"Charlie3","username_origin":"claimed","display_name":"Charlie3"}]
+PASS  ...the next change is logged (budget starts now)
+PASS  ...and the one after is blocked
+PASS  direct UPDATE on a generated account is also the free first claim
+PASS  taken name (case-insensitive) is 23505 and spends no budget  [23505 log=0]
+PASS  ...so the next valid change still works
+PASS  case-only change is a change (logged)
+PASS  ...and a second case-only change inside 24h is blocked
+PASS  another account's budget is independent (u2 can change while u1/u3/u5/u6 are spent)
+PASS  SQL-runner rename (auth.uid() null) is exempt and not logged, even repeated
+PASS  applier role rename without JWT is exempt too
+PASS  deleting a profile cascades its log rows  [had=5]
+PASS  re-apply over a live install is accepted (idempotent)  [ok]
+PASS  re-apply keeps every log row  [4]
+PASS  re-apply leaves the catalog identical
+PASS  rollback with log rows runs clean  [ok]
+PASS  ...throttle trigger and function gone, table KEPT (it holds rows)  [{"trg":0,"fn":0,"tbl":1}]
+PASS  ...and renames are unthrottled again
+PASS  re-apply after a kept-table rollback works and reuses the table  [ok]
+PASS  ...throttle is live again (the logged Bravo3 change is inside 24h, so Bravo5 is blocked)
+PASS  rollback on an empty log runs clean  [ok]
+PASS  catalog after rollback equals the catalog before apply (functions md5, ACLs, triggers, tables, policies, indexes)
+PASS  rollback is itself re-runnable (no-op)  [ok]
+PASS  mutant weekly limit 3 -> 100 is detected (by behaviour or by the apply postimage)  [true]
+PASS  mutant no auth.uid() exemption is detected (by behaviour or by the apply postimage)  [true]
+PASS  mutant generated handle not free is detected (by behaviour or by the apply postimage)  [true]
+PASS  mutant no WHEN clause / no distinct guard (same name would burn budget) is detected (by behaviour or by the apply postimage)  [true]
+PASS  mutant error code reverted to 54000 (would reach clients as HTTP 500) is detected (by behaviour or by the apply postimage)  [true]
+PASS  mutant log insert removed (no budget is ever spent) is detected (by behaviour or by the apply postimage)  [true]
+
+80 passed, 0 failed
