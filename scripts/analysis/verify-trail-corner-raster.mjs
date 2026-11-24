@@ -135,6 +135,12 @@ const setSceneState = async (page, { maze, player, trail }) => {
     // clock (it used to be held at phase 0 by Trail Shine off), so freeze that clock too: this check is only about
     // corner stroke geometry and must raster the same pixels on every run.
     scene.advanceLegacyTrailAnimationClock = () => 0;
+    // The backdrop stars (MAZER-UI-102 dark mode, the rainbow subset) take their colour from the wall clock even under
+    // reduced motion, so a captured frame differed by a few star dots on every run and cornerNW flipped around its
+    // 40 px region limit (main CI: 53 px, 54 px, then 48-51 px on this branch). This check is about corner stroke
+    // geometry, so draw the field without stars: the pixels are then the same on every machine and every run.
+    scene.stars = [];
+    scene.backdropDirty = true;
     scene.menuStaticDrawLifecyclePhase = 'settled';
     scene.menuStaticDrawRowsVisible = null;
     scene.menuStaticDrawTilesVisible = null;
