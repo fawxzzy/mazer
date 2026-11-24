@@ -148,7 +148,7 @@ const BASELINE_FLOOR: Readonly<Record<number, number>> = { 20: 324, 50: 413, 100
 const BASELINE_EMPTY_RECT: Readonly<Record<number, number>> = { 20: 195, 50: 135, 100: 82, 150: 62, 198: 33 };
 
 describe('the filled ladder is as dense as before (MAZER-GEN-007)', () => {
-  test('mean floor within 7 percent of the old maze (measured 94 to 96 percent), largest blank patch within 1.5 times the old one, from level 20 to 198', () => {
+  test('mean floor within 10 percent of the old maze (measured 92 to 96 percent; MAZER-GEN-030 walls up short dead ends, about 1.5 percent of the floor at level 100), largest blank patch within 1.5 times the old one, from level 20 to 198', () => {
     for (const level of [20, 50, 100, 150, 198]) {
       let floor = 0;
       let rect = 0;
@@ -165,7 +165,7 @@ describe('the filled ladder is as dense as before (MAZER-GEN-007)', () => {
           expect(collectOneTileStubs(maze), `${board.name} level ${level} seed ${index}`).toEqual([]);
         }
       }
-      expect(floor / mazes, `floor level ${level}`).toBeGreaterThanOrEqual(BASELINE_FLOOR[level]! * 0.93);
+      expect(floor / mazes, `floor level ${level}`).toBeGreaterThanOrEqual(BASELINE_FLOOR[level]! * 0.9);
       expect(rect / mazes, `blank patch level ${level}`).toBeLessThanOrEqual(BASELINE_EMPTY_RECT[level]! * 1.5);
     }
   }, 240_000);
