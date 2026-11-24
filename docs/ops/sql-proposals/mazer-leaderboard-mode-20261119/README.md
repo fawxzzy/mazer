@@ -4,6 +4,8 @@ Status: PROPOSED, NOT APPLIED. Nothing here ran against Supabase. Applying needs
 
 Apply file: `supabase/migrations/20260828170000_mazer_leaderboard_game_mode.sql` (one transaction). Depends on the hide-QA migration `20260828160000` (live since 2026-11-16): it aborts if that is not applied.
 Rollback: `rollback.sql` (this folder, not under `supabase/migrations`).
+Re-run 2026-11-23 on main 56043a17 (lane "mode select"): same pinned pglite 0.5.13, 27 passed, 0 failed, same two sha256 values below. Still NOT applied.
+
 Scratch evidence: `scratch-test/modetest.cjs` (run: `PGLITE_SANDBOX=<dir with @electric-sql/pglite 0.5.13> node modetest.cjs <repo root>`), log `scratch-test/run-pglite.log` (sha256 headers inside, 27 checks, 0 failed).
 Tested files (LF bytes, as committed): apply sha256 `b597fc5b57662d054a39bbcfc7b792fa83d193dceb70d2312526c3f9be529644`; rollback.sql sha256 `38530b2fedc8081e1269003bc4bc0efcfd490a06d94d76cf10a3e52495162443`.
 

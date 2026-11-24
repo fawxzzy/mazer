@@ -708,6 +708,15 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Rule: a new gate look must paint over the bake's floor painter output, never inside it, so all tile styles stay in step.
 - Not checked: a real phone. Pre-existing failure on origin/main: `type-scale-ratchet.test.ts` (tokens.css font stack), not touched here. #673 and the maze-quality PR (#684, merged) may touch raster fixtures; this PR does not change them.
 
+## 2026-11-24 MAZER-MODE-002: Mode-select sheet after Play (Endless only)
+
+- WHAT changed: Play on the main menu (the START button and tap-to-play) now opens a "Choose a mode" sheet instead of starting the run. It lists Endless (with the player's existing Level and Rank, read only) and one plain locked "More soon" slot; tapping Endless closes the sheet and starts the run through the existing START_RUN path; Back to Menu closes it. Layout is a Stack for up to 3 entries and flips to Tiles past 3 (`resolveLegacyModeSelectVariant`). Pure plan and item model in `src/legacy-runtime/legacyModeSelectPlan.ts`; new overlay kind `mode-select`; one thin hook (`requestLegacyPlayStart`) plus a scene painter in `MenuScene.ts`.
+- WHY: owner decisions 2026-11-24 recorded in `docs/architecture/MAZER-GAME-MODES-PRODUCT-CONTRACT.md` section 13 (sheet shown while Endless is the only mode, no auto-start of the last mode, no named Hazards slot, A Stack now). PR #692 (contract and options page) is folded into this PR.
+- Endless data is untouched: no storage, progression, checkpoint, outbox, network or leaderboard code in the sheet (pinned by `tests/architecture/mode-select-flow-contract.test.ts`); Hazards stays reserved and unreachable; no SQL or database change.
+- QA scripts: `capture-ui-surfaces.mjs` (`clickStartUntilPlay`) and `verify-start-transition-stability.mjs` now tap the Endless card after Start, because Start lands on the sheet.
+- Rule: a new mode needs a registry entry AND a tagline in `LEGACY_MODE_SELECT_TAGLINES` (a test pins it); the list, not the painter, is what changes.
+- Not checked: a real phone, safe areas, the Tiles layout on screen (plan tests only), a signed-in account with real progress (the fixture shows Level 1, Rank E).
+
 ## 2026-11-23 Feedback popup options (draft, not wired in, not applied)
 
 - WHAT: new `src/ui/feedback/*` (reducer, DOM popup, theme map, standalone `feedback-options.html` page) with three layouts built from the Wave 2A kit (card, bottom sheet, compact), plus a DRAFT SQL proposal under `docs/ops/sql-proposals/mazer-feedback-20261123/` and a client plan. `tests/ui/dom-primitives-styles.test.ts` skips `src/ui/feedback` (it is not a shipping import; `tests/ui/feedback-state.test.ts` pins that main.ts and MenuScene.ts do not import it). `legacy-player-message-inventory.test.ts` excludes the two feedback files from the createStatusBanner dormant pin for the same reason.

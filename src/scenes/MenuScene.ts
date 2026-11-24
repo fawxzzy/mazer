@@ -622,6 +622,15 @@ import {
   type LegacyLeaderboardOverlayPlan
 } from '../legacy-runtime/legacyLeaderboardOverlayPlan';
 import {
+  buildLegacyModeSelectItems,
+  buildLegacyModeSelectPlan,
+  isLegacyModeSelectInputGuarded,
+  resolveLegacyModeSelectKeyboardChoice,
+  type LegacyModeSelectItem,
+  type LegacyModeSelectPlan,
+  type LegacyModeSelectRect
+} from '../legacy-runtime/legacyModeSelectPlan';
+import {
   buildLegacyLeaderboardViewModel,
   resolveLegacyLeaderboardRequest,
   resolveLegacyLeaderboardTierColor,
@@ -1887,6 +1896,9 @@ export class MenuScene extends Phaser.Scene {
   private mode: RuntimeMode = 'menu';
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
+  private modeSelectIndex = 0;
+  // Scene-clock time the mode-select sheet last opened or closed; sheet taps and Play are ignored for a short window.
+  private modeSelectInputGuardStartedAt: number | null = null;
   // Wave 3A live command/state bridge -- see src/state/uiLegacyBridge.ts.
   // Null only before create() installs it and after shutdown destroys it.
   private uiBridge: UiLegacyBridge | null = null;
@@ -4575,9 +4587,16 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
+      // MAZER-MODE-002: Enter is the keyboard Play button, so it opens the mode-select sheet like a tap does.
       if (this.hasLegacyPlayAccess() && !this.menuDropdown.isShown()) {
-        this.startPlayMode();
+        this.requestLegacyPlayStart();
       }
+      return true;
+    }
+
+    if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {
+      event.preventDefault();
+      this.pressModeSelectEnter();
       return true;
     }
 
@@ -5093,7 +5112,7 @@ export class MenuScene extends Phaser.Scene {
     })) {
       return false;
     }
-    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+    this.requestLegacyPlayStart();
     return true;
   }
 
@@ -11654,7 +11673,7 @@ export class MenuScene extends Phaser.Scene {
               isPhoneWidth ? Math.max(primaryButtonWidth, this.layout.width) : primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
-              () => this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode()),
+              () => this.requestLegacyPlayStart(),
               // Harness/diagnostics keep addressing this action as 'Start' (the visible label changed).
               { explicitHitZone: true, semanticAction: 'Start' }
             )
@@ -11685,6 +11704,9 @@ export class MenuScene extends Phaser.Scene {
         break;
       case 'leaderboard':
         this.buildLeaderboardOverlay();
+        break;
+      case 'mode-select':
+        this.buildModeSelectOverlay();
         break;
     }
 
@@ -12708,6 +12730,230 @@ export class MenuScene extends Phaser.Scene {
     }
     this.uiTexts.push(label);
     return label;
+  }
+
+  // MAZER-MODE-002 (contract sections 8 to 13): Play on the main menu opens the mode-select sheet; choosing
+  // Endless starts the run exactly as Play does today. Layout and item model live in legacyModeSelectPlan.ts.
+  private requestLegacyPlayStart(): void {
+    if (this.mode === 'menu') {
+      // A second tap of the same double-tap (on Play or on the sheet's Back) must not re-open the sheet.
+      if (this.isModeSelectInputGuarded()) {
+        return;
+      }
+      this.modeSelectInputGuardStartedAt = this.time.now;
+      this.openOverlay('mode-select');
+      return;
+    }
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+  }
+
+  private isModeSelectInputGuarded(): boolean {
+    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt);
+  }
+
+  // Keyboard Enter on the sheet: the selected playable entry, or the only playable one; never a locked slot.
+  private pressModeSelectEnter(): void {
+    if (this.isModeSelectInputGuarded()) {
+      return;
+    }
+    const items = this.resolveModeSelectItems();
+    const choice = resolveLegacyModeSelectKeyboardChoice(items, this.modeSelectIndex);
+    if (choice !== null) {
+      this.startModeSelectItem(items[choice]!);
+    }
+  }
+
+  private resolveModeSelectItems(): LegacyModeSelectItem[] {
+    // Endless is today's single ladder: its stats are the player's existing level and rank, read, never written.
+    const track = this.progressionState.tracks.player;
+    return buildLegacyModeSelectItems({ level: track.level, rank: track.rank });
+  }
+
+  private startModeSelectItem(item: LegacyModeSelectItem): void {
+    if (!item.playable || this.isModeSelectInputGuarded()) {
+      return;
+    }
+    this.closeOverlay();
+    this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+  }
+
+  private createModeSelectHitZone(rect: LegacyModeSelectRect, text: string, onClick: () => void): UiButton {
+    const cx = rect.left + (rect.width / 2);
+    const cy = rect.top + (rect.height / 2);
+    const background = this.add.rectangle(cx, cy, rect.width, rect.height, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerdown', onClick);
+    const label = this.add.text(cx, cy, '', { fontSize: '1px' }).setVisible(false);
+    return {
+      background,
+      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      },
+      label,
+      setActive: () => undefined,
+      text
+    };
+  }
+
+  private paintModeSelectLock(cx: number, cy: number, color: number, alpha: number): void {
+    const g = this.overlayGraphics;
+    g.lineStyle(2, color, alpha);
+    g.beginPath();
+    g.arc(cx, cy - 3, 5, Math.PI, 0, false);
+    g.strokePath();
+    g.fillStyle(color, alpha);
+    g.fillRoundedRect(cx - 7, cy - 3, 14, 11, 3);
+  }
+
+  private paintModeSelectGlyph(id: string, cx: number, cy: number, color: number, alpha: number): void {
+    const g = this.overlayGraphics;
+    if (id === 'endless') {
+      // A corridor with a star at its end: the one-line summary of Endless.
+      g.lineStyle(3, color, alpha);
+      g.beginPath();
+      g.moveTo(cx - 22, cy + 10);
+      g.lineTo(cx - 6, cy + 10);
+      g.lineTo(cx - 6, cy - 8);
+      g.lineTo(cx + 14, cy - 8);
+      g.strokePath();
+      g.fillStyle(color, alpha);
+      g.fillCircle(cx + 20, cy - 8, 4);
+      return;
+    }
+    g.lineStyle(3, color, alpha);
+    g.beginPath();
+    g.moveTo(cx - 10, cy);
+    g.lineTo(cx + 10, cy);
+    g.moveTo(cx, cy - 10);
+    g.lineTo(cx, cy + 10);
+    g.strokePath();
+  }
+
+  private paintModeSelectCardChrome(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): { accent: number; textColor: number; alpha: number } {
+    const material = cyberArcadeMaterial;
+    const g = this.overlayGraphics;
+    const accent = item.playable ? material.rail.mint : material.rail.muted;
+    const lit = item.playable && selected;
+    g.fillStyle(accent, lit ? 0.14 : (item.playable ? 0.07 : 0.04));
+    g.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, LEGACY_UI_CONTROL_RADIUS);
+    const lockedSelected = selected && !item.playable;
+    g.lineStyle(lit || lockedSelected ? 2 : 1, accent, lit ? 0.85 : (lockedSelected ? 0.75 : (item.playable ? 0.45 : 0.3)));
+    g.strokeRoundedRect(rect.left + 0.5, rect.top + 0.5, rect.width - 1, rect.height - 1, LEGACY_UI_CONTROL_RADIUS);
+    return { accent, alpha: item.playable ? 1 : 0.6, textColor: item.playable ? 0xecfff5 : material.rail.muted };
+  }
+
+  private formatModeSelectStats(item: LegacyModeSelectItem): string {
+    return item.stats.map((stat) => `${stat.label} ${stat.value}`).join('   ');
+  }
+
+  private paintModeSelectStackCard(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
+    const material = cyberArcadeMaterial;
+    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
+    const textLeft = rect.left + 68;
+    this.paintModeSelectGlyph(item.id, rect.left + 36, rect.top + (rect.height / 2), chrome.accent, chrome.alpha);
+    // A locked card has no stats row, so its two lines sit lower to stay centred in the card.
+    const labelTop = item.playable ? 26 : 34;
+    this.addLegacyLeaderboardText(textLeft, rect.top + labelTop, item.label, chrome.textColor, 18, 0, rect.width - 68 - 44, { bold: true });
+    this.addLegacyLeaderboardText(textLeft, rect.top + labelTop + 23, item.tagline, material.rail.muted, 12, 0, rect.width - 68 - 44);
+    if (item.playable) {
+      this.addLegacyLeaderboardText(textLeft, rect.top + 71, this.formatModeSelectStats(item), material.rail.mint, 12, 0, rect.width - 68 - 44, { bold: true });
+      this.addLegacyLeaderboardText(rect.left + rect.width - 22, rect.top + (rect.height / 2), '>', material.rail.mint, 22, 0.5, 24, { bold: true });
+    } else {
+      this.paintModeSelectLock(rect.left + rect.width - 26, rect.top + (rect.height / 2), material.rail.muted, 0.8);
+    }
+  }
+
+  private paintModeSelectTile(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
+    const material = cyberArcadeMaterial;
+    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
+    const cx = rect.left + (rect.width / 2);
+    this.paintModeSelectGlyph(item.id, cx, rect.top + 36, chrome.accent, chrome.alpha);
+    this.addLegacyLeaderboardText(cx, rect.top + 82, item.label, chrome.textColor, 17, 0.5, rect.width - 16, { bold: true });
+    if (item.playable) {
+      this.addLegacyLeaderboardText(cx, rect.top + 108, this.formatModeSelectStats(item).replace('Level ', 'Lv '), material.rail.mint, 13, 0.5, rect.width - 16, { bold: true });
+    } else {
+      this.paintModeSelectLock(cx, rect.top + 112, material.rail.muted, 0.8);
+    }
+    this.addLegacyLeaderboardText(cx, rect.top + 136, item.playable ? 'Tap to select' : item.tagline, material.rail.muted, 11, 0.5, rect.width - 16);
+  }
+
+  private buildModeSelectOverlay(): void {
+    const items = this.resolveModeSelectItems();
+    const plan: LegacyModeSelectPlan = buildLegacyModeSelectPlan(
+      items,
+      this.modeSelectIndex,
+      this.layout.width,
+      this.layout.height,
+      readMazerViewportGeometry().safeArea
+    );
+    const material = cyberArcadeMaterial;
+    const variant = plan.variant;
+    this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
+    this.drawLegacySheetCard(plan.card);
+    this.createOverlayTitle(plan.title.text, plan.title.centerY);
+
+    for (const entry of plan.items) {
+      const select = (): void => {
+        if (this.isModeSelectInputGuarded()) {
+          return;
+        }
+        this.modeSelectIndex = entry.index;
+        if (variant === 'stack' && entry.item.playable) {
+          this.startModeSelectItem(entry.item);
+          return;
+        }
+        this.uiDirty = true;
+      };
+      if (variant === 'stack') {
+        this.paintModeSelectStackCard(entry.rect, entry.item, entry.item.playable);
+        if (entry.item.playable) {
+          this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
+        }
+      } else {
+        this.paintModeSelectTile(entry.rect, entry.item, entry.selected);
+        this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
+      }
+    }
+
+    if (plan.detail !== null) {
+      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
+      const d = plan.detail;
+      this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.4);
+      this.overlayGraphics.lineBetween(d.left, d.top + 0.5, d.left + d.width, d.top + 0.5);
+      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 20, current.playable ? `${current.label}: ${current.tagline}` : current.label, 0xecfff5, 13, 0.5, d.width, { bold: true });
+      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 44, current.playable ? 'Your level and score live in this mode.' : 'Locked for now. Your Endless progress is unaffected.', material.rail.muted, 12, 0.5, d.width);
+    }
+
+    if (plan.play !== null) {
+      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        plan.play.rect.left + (plan.play.rect.width / 2),
+        plan.play.rect.top + (plan.play.rect.height / 2),
+        plan.play.rect.width,
+        plan.play.rect.height,
+        plan.play.label,
+        () => this.startModeSelectItem(current),
+        plan.play.disabled ? 'secondary' : 'primary',
+        undefined,
+        { disabled: plan.play.disabled }
+      ));
+    }
+
+    this.uiButtons.push(this.createLegacyAuthActionButton(
+      plan.back.left + (plan.back.width / 2),
+      plan.back.top + (plan.back.height / 2),
+      plan.back.width,
+      plan.back.height,
+      plan.backLabel,
+      () => {
+        if (!this.isModeSelectInputGuarded()) {
+          this.handleBackAction();
+        }
+      },
+      'secondary'
+    ));
   }
 
   private buildLeaderboardOverlay(): void {
@@ -14408,6 +14654,9 @@ export class MenuScene extends Phaser.Scene {
     this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
     if (this.overlay !== 'none') {
       this.beginUiTransition('overlay-close');
+    }
+    if (this.overlay === 'mode-select') {
+      this.modeSelectInputGuardStartedAt = this.time.now;
     }
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;

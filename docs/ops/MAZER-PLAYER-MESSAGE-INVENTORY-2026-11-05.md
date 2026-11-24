@@ -131,6 +131,8 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/scenes/MenuScene.ts:2703` | `Signing you in…` | no | info / auth | raw-status | Copy key in auth table; render on the message surface |
 | `src/scenes/MenuScene.ts:17346` | `Progression reset.` | yes (inline copy) | success / progression | routed-inline | Move copy into a progression copy table; add a render surface |
 | `src/scenes/MenuScene.ts:17547` | `Runtime diagnostics authenticated fixture.` | no | n/a | fixture | None (QA fixture) |
+| `src/scenes/MenuScene.ts` (mode-select sheet) | `Your level and score live in this mode.` | no | n/a | static | Tiles-layout detail line (MAZER-MODE-002); static explainer, no routing needed |
+| `src/scenes/MenuScene.ts` (mode-select sheet) | `Locked for now. Your Endless progress is unaffected.` | no | n/a | static | Locked-tile detail line (MAZER-MODE-002); static explainer, no routing needed |
 | `src/boot/accessibilitySurface.ts:100` | `Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.` | no | n/a | static | None (a11y description) |
 | `src/boot/accessibilitySurface.ts:109` | `Mazer is ready.` | no | info | static | Live region never updated; candidate sink for the message surface announcements |
 | `src/legacy-runtime/legacyAuth.ts:763` | `Account connected.` | no | success / auth | raw-status | Auth table key `accountConnected`; no render site today (info on the snapshot) |
