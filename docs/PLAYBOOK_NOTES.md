@@ -707,3 +707,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Decisions: portrait phones only (desktop and landscape unchanged: 45x27 and 25x51 stay); safe areas and controls clear are kept; felt/difficulty targets are scale based, so a grown grid is slightly less dense; no fixture regeneration was needed. Measured: 390x844 L1 15x33 (tile 24.5, 10 px top and bottom), L30 17x39 (4 px).
 - Rule: a new gate look must paint over the bake's floor painter output, never inside it, so all tile styles stay in step.
 - Not checked: a real phone. Pre-existing failure on origin/main: `type-scale-ratchet.test.ts` (tokens.css font stack), not touched here. #673 and the maze-quality PR (#684, merged) may touch raster fixtures; this PR does not change them.
+
+## 2026-11-23 Feedback popup options (draft, not wired in, not applied)
+
+- WHAT: new `src/ui/feedback/*` (reducer, DOM popup, theme map, standalone `feedback-options.html` page) with three layouts built from the Wave 2A kit (card, bottom sheet, compact), plus a DRAFT SQL proposal under `docs/ops/sql-proposals/mazer-feedback-20261123/` and a client plan. `tests/ui/dom-primitives-styles.test.ts` skips `src/ui/feedback` (it is not a shipping import; `tests/ui/feedback-state.test.ts` pins that main.ts and MenuScene.ts do not import it). `legacy-player-message-inventory.test.ts` excludes the two feedback files from the createStatusBanner dormant pin for the same reason.
+- WHY: Zac asked for a simple star-rating popup with an optional note, saved to the database. Options first, SQL drafted only (needs a second review, a live preimage and an owner box naming the sha256).
+- Rule: the popup must not reach a shipping module until a layout is picked; then drop these exclusions and add the inventory rows.
+- Not checked: a real phone, the popup over the real game, any database apply.
