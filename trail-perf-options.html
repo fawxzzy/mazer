@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#02080f" />
+    <meta name="robots" content="noindex" />
+    <title>Mazer trail cost options</title>
+    <style>
+      html, body { background: #02080f; margin: 0; }
+      /* Option bar styles live here, not in src/, so the src colour-literal ratchet (MAZER-UI-013) stays at zero. */
+      #trail-perf-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10000; box-sizing: border-box;
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: rgba(2, 8, 15, 0.92);
+        border-top: 1px solid rgba(120, 200, 255, 0.35); color: #cfe8ff; font: 12px/1.35 system-ui, sans-serif; }
+      #trail-perf-bar .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+      #trail-perf-bar button { font: inherit; color: #cfe8ff; background: #0b1b2b; border: 1px solid #2a4a66;
+        border-radius: 6px; padding: 4px 8px; }
+      #trail-perf-bar button[aria-pressed="true"] { background: #1d4f7a; border-color: #7cc4ff; color: #fff; }
+      #trail-perf-bar .look { margin-top: 4px; opacity: 0.85; }
+      #trail-perf-bar .nums { margin-top: 2px; font-variant-numeric: tabular-nums; }
+      #trail-perf-bar.min .look, #trail-perf-bar.min .nums.measured { display: none; }
+    </style>
+  </head>
+  <body>
+    <!-- Dev/proposal page, not a build input (vite.config build.rollupOptions.input). Boots the real game at a late level
+         and lets the trail painter be switched between today's draw and three cheaper options. -->
+    <div id="app"></div>
+    <script type="module" src="/src/render/trailPerf/trailPerfOptionsMain.ts"></script>
+  </body>
+</html>
