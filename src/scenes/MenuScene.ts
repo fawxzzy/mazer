@@ -628,6 +628,8 @@ import {
 import {
   buildLegacyModeSelectItems,
   buildLegacyModeSelectPlan,
+  isLegacyModeSelectInputGuarded,
+  resolveLegacyModeSelectKeyboardChoice,
   type LegacyModeSelectItem,
   type LegacyModeSelectPlan,
   type LegacyModeSelectRect
@@ -1899,6 +1901,8 @@ export class MenuScene extends Phaser.Scene {
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
   private modeSelectIndex = 0;
+  // Scene-clock time the mode-select sheet last opened or closed; sheet taps and Play are ignored for a short window.
+  private modeSelectInputGuardStartedAt: number | null = null;
   // Wave 3A live command/state bridge -- see src/state/uiLegacyBridge.ts.
   // Null only before create() installs it and after shutdown destroys it.
   private uiBridge: UiLegacyBridge | null = null;
@@ -4587,9 +4591,16 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
+      // MAZER-MODE-002: Enter is the keyboard Play button, so it opens the mode-select sheet like a tap does.
       if (this.hasLegacyPlayAccess() && !this.menuDropdown.isShown()) {
-        this.startPlayMode();
+        this.requestLegacyPlayStart();
       }
+      return true;
+    }
+
+    if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {
+      event.preventDefault();
+      this.pressModeSelectEnter();
       return true;
     }
 
@@ -12853,10 +12864,31 @@ export class MenuScene extends Phaser.Scene {
   // Endless starts the run exactly as Play does today. Layout and item model live in legacyModeSelectPlan.ts.
   private requestLegacyPlayStart(): void {
     if (this.mode === 'menu') {
+      // A second tap of the same double-tap (on Play or on the sheet's Back) must not re-open the sheet.
+      if (this.isModeSelectInputGuarded()) {
+        return;
+      }
+      this.modeSelectInputGuardStartedAt = this.time.now;
       this.openOverlay('mode-select');
       return;
     }
     this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
+  }
+
+  private isModeSelectInputGuarded(): boolean {
+    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt);
+  }
+
+  // Keyboard Enter on the sheet: the selected playable entry, or the only playable one; never a locked slot.
+  private pressModeSelectEnter(): void {
+    if (this.isModeSelectInputGuarded()) {
+      return;
+    }
+    const items = this.resolveModeSelectItems();
+    const choice = resolveLegacyModeSelectKeyboardChoice(items, this.modeSelectIndex);
+    if (choice !== null) {
+      this.startModeSelectItem(items[choice]!);
+    }
   }
 
   private resolveModeSelectItems(): LegacyModeSelectItem[] {
@@ -12866,7 +12898,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startModeSelectItem(item: LegacyModeSelectItem): void {
-    if (!item.playable) {
+    if (!item.playable || this.isModeSelectInputGuarded()) {
       return;
     }
     this.closeOverlay();
@@ -12992,6 +13024,9 @@ export class MenuScene extends Phaser.Scene {
 
     for (const entry of plan.items) {
       const select = (): void => {
+        if (this.isModeSelectInputGuarded()) {
+          return;
+        }
         this.modeSelectIndex = entry.index;
         if (variant === 'stack' && entry.item.playable) {
           this.startModeSelectItem(entry.item);
@@ -13040,7 +13075,11 @@ export class MenuScene extends Phaser.Scene {
       plan.back.width,
       plan.back.height,
       plan.backLabel,
-      () => this.handleBackAction(),
+      () => {
+        if (!this.isModeSelectInputGuarded()) {
+          this.handleBackAction();
+        }
+      },
       'secondary'
     ));
   }
@@ -14743,6 +14782,9 @@ export class MenuScene extends Phaser.Scene {
     this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;
     if (this.overlay !== 'none') {
       this.beginUiTransition('overlay-close');
+    }
+    if (this.overlay === 'mode-select') {
+      this.modeSelectInputGuardStartedAt = this.time.now;
     }
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;

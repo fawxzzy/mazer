@@ -54,7 +54,9 @@ Any second mode, any database apply, any change to ranking or rank letters, the 
 - The sheet lists the registry modes in registry order, then one plain locked slot (section 11). Endless is the first and only playable entry today. The sheet is shown even while Endless is the only mode (owner decision, section 13 Q1); there is no auto-start of the last mode (Q3).
 - Each entry shows the mode name, one plain tagline and that mode's own stats (Endless: Level and Rank, read from the existing progression, never written by the sheet).
 - Choosing Endless closes the sheet and starts the run through the existing `START_RUN` path, so progression, checkpoint, outbox and leaderboard behave exactly as before.
-- The launch flag `?mode=play` and in-run restarts do not open the sheet; the sheet only opens from the menu surface.
+- Keyboard: Enter on the menu is the keyboard Play button and opens the sheet (same hook as a tap). In the sheet, Enter starts the selected playable entry, or the only playable entry when the selection is locked; Escape closes the sheet (the standard back action).
+- Input guard: taps on Play, the cards, the Play/Back buttons and Enter are ignored for 250 ms (`LEGACY_MODE_SELECT_INPUT_GUARD_MS`) after the sheet opens and after it closes, so a double-tap on Play cannot land on the Endless card and a double-tap on Back cannot re-open the sheet. Escape is not guarded.
+- Documented exemptions (they do not open the sheet and start Endless directly): the `?mode=play` boot shortcut, the QA/diagnostics start hooks (`startRun` and the QA overlay start command), the level-preview jump (it picks a level of the one Endless ladder), and in-run restarts. Every player-facing Play path (tap anywhere, the Play button, Enter) goes through the sheet.
 - Code: pure layout plan and item model in `src/legacy-runtime/legacyModeSelectPlan.ts`; overlay kind `'mode-select'` in `legacyOverlayRouting.ts`; a thin scene painter in `MenuScene.ts`. Tests: `tests/reset/legacy-mode-select-plan.test.ts`, `tests/architecture/mode-select-flow-contract.test.ts`.
 
 ## 9. Layout (decided 2026-11-24: A Stack now, flips to C Tiles past 3 entries)

@@ -19,7 +19,7 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain("this.authGateLocked = snapshot.status !== 'authenticated' && !this.guestPlayGranted;");
     expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
     expect(menuSceneSource).toContain('if (!this.hasLegacyPlayAccess()) {');
-    expect(menuSceneSource).toContain('if (this.hasLegacyPlayAccess() && !this.menuDropdown.isShown()) {\n        this.startPlayMode();\n      }');
+    expect(menuSceneSource).toContain('if (this.hasLegacyPlayAccess() && !this.menuDropdown.isShown()) {\n        this.requestLegacyPlayStart();\n      }');
     expect(menuSceneSource).not.toContain("if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {");
     expect(menuSceneSource).not.toContain("text: 'Play as guest'");
     expect(menuSceneSource).toContain('startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode()');

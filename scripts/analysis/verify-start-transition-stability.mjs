@@ -105,6 +105,8 @@ const runCase = async ({ baseUrl, browser, index, targetQueuedMenuRequest }) => 
     timeout: 5_000,
     polling: 20
   });
+  // The sheet ignores taps for its input guard window (250 ms) after it opens.
+  await page.waitForTimeout(350);
   const sheet = await readVisualDiagnostics(page);
   const endlessCard = sheet?.buttons?.find((button) => button.text === 'Endless' && button.bounds);
   if (endlessCard?.bounds) {

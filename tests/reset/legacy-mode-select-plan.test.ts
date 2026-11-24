@@ -7,7 +7,10 @@ import {
   buildLegacyModeSelectItems,
   buildLegacyModeSelectPlan,
   resolveLegacyModeSelectVariant,
-  type LegacyModeSelectItem
+  type LegacyModeSelectItem,
+  LEGACY_MODE_SELECT_INPUT_GUARD_MS,
+  isLegacyModeSelectInputGuarded,
+  resolveLegacyModeSelectKeyboardChoice
 } from '../../src/legacy-runtime/legacyModeSelectPlan';
 
 const VIEWPORTS = [
@@ -118,4 +121,44 @@ describe.each(VIEWPORTS)('mode-select plan at $width x $height', ({ width, heigh
       }
     });
   }
+});
+
+describe('mode-select input guard and keyboard choice (MAZER-MODE-002 review)', () => {
+  const items = buildLegacyModeSelectItems({ level: 1, rank: 'E' });
+
+  it('the guard window is one pinned constant of 250 ms', () => {
+    expect(LEGACY_MODE_SELECT_INPUT_GUARD_MS).toBe(250);
+  });
+
+  it('input is ignored inside the window and accepted at and after its end', () => {
+    expect(isLegacyModeSelectInputGuarded(1000, null)).toBe(false);
+    expect(isLegacyModeSelectInputGuarded(1000, 1000)).toBe(true);
+    expect(isLegacyModeSelectInputGuarded(1249, 1000)).toBe(true);
+    expect(isLegacyModeSelectInputGuarded(1250, 1000)).toBe(false);
+    expect(isLegacyModeSelectInputGuarded(5000, 1000)).toBe(false);
+  });
+
+  it('Enter picks the selected playable entry', () => {
+    expect(resolveLegacyModeSelectKeyboardChoice(items, 0)).toBe(0);
+  });
+
+  it('Enter on a locked selection falls back to the only playable entry', () => {
+    const lockedIndex = items.findIndex((item) => !item.playable);
+    expect(lockedIndex).toBeGreaterThan(0);
+    expect(resolveLegacyModeSelectKeyboardChoice(items, lockedIndex)).toBe(0);
+  });
+
+  it('an out-of-range selection is clamped and never returns a locked entry', () => {
+    expect(resolveLegacyModeSelectKeyboardChoice(items, 99)).toBe(0);
+    expect(resolveLegacyModeSelectKeyboardChoice(items, -4)).toBe(0);
+  });
+
+  it('with several playable entries and a locked selection Enter picks nothing; with none it picks nothing', () => {
+    const playable = (id: string) => ({ ...items[0]!, label: id });
+    const locked = items.find((item) => !item.playable)!;
+    expect(resolveLegacyModeSelectKeyboardChoice([playable('a'), playable('b'), locked], 2)).toBeNull();
+    expect(resolveLegacyModeSelectKeyboardChoice([playable('a'), playable('b'), locked], 1)).toBe(1);
+    expect(resolveLegacyModeSelectKeyboardChoice([locked], 0)).toBeNull();
+    expect(resolveLegacyModeSelectKeyboardChoice([], 0)).toBeNull();
+  });
 });

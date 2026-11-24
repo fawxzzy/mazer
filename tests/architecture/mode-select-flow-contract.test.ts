@@ -24,25 +24,55 @@ const sheetRegion = (): string => {
 
 describe('mode-select flow contract (MAZER-MODE-002)', () => {
   test('both Play entry points (tap anywhere and the Play button) go through the one mode-select hook', () => {
-    expect(menuScene.match(/this\.requestLegacyPlayStart\(\)/g)).toHaveLength(2);
+    // tap anywhere, the Play button and keyboard Enter on the menu.
+    expect(menuScene.match(/this\.requestLegacyPlayStart\(\)/g)).toHaveLength(3);
     // The only remaining direct START_RUN dispatch in the sheet region is the hook's in-run fallback and the item start.
     const direct = menuScene.match(/dispatchUiBridgeCommand\(\{ type: 'START_RUN' \}, \(\) => this\.startPlayMode\(\)\)/g) ?? [];
     expect(direct).toHaveLength(2);
-    expect(sheetRegion()).toContain("if (this.mode === 'menu') {\n      this.openOverlay('mode-select');");
+    expect(sheetRegion()).toContain("this.modeSelectInputGuardStartedAt = this.time.now;\n      this.openOverlay('mode-select');");
   });
 
   test('choosing Endless closes the sheet and starts the run through the existing START_RUN path', () => {
     const region = sheetRegion();
     const start = region.indexOf('private startModeSelectItem(item: LegacyModeSelectItem): void {');
     const body = region.slice(start, region.indexOf('private createModeSelectHitZone('));
-    expect(body).toContain('if (!item.playable) {');
+    expect(body).toContain('if (!item.playable || this.isModeSelectInputGuarded()) {');
     expect(body.indexOf('this.closeOverlay();')).toBeGreaterThan(0);
     expect(body.indexOf("{ type: 'START_RUN' }")).toBeGreaterThan(body.indexOf('this.closeOverlay();'));
   });
 
   test('Back to Menu uses the standard back action (the sheet routes through the overlay router, not its own state)', () => {
-    expect(sheetRegion()).toContain('() => this.handleBackAction(),');
+    expect(sheetRegion()).toContain('this.handleBackAction();');
     expect(read('src/legacy-runtime/legacyOverlayRouting.ts')).toContain("'mode-select'");
+  });
+
+  test('keyboard: Enter on the menu opens the sheet; Enter in the sheet picks the playable entry; Escape closes it', () => {
+    // Enter on the menu is the keyboard Play button (no direct startPlayMode call in that branch).
+    const enterMenu = menuScene.indexOf("if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {");
+    expect(enterMenu).toBeGreaterThan(0);
+    const enterMenuBody = menuScene.slice(enterMenu, menuScene.indexOf("if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {"));
+    expect(enterMenuBody).toContain('this.requestLegacyPlayStart();');
+    expect(enterMenuBody).not.toContain('this.startPlayMode()');
+    // Enter in the sheet goes through the pure keyboard choice, then the same item start as a tap.
+    const press = menuScene.slice(menuScene.indexOf('private pressModeSelectEnter(): void {'));
+    expect(press.slice(0, press.indexOf('private startModeSelectItem(')))
+      .toContain('resolveLegacyModeSelectKeyboardChoice(items, this.modeSelectIndex)');
+    expect(menuScene).toContain("if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {\n      event.preventDefault();\n      this.pressModeSelectEnter();");
+    // Escape reaches handleBackAction for every overlay, including the sheet.
+    expect(menuScene).toContain("if (event.key === 'Escape') {\n      event.preventDefault();\n      // The open menu dropdown is the topmost surface: Esc closes it before anything else.\n      if (!this.menuDropdown.close()) {\n        this.handleBackAction();");
+  });
+
+  test('input guard: opening and closing the sheet start a window in which Play, cards and Back are ignored', () => {
+    const region = sheetRegion();
+    expect(menuScene).toContain('private modeSelectInputGuardStartedAt: number | null = null;');
+    // open: the hook ignores Play inside the window and stamps the window when it opens
+    expect(region).toContain('if (this.isModeSelectInputGuarded()) {\n        return;\n      }\n      this.modeSelectInputGuardStartedAt = this.time.now;');
+    // cards, the Play button path (startModeSelectItem), Enter, and Back all check the guard
+    expect(region).toContain('if (this.isModeSelectInputGuarded()) {\n          return;\n        }\n        this.modeSelectIndex = entry.index;');
+    expect(region).toContain('if (!this.isModeSelectInputGuarded()) {\n          this.handleBackAction();');
+    // close: closeOverlay stamps the window before the sheet state is cleared
+    const close = menuScene.slice(menuScene.indexOf('private closeOverlay(): void {'));
+    expect(close.slice(0, 700)).toContain("if (this.overlay === 'mode-select') {\n      this.modeSelectInputGuardStartedAt = this.time.now;");
   });
 
   test('the sheet code reads progression but never writes storage, progression, the outbox, the network or a leaderboard', () => {

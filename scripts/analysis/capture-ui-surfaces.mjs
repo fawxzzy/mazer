@@ -1477,6 +1477,8 @@ export const chooseEndlessIfModeSelectOpen = async (page, { timeoutMs = 700 } = 
   } catch {
     return false;
   }
+  // The sheet ignores taps for its input guard window (LEGACY_MODE_SELECT_INPUT_GUARD_MS = 250) after it opens.
+  await page.waitForTimeout(350);
   const raw = await page.evaluate((attribute) => document.documentElement.getAttribute(attribute), VISUAL_DIAGNOSTICS_ATTRIBUTE);
   const point = getVisualButtonPoint(JSON.parse(raw ?? 'null'), 'Endless');
   if (!point) {

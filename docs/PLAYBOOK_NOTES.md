@@ -716,6 +716,7 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - QA scripts: `capture-ui-surfaces.mjs` (`clickStartUntilPlay`) and `verify-start-transition-stability.mjs` now tap the Endless card after Start, because Start lands on the sheet.
 - Rule: a new mode needs a registry entry AND a tagline in `LEGACY_MODE_SELECT_TAGLINES` (a test pins it); the list, not the painter, is what changes.
 - Not checked: a real phone, safe areas, the Tiles layout on screen (plan tests only), a signed-in account with real progress (the fixture shows Level 1, Rank E).
+
 ## 2026-11-23 Feedback popup options (draft, not wired in, not applied)
 
 - WHAT: new `src/ui/feedback/*` (reducer, DOM popup, theme map, standalone `feedback-options.html` page) with three layouts built from the Wave 2A kit (card, bottom sheet, compact), plus a DRAFT SQL proposal under `docs/ops/sql-proposals/mazer-feedback-20261123/` and a client plan. `tests/ui/dom-primitives-styles.test.ts` skips `src/ui/feedback` (it is not a shipping import; `tests/ui/feedback-state.test.ts` pins that main.ts and MenuScene.ts do not import it). `legacy-player-message-inventory.test.ts` excludes the two feedback files from the createStatusBanner dormant pin for the same reason.

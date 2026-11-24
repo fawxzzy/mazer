@@ -181,3 +181,30 @@ export const buildLegacyModeSelectPlan = (
     variant
   };
 };
+
+/**
+ * Taps on the sheet are ignored for this long after it opens and after it closes, so a double-tap on Play cannot
+ * land on the Endless card and a double-tap on Back cannot re-open the sheet (MAZER-MODE-002 review).
+ */
+export const LEGACY_MODE_SELECT_INPUT_GUARD_MS = 250;
+
+/** True while sheet input is still inside the guard window that started at `guardStartedAtMs`. */
+export const isLegacyModeSelectInputGuarded = (nowMs: number, guardStartedAtMs: number | null): boolean => (
+  guardStartedAtMs !== null && nowMs - guardStartedAtMs < LEGACY_MODE_SELECT_INPUT_GUARD_MS
+);
+
+/**
+ * Keyboard Enter on the sheet: the selected entry when it is playable, otherwise the only playable entry, otherwise
+ * nothing (a locked slot never starts anything). Returns an index into `items`.
+ */
+export const resolveLegacyModeSelectKeyboardChoice = (
+  items: readonly LegacyModeSelectItem[],
+  selectedIndex: number
+): number | null => {
+  const clamped = Math.min(items.length - 1, Math.max(0, selectedIndex));
+  if (items[clamped]?.playable) {
+    return clamped;
+  }
+  const playable = items.flatMap((item, index) => (item.playable ? [index] : []));
+  return playable.length === 1 ? playable[0]! : null;
+};
