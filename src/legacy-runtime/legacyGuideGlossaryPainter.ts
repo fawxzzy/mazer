@@ -81,7 +81,7 @@ const buildItems = (host: Host, model: LegacyGuideSheetModel, width: number): It
         host.drawLegacyGuideIcon(row.icon, tileLeft + (tileW / 2), tileTop + 26, host.resolveLegacyGuideAccent(row.icon.glyph), g);
         const centerX = tileLeft + (tileW / 2);
         const centerY = tileTop + GUIDE_GLOSSARY_TILE_HEIGHT - 14;
-        mask(host.addLegacySheetWrappedText(row.heading, tileLeft, centerY, tileW + 16, selected ? MINT_CSS() : WHITE(), 14, 12, 1,
+        mask(host.addLegacySheetWrappedText(row.heading, tileLeft, centerY, tileW + 8, selected ? MINT_CSS() : WHITE(), 14, 12, 1,
           { alpha: selected ? 1 : 0.92, bold: selected }).setOrigin(0.5, 0.5).setPosition(centerX, centerY).setAlign('center'));
         host.uiButtons.push(host.createLegacyAuthActionButton(
           centerX, tileTop + (GUIDE_GLOSSARY_TILE_HEIGHT / 2), tileW, GUIDE_GLOSSARY_TILE_HEIGHT, '',
