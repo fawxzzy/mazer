@@ -16,7 +16,8 @@
  *  - block: PLAYER_SIZE_RATIO (0.6) of the tile across, corner radius CHIP_CORNER_RATIO (0.3) of its width (the Chip
  *    tile's own corner proportion, so it reads as a small chip);
  *  - keyline: the end markers' keyline (a share of the half-tile, whole device px, at least one);
- *  - ring and glow: playerLocator.ts, inside the tile (the glow bleeds a fraction of a tile as a falloff);
+ *  - ring and glow: playerLocator.ts, inside the tile (the glow bleeds a fraction of a tile as a falloff), drawn in the
+ *    same player colour as the core (`coreColor`, playerColour.ts; MAZER-VIS-062);
  *  - a thin darker-green accent stroke on the block's edge.
  *
  * Motion: a small squash-and-stretch along the direction of travel while gliding (`motionAmount` 0..1 from the glide
@@ -38,6 +39,7 @@ import {
   type LocatorGraphics,
   type LocatorTileRadii
 } from './playerLocator';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export const PLAYER_MARKER = Object.freeze({
   /** The block is this share of the tile across. */
@@ -234,7 +236,7 @@ export interface PlayerMarkerDrawInput {
   /** Lifecycle fade, 0..1. */
   alpha: number;
   timeMs: number;
-  /** The player's (iridescent) core colour for this frame. */
+  /** The player's colour for this frame (playerColour.ts): the core fill, and the locator's glow, ring and ping. */
   coreColor: number;
   /** Running find-me ping start, or negative for none (always negative in the menu demo and the Guide). */
   pingStartMs: number;
@@ -254,7 +256,7 @@ export interface PlayerMarkerDrawInput {
  * Paints the marker's Graphics layers in order: locator (glow, ring, ping, keyline), core fill, accent stroke. The
  * soft shadowBlur glow is a canvas image the scene composites underneath (it cannot be a Graphics call).
  */
-export const drawPlayerMarker = (
+const drawPlayerMarkerImpl = (
   g: LocatorGraphics,
   frame: PlayerMarkerFrame,
   input: PlayerMarkerDrawInput
@@ -277,7 +279,8 @@ export const drawPlayerMarker = (
     pingStartMs: input.pingStartMs,
     reducedMotion: input.reducedMotion,
     tileCornerRadii: input.tileCornerRadii ?? null,
-    tileCornerBlend: input.tileCornerBlend ?? 1
+    tileCornerBlend: input.tileCornerBlend ?? 1,
+    colour: input.coreColor
   });
   const left = frame.centerX - frame.coreHalfWidth;
   const top = frame.centerY - frame.coreHalfHeight;
@@ -288,3 +291,8 @@ export const drawPlayerMarker = (
   g.lineStyle(frame.accentStrokeCss, PLAYER_MARKER.accentColor, Math.min(PLAYER_MARKER.accentAlpha, alpha * PLAYER_MARKER.accentAlpha));
   g.strokeRoundedRect(left, top, width, height, frame.coreCornerRadius);
 };
+
+/** The marker draw inside the cosmetic scope (MAZER-UI-102: dark mode leaves the player's colours alone, like the Spark). */
+export const drawPlayerMarker: typeof drawPlayerMarkerImpl = (...args: Parameters<typeof drawPlayerMarkerImpl>) => (
+  withCosmeticColours(() => drawPlayerMarkerImpl(...args))
+);

@@ -43,13 +43,13 @@ describe('palette readability report (shipping palette)', () => {
   });
 });
 
+// The locator's ring and ping are no longer fixed role colours: they are the shared player colour (MAZER-VIS-062), like
+// the Spark and the trail, and their separation from the floor is pinned in tests/reset/player-locator.test.ts.
 describe('shipped Chip board: real role colours against the real chip floor (non-text, >= 3:1)', () => {
   const playerCore = resolveLegacyIridescentPlayerCoreColor(0);
 
   test.each([
     ['player core', playerCore],
-    ['player ring (locator)', boardMaterial.player],
-    ['player ping (locator)', boardMaterial.playerEdge],
     ['start marker', boardMaterial.start],
     ['trail reference (cyan)', boardMaterial.trailReference],
     ['lit rim', boardMaterial.rim]
@@ -72,8 +72,6 @@ describe('shipped Starlit board (MAZER-VIS-064): real role colours against the S
 
   test.each([
     ['player core', playerCore],
-    ['player ring (locator)', boardMaterial.player],
-    ['player ping (locator)', boardMaterial.playerEdge],
     ['start marker', boardMaterial.start],
     ['trail reference (cyan)', boardMaterial.trailReference],
     ['lit rim', boardMaterial.rim]

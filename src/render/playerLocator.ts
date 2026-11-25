@@ -6,11 +6,11 @@
  *   1. a dark keyline hugging the player's rounded square (drawn before the core fill), the same thin one-to-two
  *      device pixel outline the end markers trace around their glyphs: it separates the bright core from the trail
  *      running through the same tile;
- *   2. a ring: a thin player-green rounded square that lies INSIDE the player's own tile, flush with the tile edge,
+ *   2. a ring: a thin rounded square in the player's colour that lies INSIDE the player's own tile, flush with the tile edge,
  *      the same width as the chip's lit rim. It reads as the player's cell lighting up in the player's colour and
  *      never reaches into the neighbouring tiles. Where the tile is too small to hold it without touching the block
  *      (tiles under about 8 css px at 1x) it is left out and the glow carries the marker;
- *   3. a soft player-green glow outside the ring (a few equal-alpha concentric rounded squares: Phaser Graphics has
+ *   3. a soft glow in the player's colour outside the ring (a few equal-alpha concentric rounded squares: Phaser Graphics has
  *      no gradients), bleeding a fraction of a tile past the cell edge as a falloff;
  *   4. a brief "find me" ping (two staggered expanding rings) on spawn, after unpause / level change, and whenever
  *      the player has stood still for `idleMs`. A ping is cancelled the moment the player moves. This is the one part
@@ -40,11 +40,18 @@
  * the cap's concentric arc (1). 1 is exactly the end-tile shape above, 0 exactly the plain chip ring, so the resting
  * frames are unchanged.
  *
+ * Colour (MAZER-VIS-062): the glow, the ring and the ping are the PLAYER'S colour (playerColour.ts, the one source the Spark,
+ * the trail, the edge beams and the star fills read): the caller passes this frame's colour as `colour`, and without it the
+ * shared colour is resolved here at `timeMs`. They were a fixed player green (boardMaterial.player / playerEdge), so with
+ * the shifting rainbow or a set player colour the ring stayed green. Only the dark keylines keep the board's void colour.
+ * Dark mode (MAZER-UI-102): the draw runs inside `withCosmeticColours`, like every other cosmetic, so the theme leaves the
+ * player's colours alone.
+ *
  * Reduced motion: the glow, ring and keyline are static and the ping is never started.
  *
- * Cost: a handful of Graphics calls per dynamic redraw, no gradients, no canvas, and NO per-frame allocation
- * (colours are numbers, geometry goes through one module-level scratch record, the state machine mutates
- * numeric fields). The ping only forces dynamic redraws while it is visible (about 1.3 s each time).
+ * Cost: a handful of Graphics calls per dynamic redraw, no gradients, no canvas, and no per-frame allocation beyond
+ * the cosmetic-scope call (colours are numbers, geometry goes through one module-level scratch record, the state
+ * machine mutates numeric fields). The ping only forces dynamic redraws while it is visible (about 1.3 s each time).
  *
  * Pure: no Date, no Math.random. The draw is a function of (geometry, timeMs, pingStartMs, reducedMotion).
  */
@@ -54,6 +61,8 @@ import {
   boardMaterial,
   snapLineWidth
 } from './boardTileStyle';
+import { resolvePlayerColour } from './playerColour';
+import { withCosmeticColours } from '../theme/cosmeticScope';
 
 export const PLAYER_LOCATOR = Object.freeze({
   /** Ring stroke as a share of the tile, snapped to whole device px (at least one), capped in css px. */
@@ -261,10 +270,22 @@ export interface PlayerLocatorDrawInput {
   tileCornerRadii?: LocatorTileRadii | null;
   /** 0..1 share of that cap shape the closed corners take (the cap / chip morph); omitted = 1 (the full cap shape). */
   tileCornerBlend?: number;
+  /**
+   * The player's colour this frame (playerColour.ts; the same value the core is filled with): the glow, the ring and the ping
+   * are drawn in it. Omitted: the shared player colour at `timeMs` (`resolvePlayerColour`, trail start).
+   */
+  colour?: number;
 }
 
+/** The colour the glow, ring and ping are drawn in: the caller's player colour, else the shared one (MAZER-VIS-062). */
+export const resolvePlayerLocatorColour = (input: Pick<PlayerLocatorDrawInput, 'colour' | 'timeMs' | 'reducedMotion'>): number => (
+  input.colour !== undefined && Number.isFinite(input.colour)
+    ? input.colour
+    : resolvePlayerColour(null, input.timeMs, input.reducedMotion)
+);
+
 /** Paints glow, ring, ping and the core keyline. Call BEFORE the player's own fill so the core stays on top. */
-export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawInput): void => {
+const drawPlayerLocatorImpl = (g: LocatorGraphics, input: PlayerLocatorDrawInput): void => {
   const k = PLAYER_LOCATOR;
   const alpha = Math.max(0, Math.min(1, input.alpha));
   if (alpha <= 0) {
@@ -277,10 +298,11 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
   const blend = input.tileCornerBlend ?? 1;
   // The glow and the ping start at the ring's outer edge, or at the tile edge where the ring is left out.
   const innerRadius = m.ringVisible ? m.ringHalfCss : half;
+  const colour = resolvePlayerLocatorColour(input);
 
   // 1. soft glow: equal-alpha concentric rounded squares, stacked so the cumulative alpha at the ring is glowPeakAlpha.
   const perStep = 1 - ((1 - k.glowPeakAlpha) ** (1 / k.glowSteps));
-  g.fillStyle(boardMaterial.player, perStep * alpha);
+  g.fillStyle(colour, perStep * alpha);
   for (let i = 0; i < k.glowSteps; i += 1) {
     const r = innerRadius + ((m.glowHalfCss - innerRadius) * (1 - (i / k.glowSteps)));
     fillSquare(g, cx, cy, r, half, tileRadii, blend);
@@ -288,7 +310,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
 
   // 2. the ring: the player's cell lit in the player's colour, inside the tile.
   if (m.ringVisible) {
-    g.lineStyle(m.ringStrokeCss, boardMaterial.player, k.ringAlpha * alpha);
+    g.lineStyle(m.ringStrokeCss, colour, k.ringAlpha * alpha);
     strokeSquare(g, cx, cy, m.ringHalfCss, half, tileRadii, blend);
   }
 
@@ -305,7 +327,7 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
       const fade = k.pingPeakAlpha * (1 - t) * alpha;
       g.lineStyle(k.pingStrokeCss + k.pingKeylineExtraCss, boardMaterial.void, fade * 0.7);
       strokeSquare(g, cx, cy, radius, half, tileRadii, blend);
-      g.lineStyle(k.pingStrokeCss, boardMaterial.playerEdge, fade);
+      g.lineStyle(k.pingStrokeCss, colour, fade);
       strokeSquare(g, cx, cy, radius, half, tileRadii, blend);
     }
   }
@@ -321,6 +343,11 @@ export const drawPlayerLocator = (g: LocatorGraphics, input: PlayerLocatorDrawIn
     input.coreCornerRadius + (w / 2)
   );
 };
+
+/** The locator draw inside the cosmetic scope (MAZER-UI-102: dark mode leaves the player's colours alone). */
+export const drawPlayerLocator: typeof drawPlayerLocatorImpl = (...args: Parameters<typeof drawPlayerLocatorImpl>) => (
+  withCosmeticColours(() => drawPlayerLocatorImpl(...args))
+);
 
 /**
  * Decides when a find-me ping starts. Fed once per scene frame with plain numbers/booleans:

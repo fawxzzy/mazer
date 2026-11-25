@@ -2,7 +2,8 @@
  * The ONE source of truth for the player's colour (lane "edge stars smooth + rainbow + shared player colour").
  *
  * Everything that is "the player's colour" reads it from here, so changing it once recolours all of them:
- *  - the player (the Spark kite, sparkPlayerSkin.ts `resolveSparkMaterial`);
+ *  - the player (the Spark kite, sparkPlayerSkin.ts `resolveSparkMaterial`) and the Chip marker's locator glow, ring and
+ *    find-me ping (playerLocator.ts `resolvePlayerLocatorColour`, MAZER-VIS-062: they were a fixed green);
  *  - the trail (trailIridescence.ts re-exports `samplePlayerColour` as `sampleIridescentTrail`, which the scene's trail
  *    draw and the Star dust sparkles read);
  *  - the edge beams (the player-energy lasers) and the colour inside the edge stars (edgeBeamArt.ts, edgeMarkers.ts),
