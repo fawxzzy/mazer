@@ -12,22 +12,31 @@
  *      still sits over every bloom and every fill over every keyline, as in one full pass.
  *
  * The cached layer is rebuilt when its picture could be wrong:
- *   - route: the cached part of the route is fingerprinted (every vertex position and distance); a new level, a reset,
- *     a step back into the cached part, a trimmed start or a moved board all change it;
+ *   - route: the route's first vertex and the split vertex are checked every frame (a new level, a reset, a step back
+ *     into the cached part, a trimmed start or a moved board all change one of them), and the cached part is
+ *     fingerprinted in windows of ROUTE_WINDOW segments at rebuild, one window re-checked per frame in turn, so any
+ *     other change inside the cached part is caught within one pass over the windows (a few frames; the colour clock
+ *     bounds it too) without re-hashing the whole route every frame;
  *   - head too long: the head grew more than `rebuildAfterTiles` past `headTiles` (about every 8 steps while walking);
  *   - colour clock: `refreshMs` of animation time since it was painted (colours drift; older sparkles move in steps), or
  *     the animation clock went backwards (a restarted scene); a pause stops the clock, so nothing is repainted;
  *   - style: device scale (DPR, zoom, the backing budget), tile size (resize), keyline colour (theme), lifecycle alpha,
- *     Trail Shine / reduced motion (`animated`) and Trail Fade's origin advance are part of the cache key;
+ *     Trail Shine / reduced motion (`animated`), Trail Fade's origin advance and the steady widths are compared field
+ *     by field (no key string per frame);
  *   - placement: the trail canvas origin moved by a non-whole number of device pixels.
  * Short trails (under `minTiles`), a lifecycle fade, no DOM, or a layer bigger than `maxBodyPixels` (WebKit's canvas
  * memory: one more trail-sized canvas at most, 1.6 M px = 6.4 MB) paint the whole trail live with today's full layers
  * instead, exactly as before this change (A's lighter bloom is only for the head of a cached trail).
  * The cached canvas is released (width and height 0, which frees WebKit's backing store at once) when the trail turns
- * short, when it would be over budget, and on scene shutdown (releaseStarDustTrailCache).
+ * short, when it would be over budget, and on scene shutdown or a trail skin change (releaseStarDustTrailCache, which
+ * also frees the coarse bloom's scratch canvas).
  *
  * Accepted trade-offs (owner-picked option C): cached sparkles hold still (no twinkle or spin) and their colours, and the
- * travelling shine band, move in steps at each rebuild instead of every frame.
+ * travelling shine band, move in steps at each rebuild instead of every frame. Breath (MAZER-PERF-017 follow-up): the
+ * trail's 3 s glow breath (width +-5%, glow alpha +-15% around its middle) is not cached; the cached layer is painted at
+ * the steady breath reduced motion holds (the `steady*` options) and only the live head breathes. Painting it at the
+ * breath of the moment made the whole older trail jump to a new phase at every 2 s rebuild (measured: 31% of its lit
+ * pixels off by more than 16 of 255 at 2.625x, scripts/analysis/check-star-dust-trail-breath-seam.mjs).
  */
 import { MAZER_TRAIL_BACKING_MAX_PIXELS } from './canvasBackingBudget';
 import { withCosmeticColours } from '../theme/cosmeticScope';
@@ -40,7 +49,13 @@ import {
   type StarDustDrawOptions,
   type StarDustSegment
 } from './starDustTrailCanvas';
-import { LIGHT_BLOOM_PLAN, SHIPPED_PLAN, drawStarDustWithPlan, type StarDustRenderPlan } from './starDustTrailPlan';
+import {
+  LIGHT_BLOOM_PLAN,
+  SHIPPED_PLAN,
+  drawStarDustWithPlan,
+  releaseCoarseBloomScratch,
+  type StarDustRenderPlan
+} from './starDustTrailPlan';
 
 export interface StarDustTrailCacheConfig {
   /** Tiles of route painted live right after a rebuild. */
@@ -98,42 +113,79 @@ export interface StarDustTrailCache extends StarDustTrailRenderer {
 
 type Canvas2D = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D };
 
-interface CachedBody {
-  key: string;
+/** What the cached layer was painted with; any change means a rebuild ('key'). Compared field by field. */
+interface BodyKey {
+  scale: number;
+  tileSize: number;
+  keylineColor: number;
+  keylineAlpha: number;
+  animated: boolean;
+  originAdvancePx: number;
+  steadyCoreWidth: number | undefined;
+  steadyGlowWidth: number | undefined;
+  steadyGlowAlphaRatio: number | undefined;
+  steadyGlowBlurPx: number | undefined;
+}
+
+interface CachedBody extends BodyKey {
   builtAtMs: number;
   split: number;
   splitX: number;
   splitY: number;
   splitDistance: number;
-  fingerprint: number;
+  /** The route's first vertex when painted (checked every frame). */
+  startX: number;
+  startY: number;
+  startDistance: number;
+  /** Fingerprints of segments[w * ROUTE_WINDOW .. min(split, (w + 1) * ROUTE_WINDOW)); one is re-checked per frame. */
+  windowHashes: Uint32Array;
+  windowCount: number;
+  windowCursor: number;
   /** Trail canvas origin (css px) when painted. */
   originX: number;
   originY: number;
   /** The layer's placed sparkles (scratch layout) for re-keylining the ones the head reaches. */
   sparkles: Float64Array;
   sparkleCount: number;
+  /**
+   * The cached sparkles near the split vertex (ascending): every one the head can reach while its reach stays within
+   * `candidateReach` and its vertices within the longest head of the split vertex.
+   */
+  candidates: Int32Array;
+  candidateCount: number;
+  candidateReach: number;
 }
 
 const STRIDE = STAR_DUST_SCRATCH_STRIDE;
 
-/** 32-bit fingerprint of the first `end` segments' vertices (positions and distances, 1/256 px). Exported for tests. */
-export const fingerprintStarDustRoute = (segments: readonly StarDustSegment[], end: number): number => {
+/** Segments per route fingerprint window (one window is re-hashed per frame). Exported for tests. */
+export const ROUTE_WINDOW = 128;
+
+/** Candidate sparkles are gathered at rebuild for a head reach up to this many times the reach at rebuild. */
+const CANDIDATE_REACH_SLACK = 1.5;
+
+const mixRouteHash = (h: number, value: number): number => {
+  const next = Math.imul(h ^ (Math.round(value * 256) | 0), 0x01000193);
+  return next ^ (next >>> 13);
+};
+
+/**
+ * 32-bit fingerprint of segments[start..end)'s vertices (positions and distances, 1/256 px; segments[start].previous
+ * included). Exported for tests.
+ */
+export const fingerprintStarDustRoute = (segments: readonly StarDustSegment[], end: number, start = 0): number => {
   let h = Math.imul(0x811c9dc5 ^ end, 0x01000193);
-  const mix = (value: number): void => {
-    h = Math.imul(h ^ (Math.round(value * 256) | 0), 0x01000193);
-    h ^= h >>> 13;
-  };
-  if (end > 0) {
-    const first = segments[0]!.previous;
-    mix(first.x);
-    mix(first.y);
-    mix(first.distance ?? -1);
+  if (end > start) {
+    const first = segments[start]!.previous;
+    h = mixRouteHash(h, first.x);
+    h = mixRouteHash(h, first.y);
+    h = mixRouteHash(h, first.distance ?? -1);
   }
-  for (let i = 0; i < end; i += 1) {
+  for (let i = start; i < end; i += 1) {
     const p = segments[i]!.current;
-    mix(p.x);
-    mix(p.y);
-    mix(p.distance ?? -1);
+    h = mixRouteHash(h, p.x);
+    h = mixRouteHash(h, p.y);
+    h = mixRouteHash(h, p.distance ?? -1);
   }
   return h >>> 0;
 };
@@ -178,6 +230,12 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
   let body: CachedBody | null = null;
   let invalidated = false;
   let underIndices = new Int32Array(64);
+  /** Handed to the head's pass every frame (one object, refilled). */
+  const overlay: { data: Float64Array; indices: Int32Array; count: number } = {
+    data: new Float64Array(0),
+    indices: underIndices,
+    count: 0
+  };
 
   const release = (): void => {
     body = null;
@@ -196,28 +254,53 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
     return stats.lastSparkles;
   };
 
-  const keyOf = (options: StarDustDrawOptions, scale: number): string => (
-    `${scale}|${options.tileSize}|${options.keylineColor}|${options.keylineAlpha}|${options.animated ? 1 : 0}|${options.originAdvancePx}`
+  const sameKey = (cached: BodyKey, options: StarDustDrawOptions, scale: number): boolean => (
+    cached.scale === scale
+    && cached.tileSize === options.tileSize
+    && cached.keylineColor === options.keylineColor
+    && cached.keylineAlpha === options.keylineAlpha
+    && cached.animated === options.animated
+    && cached.originAdvancePx === options.originAdvancePx
+    && cached.steadyCoreWidth === options.steadyCoreWidth
+    && cached.steadyGlowWidth === options.steadyGlowWidth
+    && cached.steadyGlowAlphaRatio === options.steadyGlowAlphaRatio
+    && cached.steadyGlowBlurPx === options.steadyGlowBlurPx
   );
+
+  /** How far (css px) the head's bloom, thread, keylines or sparkles reach a cached sparkle's centre. */
+  const headReachOf = (options: StarDustDrawOptions, scale: number): number => {
+    const sparkleReach = resolveStarDustReach(options.tileSize);
+    const bloomReach = ((options.glowWidth * STAR_DUST_TRAIL.bloomWidthScale) / 2) + (options.glowBlurPx / Math.max(1e-6, scale));
+    return sparkleReach + Math.max(sparkleReach, bloomReach);
+  };
+
+  /** The longest head (css px of route) before a 'head' rebuild. */
+  const maxHeadPx = (options: StarDustDrawOptions): number => (config.headTiles + config.rebuildAfterTiles) * options.tileSize;
 
   /** Why the cached layer cannot be reused for this paint, or null when it can. */
   const staleReason = (
     segments: readonly StarDustSegment[],
     options: StarDustDrawOptions,
-    key: string,
     total: number,
     scale: number
   ): StarDustCacheRebuildReason | null => {
     if (!body) return 'first';
     if (invalidated) return 'invalidated';
-    if (body.key !== key) return 'key';
+    if (!sameKey(body, options, scale)) return 'key';
     if (!(options.timeMs >= body.builtAtMs) || options.timeMs - body.builtAtMs >= config.refreshMs) return 'clock';
     // Stepped back (undo, backtrack) to or behind the cached part: the cached layer shows trail that is gone.
     if (body.split >= segments.length || !(total > body.splitDistance)) return 'route';
-    if (total - body.splitDistance > (config.headTiles + config.rebuildAfterTiles) * options.tileSize) return 'head';
+    if (total - body.splitDistance > maxHeadPx(options)) return 'head';
     const at = segments[body.split]!.previous;
-    if (at.x !== body.splitX || at.y !== body.splitY || !(Math.abs((at.distance ?? Number.NaN) - body.splitDistance) < 1e-6)
-      || fingerprintStarDustRoute(segments, body.split) !== body.fingerprint) {
+    if (at.x !== body.splitX || at.y !== body.splitY || !(Math.abs((at.distance ?? Number.NaN) - body.splitDistance) < 1e-6)) {
+      return 'route';
+    }
+    const start = segments[0]!.previous;
+    if (start.x !== body.startX || start.y !== body.startY || (start.distance ?? -1) !== body.startDistance) return 'route';
+    const w = body.windowCursor;
+    body.windowCursor = w + 1 < body.windowCount ? w + 1 : 0;
+    const from = w * ROUTE_WINDOW;
+    if (fingerprintStarDustRoute(segments, Math.min(body.split, from + ROUTE_WINDOW), from) !== body.windowHashes[w]) {
       return 'route';
     }
     const dx = (body.originX - options.originX) * scale;
@@ -231,7 +314,6 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
     target: { width: number; height: number },
     segments: readonly StarDustSegment[],
     options: StarDustDrawOptions,
-    key: string,
     total: number,
     scale: number,
     reason: StarDustCacheRebuildReason
@@ -271,29 +353,77 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
       surface.ctx.clearRect(0, 0, width, height);
     }
     surface.ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    // The cached layer is painted at the steady breath (see the header): the live head breathes, the older trail holds.
     const count = drawStarDustWithPlan(
       surface.ctx,
       segments.slice(0, split),
-      { ...options, routeLengthPx: total },
+      {
+        ...options,
+        coreWidth: options.steadyCoreWidth ?? options.coreWidth,
+        glowWidth: options.steadyGlowWidth ?? options.glowWidth,
+        glowAlphaRatio: options.steadyGlowAlphaRatio ?? options.glowAlphaRatio,
+        glowBlurPx: options.steadyGlowBlurPx ?? options.glowBlurPx,
+        deviceScale: scale,
+        routeLengthPx: total
+      },
       config.bodyPlan,
       false
     );
     const scratch = getStarDustSparkleScratch();
     const sparkles = body && body.sparkles.length >= count * STRIDE ? body.sparkles : new Float64Array(Math.max(64, count) * STRIDE);
     sparkles.set(scratch.subarray(0, count * STRIDE));
+
+    const windowCount = Math.ceil(split / ROUTE_WINDOW);
+    const windowHashes = body && body.windowHashes.length >= windowCount ? body.windowHashes : new Uint32Array(Math.max(8, windowCount));
+    for (let w = 0; w < windowCount; w += 1) {
+      windowHashes[w] = fingerprintStarDustRoute(segments, Math.min(split, (w + 1) * ROUTE_WINDOW), w * ROUTE_WINDOW);
+    }
+
     const at = segments[split]!.previous;
+    const candidateReach = headReachOf(options, scale) * CANDIDATE_REACH_SLACK;
+    const span = maxHeadPx(options) + candidateReach;
+    const spanSq = span * span;
+    const candidates = body && body.candidates.length >= count ? body.candidates : new Int32Array(Math.max(64, count));
+    let candidateCount = 0;
+    for (let i = 0; i < count; i += 1) {
+      const dx = sparkles[i * STRIDE]! - at.x;
+      const dy = sparkles[(i * STRIDE) + 1]! - at.y;
+      if ((dx * dx) + (dy * dy) <= spanSq) {
+        candidates[candidateCount] = i;
+        candidateCount += 1;
+      }
+    }
+
+    const start = segments[0]!.previous;
     body = {
-      key,
+      scale,
+      tileSize: options.tileSize,
+      keylineColor: options.keylineColor,
+      keylineAlpha: options.keylineAlpha,
+      animated: options.animated,
+      originAdvancePx: options.originAdvancePx,
+      steadyCoreWidth: options.steadyCoreWidth,
+      steadyGlowWidth: options.steadyGlowWidth,
+      steadyGlowAlphaRatio: options.steadyGlowAlphaRatio,
+      steadyGlowBlurPx: options.steadyGlowBlurPx,
       builtAtMs: options.timeMs,
       split,
       splitX: at.x,
       splitY: at.y,
       splitDistance: at.distance!,
-      fingerprint: fingerprintStarDustRoute(segments, split),
+      startX: start.x,
+      startY: start.y,
+      startDistance: start.distance ?? -1,
+      windowHashes,
+      windowCount,
+      windowCursor: 0,
       originX: options.originX,
       originY: options.originY,
       sparkles,
-      sparkleCount: count
+      sparkleCount: count,
+      candidates,
+      candidateCount,
+      candidateReach
     };
     invalidated = false;
     stats.bodyRebuilds += 1;
@@ -302,36 +432,49 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
     return true;
   };
 
-  /** Indices of the cached sparkles that the head's bloom, thread, keylines or sparkles reach. */
-  const sparklesUnderHead = (head: readonly StarDustSegment[], options: StarDustDrawOptions, scale: number): number => {
+  /**
+   * Indices (ascending) of the cached sparkles that the head's (segments[cached.split..]) bloom, thread, keylines or
+   * sparkles reach. Scans only the candidates gathered at rebuild while the head stays inside the region they cover
+   * (always, unless the reach grew past the slack or a head vertex left the longest head's radius); else every cached
+   * sparkle. Same result either way.
+   */
+  const sparklesUnderHead = (segments: readonly StarDustSegment[], options: StarDustDrawOptions, scale: number): number => {
     const cached = body!;
-    const k = STAR_DUST_TRAIL;
-    const sparkleReach = resolveStarDustReach(options.tileSize);
-    const bloomReach = ((options.glowWidth * k.bloomWidthScale) / 2) + (options.glowBlurPx / Math.max(1e-6, scale));
-    const reach = sparkleReach + Math.max(sparkleReach, bloomReach);
+    const reach = headReachOf(options, scale);
     const reachSq = reach * reach;
+    const radius = maxHeadPx(options);
+    const radiusSq = radius * radius;
+    let withinRadius = true;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    for (const s of head) {
+    for (let j = cached.split; j < segments.length; j += 1) {
+      const s = segments[j]!;
       minX = Math.min(minX, s.previous.x, s.current.x);
       minY = Math.min(minY, s.previous.y, s.current.y);
       maxX = Math.max(maxX, s.previous.x, s.current.x);
       maxY = Math.max(maxY, s.previous.y, s.current.y);
+      const dx = s.current.x - cached.splitX;
+      const dy = s.current.y - cached.splitY;
+      if ((dx * dx) + (dy * dy) > radiusSq) withinRadius = false;
     }
     minX -= reach;
     minY -= reach;
     maxX += reach;
     maxY += reach;
+    const useCandidates = withinRadius && reach <= cached.candidateReach;
+    const scanCount = useCandidates ? cached.candidateCount : cached.sparkleCount;
     let found = 0;
     const data = cached.sparkles;
-    for (let i = 0; i < cached.sparkleCount; i += 1) {
+    for (let c = 0; c < scanCount; c += 1) {
+      const i = useCandidates ? cached.candidates[c]! : c;
       const x = data[i * STRIDE]!;
       const y = data[(i * STRIDE) + 1]!;
       if (x < minX || x > maxX || y < minY || y > maxY) continue;
       let near = false;
-      for (const s of head) {
+      for (let j = cached.split; j < segments.length; j += 1) {
+        const s = segments[j]!;
         if (distanceToSegmentSq(x, y, s.previous.x, s.previous.y, s.current.x, s.current.y) <= reachSq) {
           near = true;
           break;
@@ -353,8 +496,9 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
     const target = ctx.canvas as { width?: number; height?: number } | undefined;
     const last = segments[segments.length - 1];
     const tile = options.tileSize;
+    const knownScale = options.deviceScale !== undefined && options.deviceScale > 0;
     if (!last || !target || !(target.width! > 0) || !(target.height! > 0) || !(tile > 0)
-      || typeof ctx.getTransform !== 'function' || !Number.isFinite(last.current.distance)) {
+      || (!knownScale && typeof ctx.getTransform !== 'function') || !Number.isFinite(last.current.distance)) {
       return paintFull(ctx, segments, options);
     }
     const total = last.current.distance!;
@@ -366,10 +510,10 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
       // Lifecycle fade: every frame differs, so a cache would rebuild every frame. Keep the layer for afterwards.
       return paintFull(ctx, segments, options);
     }
-    const scale = ctx.getTransform().a;
-    const key = keyOf(options, scale);
-    const reason = staleReason(segments, options, key, total, scale);
-    if (reason !== null && !rebuild(target as { width: number; height: number }, segments, options, key, total, scale, reason)) {
+    // The caller's device scale when it passes it (the game does): getTransform allocates a DOMMatrix per call.
+    const scale = knownScale ? options.deviceScale! : ctx.getTransform().a;
+    const reason = staleReason(segments, options, total, scale);
+    if (reason !== null && !rebuild(target as { width: number; height: number }, segments, options, total, scale, reason)) {
       return paintFull(ctx, segments, options);
     }
     const cached = body!;
@@ -381,14 +525,12 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
     ctx.drawImage(surface!.canvas, offsetX, offsetY);
     ctx.restore();
 
-    const head = segments.slice(cached.split);
-    const under = sparklesUnderHead(head, options, scale);
+    const under = sparklesUnderHead(segments, options, scale);
+    overlay.data = cached.sparkles;
+    overlay.indices = underIndices;
+    overlay.count = under;
     stats.headPaints += 1;
-    stats.lastSparkles = drawStarDustWithPlan(ctx, head, options, config.headPlan, undefined, {
-      data: cached.sparkles,
-      indices: underIndices,
-      count: under
-    });
+    stats.lastSparkles = drawStarDustWithPlan(ctx, segments, options, config.headPlan, undefined, overlay, cached.split);
     return stats.lastSparkles;
   }) as StarDustTrailCache;
 
@@ -403,8 +545,14 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
 /** The game's one trail cache (one trail canvas per scene, one play scene at a time). */
 const gameTrailCache = createStarDustTrailCache();
 
-/** Frees the game's cached trail layer (scene shutdown). */
-export const releaseStarDustTrailCache = (): void => gameTrailCache.release();
+/**
+ * Frees the game's cached trail layer and the coarse bloom's scratch canvas (scene shutdown; the trail skin stopped
+ * being Star Dust).
+ */
+export const releaseStarDustTrailCache = (): void => {
+  gameTrailCache.release();
+  releaseCoarseBloomScratch();
+};
 
 /** Counters of the game's trail cache (diagnostics and the trail-cost bench). */
 export const getStarDustTrailCacheStats = (): Readonly<StarDustTrailCacheStats> => gameTrailCache.stats;
