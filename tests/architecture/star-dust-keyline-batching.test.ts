@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   STAR_DUST_KEYLINE_BATCH,
-  drawStarDustTrailToCanvasContext,
+  drawStarDustTrailFullToCanvasContext,
   type StarDustDrawOptions,
   type StarDustSegment
 } from '../../src/render/starDustTrailCanvas';
@@ -109,7 +109,7 @@ describe('star dust keylines: batched Path2D is the same path, closed linearly',
   test('without Path2D the keylines go into the context path (the code before the change)', () => {
     vi.stubGlobal('Path2D', undefined);
     const { ctx, log } = loggingContext();
-    const sparkles = drawStarDustTrailToCanvasContext(ctx, route(), OPTIONS);
+    const sparkles = drawStarDustTrailFullToCanvasContext(ctx, route(), OPTIONS);
     expect(sparkles).toBeGreaterThan(3 * STAR_DUST_KEYLINE_BATCH);
     const ops = fallbackKeylineOps(log);
     expect(ops.filter((o) => o[0] === 'closePath')).toHaveLength(sparkles);
@@ -119,12 +119,12 @@ describe('star dust keylines: batched Path2D is the same path, closed linearly',
   test('with Path2D: one keyline stroke of a path with exactly the same verbs and points, in the same order', () => {
     vi.stubGlobal('Path2D', undefined);
     const before = loggingContext();
-    const sparkles = drawStarDustTrailToCanvasContext(before.ctx, route(), OPTIONS);
+    const sparkles = drawStarDustTrailFullToCanvasContext(before.ctx, route(), OPTIONS);
     const expected = fallbackKeylineOps(before.log);
 
     vi.stubGlobal('Path2D', FakePath2D);
     const after = loggingContext();
-    expect(drawStarDustTrailToCanvasContext(after.ctx, route(), OPTIONS)).toBe(sparkles);
+    expect(drawStarDustTrailFullToCanvasContext(after.ctx, route(), OPTIONS)).toBe(sparkles);
     const pathStrokes = after.log.filter((c) => c.name === 'stroke' && c.args.length > 0);
     expect(pathStrokes).toHaveLength(1);
     const keylinePath = pathStrokes[0]!.args[0] as FakePath2D;
@@ -144,7 +144,7 @@ describe('star dust keylines: batched Path2D is the same path, closed linearly',
   test('no single path closes more than one batch of sparkles (linear, not quadratic)', () => {
     vi.stubGlobal('Path2D', FakePath2D);
     const { ctx } = loggingContext();
-    const sparkles = drawStarDustTrailToCanvasContext(ctx, route(), OPTIONS);
+    const sparkles = drawStarDustTrailFullToCanvasContext(ctx, route(), OPTIONS);
     const [outer, ...batches] = FakePath2D.created;
     expect(outer!.closes).toBe(0);
     expect(batches).toHaveLength(Math.ceil(sparkles / STAR_DUST_KEYLINE_BATCH));

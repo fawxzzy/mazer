@@ -1,70 +1,32 @@
 /**
- * Trail-cost OPTIONS (MAZER-PERF-017 follow-up): cheaper ways to paint the Star Dust trail, for the owner to pick from on
- * the options page `trail-perf-options.html`. NOT used by the game: nothing in a shipping entry imports this module; the
- * page installs one of these renderers through starDustRenderOverride.ts on the real scene.
+ * Trail-cost OPTIONS (MAZER-PERF-017 follow-up): the ways to paint the Star Dust trail that the owner picked from on the
+ * options page `trail-perf-options.html`. SHIPPED 2026-11-24: the owner picked C + A, which is now the game's default
+ * painter (src/render/starDustTrailCache.ts). This module stays page-only: nothing in a shipping entry imports it; the
+ * page installs one of these renderers through starDustRenderOverride.ts on the real scene, or clears the seam for the
+ * game's own painter (row 'CA').
  *
- * Every renderer here draws from the same placed sparkles, colours and widths as the shipped draw
- * (starDustTrailCanvas.ts). A plan says which layers run and how:
- *   - bloom / thread: 'shipped' (one stroke per colour chunk: ~1 per 4 px of route, ~1,300 at level 300), 'coarse'
- *     (one flush, butt-capped stroke per `coarseTiles` of route, coloured by a gradient from the piece's first segment
- *     to its last; same total light as today, measured by scripts/analysis/trail-perf-options-calibrate.mjs), or 'off'
- *     (ablation only);
- *   - keyline / fills: on, or off (ablation only);
- *   - still: sparkles hold their size and angle (no twinkle, no spin); colours still shift;
+ * The plan painter itself (layers, coarse bloom) moved to src/render/starDustTrailPlan.ts, which the game uses; it is
+ * re-exported here for the page and its tests. Page-only knobs on a plan:
  *   - idleRepaintMs: the shortest gap between repaints that only the colour clock asks for (standing still). The scene's
  *     redraw gate owns that gap; the options page holds it open (trailPerfOptionsHarness.ts) as the game would;
  *   - bodyCache: everything older than the last `headTiles` of route is painted once into a cached layer, re-painted
- *     every `refreshMs` (or when the route changes); only the head is painted per frame.
- *
- * With SHIPPED_PLAN the draw issues the same canvas calls as the shipped one (tests/render/starDustTrailVariants.test.ts).
+ *     every `refreshMs` (or when the route changes); only the head is painted per frame (the page's first cut of C; the
+ *     shipped cache is starDustTrailCache.ts).
  */
-import { chunkTrailSegments, type TrailCanvasSegment } from '../navigationCoreTrailCanvas';
-import { drawTrailBloomChunks, resolveBloomDownscale, type TrailBloomOptions } from '../trailLayersCanvas';
-import { resolveTrailBloomClip } from '../trailBloomClip';
-import {
-  STAR_DUST_KEYLINE_BATCH,
-  STAR_DUST_SCRATCH_STRIDE,
-  STAR_DUST_TRAIL,
-  getStarDustSparkleScratch,
-  placeStarDustSparkles,
-  resolveStarDustKeylineWidth,
-  type StarDustDrawOptions,
-  type StarDustSegment
-} from '../starDustTrailCanvas';
+import type { StarDustSegment } from '../starDustTrailCanvas';
 import type { StarDustTrailRenderer } from '../starDustRenderOverride';
+import { LIGHT_BLOOM_PLAN, SHIPPED_PLAN, drawStarDustWithPlan, type StarDustRenderPlan } from '../starDustTrailPlan';
 
-export type LayerMode = 'shipped' | 'coarse' | 'off';
+export {
+  LIGHT_BLOOM_PLAN,
+  SHIPPED_PLAN,
+  chunkTrailSegmentsByLength,
+  drawStarDustWithPlan,
+  type LayerMode,
+  type StarDustRenderPlan
+} from '../starDustTrailPlan';
 
-export interface StarDustRenderPlan {
-  bloom: LayerMode;
-  thread: LayerMode;
-  /** Route length per coarse chunk, in tiles (at least; pieces end only on a straight run). */
-  coarseTiles: number;
-  /**
-   * Alpha gain for the coarse bloom. Today's ~4 px pieces stack their round caps a few deep, so one flush stroke at the
-   * same alpha gives less light; the gain brings the total back (measured by scripts/analysis/trail-perf-options-calibrate.mjs).
-   */
-  coarseBloomGain: number;
-  keyline: boolean;
-  fills: boolean;
-  still: boolean;
-  idleRepaintMs: number;
-  bodyCache: { headTiles: number; refreshMs: number; minTiles: number } | null;
-}
-
-export const SHIPPED_PLAN: Readonly<StarDustRenderPlan> = Object.freeze({
-  bloom: 'shipped',
-  thread: 'shipped',
-  coarseTiles: 1,
-  coarseBloomGain: 1,
-  keyline: true,
-  fills: true,
-  still: false,
-  idleRepaintMs: 0,
-  bodyCache: null
-});
-
-export type TrailPerfVariantId = 'shipped' | 'A' | 'B' | 'C';
+export type TrailPerfVariantId = 'shipped' | 'A' | 'B' | 'C' | 'CA';
 
 export interface TrailPerfVariant {
   id: TrailPerfVariantId;
@@ -77,8 +39,9 @@ export interface TrailPerfVariant {
 export const TRAIL_PERF_VARIANTS: readonly TrailPerfVariant[] = Object.freeze([
   {
     id: 'shipped',
-    name: 'Today (shipped)',
-    look: 'Star Dust as it ships: bloom and thread stroked in ~1,300 small colour pieces, every sparkle twinkles.',
+    name: 'Before (full repaint)',
+    look: 'Star Dust as it shipped until the C + A pick: bloom and thread stroked in ~1,300 small colour pieces and every '
+      + 'sparkle repainted every frame.',
     plan: SHIPPED_PLAN
   },
   {
@@ -86,8 +49,7 @@ export const TRAIL_PERF_VARIANTS: readonly TrailPerfVariant[] = Object.freeze([
     name: 'A. Light bloom',
     look: 'Same sparkles. The soft glow and the thin thread are stroked one piece per tile (about 25x fewer blurred '
       + 'strokes), each a smooth colour fade, so the rainbow still flows; the glow\'s halo shifts colour per tile.',
-    // Gain 2.5: alpha coverage 0.98x today's on the level-300 trail (0.37x per unit gain; calibrate script, Chrome DPR3).
-    plan: Object.freeze({ ...SHIPPED_PLAN, bloom: 'coarse', thread: 'coarse', coarseTiles: 1, coarseBloomGain: 2.5 })
+    plan: LIGHT_BLOOM_PLAN
   },
   {
     id: 'B',
@@ -102,327 +64,20 @@ export const TRAIL_PERF_VARIANTS: readonly TrailPerfVariant[] = Object.freeze([
     look: 'The newest 8 to 16 tiles are painted live and twinkle. Everything older is painted once into a saved layer '
       + 'and refreshed every 2 s (or after 8 steps): older sparkles hold still and their colours move in steps.',
     plan: Object.freeze({ ...SHIPPED_PLAN, bodyCache: Object.freeze({ headTiles: 8, refreshMs: 2000, minTiles: 24 }) })
+  },
+  {
+    id: 'CA',
+    name: 'C + A (shipped)',
+    look: 'The owner\'s pick, now the game\'s own painter: C\'s cached older trail (its own full glow, refreshed every 2 s '
+      + 'or 8 steps) with A\'s light glow on the live head. Trails under 48 tiles are painted whole, exactly as Before.',
+    // Not painted from this plan: the page clears the seam so the game's cached painter runs (starDustTrailCache.ts).
+    plan: Object.freeze({ ...LIGHT_BLOOM_PLAN, bodyCache: Object.freeze({ headTiles: 8, refreshMs: 2000, minTiles: 48 }) })
   }
 ]);
 
 export const findTrailPerfVariant = (id: string | null | undefined): TrailPerfVariant => (
   TRAIL_PERF_VARIANTS.find((variant) => variant.id === id) ?? TRAIL_PERF_VARIANTS[0]!
 );
-
-const STRIDE = STAR_DUST_SCRATCH_STRIDE;
-const STAR_UNIT_X = new Float64Array(8);
-const STAR_UNIT_Y = new Float64Array(8);
-for (let j = 0; j < 8; j += 1) {
-  STAR_UNIT_X[j] = Math.cos((j * Math.PI) / 4);
-  STAR_UNIT_Y[j] = Math.sin((j * Math.PI) / 4);
-}
-
-const HEX_PAIRS: readonly string[] = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
-const hexColor = (color: number): string => `#${HEX_PAIRS[(color >> 16) & 255]}${HEX_PAIRS[(color >> 8) & 255]}${HEX_PAIRS[color & 255]}`;
-const rgba = (color: number, alpha: number): string => (
-  `rgba(${(color >> 16) & 255},${(color >> 8) & 255},${color & 255},${Math.max(0, Math.min(1, alpha))})`
-);
-
-type StarPathSink = Pick<CanvasPath, 'moveTo' | 'lineTo' | 'closePath'>;
-
-const traceStar = (ctx: StarPathSink, data: Float64Array, base: number, ox: number, oy: number, waist: number): void => {
-  const x = data[base]! - ox;
-  const y = data[base + 1]! - oy;
-  const r = data[base + 2]!;
-  const c = data[base + 3]!;
-  const s = data[base + 4]!;
-  for (let j = 0; j < 8; j += 1) {
-    const reach = (j & 1) === 0 ? r : r * waist;
-    const ux = STAR_UNIT_X[j]!;
-    const uy = STAR_UNIT_Y[j]!;
-    const px = x + (((ux * c) - (uy * s)) * reach);
-    const py = y + (((ux * s) + (uy * c)) * reach);
-    if (j === 0) {
-      ctx.moveTo(px, py);
-    } else {
-      ctx.lineTo(px, py);
-    }
-  }
-  ctx.closePath();
-};
-
-const runsStraight = (a: TrailCanvasSegment, b: TrailCanvasSegment): boolean => {
-  const ax = a.current.x - a.previous.x;
-  const ay = a.current.y - a.previous.y;
-  const bx = b.current.x - b.previous.x;
-  const by = b.current.y - b.previous.y;
-  return Math.abs((ax * by) - (ay * bx)) < 1e-6 && ((ax * bx) + (ay * by)) > 0;
-};
-
-/**
- * Splits connected segments into chunks of at least `maxLengthPx` of route, ignoring colour. A chunk only ends where the
- * route runs straight on, so butt-capped pieces meet flush (corners stay inside one piece, under its round join);
- * subpath breaks always split.
- */
-export const chunkTrailSegmentsByLength = <T extends TrailCanvasSegment>(segments: readonly T[], maxLengthPx: number): T[][] => {
-  const chunks: T[][] = [];
-  let chunk: T[] = [];
-  let length = 0;
-  for (let i = 0; i < segments.length; i += 1) {
-    const segment = segments[i]!;
-    const previous = chunk[chunk.length - 1];
-    const connected = previous !== undefined
-      && previous.current.x === segment.previous.x
-      && previous.current.y === segment.previous.y;
-    if (chunk.length > 0 && (!connected || (length >= maxLengthPx && runsStraight(previous!, segment)))) {
-      chunks.push(chunk);
-      chunk = [];
-      length = 0;
-    }
-    chunk.push(segment);
-    length += Math.hypot(segment.current.x - segment.previous.x, segment.current.y - segment.previous.y);
-  }
-  if (chunk.length > 0) {
-    chunks.push(chunk);
-  }
-  return chunks;
-};
-
-/**
- * One coarse piece: butt caps (set by the caller) so neighbouring pieces meet flush instead of stacking their round caps
- * into bright beads, and a gradient from the piece's first colour to its last so the rainbow still runs smoothly.
- */
-const strokeCoarseChunk = (
-  ctx: CanvasRenderingContext2D,
-  chunk: readonly TrailCanvasSegment[],
-  width: number,
-  alphaRatio: number,
-  ox: number,
-  oy: number
-): void => {
-  const first = chunk[0]!;
-  const last = chunk[chunk.length - 1]!;
-  const x0 = first.previous.x - ox;
-  const y0 = first.previous.y - oy;
-  const x1 = last.current.x - ox;
-  const y1 = last.current.y - oy;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  for (const segment of chunk) {
-    ctx.lineTo(segment.current.x - ox, segment.current.y - oy);
-  }
-  const from = rgba(first.glowColor, first.alpha * alphaRatio);
-  const to = rgba(last.glowColor, last.alpha * alphaRatio);
-  if (from === to || Math.hypot(x1 - x0, y1 - y0) < 0.5 || typeof ctx.createLinearGradient !== 'function') {
-    ctx.strokeStyle = from;
-  } else {
-    const gradient = ctx.createLinearGradient(x0, y0, x1, y1);
-    gradient.addColorStop(0, from);
-    gradient.addColorStop(1, to);
-    ctx.strokeStyle = gradient;
-  }
-  ctx.lineWidth = width;
-  ctx.stroke();
-};
-
-let coarseBloomScratch: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
-
-const acquireCoarseBloomScratch = (width: number, height: number): typeof coarseBloomScratch => {
-  try {
-    if (typeof document === 'undefined') return null;
-    if (!coarseBloomScratch) {
-      const canvas = document.createElement('canvas');
-      const sctx = canvas.getContext('2d');
-      if (!sctx) return null;
-      coarseBloomScratch = { canvas, ctx: sctx };
-    }
-    if (coarseBloomScratch.canvas.width !== width || coarseBloomScratch.canvas.height !== height) {
-      coarseBloomScratch.canvas.width = width;
-      coarseBloomScratch.canvas.height = height;
-    }
-    return coarseBloomScratch;
-  } catch {
-    return null;
-  }
-};
-
-/**
- * Option A's bloom: the shipped downscaled blur (trailLayersCanvas.ts drawBloomDownscaled: 1/f scratch, shadowBlur, clipped
- * upscale), but over coarse flush pieces. The blur's shadow takes one colour per piece (its middle segment's).
- */
-const drawCoarseBloom = (
-  ctx: CanvasRenderingContext2D,
-  chunks: readonly (readonly TrailCanvasSegment[])[],
-  options: TrailBloomOptions
-): void => {
-  const factor = options.glowBlurPx > 0 ? resolveBloomDownscale(options.glowBlurPx) : 1;
-  const target = ctx.canvas as { width?: number; height?: number } | undefined;
-  const canScale = factor >= 2 && target !== undefined && target.width! > 0 && target.height! > 0 && typeof ctx.getTransform === 'function';
-  const scratch = canScale ? acquireCoarseBloomScratch(Math.ceil(target.width! / factor), Math.ceil(target.height! / factor)) : null;
-  const paint = (into: CanvasRenderingContext2D, blurPx: number): void => {
-    into.lineJoin = 'round';
-    into.lineCap = 'butt';
-    into.shadowBlur = blurPx;
-    for (const chunk of chunks) {
-      const middle = chunk[chunk.length >> 1]!;
-      if (blurPx > 0) into.shadowColor = rgba(middle.glowColor, middle.alpha * options.glowAlphaRatio);
-      strokeCoarseChunk(into, chunk, options.glowWidth, options.glowAlphaRatio, options.originX, options.originY);
-    }
-    into.shadowBlur = 0;
-    into.shadowColor = 'transparent';
-  };
-  ctx.save();
-  if (!scratch) {
-    paint(ctx, options.glowBlurPx);
-    ctx.restore();
-    return;
-  }
-  const sctx = scratch.ctx;
-  const scale = ctx.getTransform().a / factor;
-  sctx.setTransform(1, 0, 0, 1, 0, 0);
-  sctx.clearRect(0, 0, scratch.canvas.width, scratch.canvas.height);
-  sctx.setTransform(scale, 0, 0, scale, 0, 0);
-  paint(sctx, options.glowBlurPx / factor);
-  const clip = resolveTrailBloomClip(chunks, {
-    width: target!.width!,
-    height: target!.height!,
-    scale: ctx.getTransform().a,
-    originX: options.originX,
-    originY: options.originY,
-    glowWidth: options.glowWidth,
-    glowBlurPx: options.glowBlurPx,
-    factor
-  });
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (clip) {
-    ctx.beginPath();
-    const r = clip.rects;
-    for (let i = 0; i < r.length; i += 4) {
-      ctx.rect(r[i]!, r[i + 1]!, r[i + 2]!, r[i + 3]!);
-    }
-    ctx.clip();
-  }
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(scratch.canvas, 0, 0, scratch.canvas.width, scratch.canvas.height, 0, 0, target!.width!, target!.height!);
-  ctx.restore();
-};
-
-/**
- * The plan's layers for `segments`, into `ctx` (already transformed by the caller, as the shipped draw expects). Returns the
- * sparkle count. Mirrors drawStarDustTrailToCanvasContextImpl call for call when the plan is SHIPPED_PLAN.
- */
-export const drawStarDustWithPlan = (
-  ctx: CanvasRenderingContext2D,
-  segments: readonly StarDustSegment[],
-  options: StarDustDrawOptions,
-  plan: Readonly<StarDustRenderPlan>,
-  animatedOverride?: boolean
-): number => {
-  if (segments.length === 0) {
-    return 0;
-  }
-  const k = STAR_DUST_TRAIL;
-  const ox = options.originX;
-  const oy = options.originY;
-  const coarsePx = Math.max(1, options.tileSize * plan.coarseTiles);
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  let shippedChunks: TrailCanvasSegment[][] | null = null;
-  const shipped = (): TrailCanvasSegment[][] => {
-    shippedChunks ??= chunkTrailSegments(segments);
-    return shippedChunks;
-  };
-
-  let coarseChunks: TrailCanvasSegment[][] | null = null;
-  const coarse = (): TrailCanvasSegment[][] => {
-    coarseChunks ??= chunkTrailSegmentsByLength(segments, coarsePx);
-    return coarseChunks;
-  };
-
-  if (plan.bloom !== 'off') {
-    const bloomOptions = {
-      originX: ox,
-      originY: oy,
-      glowWidth: options.glowWidth * k.bloomWidthScale,
-      glowAlphaRatio: options.glowAlphaRatio * k.bloomAlphaScale,
-      glowBlurPx: options.glowBlurPx
-    };
-    if (plan.bloom === 'coarse') {
-      drawCoarseBloom(ctx, coarse(), { ...bloomOptions, glowAlphaRatio: bloomOptions.glowAlphaRatio * plan.coarseBloomGain });
-    } else {
-      drawTrailBloomChunks(ctx, shipped(), bloomOptions);
-    }
-  }
-
-  if (plan.thread !== 'off') {
-    const threadWidth = Math.max(k.threadMinCss, options.coreWidth * k.threadOfCore);
-    if (plan.thread === 'coarse') {
-      ctx.save();
-      ctx.lineCap = 'butt';
-      for (const chunk of coarse()) {
-        strokeCoarseChunk(ctx, chunk, threadWidth, k.threadAlpha, ox, oy);
-      }
-      ctx.restore();
-    } else {
-      ctx.lineWidth = threadWidth;
-      for (const chunk of shipped()) {
-        const first = chunk[0]!;
-        ctx.beginPath();
-        ctx.moveTo(first.previous.x - ox, first.previous.y - oy);
-        for (const segment of chunk) {
-          ctx.lineTo(segment.current.x - ox, segment.current.y - oy);
-        }
-        ctx.strokeStyle = rgba(first.glowColor, first.alpha * k.threadAlpha);
-        ctx.stroke();
-      }
-    }
-  }
-
-  const animated = animatedOverride ?? (plan.still ? false : options.animated);
-  const count = placeStarDustSparkles(segments, { ...options, animated });
-  const data = getStarDustSparkleScratch();
-  if (count > 0) {
-    if (plan.keyline) {
-      ctx.lineJoin = 'miter';
-      ctx.miterLimit = 4;
-      let path: Path2D | null = null;
-      if (typeof Path2D === 'function') {
-        path = new Path2D();
-        for (let first = 0; first < count; first += STAR_DUST_KEYLINE_BATCH) {
-          const batch = new Path2D();
-          const end = Math.min(count, first + STAR_DUST_KEYLINE_BATCH);
-          for (let i = first; i < end; i += 1) {
-            traceStar(batch, data, i * STRIDE, ox, oy, k.waistRatio);
-          }
-          path.addPath(batch);
-        }
-      } else {
-        ctx.beginPath();
-        for (let i = 0; i < count; i += 1) {
-          traceStar(ctx, data, i * STRIDE, ox, oy, k.waistRatio);
-        }
-      }
-      ctx.lineWidth = resolveStarDustKeylineWidth(options.tileSize);
-      ctx.strokeStyle = rgba(options.keylineColor, k.keylineAlpha * Math.max(0, Math.min(1, options.keylineAlpha)));
-      if (path) {
-        ctx.stroke(path);
-      } else {
-        ctx.stroke();
-      }
-    }
-    if (plan.fills) {
-      for (let i = 0; i < count; i += 1) {
-        const base = i * STRIDE;
-        ctx.globalAlpha = Math.max(0, Math.min(1, data[base + 6]!));
-        ctx.fillStyle = hexColor(data[base + 5]!);
-        ctx.beginPath();
-        traceStar(ctx, data, base, ox, oy, k.waistRatio);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-  }
-  ctx.restore();
-  return count;
-};
 
 type Canvas2D = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D };
 

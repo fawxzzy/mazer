@@ -4,6 +4,8 @@
 //     [--engine=chromium|webkit] [--webkit-exe=<Playwright.exe>] [--channel=chrome] [--level=300] [--viewport=390x844] [--dpr=3]
 //     [--throttle=4] [--idle-ms=4000] [--walk-ms=4000] [--step-ms=139] [--set=ablation,variants] [--rows=id,id] [--out=<file.json>]
 //     [--shots=<dir>] (one viewport screenshot per variant after its walk)
+//     [--pw-module=<file URL of another Playwright's index.mjs>] (a WebKit build newer than this repo's Playwright hangs
+//     at newPage; drive it with the Playwright it belongs to)
 //
 // Same page, level and long trail for every row. Each row: put the longest route minus the walk into the trail, wait,
 // record rAF frame intervals for an idle window and a walking window (real moves through the QA hook). WebKit defers
@@ -45,7 +47,7 @@ if (sets.includes('ablation')) {
   );
 }
 if (sets.includes('variants')) {
-  for (const id of ['shipped', 'A', 'B', 'C']) ROWS.push({ id, kind: 'variant' });
+  for (const id of ['shipped', 'A', 'B', 'C', 'CA']) ROWS.push({ id, kind: 'variant' });
 }
 
 // --rows=today,nothing keeps only those rows (e.g. to compare device scales).

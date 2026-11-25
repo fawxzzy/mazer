@@ -100,10 +100,10 @@ import {
 } from '../render/sparkPlayerSkin';
 import {
   drawStarDustToGraphics,
-  drawStarDustTrailToCanvasContext,
   resolveStarDustReach,
   type StarDustSegment
 } from '../render/starDustTrailCanvas';
+import { drawStarDustTrailToCanvasContext, releaseStarDustTrailCache } from '../render/starDustTrailCache';
 import { resolveTrailSkin } from '../render/skinRegistry';
 import {
   TRAIL_FADE_ALPHA_MIN,
@@ -2763,6 +2763,7 @@ export class MenuScene extends Phaser.Scene {
         this.textures.remove(this.trailCanvasTextureKey);
       }
       this.trailCanvasTexture = null;
+      releaseStarDustTrailCache(); // MAZER-PERF-017: free the cached older-trail layer with the trail canvas.
       this.trailCanvasImage = null;
       this.trailCanvasTextureKey = null;
       if (this.playerGlowCanvasTextureKey !== null && this.textures.exists(this.playerGlowCanvasTextureKey)) {

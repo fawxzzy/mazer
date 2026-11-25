@@ -88,6 +88,8 @@ jobs:
           tests/render/bleedGlow.test.ts
           tests/render/backdropStars.test.ts
           tests/render/trail-bloom-clip.test.ts
+          tests/render/starDustTrailCache.test.ts
+          tests/render/starDustTrailVariants.test.ts
           tests/render/controller-halo-look.test.ts
           tests/render/menu-play-label-attention.test.ts
           tests/reset/board-tile-layer.test.ts
