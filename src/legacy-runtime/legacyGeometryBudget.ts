@@ -447,6 +447,18 @@ export const resolveGeometryBudgetGateWrapFloor = (level: number, gateLevel: boo
   return gateLevel && felt >= GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL && felt < GEOMETRY_BUDGET_FELT_SATURATION_LEVEL ? 1 : 0;
 };
 
+// MAZER-GEN-033: whether the base search of a gate level keeps going until a base lands with a gate (wrapped bases for
+// most of the budget, a gateless landing ranked below a gated one). From the fade start it is the levels with the wrap
+// floor above (MAZER-GEN-031). Below the fade start a gate level already owns its band's wraps, so it searches whenever
+// this maze has a wrap to guard (`wrapRungs` > 0); before, the search stopped at the first base that landed in its
+// window, gate or not, and only about half of those levels carried a gate. Levels from the felt saturation level on
+// are unchanged (no wrap floor, no search). Pure, like the floor: `gateLevel` is isBleedGateLevel(level).
+export const resolveGeometryBudgetGateSearch = (level: number, gateLevel: boolean, wrapRungs: number): boolean => {
+  if (!gateLevel) { return false; }
+  if (resolveGeometryBudgetGateWrapFloor(level, gateLevel) > 0) { return true; }
+  return resolveGeometryBudgetFeltLevel(level) < GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL && wrapRungs > 0;
+};
+
 // Base mazes tried (at most) with the wrap corridors of the roll before a level falls back to
 // plain bases: the wrap saving is priced into the target, so a base whose wraps leave the
 // tuner too little capacity is retried, and the ladder's ordering guarantee outranks the wrap

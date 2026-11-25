@@ -34,6 +34,7 @@ import {
   resolveGeometryBudgetRouteBranch,
   resolveGeometryBudgetRouteTarget,
   resolveGeometryBudgetTarget,
+  resolveGeometryBudgetGateSearch,
   resolveGeometryBudgetGateWrapFloor,
   resolveGeometryBudgetWrapRungs
 } from './legacyGeometryBudget';
@@ -706,6 +707,9 @@ const selectLegacyGeometryBudgetMaze = (
       Math.min(profileRungs, Math.max(0, Math.trunc(resolveGeometryBudgetWrapRungs(feltLevel, seed))))
     )
     : Math.min(profileRungs, Math.max(0, Math.trunc(selectionOptions.wrapRungs)));
+  // MAZER-GEN-033: below the fade start a gate level with a wrap to guard searches for a gated base too (it used to take
+  // the first base that landed, gate or not). From the fade start this is exactly gateKeepsWrap (MAZER-GEN-031).
+  const gateSearch = resolveGeometryBudgetGateSearch(feltLevel, gateLevel, wrapRungs);
   const wrapPricePercent = selectionOptions.wrapPricePercent ?? FELT_WRAP_PRICE_PERCENT;
   const profileWithRungs = (rungs: number): LegacyMazeGenerationProfile => (
     rungs === profileRungs
@@ -730,8 +734,9 @@ const selectLegacyGeometryBudgetMaze = (
     // The rolled wraps are tried on the first few bases only; a base that cannot land
     // with them (priced, they raise the raw target) is retried plain.
     // MAZER-GEN-031: a gate level that must keep its wrap tries wrapped bases for most of the budget (the last few
-    // bases stay plain so the ladder can still land when no wrapped base does).
-    const baseRungs = index < (gateKeepsWrap ? GEOMETRY_BUDGET_BASE_CANDIDATES - GATE_PLAIN_FALLBACK_BASES : GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS) ? wrapRungs : 0;
+    // bases stay plain so the ladder can still land when no wrapped base does). MAZER-GEN-033: so does a searching
+    // gate level below the fade start.
+    const baseRungs = index < (gateSearch ? GEOMETRY_BUDGET_BASE_CANDIDATES - GATE_PLAIN_FALLBACK_BASES : GEOMETRY_BUDGET_WRAP_BASE_ATTEMPTS) ? wrapRungs : 0;
     const baseProfile = profileWithRungs(baseRungs);
     // Every maze is double-lured and held to the reverse floor of its level and wrap rungs
     // (legacyGeometryBudget.ts).
@@ -768,7 +773,8 @@ const selectLegacyGeometryBudgetMaze = (
     // when every base in the budget is such a maze.
     const wrapLost = (base.islandStats?.base ?? 0) > 0 && baseRungs > 0;
     // MAZER-GEN-031: a gate level past the fade keeps trying bases (up to the budget) until one lands with a gate.
-    const gateMissed = gateKeepsWrap && tuned !== null && tuned.pricedBleedGate === null;
+    // MAZER-GEN-033: a searching gate level below the fade does the same.
+    const gateMissed = gateSearch && tuned !== null && tuned.pricedBleedGate === null;
     const gateRankPenalty = gateMissed && distance === 0 ? (tieBiased ? GATE_MISSED_TIE_RANK_PENALTY : GATE_MISSED_RANK_PENALTY) : 0;
     const rank = (tieBiased ? distance + 0.5 : distance) + (wrapLost ? WRAP_LOST_RANK_PENALTY : gateRankPenalty);
     if (selectedMaze === null || rank < selectedRank) {
