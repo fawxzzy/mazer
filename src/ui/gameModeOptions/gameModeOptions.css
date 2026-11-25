@@ -1,0 +1,192 @@
+/*
+ * Game-mode selector options page (proposal). Colours come only from the shared tokens (tokens.css, remapped by the dark
+ * neon theme) and from custom properties the page script fills from src/render/palette.ts, so this file holds no colour
+ * literal. Fonts are the shipped ones: Space Grotesk for text, Oxanium for short uppercase labels.
+ */
+.gm-page { box-sizing: border-box; margin: 0 auto; max-width: 980px; padding: 20px 12px 56px; display: grid; gap: 36px; font-family: var(--mazer-token-font-ui); }
+.gm-intro h1 { font-size: 1.35rem; line-height: 1.2; margin: 0 0 8px; }
+.gm-intro p { color: var(--mazer-token-color-text-muted); font-size: .95rem; line-height: 1.4; margin: 0 0 8px; }
+.gm-intro a { color: var(--mazer-token-color-semantic-info); font-size: .9rem; }
+.gm-option { display: grid; gap: 10px; }
+.gm-option-head h2 { font-size: 1.1rem; margin: 0 0 4px; }
+.gm-option-head p { color: var(--mazer-token-color-text-muted); font-size: .9rem; line-height: 1.35; margin: 0; }
+.gm-option-head .gm-why { color: var(--mazer-token-color-text-primary); margin-top: 6px; }
+.gm-pick { background: var(--mazer-token-color-brand-mint); border-radius: var(--mazer-token-radius-round); color: var(--mazer-token-color-bg-canvas); font: 700 .7rem/1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .08em; padding: 4px 8px; text-transform: uppercase; vertical-align: middle; }
+
+/* Stage: stands in for the game menu behind the selector (the real menu is a Phaser canvas). */
+.gm-stage {
+  --gm-gap: 0px;
+  align-items: center;
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--gm-accent-deep) 34%, transparent), transparent 70%),
+    var(--mazer-token-color-bg-canvas, var(--mazer-token-color-bg-shell));
+  border: 1px solid var(--mazer-token-color-line-subtle);
+  border-radius: var(--mazer-token-radius-sheet);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 470px;
+  overflow: hidden;
+  padding: 22px 0 24px;
+  position: relative;
+}
+.gm-stage > * { position: relative; }
+.gm-far {
+  background-image:
+    radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--mazer-token-color-text-primary) 60%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--mazer-token-color-text-primary) 45%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 45% 85%, color-mix(in srgb, var(--gm-accent-deep) 80%, transparent) 0 2px, transparent 3px);
+  background-position-x: calc(var(--gm-scroll, 0) * -0.06px);
+  background-size: 140px 120px, 190px 160px, 260px 220px;
+  inset: 0;
+  opacity: .55;
+  pointer-events: none;
+  position: absolute !important;
+}
+.gm-kicker { color: var(--mazer-token-color-text-muted); font: 600 .78rem/1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .22em; margin: 0; text-transform: uppercase; }
+.gm-tagline { color: var(--mazer-token-color-text-primary); font-size: 1rem; line-height: 1.3; margin: 0; padding: 0 20px; text-align: center; }
+.gm-chips { display: flex; gap: 8px; justify-content: center; min-height: 28px; }
+.gm-chip { border: 1px solid var(--mazer-token-color-line-normal); border-radius: var(--mazer-token-radius-round); color: var(--mazer-token-color-semantic-info); font-size: .82rem; padding: 4px 12px; }
+.gm-chip--locked { border-color: var(--mazer-token-color-line-subtle); color: var(--mazer-token-color-text-disabled); }
+.gm-play { min-height: 48px; width: min(calc(100% - 48px), 320px); }
+.gm-note { color: var(--mazer-token-color-semantic-info); font-size: .82rem; margin: 0; min-height: 1.1em; }
+
+/* Rail: native touch scroll, snap, mouse drag and wheel handled in gameModeRail.ts. */
+.gm-rail {
+  container-type: inline-size;
+  margin-block: -22px;
+  padding-block: 22px;
+  cursor: grab;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  position: relative;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.gm-rail::-webkit-scrollbar { display: none; }
+.gm-rail:focus-visible { outline: 2px solid var(--mazer-token-color-semantic-info); outline-offset: -2px; }
+.gm-rail.is-dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+.gm-track { display: flex; width: max-content; }
+.gm-track::before, .gm-track::after { content: ""; flex: 0 0 var(--gm-pad, 0px); }
+.gm-item {
+  align-items: center;
+  appearance: none;
+  background: none;
+  border: 0;
+  box-sizing: border-box;
+  color: var(--mazer-token-color-text-primary);
+  cursor: inherit;
+  display: flex;
+  flex: 0 0 var(--gm-item-w);
+  flex-direction: column;
+  font: inherit;
+  gap: 10px;
+  margin: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.gm-item:focus-visible { outline: 2px solid var(--mazer-token-color-semantic-info); outline-offset: 2px; }
+.gm-name { font: 700 1.5rem/1.1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .08em; text-transform: uppercase; }
+.gm-sub { color: var(--mazer-token-color-text-muted); font-size: .85rem; line-height: 1.25; }
+.gm-item.is-locked .gm-name { color: var(--mazer-token-color-text-muted); }
+
+/* Maze picture: Chip tiles as DOM boxes (corridor fill, lit rim, rounded), never an image, SVG or canvas. */
+.gm-art { display: grid; gap: 3px; grid-template-columns: repeat(var(--gm-cols), 1fr); pointer-events: none; width: 100%; }
+.gm-tile { aspect-ratio: 1; border-radius: 26%; box-sizing: border-box; display: block; position: relative; }
+.gm-tile--wall { background: radial-gradient(circle, var(--gm-socket) 0 16%, transparent 19%); }
+.gm-tile--path, .gm-tile--start, .gm-tile--end, .gm-tile--trail, .gm-tile--gate, .gm-tile--hazard {
+  background: var(--gm-corridor);
+  border: 1px solid var(--gm-corridor-edge);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mazer-token-color-text-primary) 12%, transparent);
+}
+.gm-tile--trail { background: color-mix(in srgb, var(--gm-trail) 34%, var(--gm-corridor)); border-color: color-mix(in srgb, var(--gm-trail) 70%, var(--gm-corridor-edge)); box-shadow: 0 0 6px color-mix(in srgb, var(--gm-trail-glow) 55%, transparent); }
+.gm-tile--start::after { background: radial-gradient(circle, var(--gm-start-core) 0 22%, var(--gm-start) 24% 48%, transparent 52%); content: ""; inset: 0; position: absolute; }
+.gm-tile--end::after { background: var(--gm-goal); clip-path: polygon(50% 6%, 62% 38%, 96% 38%, 68% 58%, 80% 92%, 50% 70%, 20% 92%, 32% 58%, 4% 38%, 38% 38%); content: ""; inset: 6%; position: absolute; }
+.gm-tile--gate { box-shadow: inset 0 0 0 2px var(--gm-gate), 0 0 8px color-mix(in srgb, var(--gm-gate) 60%, transparent); }
+.gm-tile--hazard::after { background: var(--gm-gate); content: ""; inset: 28%; position: absolute; transform: rotate(45deg); }
+.gm-item.is-locked .gm-art { filter: saturate(.55); opacity: .8; }
+
+/* A. Peeking cards */
+.gm-v-peek { --gm-item-w: min(62cqw, 270px); }
+.gm-v-peek .gm-item {
+  background: var(--mazer-token-color-bg-panel);
+  border: 1px solid var(--mazer-token-color-line-subtle);
+  border-radius: var(--mazer-token-radius-panel);
+  margin-inline: 6px;
+  opacity: calc(1 - var(--ad, 0) * .5);
+  padding: 16px 14px 18px;
+  transform: scale(calc(1 - var(--ad, 0) * .14));
+  transition: border-color var(--mazer-token-motion-duration-base), box-shadow var(--mazer-token-motion-duration-base);
+}
+.gm-v-peek .gm-item.is-active { border-color: var(--mazer-token-color-brand-mint); box-shadow: 0 0 22px color-mix(in srgb, var(--gm-accent-deep) 55%, transparent); }
+.gm-v-peek .gm-art { margin: 4px 0; }
+
+/* B. Floating labels: no container at all. */
+.gm-v-float { --gm-item-w: min(60cqw, 300px); }
+.gm-v-float .gm-item { opacity: calc(1 - var(--ad, 0) * .6); padding: 8px 0; transform: scale(calc(1 - var(--ad, 0) * .12)); }
+.gm-v-float .gm-art { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--gm-accent-deep) 70%, transparent)); width: 84%; }
+.gm-v-float .gm-item.is-active .gm-art { animation: gm-drift var(--mazer-token-motion-loop-drift) ease-in-out infinite; }
+.gm-v-float .gm-name { position: relative; }
+.gm-v-float .gm-name::after { background: var(--mazer-token-color-brand-mint); border-radius: var(--mazer-token-radius-round); bottom: -8px; content: ""; height: 2px; left: 50%; position: absolute; transform: translateX(-50%) scaleX(calc(1 - min(var(--ad, 0), 1))); width: 60%; }
+.gm-v-float .gm-sub { opacity: calc(1 - min(var(--ad, 0), 1)); }
+@keyframes gm-drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+/* C. Big-type rail */
+.gm-v-type { --gm-item-w: 78cqw; }
+.gm-v-type .gm-rail { scroll-snap-type: x proximity; }
+.gm-v-type .gm-item { gap: 0; padding: 6px 0; }
+.gm-v-type .gm-name { color: transparent; font-size: clamp(2.2rem, 12.5cqw, 5.2rem); -webkit-text-stroke: 1.5px var(--mazer-token-color-text-muted); transition: color var(--mazer-token-motion-duration-base); }
+.gm-v-type .gm-item.is-active .gm-name { color: var(--mazer-token-color-text-primary); -webkit-text-stroke-color: var(--mazer-token-color-brand-mint); text-shadow: 0 0 22px color-mix(in srgb, var(--gm-accent-deep) 80%, transparent); }
+.gm-v-type .gm-sub { display: none; }
+.gm-detail-art { margin: 6px 0 0; width: min(46%, 220px); }
+
+/* D. Depth and parallax */
+.gm-v-depth { --gm-item-w: min(58cqw, 260px); }
+.gm-v-depth .gm-far { background-position-x: calc(var(--gm-scroll, 0) * -0.35px); opacity: .9; }
+.gm-v-depth .gm-item {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mazer-token-color-bg-elevated) 80%, transparent), color-mix(in srgb, var(--mazer-token-color-bg-panel) 55%, transparent));
+  border: 1px solid color-mix(in srgb, var(--mazer-token-color-line-normal) 60%, transparent);
+  border-radius: var(--mazer-token-radius-panel);
+  margin-inline: 8px;
+  opacity: calc(1 - var(--ad, 0) * .4);
+  overflow: hidden;
+  padding: 18px 10px 16px;
+  transform: perspective(760px) translateZ(calc(var(--ad, 0) * -60px)) rotateY(calc(var(--d, 0) * -34deg));
+}
+.gm-v-depth .gm-art { transform: translateX(calc(var(--d, 0) * -16px)) scale(1.06); }
+.gm-v-depth .gm-name, .gm-v-depth .gm-sub { transform: translateX(calc(var(--d, 0) * 34px)); }
+.gm-v-depth .gm-item.is-active { border-color: var(--mazer-token-color-brand-mint); box-shadow: 0 18px 30px -18px var(--gm-accent-deep); }
+
+/* E. Dial */
+.gm-v-dial { --gm-item-w: 30cqw; }
+.gm-v-dial .gm-detail-art { margin-top: 10px; width: min(58%, 250px); }
+.gm-dialwrap { width: 100%; }
+.gm-v-dial .gm-track { position: relative; }
+.gm-v-dial .gm-ticks { background: repeating-linear-gradient(90deg, var(--mazer-token-color-line-normal) 0 2px, transparent 2px 14px); height: 12px; left: 0; position: absolute; right: 0; top: 14px; }
+.gm-v-dial .gm-item { gap: 0; margin-top: 34px; padding-bottom: 8px; }
+.gm-v-dial .gm-name { color: var(--mazer-token-color-text-muted); font-size: 1rem; transition: color var(--mazer-token-motion-duration-base); }
+.gm-v-dial .gm-item.is-active .gm-name { color: var(--mazer-token-color-brand-mint); }
+.gm-v-dial .gm-sub { display: none; }
+.gm-marker { background: var(--mazer-token-color-brand-mint); border-radius: var(--mazer-token-radius-round); box-shadow: 0 0 10px var(--gm-accent-deep); height: 30px; left: 50%; pointer-events: none; position: absolute; top: 4px; transform: translateX(-50%); width: 3px; }
+
+@media (min-width: 720px) {
+  .gm-stage { min-height: 520px; }
+  .gm-v-peek { --gm-item-w: 280px; }
+  .gm-v-dial { --gm-item-w: 180px; }
+  .gm-v-type { --gm-item-w: 460px; }
+  .gm-v-type .gm-name { font-size: 5.2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gm-v-float .gm-item.is-active .gm-art { animation: none; }
+}
+
+/* The tagline lives once, under the rail; an item only repeats text when it is locked. */
+.gm-sub { display: none; }
+
+/* Locked: a flat, clearly inactive button (the kit's disabled tint stays too saturated on the neon accent). */
+.gm-play:disabled { background: var(--mazer-token-color-bg-elevated); border: 1px solid var(--mazer-token-color-line-subtle); color: var(--mazer-token-color-text-disabled); opacity: 1; }
