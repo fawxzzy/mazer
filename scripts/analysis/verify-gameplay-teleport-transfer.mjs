@@ -32,7 +32,8 @@
  *     complete -> input unlocked again, via real accepted moves only;
  *   - reduced motion: no beams at all, the diamonds only crossfade full/empty (no sweep, no brightening), 200 ms unlock;
  *   - compact/touch layout: the same, with the diamonds inside a 390x844 viewport;
- *   - the ring of 8 diamonds is parked on its stations while any beam fires, circulates the
+ *   - the ring of 8 diamonds is parked on its stations while the arrival beams fire (on departure it starts to orbit at the
+ *     first beam contact, together with the fills, and the beams follow the diamonds: MAZER-VIS-061), circulates the
  *     perimeter during the build/deconstruct lap, and is exactly back on its stations at the end
  *     (static in reduced motion);
  *   - pause freezes the beams, the intro/outro clocks and the coupled maze
@@ -134,8 +135,12 @@ const LIT_ALPHA_FLOOR = 0.62;
 // The diamond ring ORBITS the viewport perimeter (resolveOrbitingEdgeStations) and never leaves the viewport at any phase.
 // Vertices are compared without their half-pixel stroke, so a flush kite sits at 0.5 px; allow a hair of float slack only.
 const ORBIT_CLIP_TOLERANCE_PX = 0.01;
-// The ring is parked (exact rest layout) while beams fly and after the lap; it must visibly travel in between.
+// The ring is parked (exact rest layout) while the ARRIVAL beams fly and after the lap; it must visibly travel in between.
+// MAZER-VIS-061: on DEPARTURE the orbit starts at the first beam contact, together with the fills (src/render/introTimeline.ts
+// OUTRO_RING_ORBIT_START_MS, ~302.24 ms; an acceptance number, not imported), so the ring is parked only before that and the
+// departure beams follow the diamonds as they move.
 const RING_PARKED_TOLERANCE_PX = 0.5;
+const OUTRO_RING_ORBIT_START_MS = 302.24;
 const RING_MIN_TRAVEL_PX = 20;
 
 const sameList = (a, b) => a.length === b.length && a.every((value, index) => value === b[index]);
@@ -269,6 +274,8 @@ const installHarness = (page) => page.evaluate(({ BLOOM_OUTER_MIN_WIDTH_PX, POOF
       })(),
       // Kite length tip -> outer tip, per marker: 20 css px at full size, 10 at the 50% rest size.
       outerTips: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : { x: marker.vertices[marker.vertices.length >> 1].x, y: marker.vertices[marker.vertices.length >> 1].y })),
+      // Kite INNER TIP (vertex 0, where the beams attach), as drawn: MAZER-VIS-061 orbits the ring while the departure beams fill it.
+      innerTips: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : { x: marker.vertices[0].x, y: marker.vertices[0].y })),
       kiteLengths: edge.frame.map((marker) => (marker.vertices.length < 3 ? null : Math.hypot(marker.vertices[0].x - marker.vertices[marker.vertices.length >> 1].x, marker.vertices[0].y - marker.vertices[marker.vertices.length >> 1].y))),
       markerBounds: (() => {
         const all = edge.frame.flatMap((marker) => marker.vertices);
@@ -441,6 +448,27 @@ const innerTipOf = (station, kiteLength = KITE_FULL_LENGTH_PX) => ({
   x: station.x + (Math.cos(station.a) * (kiteLength - INNER_TIP_REACH_PX)),
   y: station.y + (Math.sin(station.a) * (kiteLength - INNER_TIP_REACH_PX))
 });
+
+/**
+ * MAZER-VIS-061: the stations as DRAWN this frame, read back from each kite (inner tip = vertex 0, outer tip = the middle vertex),
+ * in the harness station shape, so innerTipOf(station, kiteLength) is the drawn inner tip. The departure beams are checked against
+ * these because the ring orbits while they fill it; while it is parked they equal the rest stations (pinned by the parked check).
+ */
+const drawnStationsOf = (frame) => frame.innerTips.map((inner, id) => {
+  const outer = frame.outerTips[id];
+  if (!inner || !outer) { return null; }
+  const length = Math.hypot(inner.x - outer.x, inner.y - outer.y);
+  const a = Math.atan2(inner.y - outer.y, inner.x - outer.x);
+  return { id, x: inner.x - (Math.cos(a) * (length - INNER_TIP_REACH_PX)), y: inner.y - (Math.sin(a) * (length - INNER_TIP_REACH_PX)), a };
+}).filter(Boolean);
+const withDrawnStations = (frames) => frames.map((frame) => (frame.markerCount === 8 ? { ...frame, stations: drawnStationsOf(frame) } : frame));
+
+/** Every kite vertex inside the painted canvas (vertices carry no stroke, so a flush kite sits at 0.5 px). */
+const markersInsideCanvas = (frame) => (
+  frame.visible !== null && frame.markerCount === 8 && frame.markerBounds !== null
+  && frame.markerBounds.minX >= -ORBIT_CLIP_TOLERANCE_PX && frame.markerBounds.minY >= -ORBIT_CLIP_TOLERANCE_PX
+  && frame.markerBounds.maxX <= frame.visible.w + ORBIT_CLIP_TOLERANCE_PX && frame.markerBounds.maxY <= frame.visible.h + ORBIT_CLIP_TOLERANCE_PX
+);
 
 /** Longest run of consecutive frames for which `predicate(frame)` holds. */
 const longestRun = (frames, predicate) => {
@@ -983,7 +1011,8 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
     check(`${label}: reduced motion keeps every diamond's painted outer tip on the screen edge through the whole cycle (${reducedCycleEdge.checked} samples)`, reducedCycleEdge.ok, JSON.stringify(reducedCycleEdge));
     check(`${label}: reduced motion keeps every diamond at a FIXED 50% size through the whole cycle (no size animation, ${frames.length} frames)`, frames.filter((f) => f.markerCount === 8).every((f) => f.kiteLengths.every((length) => approx(length, KITE_REST_LENGTH_PX))), JSON.stringify(frames.find((f) => f.markerCount === 8 && f.kiteLengths.some((length) => !approx(length, KITE_REST_LENGTH_PX)))?.kiteLengths));
   } else {
-    const d = analyzeBeams(departure, stations, 'outward');
+    // MAZER-VIS-061: the ring orbits from the first contact, so each departure beam is matched against its diamond where it is DRAWN.
+    const d = analyzeBeams(withDrawnStations(departure), stations, 'outward');
     check(`${label}: on goal-reset the player fires a beam to ALL 8 diamonds (the scene's own firing set covers stations 0-7)`, sameList(d.sceneIds, ALL_STATION_IDS), JSON.stringify(d));
     check(
       `${label}: the departure beam geometry agrees -- every beam STARTS at the player and points at its own diamond (outward), all 8 identified`,
@@ -999,8 +1028,12 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
       d.attachment.worstTipError <= 1.01 / (departure.find((f) => f.firing.length > 0)?.dpr ?? 1) && d.attachment.minAttachedFrames >= Math.floor(PULSE_TAIL_MS / FRAME_MS) - 2,
       JSON.stringify(d.attachment)
     );
-    const departureEdge = analyzeEdgeContact(departure.filter((f) => f.markerCount === 8 && f.outroAge <= DEPARTURE_BEAM_END_MS));
-    check(`${label}: while the diamonds grow 50% to 100% with their fill, every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
+    // Parked (before the orbit starts at the first contact) every outer tip sits on its own edge; once the ring orbits it may round a
+    // corner, so from then on every diamond must stay inside the painted canvas (never clipped) while it grows with its fill.
+    const departureEdge = analyzeEdgeContact(departure.filter((f) => f.markerCount === 8 && f.outroAge < OUTRO_RING_ORBIT_START_MS - FRAME_MS));
+    check(`${label}: before the orbit starts (first contact), every diamond's PAINTED outer tip stays on the screen edge (never past it, within half a device pixel; ${departureEdge.checked} samples)`, departureEdge.ok, JSON.stringify(departureEdge));
+    const departureGrowing = departure.filter((f) => f.markerCount === 8 && f.outroAge <= DEPARTURE_BEAM_END_MS);
+    check(`${label}: while the diamonds grow 50% to 100% with their fill and orbit, all 8 stay inside the painted canvas (${departureGrowing.length} frames)`, departureGrowing.length > 10 && departureGrowing.every(markersInsideCanvas), JSON.stringify(departureGrowing.find((f) => !markersInsideCanvas(f))?.markerBounds ?? null));
     const kitesDeparture = analyzeKiteSize(departure, 'departure');
     check(`${label}: on goal the diamonds start at 50%, grow smoothly with their fill and stay full size to the end of the deconstruct`, kitesDeparture.ok, JSON.stringify(kitesDeparture.problems));
     check(
@@ -1020,13 +1053,18 @@ const assertGoalCycle = async (label, frames, h, { stations, viewport, reducedMo
   );
   const base = ringBase(frames);
   const drift = ringDriftFrom(base, frames);
-  const parkedDrift = ringDriftFrom(base, frames.filter((f) => f.firing.length > 0));
+  // Arrival beams fire with the ring parked; departure beams fire while it starts to orbit (MAZER-VIS-061), parked only before the first contact.
+  const parkedDrift = ringDriftFrom(base, frames.filter((f) => f.firing.length > 0 && f.outroAge === null));
+  const preOrbitDrift = ringDriftFrom(base, frames.filter((f) => f.outroAge !== null && f.outroAge < OUTRO_RING_ORBIT_START_MS - FRAME_MS));
+  const orbitDuringFill = ringDriftFrom(base, frames.filter((f) => f.outroAge !== null && f.outroAge >= OUTRO_RING_ORBIT_START_MS + FRAME_MS && f.outroAge <= DEPARTURE_BEAM_END_MS));
   const finalDrift = ringDriftFrom(base, frames.slice(-1));
   if (reducedMotion) {
     check(`${label}: reduced motion keeps the ring of 8 diamonds static through the whole transfer (max drift <= ${RING_PARKED_TOLERANCE_PX} px)`, drift <= RING_PARKED_TOLERANCE_PX, `maxDrift=${drift}`);
   } else {
     check(`${label}: the ring of 8 diamonds circulates the perimeter during the build/deconstruct lap (max travel >= ${RING_MIN_TRAVEL_PX} px)`, drift >= RING_MIN_TRAVEL_PX, `maxDrift=${drift}`);
-    check(`${label}: the ring is parked on its stations while any beam fires (drift <= ${RING_PARKED_TOLERANCE_PX} px)`, parkedDrift <= RING_PARKED_TOLERANCE_PX, `parkedDrift=${parkedDrift}`);
+    check(`${label}: the ring is parked on its stations while any arrival beam fires (drift <= ${RING_PARKED_TOLERANCE_PX} px)`, parkedDrift <= RING_PARKED_TOLERANCE_PX, `parkedDrift=${parkedDrift}`);
+    check(`${label}: on departure the ring stays parked until the first beam contact (~${Math.round(OUTRO_RING_ORBIT_START_MS)} ms, drift <= ${RING_PARKED_TOLERANCE_PX} px)`, preOrbitDrift <= RING_PARKED_TOLERANCE_PX, `preOrbitDrift=${preOrbitDrift}`);
+    check(`${label}: on departure the orbit starts together with the fills (the ring moves while the beams fill it, MAZER-VIS-061)`, orbitDuringFill > RING_PARKED_TOLERANCE_PX * 2, `orbitDuringFill=${orbitDuringFill}`);
     check(`${label}: the ring is back exactly on its stations when the transfer completes (drift <= ${RING_PARKED_TOLERANCE_PX} px)`, finalDrift <= RING_PARKED_TOLERANCE_PX, `finalDrift=${finalDrift}`);
   }
 
