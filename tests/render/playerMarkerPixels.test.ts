@@ -168,10 +168,15 @@ describe.each(TILE_SIZES.flatMap((tile) => DPRS.map((dpr) => [tile, dpr] as cons
     test('the opaque block is centred on the tile and is the same share of it at every size', () => {
       for (const cell of CELLS) {
         const r = render(tileSize, dpr, cell);
-        // opaque core pixels: the exact core colour (the accent stroke and keyline differ from it)
+        // opaque core pixels: the exact core colour (the accent stroke and keyline differ from it). The locator ring is the same
+        // player colour (MAZER-VIS-062) but lies at the tile edge, outside the dark keyline: only pixels within the block's own
+        // reach (plus one device px of snap) are counted.
+        const reachX = (r.frame.coreHalfWidth * dpr) + 1;
+        const reachY = (r.frame.coreHalfHeight * dpr) + 1;
         let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity; let count = 0;
         for (const p of changedPixels(r)) {
           if (!same(p.after, rgb(CORE))) continue;
+          if (Math.abs((p.x + 0.5) - (r.frame.centerX * dpr)) > reachX || Math.abs((p.y + 0.5) - (r.frame.centerY * dpr)) > reachY) continue;
           minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); count += 1;
         }
         expect(count, `core pixels ${cell.x},${cell.y}`).toBeGreaterThan(0);

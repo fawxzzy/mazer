@@ -20,10 +20,10 @@
  * - Orbit ("title orbit sigils"): while the maze generates (intro) and while
  *   it deconstructs (outro) the whole ring CIRCULATES along the viewport
  *   perimeter (resolveOrbitingEdgeStations). The phase is the timeline's
- *   ringSpinRad reinterpreted as laps (2 pi = one full lap = 8 station steps;
- *   positive = clockwise, the direction of increasing station id). Diamond i
- *   travels the same perimeter parametrization as the rest stations, so after
- *   a whole number of steps it sits EXACTLY on station i+k and a whole lap (the
+ *   ringSpinRad reinterpreted as laps (2 pi = one full lap of the path;
+ *   positive = clockwise, the direction of increasing station id). The phase
+ *   is a fraction of the path LENGTH (MAZER-VIS-061), so the ring moves at one
+ *   constant on-screen speed, corners and long sides alike; a whole lap (the
  *   timelines return an exact 0 at rest) is exactly the fixed layout. The kite
  *   keeps pointing inward: its angle rises linearly with the perimeter
  *   coordinate (diagonal at a corner, pure edge normal at the midpoint, next
@@ -318,35 +318,19 @@ const ORBIT_SNAP_EPSILON = 1e-9;
 const wrapStep = (value: number): number => ((value % EDGE_STATION_COUNT) + EDGE_STATION_COUNT) % EDGE_STATION_COUNT;
 
 /**
- * One diamond at ring phase `phaseRad` (radians; 2 pi = one full clockwise lap,
- * negative = counter-clockwise). Pure function of the viewport, the id and the
- * phase. A whole number of station steps (a whole number of laps included)
- * returns the REST station of id + steps (same id), copied from `restStations`,
- * so the end of every timeline lands exactly on the fixed layout.
- *
- * Between stations the diamond moves along the perimeter coordinate s (station
- * units, 2 per side, clockwise from the top-left corner): along the side it
- * interpolates between the rest corner centres through the rest midpoint
- * (linear when both corners are the same distance from it), and its angle is
- * (s + 1) pi / 4 -- the rest orientation at every station, so the kite swings
- * smoothly through the corners. Top/bottom: outer tip flush with the screen
- * edge. Left/right: the centre eases from the corner inset to the flush offset
- * at the midpoint (the rest corners are inset along the left/right edges), so
- * the kite never leaves the viewport at any phase.
+ * The orbit PATH: the pose at perimeter coordinate s (station units, 0..8, 2 per side, clockwise from the top-left corner).
+ * Whole s is the rest orientation of that station. Along the side it interpolates between the rest corner centres through the
+ * rest midpoint (linear when both corners are the same distance from it), and its angle is (s + 1) pi / 4 -- the rest orientation at
+ * every station, so the kite swings smoothly through the corners. Top/bottom: outer tip flush with the screen edge. Left/right: the
+ * centre eases from the corner inset to the flush offset at the midpoint (the rest corners are inset along the left/right edges), so
+ * the kite never leaves the viewport at any point of the path.
  */
-export const resolveOrbitingEdgeStation = (
+const resolveOrbitPathPose = (
   viewport: EdgeViewport,
   id: EdgeStationId,
-  phaseRad: number,
-  restStations: ReadonlyArray<EdgeStation> = resolveEdgeStations(viewport)
+  s: number,
+  restStations: ReadonlyArray<EdgeStation>
 ): EdgeStation => {
-  const shift = Number.isFinite(phaseRad) ? (phaseRad / (Math.PI * 2)) * EDGE_ORBIT_STEPS_PER_LAP : 0;
-  const nearest = Math.round(shift);
-  if (Math.abs(shift - nearest) < ORBIT_SNAP_EPSILON) {
-    const rest = restStations[wrapStep(id + nearest)] as EdgeStation;
-    return { ...rest, id };
-  }
-  const s = wrapStep(id + shift);
   const sideIndex = Math.min(3, Math.floor(s / 2));
   const side = ORBIT_SIDES[sideIndex] as EdgeSide;
   const u = (s - (2 * sideIndex)) / 2;
@@ -387,6 +371,100 @@ export const resolveOrbitingEdgeStation = (
   const cornerCap = (restStations[0] as EdgeStation).maxScale ?? 1;
   const maxScale = 1 - ((1 - cornerCap) * cornerBlend);
   return { id, x, y, inwardAngle: angle, side, isCorner: false, ...(maxScale < 1 ? { maxScale } : {}) };
+};
+
+/**
+ * MAZER-VIS-061: arc-length table of the orbit path, so the ring moves at ONE constant on-screen speed all the way round. The old
+ * phase mapping gave every half side the same time, so a star sped up ~2x as it turned a corner onto a long side of a phone. The
+ * path is sampled ORBIT_ARC_SAMPLES_PER_SIDE times per side; the cumulative centre-path length is kept in one reused buffer and
+ * rebuilt only when the viewport or the rest layout changes (no per-frame allocation once warm).
+ */
+export const ORBIT_ARC_SAMPLES_PER_SIDE = 64;
+const ORBIT_ARC_SAMPLES = ORBIT_ARC_SAMPLES_PER_SIDE * 4;
+const ORBIT_ARC_SAMPLES_PER_STEP = ORBIT_ARC_SAMPLES / EDGE_STATION_COUNT;
+const orbitArcLength = new Float64Array(ORBIT_ARC_SAMPLES + 1);
+const ORBIT_ARC_KEY_CAP = 2 + (EDGE_STATION_COUNT * 2);
+const orbitArcKey = new Float64Array(ORBIT_ARC_KEY_CAP + 1).fill(Number.NaN);
+
+/** Builds (or reuses) the arc-length table for this viewport + rest layout; returns the full path length in css px. */
+const ensureOrbitArcTable = (viewport: EdgeViewport, restStations: ReadonlyArray<EdgeStation>): number => {
+  const cap = (restStations[0] as EdgeStation).maxScale ?? 1;
+  let same = orbitArcKey[0] === viewport.width && orbitArcKey[1] === viewport.height && orbitArcKey[ORBIT_ARC_KEY_CAP] === cap;
+  for (let index = 0; same && index < EDGE_STATION_COUNT; index += 1) {
+    const rest = restStations[index] as EdgeStation;
+    same = orbitArcKey[2 + (index * 2)] === rest.x && orbitArcKey[3 + (index * 2)] === rest.y;
+  }
+  if (same) {
+    return orbitArcLength[ORBIT_ARC_SAMPLES] as number;
+  }
+  orbitArcKey[0] = viewport.width;
+  orbitArcKey[1] = viewport.height;
+  orbitArcKey[ORBIT_ARC_KEY_CAP] = cap;
+  for (let index = 0; index < EDGE_STATION_COUNT; index += 1) {
+    const rest = restStations[index] as EdgeStation;
+    orbitArcKey[2 + (index * 2)] = rest.x;
+    orbitArcKey[3 + (index * 2)] = rest.y;
+  }
+  const first = resolveOrbitPathPose(viewport, 0, 0, restStations);
+  let previous = first;
+  orbitArcLength[0] = 0;
+  for (let sample = 1; sample <= ORBIT_ARC_SAMPLES; sample += 1) {
+    // The last sample is s = 8, back at the top-left corner: reuse the s = 0 pose so the loop closes exactly.
+    const pose = sample === ORBIT_ARC_SAMPLES
+      ? first
+      : resolveOrbitPathPose(viewport, 0, sample / ORBIT_ARC_SAMPLES_PER_STEP, restStations);
+    orbitArcLength[sample] = (orbitArcLength[sample - 1] as number) + Math.hypot(pose.x - previous.x, pose.y - previous.y);
+    previous = pose;
+  }
+  return orbitArcLength[ORBIT_ARC_SAMPLES] as number;
+};
+
+/** Perimeter coordinate s (0..8) at centre-path length `arc` (0..path length) along the cached table. */
+const orbitCoordinateAtArc = (arc: number): number => {
+  let low = 0;
+  let high = ORBIT_ARC_SAMPLES;
+  while (high - low > 1) {
+    const middle = (low + high) >> 1;
+    if ((orbitArcLength[middle] as number) <= arc) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  const start = orbitArcLength[low] as number;
+  const span = (orbitArcLength[high] as number) - start;
+  const fraction = span > 0 ? Math.max(0, Math.min(1, (arc - start) / span)) : 0;
+  return (low + fraction) / ORBIT_ARC_SAMPLES_PER_STEP;
+};
+
+/**
+ * One diamond at ring phase `phaseRad` (radians; 2 pi = one full clockwise lap, negative = counter-clockwise). Pure function of the
+ * viewport, the id and the phase. Phase 0 and every whole lap return the REST station of `id`, copied from `restStations`, so the end
+ * of every timeline lands exactly on the fixed layout.
+ *
+ * MAZER-VIS-061: the phase is a fraction of the path LENGTH, not of the station count. Every diamond starts at its own rest station and
+ * travels phase / 2pi of the whole path, so all eight move as one rigid ring at one constant on-screen speed through the corners and
+ * along the long and short sides alike (the old station-step mapping gave each half side equal time: ~2x faster on the long sides of
+ * a phone). Off whole laps a diamond is generally between stations; a whole lap is exactly the rest layout.
+ */
+export const resolveOrbitingEdgeStation = (
+  viewport: EdgeViewport,
+  id: EdgeStationId,
+  phaseRad: number,
+  restStations: ReadonlyArray<EdgeStation> = resolveEdgeStations(viewport)
+): EdgeStation => {
+  const laps = Number.isFinite(phaseRad) ? phaseRad / (Math.PI * 2) : 0;
+  if (Math.abs(laps - Math.round(laps)) * EDGE_ORBIT_STEPS_PER_LAP < ORBIT_SNAP_EPSILON) {
+    const rest = restStations[id] as EdgeStation;
+    return { ...rest, id };
+  }
+  const pathLength = ensureOrbitArcTable(viewport, restStations);
+  if (!(pathLength > 0)) {
+    return resolveOrbitPathPose(viewport, id, wrapStep(id + (laps * EDGE_ORBIT_STEPS_PER_LAP)), restStations);
+  }
+  const start = orbitArcLength[id * ORBIT_ARC_SAMPLES_PER_STEP] as number;
+  const arc = (start + ((laps - Math.floor(laps)) * pathLength)) % pathLength;
+  return resolveOrbitPathPose(viewport, id, wrapStep(orbitCoordinateAtArc(arc)), restStations);
 };
 
 /** All 8 diamonds at ring phase `phaseRad` (see resolveOrbitingEdgeStation). Phase 0 = resolveEdgeStations. */
@@ -902,8 +980,17 @@ export const resolveEdgeBeamProgress = (laserProgress: number, index: number, co
 export type { EdgeBeamDirection };
 
 export interface EdgeBeamsInput {
-  /** Each diamond's CURRENT position (resolveOrbitingEdgeStations); the rest layout while the ring is parked. */
+  /**
+   * The REST layout (resolveEdgeStations), moved to each diamond's current orbit position by `spinRad`; or stations that are
+   * already orbited, with `spinRad` absent / 0.
+   */
   readonly stations: ReadonlyArray<EdgeStation>;
+  /**
+   * The ring phase this frame (the timeline's ringSpinRad, the value the diamonds are drawn at). MAZER-VIS-061: the outro ring
+   * starts to orbit at the first beam contact, while the beams are still attached, so each beam end follows its diamond's
+   * CURRENT position. Absent / 0: `stations` are used as given.
+   */
+  readonly spinRad?: number;
   /** The maze spawn tile (arrival) or the player (departure), in screen space. */
   readonly focus: EdgePoint;
   /** inward: diamonds -> focus (build). outward: focus -> diamonds (deconstruct). */
@@ -961,8 +1048,13 @@ export const resolveEdgeBeams = (input: EdgeBeamsInput): EdgeBeamsGeometry => {
   const clockMs = resolveBeamClockMs(input);
   const pop = Math.max(0, Math.min(1, input.spawnPop));
   const firingIds = new Set<number>();
-  const count = input.stations.length;
-  const beams = input.stations.map((station, index): EdgeBeam => {
+  const spinRad = input.spinRad !== undefined && Number.isFinite(input.spinRad) ? input.spinRad : 0;
+  const viewport = spinRad !== 0 ? inferRestViewport(input.stations) : null;
+  const stations = viewport !== null
+    ? input.stations.map((station) => resolveOrbitingEdgeStation(viewport, station.id, spinRad, input.stations))
+    : input.stations;
+  const count = stations.length;
+  const beams = stations.map((station, index): EdgeBeam => {
     const pulse = resolveEdgeBeamPulse(input.direction, clockMs, index, count);
     // The diamond grows/shrinks about its OUTER tip with its fill (edgeStarMotion.ts), so the inner tip moves: follow the diamond's
     // current size every frame (the same size `resolveEdgeRingScales` draws it at).

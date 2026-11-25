@@ -20,7 +20,15 @@ import {
   samplePlayerColour,
   setPlayerColour
 } from '../../src/render/playerColour';
+import {
+  drawPlayerLocator,
+  resolvePlayerLocatorColour,
+  type LocatorGraphics,
+  type PlayerLocatorDrawInput
+} from '../../src/render/playerLocator';
+import { createPlayerMarkerFrame, drawPlayerMarker, resolvePlayerMarkerFrame } from '../../src/render/playerMarker';
 import { createSparkMaterial, resolveSparkMaterial } from '../../src/render/sparkPlayerSkin';
+import { isCosmeticColourScopeActive } from '../../src/theme/cosmeticScope';
 import { sampleIridescentTrail as sampleTrailForDrawing } from '../../src/render/trailIridescence';
 import {
   resolveSharedBorderColor as resolveRawRainbowBorderColor,
@@ -138,6 +146,97 @@ describe('player colour: one setter recolours every consumer', () => {
   });
 });
 
+/** Records every colour the locator paints: the glow (fills) and the ring, pings and keylines (strokes). */
+interface LocatorPainted { fills: number[]; strokes: number[]; outsideScope: number }
+const makeLocatorPainter = (): LocatorGraphics & LocatorPainted => {
+  const painted: LocatorGraphics & LocatorPainted = {
+    fills: [],
+    strokes: [],
+    outsideScope: 0,
+    fillStyle(color: number) { painted.fills.push(color); if (!isCosmeticColourScopeActive()) painted.outsideScope += 1; },
+    fillRoundedRect() {},
+    lineStyle(_width: number, color: number) { painted.strokes.push(color); if (!isCosmeticColourScopeActive()) painted.outsideScope += 1; },
+    strokeRoundedRect() {}
+  };
+  return painted;
+};
+
+const locatorInput = (over: Partial<PlayerLocatorDrawInput> = {}): PlayerLocatorDrawInput => ({
+  centerX: 100,
+  centerY: 80,
+  tileSize: 20,
+  devicePixelRatio: 2,
+  coreHalfWidth: 6,
+  coreHalfHeight: 6,
+  coreCornerRadius: 1.5,
+  coreReachCss: 6.4,
+  alpha: 1,
+  timeMs: 0,
+  pingStartMs: 0,
+  reducedMotion: false,
+  ...over
+});
+
+const markerFrame = () => resolvePlayerMarkerFrame({
+  centerX: 100, centerY: 80, tileSize: 20, devicePixelRatio: 2, timeMs: 0, reducedMotion: true, motionAmount: 0, headingX: 0, headingY: 0
+}, createPlayerMarkerFrame());
+
+describe('player colour: the locator ring and glow follow it (MAZER-VIS-062)', () => {
+  test('a set player colour paints the glow, the ring and the ping; only the dark keylines keep another colour', () => {
+    setPlayerColour(FLAT);
+    const painted = makeLocatorPainter();
+    drawPlayerLocator(painted, locatorInput({ timeMs: 120 }));
+    expect(painted.fills.length).toBeGreaterThan(0);
+    expect(painted.fills.every((colour) => colour === FLAT)).toBe(true);
+    // the ring and the live ping rings are FLAT; every other stroke is the one dark keyline colour
+    expect(painted.strokes[0]).toBe(FLAT);
+    expect(painted.strokes.filter((colour) => colour === FLAT).length).toBeGreaterThanOrEqual(2);
+    expect(new Set(painted.strokes).size).toBe(2);
+    expect([...painted.fills, ...painted.strokes].includes(0x2bb868)).toBe(false);
+  });
+
+  test('rainbow: the ring and glow shift with the clock, the same colour the lasers and star fills read at that time', () => {
+    expect(isPlayerColourRainbow()).toBe(true);
+    const seen = new Set<number>();
+    for (const timeMs of [0, 900, 2500, 5000]) {
+      const shared = resolvePlayerColour(null, timeMs, false);
+      const painted = makeLocatorPainter();
+      drawPlayerLocator(painted, locatorInput({ timeMs, pingStartMs: -1 }));
+      expect(painted.fills.every((colour) => colour === shared), `glow at ${timeMs}`).toBe(true);
+      expect(painted.strokes[0], `ring at ${timeMs}`).toBe(shared);
+      // the beams and star fills colour themselves from the same source at the same clock
+      const beams = makePainter();
+      drawEdgeBeams(beams, { direction: 'outward', focus: { x: 200, y: 400 }, laserProgress: 0, spawnPop: 0, stations, clockMs: 150, playerColour: shared });
+      expect(beams.lines.includes(shared)).toBe(true);
+      seen.add(shared);
+    }
+    expect(seen.size).toBeGreaterThan(2);
+    // reduced motion freezes it exactly like every other consumer
+    expect(resolvePlayerLocatorColour({ timeMs: 9000, reducedMotion: true })).toBe(resolvePlayerColour(null, 9000, true));
+  });
+
+  test('the Chip marker hands its core colour to the locator, so core, ring and glow are one colour', () => {
+    const core = 0x44aaff;
+    const painted = makeLocatorPainter();
+    drawPlayerMarker(painted, markerFrame(), { tileSize: 20, devicePixelRatio: 2, alpha: 1, timeMs: 0, coreColor: core, pingStartMs: -1, reducedMotion: true });
+    expect(painted.fills.filter((colour) => colour === core).length).toBeGreaterThan(1);
+    expect(painted.strokes[0]).toBe(core);
+    expect(resolvePlayerLocatorColour({ colour: core, timeMs: 0, reducedMotion: false })).toBe(core);
+  });
+
+  test('dark mode leaves them alone: every locator and marker colour is set inside the cosmetic scope (MAZER-UI-102)', () => {
+    const locator = makeLocatorPainter();
+    drawPlayerLocator(locator, locatorInput());
+    expect(locator.fills.length + locator.strokes.length).toBeGreaterThan(3);
+    expect(locator.outsideScope).toBe(0);
+    const marker = makeLocatorPainter();
+    drawPlayerMarker(marker, markerFrame(), { tileSize: 20, devicePixelRatio: 2, alpha: 1, timeMs: 0, coreColor: FLAT, pingStartMs: -1, reducedMotion: true });
+    expect(marker.fills.length + marker.strokes.length).toBeGreaterThan(3);
+    expect(marker.outsideScope).toBe(0);
+    expect(isCosmeticColourScopeActive()).toBe(false);
+  });
+});
+
 /** Every src file except the palette itself and the player colour module. */
 const listSourceFiles = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   const path = join(dir, name);
@@ -160,11 +259,17 @@ describe('player colour: no consumer can bypass the shared source', () => {
     }
   });
 
-  test('the lasers, the star fills and the Spark do not use the static green token', () => {
-    for (const name of ['edgeBeamArt.ts', 'edgeMarkers.ts', 'sparkPlayerSkin.ts']) {
+  test('the lasers, the star fills, the Spark and the locator ring and glow do not use the static green token', () => {
+    for (const name of ['edgeBeamArt.ts', 'edgeMarkers.ts', 'sparkPlayerSkin.ts', 'playerLocator.ts', 'playerMarker.ts']) {
       const source = readFileSync(resolve(root, 'render', name), 'utf8');
       expect(source, name).not.toMatch(/\bPLAYER_COLOR\b/);
+      // boardMaterial.player / playerEdge is that same static green (MAZER-VIS-062): doc comments may name it, code may not
+      const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      expect(code, name).not.toMatch(/\bboardMaterial\.player(Edge)?\b/);
     }
+    // the locator's colour comes from the shared source
+    const locator = readFileSync(resolve(root, 'render', 'playerLocator.ts'), 'utf8');
+    expect(locator).toMatch(/import \{ resolvePlayerColour \} from '\.\/playerColour';/);
   });
 
   test('the scene colours the lasers with the player colour', () => {

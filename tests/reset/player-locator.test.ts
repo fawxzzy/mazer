@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { BOARD_CHIP_FILL, CHIP_CORNER_RATIO, boardMaterial } from '../../src/render/boardTileStyle';
 import { getContrastRatio } from '../../src/render/palette';
+import { resolvePlayerColour } from '../../src/render/playerColour';
 import { resolvePlayerMarkerReach } from '../../src/render/playerMarker';
 import {
   PLAYER_LOCATOR,
@@ -222,16 +223,20 @@ describe('player locator draw', () => {
   });
 });
 
-describe('player locator contrast (non-text, WCAG 3:1 against the real Chip floor)', () => {
-  test('ring and ping colours each clear 3:1 against the shipped chip fill', () => {
-    for (const [name, color] of [['ring', boardMaterial.player], ['ping', boardMaterial.playerEdge]] as const) {
-      expect(getContrastRatio(color, BOARD_CHIP_FILL), name).toBeGreaterThanOrEqual(3);
+describe('player locator contrast (non-text, against the real Chip floor)', () => {
+  // MAZER-VIS-062: the ring and ping are the shared player colour (playerColour.ts), the same colour as the Spark and the
+  // trail core, so their contrast against a bare chip moves with its rainbow exactly as theirs does (the trail core's own
+  // floor rule lives in trail-iridescence.test.ts). What keeps the ring readable on any floor is the dark keyline it sits
+  // against: that separation is pinned here over a whole rainbow sweep.
+  test('the dark keyline separates the ring and ping (the player colour) from the board by a wide margin all round its rainbow', () => {
+    for (let timeMs = 0; timeMs < 8000; timeMs += 50) {
+      const colour = resolvePlayerColour(null, timeMs, false);
+      expect(getContrastRatio(boardMaterial.void, colour), `at ${timeMs} ms`).toBeGreaterThanOrEqual(6);
     }
   });
 
   test('the dark keyline separates the ring from chips and the lit rim by a wide margin', () => {
     expect(getContrastRatio(boardMaterial.void, BOARD_CHIP_FILL)).toBeGreaterThanOrEqual(3);
-    expect(getContrastRatio(boardMaterial.void, boardMaterial.player)).toBeGreaterThanOrEqual(7);
     expect(getContrastRatio(boardMaterial.void, boardMaterial.rim)).toBeGreaterThanOrEqual(7);
   });
 });
