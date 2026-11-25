@@ -90,6 +90,21 @@ export interface StarDustDrawOptions {
    * is placed on it (the next slice places that one). Unset: the segments are the whole route, as before.
    */
   routeLengthPx?: number;
+  /**
+   * MAZER-PERF-017 follow-up, cached trail only: `coreWidth`, `glowWidth`, `glowAlphaRatio` and `glowBlurPx` at the
+   * trail's steady breath (the mid level reduced motion holds). The cached layer is painted with these, so it does not
+   * jump to a new breath phase at each rebuild while the live head keeps breathing. Unset: the live values, as before.
+   * The full painter ignores them.
+   */
+  steadyCoreWidth?: number;
+  steadyGlowWidth?: number;
+  steadyGlowAlphaRatio?: number;
+  steadyGlowBlurPx?: number;
+  /**
+   * Cached trail only: the context's current device scale (the `a` of the transform the caller set), so the per-frame
+   * path does not call getTransform (it allocates a DOMMatrix). Unset: read from the context.
+   */
+  deviceScale?: number;
 }
 
 /** Largest distance (css px) a sparkle reaches past the route, keyline included: the trail canvas's padding. */
@@ -151,15 +166,17 @@ const segmentStart = (segment: StarDustSegment, fallback: number): number => (
 
 /**
  * Places the sparkles for these segments into the module scratch (x, y, radius, cos, sin, colour, alpha per sparkle) and
- * returns how many. Exported for tests; the draw calls it.
+ * returns how many. Exported for tests; the draw calls it. `startIndex`: place only segments[startIndex..] (the cached trail's
+ * live head, without copying the array); same result as placing segments.slice(startIndex).
  */
 export const placeStarDustSparkles = (
   segments: readonly StarDustSegment[],
-  options: Pick<StarDustDrawOptions, 'tileSize' | 'timeMs' | 'animated' | 'originAdvancePx' | 'routeLengthPx'>
+  options: Pick<StarDustDrawOptions, 'tileSize' | 'timeMs' | 'animated' | 'originAdvancePx' | 'routeLengthPx'>,
+  startIndex = 0
 ): number => {
   const k = STAR_DUST_TRAIL;
   const tile = options.tileSize;
-  if (segments.length === 0 || !(tile > 0)) {
+  if (segments.length <= startIndex || !(tile > 0)) {
     return 0;
   }
   const spacing = tile * k.spacingTileRatio;
@@ -168,7 +185,7 @@ export const placeStarDustSparkles = (
 
   // Route length: the last segment's end distance, or the summed segment lengths when the vertices carry none.
   let total = 0;
-  for (let i = 0; i < segments.length; i += 1) {
+  for (let i = startIndex; i < segments.length; i += 1) {
     const s = segments[i]!;
     const len = Math.hypot(s.current.x - s.previous.x, s.current.y - s.previous.y);
     total = Number.isFinite(s.current.distance) ? s.current.distance! : total + len;
@@ -185,7 +202,7 @@ export const placeStarDustSparkles = (
 
   let count = 0;
   let walked = 0;
-  for (let i = 0; i < segments.length; i += 1) {
+  for (let i = startIndex; i < segments.length; i += 1) {
     const s = segments[i]!;
     const len = Math.hypot(s.current.x - s.previous.x, s.current.y - s.previous.y);
     const d0 = segmentStart(s, walked);

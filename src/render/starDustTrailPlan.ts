@@ -133,13 +133,17 @@ const runsStraight = (a: TrailCanvasSegment, b: TrailCanvasSegment): boolean => 
 /**
  * Splits connected segments into chunks of at least `maxLengthPx` of route, ignoring colour. A chunk only ends where the
  * route runs straight on, so butt-capped pieces meet flush (corners stay inside one piece, under its round join);
- * subpath breaks always split.
+ * subpath breaks always split. `startIndex`: chunk only segments[startIndex..] (same as chunking segments.slice(startIndex)).
  */
-export const chunkTrailSegmentsByLength = <T extends TrailCanvasSegment>(segments: readonly T[], maxLengthPx: number): T[][] => {
+export const chunkTrailSegmentsByLength = <T extends TrailCanvasSegment>(
+  segments: readonly T[],
+  maxLengthPx: number,
+  startIndex = 0
+): T[][] => {
   const chunks: T[][] = [];
   let chunk: T[] = [];
   let length = 0;
-  for (let i = 0; i < segments.length; i += 1) {
+  for (let i = startIndex; i < segments.length; i += 1) {
     const segment = segments[i]!;
     const previous = chunk[chunk.length - 1];
     const connected = previous !== undefined
@@ -198,6 +202,21 @@ const strokeCoarseChunk = (
 
 let coarseBloomScratch: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
 
+/**
+ * Frees the coarse bloom's scratch canvas (about 1/f^2 of the trail canvas). The cached trail painter calls this when it
+ * releases its layer: on scene shutdown and when the trail skin stops being Star Dust. The next coarse bloom makes a new one.
+ */
+export const releaseCoarseBloomScratch = (): void => {
+  if (coarseBloomScratch) {
+    coarseBloomScratch.canvas.width = 0;
+    coarseBloomScratch.canvas.height = 0;
+    coarseBloomScratch = null;
+  }
+};
+
+/** Tests: whether the coarse bloom scratch canvas is held. */
+export const hasCoarseBloomScratch = (): boolean => coarseBloomScratch !== null;
+
 const acquireCoarseBloomScratch = (width: number, height: number): typeof coarseBloomScratch => {
   try {
     if (typeof document === 'undefined') return null;
@@ -224,7 +243,8 @@ const acquireCoarseBloomScratch = (width: number, height: number): typeof coarse
 const drawCoarseBloom = (
   ctx: CanvasRenderingContext2D,
   chunks: readonly (readonly TrailCanvasSegment[])[],
-  options: TrailBloomOptions
+  options: TrailBloomOptions,
+  deviceScale?: number
 ): void => {
   const factor = options.glowBlurPx > 0 ? resolveBloomDownscale(options.glowBlurPx) : 1;
   const target = ctx.canvas as { width?: number; height?: number } | undefined;
@@ -249,7 +269,9 @@ const drawCoarseBloom = (
     return;
   }
   const sctx = scratch.ctx;
-  const scale = ctx.getTransform().a / factor;
+  // The caller's device scale when it knows it (the cached painter passes it: getTransform allocates a DOMMatrix).
+  const device = deviceScale !== undefined && deviceScale > 0 ? deviceScale : ctx.getTransform().a;
+  const scale = device / factor;
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.clearRect(0, 0, scratch.canvas.width, scratch.canvas.height);
   sctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -257,7 +279,7 @@ const drawCoarseBloom = (
   const clip = resolveTrailBloomClip(chunks, {
     width: target!.width!,
     height: target!.height!,
-    scale: ctx.getTransform().a,
+    scale: device,
     originX: options.originX,
     originY: options.originY,
     glowWidth: options.glowWidth,
@@ -282,7 +304,8 @@ const drawCoarseBloom = (
 /**
  * The plan's layers for `segments`, into `ctx` (already transformed by the caller, as the full painter expects). Returns
  * the sparkle count. Mirrors the full painter (drawStarDustTrailToCanvasContextImpl) call for call when the plan is
- * SHIPPED_PLAN and no `under` sparkles are given.
+ * SHIPPED_PLAN and no `under` sparkles are given. `startIndex`: draw only segments[startIndex..] (the cached trail's
+ * live head, without copying the array); same result as drawing segments.slice(startIndex).
  */
 export const drawStarDustWithPlan = (
   ctx: CanvasRenderingContext2D,
@@ -290,9 +313,10 @@ export const drawStarDustWithPlan = (
   options: StarDustDrawOptions,
   plan: Readonly<StarDustRenderPlan>,
   animatedOverride?: boolean,
-  under?: StarDustUnderSparkles | null
+  under?: StarDustUnderSparkles | null,
+  startIndex = 0
 ): number => {
-  if (segments.length === 0) {
+  if (segments.length <= startIndex) {
     return 0;
   }
   const k = STAR_DUST_TRAIL;
@@ -306,13 +330,13 @@ export const drawStarDustWithPlan = (
 
   let shippedChunks: TrailCanvasSegment[][] | null = null;
   const shipped = (): TrailCanvasSegment[][] => {
-    shippedChunks ??= chunkTrailSegments(segments);
+    shippedChunks ??= chunkTrailSegments(startIndex > 0 ? segments.slice(startIndex) : segments);
     return shippedChunks;
   };
 
   let coarseChunks: TrailCanvasSegment[][] | null = null;
   const coarse = (): TrailCanvasSegment[][] => {
-    coarseChunks ??= chunkTrailSegmentsByLength(segments, coarsePx);
+    coarseChunks ??= chunkTrailSegmentsByLength(segments, coarsePx, startIndex);
     return coarseChunks;
   };
 
@@ -325,7 +349,12 @@ export const drawStarDustWithPlan = (
       glowBlurPx: options.glowBlurPx
     };
     if (plan.bloom === 'coarse') {
-      drawCoarseBloom(ctx, coarse(), { ...bloomOptions, glowAlphaRatio: bloomOptions.glowAlphaRatio * plan.coarseBloomGain });
+      drawCoarseBloom(
+        ctx,
+        coarse(),
+        { ...bloomOptions, glowAlphaRatio: bloomOptions.glowAlphaRatio * plan.coarseBloomGain },
+        options.deviceScale
+      );
     } else {
       drawTrailBloomChunks(ctx, shipped(), bloomOptions);
     }
@@ -356,7 +385,7 @@ export const drawStarDustWithPlan = (
   }
 
   const animated = animatedOverride ?? (plan.still ? false : options.animated);
-  const count = placeStarDustSparkles(segments, { ...options, animated });
+  const count = placeStarDustSparkles(segments, animated === options.animated ? options : { ...options, animated }, startIndex);
   const data = getStarDustSparkleScratch();
   const underCount = under ? under.count : 0;
   if (count > 0 || underCount > 0) {

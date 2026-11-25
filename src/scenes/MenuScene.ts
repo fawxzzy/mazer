@@ -2151,6 +2151,8 @@ export class MenuScene extends Phaser.Scene {
   private trailCanvasWidth = 0;
   private trailCanvasHeight = 0;
   private trailCanvasResolution = 0;
+  /** MAZER-PERF-017: the Star Dust trail cache holds canvases; released when the trail skin changes away from it. */
+  private starDustTrailCacheHeld = false;
   // Same real-2D-canvas compositor pattern as trailCanvasImage above, for
   // the player marker's own two drop-shadow glow layers (see
   // navigationCorePlayerGlowCanvas.ts's own header comment for why a
@@ -2764,6 +2766,7 @@ export class MenuScene extends Phaser.Scene {
       }
       this.trailCanvasTexture = null;
       releaseStarDustTrailCache(); // MAZER-PERF-017: free the cached older-trail layer with the trail canvas.
+      this.starDustTrailCacheHeld = false;
       this.trailCanvasImage = null;
       this.trailCanvasTextureKey = null;
       if (this.playerGlowCanvasTextureKey !== null && this.textures.exists(this.playerGlowCanvasTextureKey)) {
@@ -10710,7 +10713,20 @@ export class MenuScene extends Phaser.Scene {
     };
     // L7 trail skin Star dust (skinRegistry.ts): four-point sparkles in today's trail colours along the same route,
     // each with its own dark keyline (which carries the contrast job the neon tube's underlay did on the Chip floor).
-    if (resolveTrailSkin().id === 'star-dust') {
+    const starDustSkin = resolveTrailSkin().id === 'star-dust';
+    if (!starDustSkin && this.starDustTrailCacheHeld) {
+      releaseStarDustTrailCache(); // MAZER-PERF-017: another skin now; free the cached layer and the bloom scratch.
+      this.starDustTrailCacheHeld = false;
+    }
+    if (starDustSkin) {
+      this.starDustTrailCacheHeld = true;
+      // MAZER-PERF-017: the cached older trail is painted at the steady breath (the level reduced motion holds) so it
+      // does not jump at each rebuild; only the live head breathes (src/render/starDustTrailCache.ts). Same formulas
+      // as above and in the caller, at breath resolveTrailBreath(_, true).
+      const steadyBreath = resolveTrailBreath(0, true);
+      const steadyWidthScale = resolveTrailWidthScale(steadyBreath);
+      const steadyResting = resolveTrailWidths(starDust.tileSize);
+      const steadyGlowWidth = steadyResting.glowWidth * steadyWidthScale;
       drawStarDustTrailToCanvasContext(this.trailCanvasTexture.context, segments, {
         ...trailDrawOptions,
         tileSize: starDust.tileSize,
@@ -10718,7 +10734,12 @@ export class MenuScene extends Phaser.Scene {
         keylineAlpha: starDust.lifecycleAlpha,
         timeMs: starDust.timeMs,
         animated: starDust.animated,
-        originAdvancePx: starDust.originAdvancePx
+        originAdvancePx: starDust.originAdvancePx,
+        steadyCoreWidth: steadyResting.coreWidth * steadyWidthScale,
+        steadyGlowWidth,
+        steadyGlowAlphaRatio: LEGACY_PLAY_TRAIL_GLOW_ALPHA_RATIO * resolveTrailGlowAlphaScale(steadyBreath),
+        steadyGlowBlurPx: Math.max(2, steadyGlowWidth * 0.5) * resolution,
+        deviceScale: resolution
       });
     } else if (this.boardTileStyle !== 'trace') {
       // Starlit (MAZER-VIS-064) keeps the Chip trail as is. Open item A8 of the Chip amendment: several energy stops fall under 3:1 on the mid-tone chip, so
