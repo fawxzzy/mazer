@@ -124,11 +124,15 @@ describe('all 8 edge diamonds are visible on the canvas in play (MAZER-VIS-033)'
         expect(point.y).toBeLessThanOrEqual(config.height);
       }
     }
-    // After any whole number of ring steps the eight are exactly the rest layout again (the bottom corners included).
-    for (const steps of [0, 1, 4, 8]) {
+    // After a whole lap the eight are exactly the rest layout again (the bottom corners included); at any phase in between all
+    // eight stay inside the canvas. (MAZER-VIS-061: the phase is a fraction of the path length, so a single station step is no
+    // longer a rest layout on a non-square screen.)
+    for (const steps of [0, 8, -8]) {
+      expect(resolveOrbitingEdgeStations(viewport, (steps / 8) * Math.PI * 2)).toEqual(stations);
+    }
+    for (const steps of [0, 1, 2.5, 4, 5.75, 8]) {
       const orbit = resolveOrbitingEdgeStations(viewport, (steps / 8) * Math.PI * 2);
       expect(orbit).toHaveLength(8);
-      expect(orbit.map((station) => station.side).sort()).toEqual(stations.map((station) => station.side).sort());
       for (const station of orbit) {
         const rect = rectOf(station);
         expect(rect.left).toBeGreaterThanOrEqual(-1e-9);

@@ -9283,6 +9283,8 @@ export class MenuScene extends Phaser.Scene {
     spawnBurst: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
     let firingIds: ReadonlySet<number> = new Set<number>();
+    // Resolved first: the beams attach to each diamond's CURRENT orbit position (MAZER-VIS-061, resolveEdgeBeams spinRad).
+    const ring = this.resolveLegacyEdgeRing(time, spawnBurst);
     if (!this.prefersLegacyReducedMotion() && this.overlay === 'none') {
       const boardRelativeX = mazeLeft + ((playerPoint.x + 0.5) * mazeTileSize);
       const boardRelativeY = mazeTop + ((playerPoint.y + 0.5) * mazeTileSize);
@@ -9302,6 +9304,7 @@ export class MenuScene extends Phaser.Scene {
           laserProgress: outro.laserProgress,
           playerColour,
           spawnPop: 0,
+          spinRad: ring.spinRad,
           stations: this.resolveLegacyEdgeStations()
         }).firingIds;
       } else if (spawnBurst.active) {
@@ -9313,6 +9316,7 @@ export class MenuScene extends Phaser.Scene {
           laserProgress: spawnBurst.travelProgress,
           playerColour,
           spawnPop: spawnBurst.flashProgress,
+          spinRad: ring.spinRad,
           stations: this.resolveLegacyEdgeStations()
         }).firingIds;
       }
@@ -9323,7 +9327,6 @@ export class MenuScene extends Phaser.Scene {
     // no stale lit frames survive into play).
     const firing = firingIds.size > 0;
     this.edgeBeamFiringIds = firingIds;
-    const ring = this.resolveLegacyEdgeRing(time, spawnBurst);
     const ringActive = ring.lifecycle !== null;
     this.edgeRing = ring;
     if (firing || this.edgeBeamWasFiring || ringActive || this.edgeRingActive) {

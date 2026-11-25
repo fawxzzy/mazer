@@ -910,17 +910,24 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     expect(restRecorder.lineColors).toEqual(Array.from({ length: 8 }, () => border));
   });
 
-  test('orbit start is derived from the master laser clock: the instant the last beam has let go (720 ms at the shipped timings)', () => {
+  test('MAZER-VIS-061: the orbit starts together with the fills, at the first beam contact (~302 ms), derived from the beam timeline', () => {
     const times = Array.from({ length: EDGE_BEAM_COUNT }, (_, index) => resolveBeamTimes(index));
-    const lastTailArrivesMs = Math.max(...times.map((time) => time.tailArrivesMs));
-    expect(OUTRO_RING_ORBIT_START_MS).toBeCloseTo(lastTailArrivesMs, 9);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS + INTRO_BEAM_RETRACT_MS);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_LASER_MS + EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
-    // 600 ms before MAZER-VIS-038 (the beam let go when the fill ended); the retract after the last fill moves it to 720.
-    expect(OUTRO_RING_ORBIT_START_MS).toBe(720);
-    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS, FULL).ringSpinRad).toBe(0);
-    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS + 1, FULL).ringSpinRad).not.toBe(0);
+    const firstContactMs = Math.min(...times.map((time) => time.contactMs));
+    // The first fill starts when the first head touches its diamond: the ring starts at that same instant.
+    expect(OUTRO_RING_ORBIT_START_MS).toBeCloseTo(firstContactMs, 9);
+    expect(OUTRO_RING_ORBIT_START_MS).toBeCloseTo((times[0] as (typeof times)[number]).contactMs, 9);
+    // ~302 ms at the shipped timings (it was 720, the instant the last beam let go: ~420 ms after the fills began).
+    expect(OUTRO_RING_ORBIT_START_MS).toBeGreaterThan(300);
+    expect(OUTRO_RING_ORBIT_START_MS).toBeLessThan(305);
+    expect(OUTRO_RING_ORBIT_START_MS).toBeLessThan(OUTRO_LASER_MS + EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
+    // Fill and orbit begin on the same clock: the diamond with the earliest contact is still empty at the start, already filling
+    // (and the ring already moving) one ms later.
+    const fillAt = (ms: number): number => resolveBeamFillAt('outward', ms, 0);
+    expect(fillAt(OUTRO_RING_ORBIT_START_MS - 1)).toBe(0);
+    expect(fillAt(OUTRO_RING_ORBIT_START_MS + 1)).toBeGreaterThan(0);
+    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS - 1, FULL).ringSpinRad).toBe(0);
+    expect(resolveIntroDeconstruct(OUTRO_RING_ORBIT_START_MS + 1, FULL).ringSpinRad).toBeLessThan(0);
+    expect(INTRO_BEAM_PULSE_MS + INTRO_BEAM_RETRACT_MS).toBe(EDGE_BEAM_PULSE_MS + EDGE_BEAM_RETRACT_MS);
     // Total outro length does not depend on the orbit start.
     expect(resolveOutroTotalMs(TILES)).toBe(OUTRO_TILES_START_MS + resolveOutroRemoveMs(TILES) + OUTRO_HANDOFF_MS);
   });
@@ -930,7 +937,7 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     const outroEnd = resolveOutroTotalMs(TILES);
     const TAU = Math.PI * 2;
     void CYCLE;
-    // Outro: parked (exact 0) until the last beam has let go, then monotone counter-clockwise to -2 pi at the turnaround.
+    // Outro: parked (exact 0) until the first beam touches its diamond, then monotone counter-clockwise to -2 pi at the turnaround.
     for (let ms = 0; ms <= OUTRO_RING_ORBIT_START_MS; ms += 1) {
       expect(resolveIntroDeconstruct(ms, FULL).ringSpinRad, `outro t=${ms}`).toBe(0);
     }
@@ -958,9 +965,9 @@ describe('ring fill and spin over the intro / outro timelines (per frame)', () =
     const viewport = { width: 390, height: 844 };
     expect(resolveOrbitingEdgeStations(viewport, resolveIntro(0, FULL).ringSpinRad)).toEqual(resolveEdgeStations(viewport));
     expect(resolveOrbitingEdgeStations(viewport, resolveIntro(introEnd, FULL).ringSpinRad)).toEqual(resolveEdgeStations(viewport));
-    // The windows are the ~2-3.3 s reveal / deconstruct.
+    // The windows are the ~2-3.4 s reveal / deconstruct.
     expect(introEnd).toBeGreaterThanOrEqual(2000);
-    expect(outroEnd - OUTRO_RING_ORBIT_START_MS).toBeLessThanOrEqual(3300);
+    expect(outroEnd - OUTRO_RING_ORBIT_START_MS).toBeLessThanOrEqual(3400);
   });
 });
 
@@ -978,17 +985,79 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     expect(resolveOrbitingEdgeStations(viewport, -Math.PI * 2)).toEqual(resolveEdgeStations(viewport));
   });
 
-  test.each(ORBIT_VIEWPORTS)('after k whole steps diamond i is EXACTLY on rest station i+k at $width x $height', (viewport) => {
+  test.each(ORBIT_VIEWPORTS)('after k whole laps every diamond is EXACTLY on its own rest station at $width x $height', (viewport) => {
+    const rest = resolveEdgeStations(viewport);
+    for (let k = -3; k <= 3; k += 1) {
+      expect(resolveOrbitingEdgeStations(viewport, k * Math.PI * 2)).toEqual(rest);
+    }
+  });
+
+  test('on a square screen (all half sides the same length) a whole station step lands on rest station i+k', () => {
+    const viewport = { width: 600, height: 600 };
     const rest = resolveEdgeStations(viewport);
     for (let k = -9; k <= 9; k += 1) {
-      const orbit = resolveOrbitingEdgeStations(viewport, k * STEP);
-      orbit.forEach((station, index) => {
+      resolveOrbitingEdgeStations(viewport, k * STEP).forEach((station, index) => {
         const target = rest[(((index + k) % 8) + 8) % 8] as (typeof rest)[number];
         expect(station.id).toBe(index);
-        expect({ ...station, id: target.id }).toEqual(target);
+        expect(station.x, `k ${k} id ${index}`).toBeCloseTo(target.x, 6);
+        expect(station.y, `k ${k} id ${index}`).toBeCloseTo(target.y, 6);
+        let turn = station.inwardAngle - target.inwardAngle;
+        turn -= Math.round(turn / (Math.PI * 2)) * Math.PI * 2;
+        expect(Math.abs(turn), `k ${k} id ${index}`).toBeLessThan(1e-6);
       });
     }
   });
+
+  test.each([
+    ...ORBIT_VIEWPORTS,
+    { width: 393, height: 851, safeAreaBottom: 34 },
+    { width: 412, height: 915 },
+    { width: 360, height: 780 }
+  ])('MAZER-VIS-061: constant on-screen speed all the way round, corners included, at $width x $height', (viewport) => {
+    // Old mapping: each half side got the same share of the lap, so a star sped up ~2x turning onto a long side of a phone.
+    // Now equal phase steps are equal path lengths for every diamond, through every corner. Samples whose chord cuts a corner
+    // (the path turns there) are compared with their path length bound instead.
+    const rest = resolveEdgeStations(viewport);
+    const samples = 4000;
+    for (const id of [0, 1, 2, 3, 4, 5, 6, 7] as const) {
+      let previous = resolveOrbitingEdgeStation(viewport, id, 1e-7, rest);
+      const steps: number[] = [];
+      let sideChanges = 0;
+      for (let index = 1; index < samples; index += 1) {
+        const current = resolveOrbitingEdgeStation(viewport, id, ((index / samples) * Math.PI * 2) + 1e-7, rest);
+        const travelled = Math.hypot(current.x - previous.x, current.y - previous.y);
+        if (current.side === previous.side) {
+          steps.push(travelled);
+        } else {
+          sideChanges += 1;
+          steps.push(Number.NaN);
+        }
+        previous = current;
+      }
+      const straight = steps.filter((step) => Number.isFinite(step));
+      const slowest = Math.min(...straight);
+      const fastest = Math.max(...straight);
+      // Four corners per lap (a diamond that starts ON a corner crosses its fourth one at the very end of the lap).
+      expect(sideChanges, `id ${id}`).toBeGreaterThanOrEqual(3);
+      expect(sideChanges, `id ${id}`).toBeLessThanOrEqual(4);
+      expect(fastest / slowest, `id ${id}: max/min px per step`).toBeLessThan(1.01);
+      // Every corner-crossing sample is no longer than a straight one (a chord is never longer than its arc).
+      steps.forEach((step, index) => {
+        if (!Number.isFinite(step)) {
+          const current = resolveOrbitingEdgeStation(viewport, id, (((index + 1) / samples) * Math.PI * 2) + 1e-7, rest);
+          const before = resolveOrbitingEdgeStation(viewport, id, ((index / samples) * Math.PI * 2) + 1e-7, rest);
+          expect(Math.hypot(current.x - before.x, current.y - before.y)).toBeLessThanOrEqual(fastest + 1e-9);
+        }
+      });
+    }
+    // The eight move as one rigid ring: all at the same speed.
+    const speedOf = (id: 0 | 3): number => {
+      const a = resolveOrbitingEdgeStation(viewport, id, 0.0101, rest);
+      const b = resolveOrbitingEdgeStation(viewport, id, 0.0102, rest);
+      return Math.hypot(b.x - a.x, b.y - a.y);
+    };
+    expect(speedOf(3) / speedOf(0)).toBeCloseTo(1, 2);
+  }, 120_000);
 
   test('pure: same viewport and phase give the same stations, and a positive phase is clockwise', () => {
     const viewport = { width: 390, height: 844 };
@@ -1026,11 +1095,12 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
         const bottomCornerLift = resolveEdgeBottomCornerInset(viewport) - resolveEdgeStationNormalExtent(0);
         if (station.side === 'top') {
           expect(minY, label).toBeLessThanOrEqual(cornerLift + 1e-9);
-          if (Math.abs(minY) < 1e-9) flushSamples += 1;
+          // Flush (within 0.05 px: the samples land near, not exactly on, the side midpoint since MAZER-VIS-061).
+          if (Math.abs(minY) < 0.05) flushSamples += 1;
         }
         if (station.side === 'bottom') {
           expect(viewport.height - maxY, label).toBeLessThanOrEqual(bottomCornerLift + 1e-9);
-          if (Math.abs(viewport.height - maxY) < 1e-9) flushSamples += 1;
+          if (Math.abs(viewport.height - maxY) < 0.05) flushSamples += 1;
         }
       }
     }
@@ -1059,7 +1129,8 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
   }, 120_000);
 
   test('orientation: diagonal at a corner, the pure edge normal at a side midpoint, next corner diagonal (inward)', () => {
-    const viewport = { width: 390, height: 844 };
+    // A square screen, so a whole station step is a whole station (MAZER-VIS-061: on other screens the phase is path length).
+    const viewport = { width: 600, height: 600 };
     const at = (id: number, steps: number) => resolveOrbitingEdgeStation(viewport, id as 0, steps * STEP + 1e-6);
     const angle = (id: number, steps: number): number => at(id, steps).inwardAngle;
     const near = (value: number, expected: number): void => {
@@ -1072,8 +1143,10 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     near(angle(0, 3), Math.PI);
     near(angle(0, 5), -Math.PI / 2);
     near(angle(0, 7), 0);
-    // Midway between a corner and a midpoint it is 22.5 degrees off the normal.
-    near(resolveOrbitingEdgeStation(viewport, 0, STEP * 0.5).inwardAngle, (3 * Math.PI) / 8);
+    // Between a corner and a midpoint it is strictly between the corner diagonal and the edge normal.
+    const between = resolveOrbitingEdgeStation(viewport, 0, STEP * 0.5).inwardAngle;
+    expect(between).toBeGreaterThan(Math.PI / 4);
+    expect(between).toBeLessThan(Math.PI / 2);
   });
 
   test('the diamonds draw ON the orbit: drawEdgeMarkers places each kite at its state phase, rest at phase 0, nothing in reduced motion', () => {
@@ -1124,7 +1197,7 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
     });
   });
 
-  test('the orbit never overlaps the beam flight (intro: beams only after the orbit ended; outro: orbit only after the beams landed)', () => {
+  test('intro beams fire only after the orbit ended; outro: the ring is parked until the first fill, then moves while beams are attached', () => {
     for (const tileCount of [40, 300, 900]) {
       const options = { reducedMotion: false, tileCount } as const;
       for (let ms = 0; ms < 6000; ms += 1) {
@@ -1135,12 +1208,48 @@ describe('diamond orbit: the ring circulates along the viewport perimeter', () =
           expect(intro.ringSpinRad, `intro n=${tileCount} t=${ms}`).toBe(0);
         }
         const outro = resolveIntroDeconstruct(ms, options);
-        // The ring holds still while the last beam is still being absorbed (head lands at 400, tail 200 ms later).
-        if (ms <= OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS) {
+        // MAZER-VIS-061: parked while the heads fly, moving from the first contact (the beams follow the diamonds, test below).
+        if (ms <= OUTRO_RING_ORBIT_START_MS) {
           expect(outro.ringSpinRad, `outro n=${tileCount} t=${ms}`).toBe(0);
+        } else if (ms <= OUTRO_TILES_START_MS + EDGE_BEAM_PULSE_MS) {
+          expect(outro.ringSpinRad, `outro n=${tileCount} t=${ms}`).toBeLessThan(0);
         }
       }
     }
+  });
+
+  test('MAZER-VIS-061: with spinRad the beams stay attached to each diamond\'s CURRENT orbit position (rest layout in, orbit applied)', () => {
+    const viewport = { width: 412, height: 915 };
+    const rest = resolveEdgeStations(viewport);
+    const focus = { x: 206, y: 450 };
+    const FULL = { reducedMotion: false, tileCount: 300 } as const;
+    for (const clockMs of [OUTRO_RING_ORBIT_START_MS + 40, 520, 700]) {
+      const spinRad = resolveIntroDeconstruct(clockMs, FULL).ringSpinRad;
+      expect(spinRad).toBeLessThan(0);
+      const moved = resolveOrbitingEdgeStations(viewport, spinRad);
+      const withSpin = resolveEdgeBeams({ clockMs, direction: 'outward', focus, laserProgress: 1, spawnPop: 0, spinRad, stations: rest });
+      const preOrbited = resolveEdgeBeams({ clockMs, direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations: moved });
+      expect(withSpin.beams.map((beam) => beam.to)).toEqual(preOrbited.beams.map((beam) => beam.to));
+      moved.forEach((station, index) => {
+        const scale = Math.min(resolveEdgeStarScale(resolveBeamFillAt('outward', clockMs, index)), station.maxScale ?? 1);
+        expect(withSpin.beams[index]?.to).toEqual(resolveEdgeInnerTip(station, scale));
+      });
+      // ...and it is not the rest position any more.
+      const parked = resolveEdgeBeams({ clockMs, direction: 'outward', focus, laserProgress: 1, spawnPop: 0, stations: rest });
+      expect(withSpin.beams.map((beam) => beam.to)).not.toEqual(parked.beams.map((beam) => beam.to));
+    }
+    // spinRad 0 / absent: the stations are used as given.
+    const zero = resolveEdgeBeams({ clockMs: 200, direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, spinRad: 0, stations: rest });
+    const absent = resolveEdgeBeams({ clockMs: 200, direction: 'outward', focus, laserProgress: 0.5, spawnPop: 0, stations: rest });
+    expect(zero.beams).toEqual(absent.beams);
+  });
+
+  test('MAZER-VIS-061: the scene hands the ring phase to the beams (no other orbit maths in the hot file)', () => {
+    const scene = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const lasers = scene.slice(scene.indexOf('private drawLegacyEdgeLasers('), scene.indexOf('private resolveLegacyEdgeRing('));
+    expect(lasers.indexOf('const ring = this.resolveLegacyEdgeRing(time, spawnBurst);')).toBeGreaterThan(-1);
+    expect(lasers.indexOf('const ring = this.resolveLegacyEdgeRing(time, spawnBurst);')).toBeLessThan(lasers.indexOf('drawEdgeBeams('));
+    expect(lasers.match(/spinRad: ring\.spinRad,/g)).toHaveLength(2);
   });
 });
 

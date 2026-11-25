@@ -41,8 +41,9 @@
  * Deconstruct (resolveIntroDeconstruct) is the mirror: the player fires a beam out to
  * ALL 8 diamonds (heads 0-400; each diamond grows from 50% to 100% of its size by the instant its
  * beam touches its inner tip, then FILLS while the beam stays attached and is full 200 ms later; the beam
- * then retracts over 120 ms; the ring stays parked while the beams fly and are attached, then circulates one full lap COUNTER-clockwise along the
- * perimeter from 720 to the end: it unwinds what the build wound), the edge paths vanish atomically
+ * then retracts over 120 ms; the ring starts to circulate one full lap COUNTER-clockwise along the perimeter at the first beam
+ * contact (~302 ms, together with the fills; the beams follow the moving diamonds) and runs to the end: it unwinds what the
+ * build wound), the edge paths vanish atomically
  * at 400, the tiles dissolve LINEARLY from 400 over removeMs(N) = clamp(N / 70
  * tiles/s, 1800, 3000) ms, then a 300 ms handoff beat. The lighting fades over the
  * last 150 ms.
@@ -191,14 +192,16 @@ export const OUTRO_LASER_MS = MOTION_DURATION_MS.long;
 export const OUTRO_EDGE_PATHS_OFF_MS = OUTRO_LASER_MS;
 export const OUTRO_TILES_START_MS = OUTRO_EDGE_PATHS_OFF_MS;
 /**
- * The ring starts to circulate once the last beam has fully let go, derived from the master laser clock: the last head
- * lands at OUTRO_LASER_MS (the laser length), the beam stays connected for one INTRO_BEAM_PULSE_MS more (the last diamond
- * fills to 100%), then retracts over INTRO_BEAM_RETRACT_MS, so the diamonds hold still (a beam is attached to each inner
- * tip) until the beams are gone. 720 ms at the shipped timings (was 600 before MAZER-VIS-038, when the beam let go at the
- * end of the fill); it follows the laser length, the pulse and the retract if any changes. The orbit still ends with the
- * outro, so no total duration moves.
+ * MAZER-VIS-061: the ring starts to circulate together with the fills, at the instant the FIRST beam head touches its
+ * diamond (beam 0, the one with no stagger offset): edgeBeamTimeline.ts' `resolveBeamTimes(0).contactMs`, i.e.
+ * INTRO_LASER_MS * inverseSmoothstep(1 - INTRO_BEAM_STAGGER_MS / INTRO_LASER_MS), ~302 ms at the shipped timings. (It used
+ * to wait for the last beam to let go, 720 ms: the fills started ~420 ms before any star moved.) The beams follow each
+ * diamond's CURRENT position (resolveEdgeBeams `spinRad`), so a beam stays attached to its inner tip while the ring moves.
+ * The closed form is inlined (edgeBeamTimeline.ts imports this module); tests/render/edgeMarkers pins it equal to the
+ * beam timeline. The orbit still ends with the outro, so no total duration moves.
  */
-export const OUTRO_RING_ORBIT_START_MS = OUTRO_LASER_MS + INTRO_BEAM_PULSE_MS + INTRO_BEAM_RETRACT_MS;
+export const OUTRO_RING_ORBIT_START_MS = INTRO_LASER_MS
+  * (0.5 - Math.sin(Math.asin(1 - (2 * (1 - (INTRO_BEAM_STAGGER_MS / INTRO_LASER_MS)))) / 3));
 export const OUTRO_REMOVE_MIN_MS = 1800;
 export const OUTRO_REMOVE_MAX_MS = 3000;
 export const OUTRO_DIGIT_IN_MS = MOTION_DURATION_MS.slow;
