@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_a154326def4c",
+  "export_id": "pbe_mazer_owner_registry_440b12549ce7",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:a154326def4cd97a71630edfd95897ced0740382f9b30a92f89f106cbd58f5d8",
-  "generated_at": "2026-11-24T18:08:36.000Z",
+  "source_revision": "sha256:440b12549ce776cab9cadbfb42134e21593ddea782de00c56ce341a51ac9cad9",
+  "generated_at": "2026-11-25T04:33:41.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:4433d623ae207c9788a8777414c978ec9c5718275557d555bfbffe3c4189bda3",
-      "observed_at": "2026-11-24T18:08:36.000Z"
+      "revision": "sha256:d2c15d89bdad433de68964563a52d190a9706ed3e26cc316884765b14b8430d9",
+      "observed_at": "2026-11-25T04:33:41.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-24T18:08:36.000Z"
+      "observed_at": "2026-11-25T04:33:41.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-24T18:08:36.000Z"
+      "observed_at": "2026-11-25T04:33:41.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-24T18:08:36.000Z"
+      "observed_at": "2026-11-25T04:33:41.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-24T18:08:36.000Z"
+      "observed_at": "2026-11-25T04:33:41.000Z"
     }
   ],
   "cards": [
@@ -5060,24 +5060,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-flow-019_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-FLOW-019",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Show the build stamp in Settings",
-        "description": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running.",
+        "description": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running. Board update 2026-11-25: Settings ends with a muted Build line showing the bundle id (PR 702), live in build main-CB24t84j; the sha part shows no sha on CLI deploys PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-16T14:26:23.000Z",
+        "updated_at": "2026-11-25T04:33:41.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-019",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5085,11 +5085,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-FLOW-019",
         "source_status": "current",
-        "source_updated_at": "2026-11-16T14:26:23.000Z"
+        "source_updated_at": "2026-11-25T04:33:41.000Z"
       },
       "content": {
-        "summary": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running.",
-        "objective": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running.",
+        "summary": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running. Board update 2026-11-25: Settings ends with a muted Build line showing the bundle id (PR 702), live in build main-CB24t84j; the sha part shows no sha on CLI deploys PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Add the deployed build id and main sha to Settings so a phone check can confirm which build is running. Board update 2026-11-25: Settings ends with a muted Build line showing the bundle id (PR 702), live in build main-CB24t84j; the sha part shows no sha on CLI deploys PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Settings shows build id and short sha",
           "Value comes from the build, not a network call",
@@ -5840,26 +5840,26 @@
     {
       "idempotency_key": "pbk_mazer_mazer-gen-033_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-GEN-033",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Widen gate placement below level 100",
-        "description": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability.",
+        "description": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability. Board update 2026-11-25: Gate levels below 100 now carry their gate: share 0.53 to 0.94-0.99, levels 100 and up unchanged (PR 707), live in build main-CB24t84j; headless only PR #707 merged (b0f7ae48). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "feature",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [
           "MAZER-GEN-031"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-24T06:07:44.000Z",
+        "updated_at": "2026-11-25T04:33:21.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-033",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -5867,11 +5867,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-GEN-033",
         "source_status": "current",
-        "source_updated_at": "2026-11-24T06:07:44.000Z"
+        "source_updated_at": "2026-11-25T04:33:21.000Z"
       },
       "content": {
-        "summary": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability.",
-        "objective": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability.",
+        "summary": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability. Board update 2026-11-25: Gate levels below 100 now carry their gate: share 0.53 to 0.94-0.99, levels 100 and up unchanged (PR 707), live in build main-CB24t84j; headless only PR #707 merged (b0f7ae48). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Gate levels below 100 land a gate about 60 percent of the time. Widen the placement search so a gate level reliably carries a gate, keeping cadence and solvability. Board update 2026-11-25: Gate levels below 100 now carry their gate: share 0.53 to 0.94-0.99, levels 100 and up unchanged (PR 707), live in build main-CB24t84j; headless only PR #707 merged (b0f7ae48). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Gate levels below 100 carry a gate at a measured higher share",
           "Cadence and solvability are unchanged",
@@ -8911,7 +8911,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
-        "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+        "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "high",
@@ -8920,7 +8920,7 @@
           "MAZER-PERF-016"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-24T18:08:36.000Z",
+        "updated_at": "2026-11-25T04:33:16.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
         "extensions": {
           "owner_status": "review",
@@ -8931,11 +8931,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
         "source_status": "current",
-        "source_updated_at": "2026-11-24T18:08:36.000Z"
+        "source_updated_at": "2026-11-25T04:33:16.000Z"
       },
       "content": {
-        "summary": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
-        "objective": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look.",
+        "summary": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Per-phase frame cost table measured at level 300 with a long trail under phone emulation",
           "Top cost fixed with a zero-difference pixel check at several device scales",
@@ -13545,24 +13545,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-ui-093_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-UI-093",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Check whether the Arrows setting does anything",
-        "description": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
+        "description": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide. Board update 2026-11-25: The Arrows setting does nothing: its row was removed in August and touch always uses the floating stick; pinned by a test (PR 702), live in build main-CB24t84j; headless only PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "technical-debt",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T17:23:23.000Z",
+        "updated_at": "2026-11-25T04:33:38.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-093",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -13570,11 +13570,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-093",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T17:23:23.000Z"
+        "source_updated_at": "2026-11-25T04:33:38.000Z"
       },
       "content": {
-        "summary": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
-        "objective": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide.",
+        "summary": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide. Board update 2026-11-25: The Arrows setting does nothing: its row was removed in August and touch always uses the floating stick; pinned by a test (PR 702), live in build main-CB24t84j; headless only PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The Arrows setting looks unused. Either wire it to something or remove it from Settings and the Guide. Board update 2026-11-25: The Arrows setting does nothing: its row was removed in August and touch always uses the floating stick; pinned by a test (PR 702), live in build main-CB24t84j; headless only PR #702 merged (e2cf7b88). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "The setting either changes behaviour or is removed",
           "The Settings sheet and Guide match",
@@ -16937,24 +16937,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-061_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-061",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Smooth the edge star orbit speed at screen corners",
-        "description": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
+        "description": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin. Board update 2026-11-25: Edge star orbit runs at one even speed from the first fill (PR 708), live in build main-CB24t84j; headless only, motion not watched on a phone PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T17:23:23.000Z",
+        "updated_at": "2026-11-25T04:33:25.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-061",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -16962,11 +16962,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-061",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T17:23:23.000Z"
+        "source_updated_at": "2026-11-25T04:33:25.000Z"
       },
       "content": {
-        "summary": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
-        "objective": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin.",
+        "summary": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin. Board update 2026-11-25: Edge star orbit runs at one even speed from the first fill (PR 708), live in build main-CB24t84j; headless only, motion not watched on a phone PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The orbit speed steps up about 2x at the screen corners, and the orbit starts about 720 ms after the fills begin. Board update 2026-11-25: Edge star orbit runs at one even speed from the first fill (PR 708), live in build main-CB24t84j; headless only, motion not watched on a phone PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Orbit speed is constant around the screen including the corners",
           "The orbit starts together with the fills",
@@ -16988,24 +16988,24 @@
     {
       "idempotency_key": "pbk_mazer_mazer-vis-062_v1",
       "record_kind": "project-work",
-      "record_status": "candidate",
+      "record_status": "active",
       "record": {
         "contract_version": "atlas.card-record.v2",
         "card_id": "MAZER-VIS-062",
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Make the player locator ring and glow follow the player colour",
-        "description": "The locator ring and glow around the player are still green when the player colour changes.",
+        "description": "The locator ring and glow around the player are still green when the player colour changes. Board update 2026-11-25: Player locator ring and glow use the shared player colour (PR 708), live in build main-CB24t84j; only the unused Chip marker changed, headless only PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "card_type": "bug",
-        "lifecycle": "planning",
+        "lifecycle": "review",
         "priority": "low",
         "owner": "mazer",
         "dependencies": [],
         "board_version": 1,
-        "updated_at": "2026-11-19T17:23:23.000Z",
+        "updated_at": "2026-11-25T04:33:33.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-062",
         "extensions": {
-          "owner_status": "planning",
+          "owner_status": "review",
           "public_safe": true
         }
       },
@@ -17013,11 +17013,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-VIS-062",
         "source_status": "current",
-        "source_updated_at": "2026-11-19T17:23:23.000Z"
+        "source_updated_at": "2026-11-25T04:33:33.000Z"
       },
       "content": {
-        "summary": "The locator ring and glow around the player are still green when the player colour changes.",
-        "objective": "The locator ring and glow around the player are still green when the player colour changes.",
+        "summary": "The locator ring and glow around the player are still green when the player colour changes. Board update 2026-11-25: Player locator ring and glow use the shared player colour (PR 708), live in build main-CB24t84j; only the unused Chip marker changed, headless only PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "objective": "The locator ring and glow around the player are still green when the player colour changes. Board update 2026-11-25: Player locator ring and glow use the shared player colour (PR 708), live in build main-CB24t84j; only the unused Chip marker changed, headless only PR #708 merged (900b3190). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Ring and glow follow the shared player colour",
           "Rainbow mode shifts them with the laser and star fill",

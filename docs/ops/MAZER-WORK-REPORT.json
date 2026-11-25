@@ -3,11 +3,11 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-24T18:08:36.000Z",
+    "registryUpdatedAt": "2026-11-25T04:33:41.000Z",
     "boardSync": {
-      "at": "2026-11-24T18:08:36.000Z",
-      "appliedEventCount": 546,
-      "lastEventId": "8244c89737f8"
+      "at": "2026-11-25T04:33:41.000Z",
+      "appliedEventCount": 552,
+      "lastEventId": "504cdc2ff2ed"
     }
   },
   "counters": {
@@ -17,11 +17,11 @@
     "deferred": 24,
     "buckets": {
       "needs-you": 32,
-      "in-review": 61,
+      "in-review": 66,
       "blocked": 8,
       "ready": 1,
       "in-progress": 1,
-      "unclassified": 13,
+      "unclassified": 8,
       "deferred": 24,
       "completed": 193
     },
@@ -2956,7 +2956,7 @@
       "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
       "status": "review",
       "priority": "high",
-      "prs": "#700",
+      "prs": "#700, #706, #705, #704",
       "note": ""
     },
     {
@@ -3320,11 +3320,27 @@
       "note": "PR #487 open for review, not merged, not deployed."
     },
     {
+      "id": "MAZER-FLOW-019",
+      "title": "Show the build stamp in Settings",
+      "status": "review",
+      "priority": "low",
+      "prs": "#702",
+      "note": ""
+    },
+    {
       "id": "MAZER-GEN-020",
       "title": "Revisit diagonal maze paths now that movement is automatic",
       "status": "review",
       "priority": "low",
       "prs": "#618",
+      "note": ""
+    },
+    {
+      "id": "MAZER-GEN-033",
+      "title": "Widen gate placement below level 100",
+      "status": "review",
+      "priority": "low",
+      "prs": "#707",
       "note": ""
     },
     {
@@ -3368,11 +3384,35 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-093",
+      "title": "Check whether the Arrows setting does anything",
+      "status": "review",
+      "priority": "low",
+      "prs": "#702",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-057",
       "title": "Bottom corner stars in landscape and iPads",
       "status": "review",
       "priority": "low",
       "prs": "#689",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-061",
+      "title": "Smooth the edge star orbit speed at screen corners",
+      "status": "review",
+      "priority": "low",
+      "prs": "#708",
+      "note": ""
+    },
+    {
+      "id": "MAZER-VIS-062",
+      "title": "Make the player locator ring and glow follow the player colour",
+      "status": "review",
+      "priority": "low",
+      "prs": "#708",
       "note": ""
     }
   ],
@@ -3698,22 +3738,8 @@
       "lane": null
     },
     {
-      "id": "MAZER-FLOW-019",
-      "title": "Show the build stamp in Settings",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
       "id": "MAZER-GEN-032",
       "title": "Make plateau gates meaningful from level 283",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-GEN-033",
-      "title": "Widen gate placement below level 100",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -3742,27 +3768,6 @@
     {
       "id": "MAZER-UI-036",
       "title": "Move remaining legacy font stacks to the shared type scale",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-UI-093",
-      "title": "Check whether the Arrows setting does anything",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-061",
-      "title": "Smooth the edge star orbit speed at screen corners",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-VIS-062",
-      "title": "Make the player locator ring and glow follow the player colour",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4890,7 +4895,7 @@
       "sub": null
     },
     "MAZER-FLOW-019": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-057": {
@@ -4986,15 +4991,15 @@
       "sub": null
     },
     "MAZER-VIS-061": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-062": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-UI-093": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-VIS-063": {
@@ -5086,7 +5091,7 @@
       "sub": null
     },
     "MAZER-GEN-033": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-MODE-002": {
