@@ -76,7 +76,7 @@ describe('MAZER-GEN-031: the gate wrap floor', () => {
 
 // MAZER-GEN-033: gate levels below level 100 used to take the first base that landed in its window, gate or not, so
 // only about half of them carried a gate. They now search like the levels past the fade (wrapped bases for 20 of the 24
-// tries, a gateless landing ranked below a gated one). Measured on origin/main e928e24e, before -> after (phone |
+// tries, a gateless landing ranked below a gated one). Measured on origin/main 95af9468, before -> after (phone |
 // desktop, 4 seeds per gate level, every level 20-99, scripts/analysis/gate-survival-report.ts):
 //   gated 0.53 | 0.54 -> 0.94 | 0.99   saving mean 12.5 | 15.6 -> 12.2 | 14.0   short dead ends mean 0.63 | 0.64 -> 0.73 | 0.68,
 //   max 5 | 5 both before and after, wraps kept 1.00. Cadence, levels 100 and up and every non-gate level are unchanged.
