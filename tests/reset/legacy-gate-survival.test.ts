@@ -19,6 +19,7 @@ import {
   GEOMETRY_BUDGET_WRAP_FADE_FROM_LEVEL,
   GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL,
   LAST_BUDGET_LEVEL,
+  resolveGeometryBudgetGateSearch,
   resolveGeometryBudgetGateWrapFloor,
   resolveGeometryBudgetTarget
 } from '../../src/legacy-runtime/legacyGeometryBudget';
@@ -55,6 +56,79 @@ describe('MAZER-GEN-031: the gate wrap floor', () => {
     expect(resolveGeometryBudgetGateWrapFloor(TO + 50, false)).toBe(0);
     expect(resolveGeometryBudgetGateWrapFloor(FROM, false)).toBe(0);
   });
+
+  test('MAZER-GEN-033: a gate level searches for a gated base below the fade start whenever it has a wrap; nothing else changes', () => {
+    // Below the fade start: the search follows the maze's wraps (no wrap, nothing to guard).
+    expect(resolveGeometryBudgetGateSearch(20, true, 1)).toBe(true);
+    expect(resolveGeometryBudgetGateSearch(FROM - 1, true, 2)).toBe(true);
+    expect(resolveGeometryBudgetGateSearch(FROM - 1, true, 0)).toBe(false);
+    expect(resolveGeometryBudgetGateSearch(FROM - 1, false, 2)).toBe(false);
+    // From the fade start it is exactly the GEN-031 wrap floor, whatever the roll.
+    for (const level of [FROM, TO, TO + 50, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL - 1, GEOMETRY_BUDGET_FELT_SATURATION_LEVEL, LAST_BUDGET_LEVEL, 1_000]) {
+      for (const rungs of [0, 1, 2]) {
+        for (const gate of [true, false]) {
+          expect(resolveGeometryBudgetGateSearch(level, gate, rungs), `${level} ${rungs} ${gate}`).toBe(resolveGeometryBudgetGateWrapFloor(level, gate) > 0);
+        }
+      }
+    }
+  });
+});
+
+// MAZER-GEN-033: gate levels below level 100 used to take the first base that landed in its window, gate or not, so
+// only about half of them carried a gate. They now search like the levels past the fade (wrapped bases for 20 of the 24
+// tries, a gateless landing ranked below a gated one). Measured on origin/main e928e24e, before -> after (phone |
+// desktop, 4 seeds per gate level, every level 20-99, scripts/analysis/gate-survival-report.ts):
+//   gated 0.53 | 0.54 -> 0.94 | 0.99   saving mean 12.5 | 15.6 -> 12.2 | 14.0   short dead ends mean 0.63 | 0.64 -> 0.73 | 0.68,
+//   max 5 | 5 both before and after, wraps kept 1.00. Cadence, levels 100 and up and every non-gate level are unchanged.
+describe('MAZER-GEN-033: gate levels below level 100 carry their gate (both frozen boards)', () => {
+  // [from, to, step, minGatedShare, minMeanSaving, maxMeanShortDeadEnds]; every floor sits below the measured value
+  // and above the measured share before (0.42 to 0.59).
+  const BANDS: ReadonlyArray<readonly [number, number, number, number, number, number]> = [
+    [20, 59, 1, 0.75, 5, 1.5],
+    [60, 99, 1, 0.8, 5, 1.5]
+  ];
+  test.each(BANDS)('levels %i-%i: gate levels carry gates, keep their wrap and stay clean of short dead ends', (from, to, step, minShare, minSaving, maxShort) => {
+    for (const board of LADDER_BOARDS) {
+      const result = sweepGateSurvival(range(from, to, step), 2, board);
+      const label = `${board.name} ${from}-${to} ${JSON.stringify(result)}`;
+      expect(result.gateLevels, label).toBeGreaterThan(10);
+      expect(result.gatedShare, label).toBeGreaterThanOrEqual(minShare);
+      expect(result.meanGatedSaving, label).toBeGreaterThanOrEqual(minSaving);
+      expect(result.minGatedSaving, label).toBeGreaterThanOrEqual(1);
+      expect(result.wrapShare, label).toBeGreaterThanOrEqual(0.99);
+      expect(result.meanShortDeadEnds, label).toBeLessThanOrEqual(maxShort);
+      expect(result.shortShare, label).toBeLessThan(0.1);
+    }
+  }, 300_000);
+
+  test('a gated maze below level 100 is deterministic, solvable, lands its felt window and its gate lands again with its saving', () => {
+    let gated = 0;
+    for (const board of LADDER_BOARDS) {
+      for (const level of [22, 34, 57, 73, 85, 98]) {
+        expect(isBleedGateLevel(level)).toBe(true);
+        for (let index = 0; index < 2; index += 1) {
+          const seed = seedForIndex(index);
+          const first = generateLadderMaze(level, board, seed) as LegacyMazeSnapshot;
+          const again = generateLadderMaze(level, board, seed) as LegacyMazeSnapshot;
+          const label = `${board.name} ${level} ${index}`;
+          expect(hashLadderMaze(again), label).toBe(hashLadderMaze(first));
+          expect(first.solutionPath[0], label).toEqual(first.start);
+          expect(first.solutionPath[first.solutionPath.length - 1], label).toEqual(first.goal);
+          const target = resolveGeometryBudgetTarget(level)!;
+          const priced = measurePricedFeltSteps(first);
+          expect(priced, label).toBeGreaterThanOrEqual(target);
+          expect(priced, label).toBeLessThanOrEqual(target + 1);
+          const gate = first.bleedGates?.[0];
+          if (!gate) { continue; }
+          gated += 1;
+          expect(placeLegacyBleedGateWithHint(first, gate)?.gate, label).toEqual(gate);
+          expect(gate.gatedSaving, label).toBeGreaterThan(0);
+          expect(gate.ungatedSaving, label).toBeGreaterThanOrEqual(gate.gatedSaving);
+        }
+      }
+    }
+    expect(gated).toBeGreaterThanOrEqual(20);
+  }, 120_000);
 });
 
 describe('MAZER-GEN-031: gates survive past level 140 (both frozen boards)', () => {
