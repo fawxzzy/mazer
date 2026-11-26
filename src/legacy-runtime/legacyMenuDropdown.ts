@@ -15,6 +15,7 @@
  * position the panel hands to text and icon images is an integer). Rendering lives in src/render/menuDropdownArt.ts and
  * src/render/menuDropdownButtons.ts.
  */
+import { designTokens } from '../theme/tokens';
 import { LEGACY_MIN_HIT_TARGET_PX } from './legacyHitTarget';
 import { LEGACY_MENU_ROW_PANEL_WIDTH_PX, buildLegacyMenuRows, type LegacyMainMenuRowId } from './legacyMenuRows';
 
@@ -57,7 +58,8 @@ export const LEGACY_MENU_DROPDOWN_STATE_RIGHT_INSET_PX = 14;
 /** Label/icon alpha of a disabled row. */
 export const LEGACY_MENU_DROPDOWN_DISABLED_ALPHA = 0.4;
 export const LEGACY_MENU_DROPDOWN_OPEN_MS = 180;
-export const LEGACY_MENU_DROPDOWN_CLOSE_MS = 140;
+/** Close = the registered press motion token (140 ms); open (180 ms) has no token and stays a literal. */
+export const LEGACY_MENU_DROPDOWN_CLOSE_MS = designTokens.motionMs.press;
 /** The panel slides down this far while it opens. */
 export const LEGACY_MENU_DROPDOWN_SLIDE_PX = 10;
 
