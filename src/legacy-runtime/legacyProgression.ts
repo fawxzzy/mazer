@@ -9,6 +9,7 @@ import { clampInteger } from './legacyDefaults';
 import { LAST_BUDGET_LEVEL, resolveGeometryBudgetProfile } from './legacyGeometryBudget';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import { resolveLegacyMenuBoardAspectRatio, resolveLegacyMenuLayout } from './legacyMenuLayout';
+import { designTokens, legacyPhaserAliases } from '../theme/tokens';
 import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
 import {
   type MazeCycleTelemetryReceipt,
@@ -240,58 +241,64 @@ export interface LegacyProgressionGenerationReview {
   tolerance: number;
 }
 
+// MAZER-UI-013: the green player/trail values come from the registered legacy player tokens (same values as the old
+// literals: #36ff7d core, #00b84a halo), not hard-coded copies.
+const LEGACY_PROGRESS_PLAYER_CORE_COLOR = legacyPhaserAliases['player.core'];
+const LEGACY_PROGRESS_PLAYER_HALO_COLOR = legacyPhaserAliases['player.halo'];
+const LEGACY_PROGRESS_PLAYER_CORE_HEX = designTokens.legacy.color['player.core'].toLowerCase();
+
 const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' | 'tier'>> = [
   {
-    badgeColor: '#36ff7d',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
-    rankColor: 0x36ff7d,
-    trailColor: 0x36ff7d,
+    badgeColor: LEGACY_PROGRESS_PLAYER_CORE_HEX,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
+    rankColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#59fff0',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
     rankColor: 0x59fff0,
-    trailColor: 0x36ff7d,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#7da8ff',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
     rankColor: 0x7da8ff,
-    trailColor: 0x36ff7d,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#fff05a',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
     rankColor: 0xfff05a,
-    trailColor: 0x36ff7d,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#ff61c7',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
     rankColor: 0xff61c7,
-    trailColor: 0x36ff7d,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#ffd36a',
-    playerCoreColor: 0x36ff7d,
-    playerHaloColor: 0x00b84a,
+    playerCoreColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
+    playerHaloColor: LEGACY_PROGRESS_PLAYER_HALO_COLOR,
     rankColor: 0xffd36a,
-    trailColor: 0x36ff7d,
+    trailColor: LEGACY_PROGRESS_PLAYER_CORE_COLOR,
     trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
     trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   }
@@ -299,8 +306,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
 
 const LEGACY_PROGRESS_PATH_CORE_CONTRAST_COLOR = 0xe7fff4;
 const LEGACY_PROGRESS_MIN_PATH_COLOR_DISTANCE = 145;
-const LEGACY_PROGRESS_FALLBACK_PLAYER_COLOR = 0x36ff7d;
-const LEGACY_PROGRESS_FALLBACK_TRAIL_COLOR = 0x36ff7d;
+const LEGACY_PROGRESS_FALLBACK_PLAYER_COLOR = LEGACY_PROGRESS_PLAYER_CORE_COLOR;
+const LEGACY_PROGRESS_FALLBACK_TRAIL_COLOR = LEGACY_PROGRESS_PLAYER_CORE_COLOR;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_PULSE_COLOR = LEGACY_TRAIL_SHINE_COLOR;
 const LEGACY_PROGRESSION_ORDINAL_PATTERN = /^(0|[1-9]\d*)$/;
 

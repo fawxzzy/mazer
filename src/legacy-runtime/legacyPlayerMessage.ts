@@ -1,4 +1,5 @@
 import { AUTH_SURFACE_MESSAGES } from '../brand/authSurfaceCopy';
+import { designTokens } from '../theme/tokens';
 
 export type LegacyPlayerMessageTone = 'error' | 'info' | 'success' | 'warning';
 
@@ -47,10 +48,11 @@ export const LEGACY_PLAYER_MESSAGE_MAX_VISIBLE = 3;
 export const LEGACY_AUTH_FAILURE_MESSAGE_MIN_DURATION_MS = 8000;
 
 export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, string> = {
-  error: '#ff7d7d',
-  info: '#b7f2ff',
-  success: '#72e0bf',
-  warning: '#ffcf91'
+  // The registered tone tokens (#ff7d7d / #b7f2ff / #72e0bf / #ffcf91), lower-cased to keep the exact strings shipped.
+  error: designTokens.color['tone.error'].toLowerCase(),
+  info: designTokens.color['tone.info'].toLowerCase(),
+  success: designTokens.color['tone.success'].toLowerCase(),
+  warning: designTokens.color['tone.warning'].toLowerCase()
 };
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
