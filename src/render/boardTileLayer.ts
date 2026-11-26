@@ -40,6 +40,13 @@ import {
 import { resolveRevealMaskLength } from './boardRevealMask';
 import type { BleedGateBracketPlan } from './bleedGateTileLook';
 import { toWholeImagePosition } from './pixelAlignment';
+import {
+  installBoardLayerFrameCache,
+  resolveBoardLayerCacheEnabled,
+  type BoardLayerCacheHandle,
+  type BoardLayerCacheImageLike
+} from './boardLayerFrameCache';
+import { patchCanvasContextResolution, readCanvasContextResolution } from '../boot/canvasResolution';
 import { PALETTE_MASK_BLACK_CSS } from './trailPalette';
 import { resolveStartDirection, type StartDirection } from './startDirection';
 import {
@@ -504,6 +511,10 @@ export class BoardTileLayer {
   private gateBrackets: ReadonlyMap<string, BleedGateBracketPlan> = new Map();
   private textureWidth = 0;
   private textureHeight = 0;
+  /** Bumped whenever the texture's pixels change; the frame cache refills its layer when it moves. */
+  private textureVersion = 0;
+  /** PERF-017 follow-up: the resampled board is drawn once and then copied 1:1 while nothing changes. */
+  readonly frameCache: BoardLayerCacheHandle | null;
   private softCellExtent = new Uint8ClampedArray(0);
   /** Cumulative diagnostics (read by tests and the runtime diagnostics hook). */
   bakeCount = 0;
@@ -514,6 +525,13 @@ export class BoardTileLayer {
   constructor(scene: Phaser.Scene, textureKey: string) {
     this.texture = scene.textures.createCanvas(textureKey, 1, 1) as Phaser.Textures.CanvasTexture;
     this.image = scene.add.image(0, 0, textureKey).setOrigin(0, 0).setVisible(false);
+    this.frameCache = typeof window !== 'undefined' && resolveBoardLayerCacheEnabled(window.location.search)
+      ? installBoardLayerFrameCache(this.image as unknown as BoardLayerCacheImageLike, {
+        readVersion: () => this.textureVersion,
+        readResolution: readCanvasContextResolution,
+        patchResolution: (context, resolution) => patchCanvasContextResolution(context as CanvasRenderingContext2D, resolution)
+      })
+      : null;
   }
 
   get currentHash(): string | null {
@@ -615,6 +633,7 @@ export class BoardTileLayer {
         });
       }
       this.texture.refresh();
+      this.textureVersion += 1;
       this.composedKey = composeKey;
       recomposed = true;
       composeMs = performance.now() - t1;
