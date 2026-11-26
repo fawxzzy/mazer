@@ -20,6 +20,16 @@
  * (the build/teardown reveal, zoom, resize, theme rebake, a scene restart) simply draws through Phaser as before and the
  * layer is refilled once the picture holds still again. Normal blend only, no mask, no crop, no per-frame allocation.
  *
+ * Lost pixels: the key cannot see the browser discarding the layer's backing store (a canvas `contextlost` on Chrome, iOS
+ * memory pressure or backgrounding), so the layer is also dropped on the layer canvas `contextlost` / `contextrestored`
+ * and when the document becomes visible again; the next still frames refill it with one Phaser draw. Listeners are added
+ * when the layer canvas is created and removed in release().
+ *
+ * Key assumption: the board image sits at origin (0, 0) with no flip (boardTileLayer.ts: setOrigin(0, 0), never flipped).
+ * The key reads originX/originY/flipX/flipY, so a future setOrigin / setFlip already changes it; but the fill itself relies
+ * on the layer being drawn at device (0, 0) 1:1, which only holds for that placement. A change to the origin or flip
+ * policy must revisit this module (the "origin 0,0, no flip" test pins it).
+ *
  * Kill switch: `?boardLayerCache=0` leaves the board image on Phaser's own draw.
  */
 
@@ -52,6 +62,15 @@ interface CacheCanvasLike {
   width: number;
   height: number;
   getContext: (type: '2d') => CacheContextLike | null;
+  addEventListener?: (type: string, listener: () => void) => void;
+  removeEventListener?: (type: string, listener: () => void) => void;
+}
+
+/** The slice of `document` used to notice the page coming back to the foreground. */
+export interface BoardLayerCacheVisibilityTargetLike {
+  visibilityState?: string;
+  addEventListener: (type: 'visibilitychange', listener: () => void) => void;
+  removeEventListener: (type: 'visibilitychange', listener: () => void) => void;
 }
 
 interface CacheContextLike {
@@ -62,6 +81,7 @@ interface CacheContextLike {
   drawImage(image: unknown, dx: number, dy: number): void;
   globalAlpha: number;
   globalCompositeOperation: string;
+  isContextLost?: () => boolean;
 }
 
 interface CanvasRendererLike {
@@ -107,6 +127,8 @@ export interface BoardLayerCacheOptions {
   patchResolution: (context: unknown, resolution: number) => void;
   /** Offscreen canvas factory (default: a DOM canvas). */
   createCanvas?: () => CacheCanvasLike;
+  /** Where `visibilitychange` is heard (default: `document` when there is one). */
+  visibilityTarget?: BoardLayerCacheVisibilityTargetLike | null;
   stableFrames?: number;
 }
 
@@ -147,6 +169,38 @@ export const installBoardLayerFrameCache = (
     haveKey = false;
     stable = 0;
     layerValid = false;
+  };
+
+  // The browser may have dropped the layer's pixels without telling the key: forget the layer and its context state.
+  const onLayerPixelsLost = (): void => {
+    layerResolution = Number.NaN; // a lost/restored context starts from default state: re-patch before the next fill
+    invalidate();
+  };
+  const onVisibilityChange = (): void => {
+    if (visibilityTarget?.visibilityState === 'visible') onLayerPixelsLost();
+  };
+  const visibilityTarget: BoardLayerCacheVisibilityTargetLike | null = options.visibilityTarget !== undefined
+    ? options.visibilityTarget
+    : (typeof document !== 'undefined' ? document as unknown as BoardLayerCacheVisibilityTargetLike : null);
+  let listeningCanvas: CacheCanvasLike | null = null;
+  let listeningVisibility = false;
+  const listen = (canvas: CacheCanvasLike): void => {
+    canvas.addEventListener?.('contextlost', onLayerPixelsLost);
+    canvas.addEventListener?.('contextrestored', onLayerPixelsLost);
+    listeningCanvas = canvas;
+    if (visibilityTarget && !listeningVisibility) {
+      visibilityTarget.addEventListener('visibilitychange', onVisibilityChange);
+      listeningVisibility = true;
+    }
+  };
+  const unlisten = (): void => {
+    listeningCanvas?.removeEventListener?.('contextlost', onLayerPixelsLost);
+    listeningCanvas?.removeEventListener?.('contextrestored', onLayerPixelsLost);
+    listeningCanvas = null;
+    if (visibilityTarget && listeningVisibility) {
+      visibilityTarget.removeEventListener('visibilitychange', onVisibilityChange);
+      listeningVisibility = false;
+    }
   };
 
   const writeKey = (
@@ -255,8 +309,9 @@ export const installBoardLayerFrameCache = (
         layerCanvas = (options.createCanvas ?? defaultCreateCanvas)();
         layerContext = layerCanvas.getContext('2d');
         layerResolution = Number.NaN;
+        listen(layerCanvas);
       }
-      if (layerContext === null) {
+      if (layerContext === null || layerContext.isContextLost?.() === true) {
         invalidate();
         stats.passes += 1;
         original.call(image, renderer, src, camera, parentMatrix);
@@ -296,6 +351,7 @@ export const installBoardLayerFrameCache = (
   };
 
   const release = (): void => {
+    unlisten();
     layerValid = false;
     if (layerCanvas !== null) {
       layerCanvas.width = 0;

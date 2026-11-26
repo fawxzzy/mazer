@@ -38,7 +38,24 @@ const makeCtx = (name: string, width = 100, height = 200): FakeCtx => {
 const setup = (over: Partial<BoardLayerCacheImageLike> = {}) => {
   const game = makeCtx('game');
   const layer = makeCtx('layer');
-  const layerCanvas = Object.assign(layer.canvas, { getContext: () => layer });
+  const canvasListeners = new Map<string, Set<() => void>>();
+  const layerCanvas = Object.assign(layer.canvas, {
+    getContext: () => layer,
+    addEventListener: (type: string, fn: () => void) => {
+      if (!canvasListeners.has(type)) canvasListeners.set(type, new Set());
+      canvasListeners.get(type)!.add(fn);
+    },
+    removeEventListener: (type: string, fn: () => void) => { canvasListeners.get(type)?.delete(fn); }
+  });
+  const docListeners = new Set<() => void>();
+  const doc = {
+    visibilityState: 'visible',
+    addEventListener: (_t: 'visibilitychange', fn: () => void) => { docListeners.add(fn); },
+    removeEventListener: (_t: 'visibilitychange', fn: () => void) => { docListeners.delete(fn); }
+  };
+  const fire = (type: string) => { for (const fn of [...(canvasListeners.get(type) ?? [])]) fn(); };
+  const fireVisibility = () => { for (const fn of [...docListeners]) fn(); };
+  const listenerCount = () => docListeners.size + [...canvasListeners.values()].reduce((n, set) => n + set.size, 0);
   const renderer = { currentContext: game as unknown };
   let phaserDraws = 0;
   const drawnOn: unknown[] = [];
@@ -57,7 +74,8 @@ const setup = (over: Partial<BoardLayerCacheImageLike> = {}) => {
     readVersion: () => version,
     readResolution: () => 3,
     patchResolution: (_c, res) => { patched.push(res); },
-    createCanvas: () => layerCanvas as never
+    createCanvas: () => layerCanvas as never,
+    visibilityTarget: doc
   });
   const camera = {
     alpha: 1, scrollX: 0, scrollY: 0, roundPixels: true, renderRoundPixels: true, addToRenderList: () => undefined,
@@ -66,7 +84,7 @@ const setup = (over: Partial<BoardLayerCacheImageLike> = {}) => {
   const parent = { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 };
   const frame = () => image.renderCanvas(renderer, image, camera, parent);
   return {
-    image, handle, game, layer, frame, camera, parent, drawnOn, patched, handlers,
+    image, handle, game, layer, frame, camera, parent, drawnOn, patched, handlers, doc, fire, fireVisibility, listenerCount,
     phaserDraws: () => phaserDraws,
     bump: () => { version += 1; }
   };
@@ -185,6 +203,104 @@ describe('installBoardLayerFrameCache', () => {
     for (let i = 0; i < 4; i += 1) t.frame();
     t.handlers.destroy?.();
     expect(t.layer.canvas).toMatchObject({ width: 0, height: 0 });
+  });
+
+  describe('the browser dropping the layer pixels (the key cannot see it)', () => {
+    const settle = (t: ReturnType<typeof setup>) => { for (let i = 0; i < 6; i += 1) t.frame(); };
+    const expectOneRefill = (t: ReturnType<typeof setup>, mutateBefore?: () => void) => {
+      const { fills, hits } = t.handle.stats;
+      const drawsBefore = t.phaserDraws();
+      mutateBefore?.();
+      t.frame();
+      expect(t.phaserDraws(), 'first frame after the loss goes through Phaser, never a copy of the stale layer').toBe(drawsBefore + 1);
+      expect(t.handle.stats.hits).toBe(hits);
+      settle(t);
+      expect(t.handle.stats.fills, 'one refill once the picture holds still').toBe(fills + 1);
+      expect(t.handle.stats.hits).toBeGreaterThan(hits);
+    };
+
+    test('layer canvas contextlost forces a refill', () => {
+      const t = setup();
+      settle(t);
+      expectOneRefill(t, () => t.fire('contextlost'));
+    });
+
+    test('layer canvas contextrestored forces a refill and re-patches the resolution', () => {
+      const t = setup();
+      settle(t);
+      const patches = t.patched.length;
+      expectOneRefill(t, () => t.fire('contextrestored'));
+      expect(t.patched.length).toBe(patches + 1);
+    });
+
+    test('document visibilitychange to visible forces a refill; to hidden does not', () => {
+      const t = setup();
+      settle(t);
+      const { fills, hits } = t.handle.stats;
+      t.doc.visibilityState = 'hidden';
+      t.fireVisibility();
+      t.frame();
+      expect(t.handle.stats).toMatchObject({ fills, hits: hits + 1 }); // still a plain copy
+      t.doc.visibilityState = 'visible';
+      expectOneRefill(t, () => t.fireVisibility());
+    });
+
+    test('a lost context is never trusted: no valid layer while isContextLost() is true', () => {
+      const t = setup();
+      let lost = true;
+      (t.layer as unknown as { isContextLost: () => boolean }).isContextLost = () => lost;
+      settle(t);
+      expect(t.handle.stats).toMatchObject({ fills: 0, hits: 0 });
+      lost = false;
+      settle(t);
+      expect(t.handle.stats.fills).toBe(1);
+    });
+
+    test('release (destroy or uninstall) removes every listener', () => {
+      for (const end of ['destroy', 'uninstall'] as const) {
+        const t = setup();
+        settle(t);
+        expect(t.listenerCount()).toBe(3);
+        if (end === 'destroy') t.handlers.destroy?.();
+        else t.handle.uninstall();
+        expect(t.listenerCount(), end).toBe(0);
+      }
+    });
+
+    test('kill switch semantics are unchanged: disabled cache never listens or copies', () => {
+      const t = setup();
+      t.handle.setEnabled(false);
+      for (let i = 0; i < 6; i += 1) t.frame();
+      expect(t.listenerCount()).toBe(0);
+      expect(t.handle.stats.hits).toBe(0);
+    });
+  });
+
+  test('the key assumes the board image at origin (0, 0) with no flip; any change to either is a key change', () => {
+    // The layer is copied back at device (0, 0), 1:1. That is only the same picture while the image sits at origin
+    // (0, 0) unflipped (boardTileLayer.ts: setOrigin(0, 0)). A future setOrigin / setFlip must keep updating the key.
+    const settle = (t: ReturnType<typeof setup>) => { for (let i = 0; i < 6; i += 1) t.frame(); };
+    const t0 = setup();
+    expect(t0.image).toMatchObject({ originX: 0, originY: 0, flipX: false, flipY: false });
+    const mutations: Array<[string, (t: ReturnType<typeof setup>) => void]> = [
+      ['originX', (t) => { t.image.originX = 0.5; }],
+      ['originY', (t) => { t.image.originY = 0.5; }],
+      ['flipX', (t) => { t.image.flipX = true; }],
+      ['flipY', (t) => { t.image.flipY = true; }]
+    ];
+    for (const [name, mutate] of mutations) {
+      const t = setup();
+      settle(t);
+      const drawsBefore = t.phaserDraws();
+      mutate(t);
+      t.frame();
+      expect(t.phaserDraws(), `${name} change goes through Phaser`).toBe(drawsBefore + 1);
+    }
+    const layer = readFileSync(join(__dirname, '..', '..', 'src', 'render', 'boardTileLayer.ts'), 'utf8');
+    expect(layer).toContain('.setOrigin(0, 0)');
+    expect(layer).not.toContain('setFlip');
+    expect(layer).not.toContain('.flipX =');
+    expect(layer).not.toContain('.flipY =');
   });
 
   test('a long still run is one fill, then copies only', () => {
