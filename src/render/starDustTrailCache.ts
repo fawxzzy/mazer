@@ -1,5 +1,12 @@
 /**
- * MAZER-PERF-017: the game's Star Dust trail painter. Owner pick 2026-11-24: option C (the older trail cached in an
+ * WITHDRAWN FROM THE GAME 2026-11-25 (MAZER-PERF-017 look restore): the owner disliked the look ("parts blinking slower")
+ * and asked for the old look back without losing visual quality. Measured (scripts/analysis/
+ * check-star-dust-trail-exact-look.mjs, 393x851 @2.625, Chromium and WebKit): this cache differs from the full painter
+ * by up to 247 of 255 per channel on 61-64% of lit pixels, and no cached design can match it within 3, because every
+ * layer (bloom, thread, sparkles) changes by 39-245 between two consecutive paints. The game paints with the full
+ * painter again (`drawStarDustTrailToCanvasContext` at the bottom of this file); this cache stays for the options page.
+ *
+ * MAZER-PERF-017: the Star Dust trail painter as shipped 2026-11-24. Owner pick 2026-11-24: option C (the older trail cached in an
  * offscreen layer, only the live head repainted per frame) with option A's lighter bloom for the live head. The look is
  * unchanged in kind: pointed, rainbow-shifting four-point stars with their dark keylines, never a glow stand-in.
  *
@@ -44,6 +51,7 @@ import { getStarDustTrailRenderOverride, type StarDustTrailRenderer } from './st
 import {
   STAR_DUST_SCRATCH_STRIDE,
   STAR_DUST_TRAIL,
+  drawStarDustTrailFullToCanvasContext,
   getStarDustSparkleScratch,
   resolveStarDustReach,
   type StarDustDrawOptions,
@@ -542,26 +550,31 @@ export const createStarDustTrailCache = (overrides: Partial<StarDustTrailCacheCo
   return renderer;
 };
 
-/** The game's one trail cache (one trail canvas per scene, one play scene at a time). */
-const gameTrailCache = createStarDustTrailCache();
+/**
+ * The one shared cached painter (C + A). Since 2026-11-25 the game no longer paints with it (see the file header); the
+ * trail-cost options page installs it through the override seam for its 'CA' row.
+ */
+export const drawStarDustTrailCachedToCanvasContext: StarDustTrailCache = createStarDustTrailCache();
 
 /**
- * Frees the game's cached trail layer and the coarse bloom's scratch canvas (scene shutdown; the trail skin stopped
- * being Star Dust).
+ * Frees the shared cached layer and the coarse bloom's scratch canvas (scene shutdown; the trail skin stopped being Star
+ * Dust). Nothing to free when nothing painted through the cache, which is the game's case since 2026-11-25.
  */
 export const releaseStarDustTrailCache = (): void => {
-  gameTrailCache.release();
+  drawStarDustTrailCachedToCanvasContext.release();
   releaseCoarseBloomScratch();
 };
 
-/** Counters of the game's trail cache (diagnostics and the trail-cost bench). */
-export const getStarDustTrailCacheStats = (): Readonly<StarDustTrailCacheStats> => gameTrailCache.stats;
+/** Counters of the shared cached painter (the trail-cost bench). */
+export const getStarDustTrailCacheStats = (): Readonly<StarDustTrailCacheStats> => drawStarDustTrailCachedToCanvasContext.stats;
 
 /**
- * Draws the star-dust trail into the trail canvas (already cleared and transformed by the caller). Returns the number of
- * sparkles painted live this frame. MAZER-UI-102: cosmetics keep their own colours under dark mode (cosmeticScope.ts).
- * The override is the trail-cost options page's seam (starDustRenderOverride.ts); it is never set in the game.
+ * The game's Star Dust trail painter: draws the star-dust trail into the trail canvas (already cleared and transformed
+ * by the caller) and returns the number of sparkles painted. MAZER-PERF-017 look restore (2026-11-25): this is the FULL
+ * painter again (starDustTrailCanvas.ts), every layer repainted at the real breath on every paint, exactly the look
+ * before #706. MAZER-UI-102: cosmetics keep their own colours under dark mode (cosmeticScope.ts). The override is the
+ * trail-cost options page's seam (starDustRenderOverride.ts); it is never set in the game.
  */
 export const drawStarDustTrailToCanvasContext: StarDustTrailRenderer = (ctx, segments, options) => withCosmeticColours(
-  () => (getStarDustTrailRenderOverride() ?? gameTrailCache)(ctx, segments, options)
+  () => (getStarDustTrailRenderOverride() ?? drawStarDustTrailFullToCanvasContext)(ctx, segments, options)
 );

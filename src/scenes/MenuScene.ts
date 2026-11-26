@@ -10720,9 +10720,9 @@ export class MenuScene extends Phaser.Scene {
     }
     if (starDustSkin) {
       this.starDustTrailCacheHeld = true;
-      // MAZER-PERF-017: the cached older trail is painted at the steady breath (the level reduced motion holds) so it
-      // does not jump at each rebuild; only the live head breathes (src/render/starDustTrailCache.ts). Same formulas
-      // as above and in the caller, at breath resolveTrailBreath(_, true).
+      // MAZER-PERF-017: the game paints the whole trail at the real breath (full painter, look restored 2026-11-25); the
+      // steady-breath fields are read only by the withdrawn cached painter on the trail-cost options page
+      // (src/render/starDustTrailCache.ts). Same formulas as above and in the caller, at breath resolveTrailBreath(_, true).
       const steadyBreath = resolveTrailBreath(0, true);
       const steadyWidthScale = resolveTrailWidthScale(steadyBreath);
       const steadyResting = resolveTrailWidths(starDust.tileSize);

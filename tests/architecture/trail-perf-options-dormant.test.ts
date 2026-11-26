@@ -1,8 +1,9 @@
 /**
  * The trail cost options page (trail-perf-options.html, MAZER-PERF-017 follow-up) must not change the game: the page is
  * not a build input, nothing the game ships imports its code, and the draw seam it uses is empty unless the page fills it.
- * Since the owner's C + A pick (2026-11-24) the game draws through the cached painter (starDustTrailCache.ts); the full
- * repaint stays only as the reference and the page's "Before" row.
+ * The owner's C + A pick (cached painter, 2026-11-24) was withdrawn 2026-11-25 for its look: the game draws the whole
+ * trail with the full painter again, through drawStarDustTrailToCanvasContext (starDustTrailCache.ts); only the page
+ * installs the cached painter.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -48,16 +49,19 @@ describe('trail cost options page stays out of the game', () => {
     expect(offenders).toEqual([]);
   });
 
-  test('the scene draws the trail through the cached painter; the full repaint is not called by game code', () => {
+  test('the scene draws the trail with the full painter; the cached painter is not called by game code', () => {
     const scene = readFileSync(join(ROOT, 'src', 'scenes', 'MenuScene.ts'), 'utf8');
     expect(scene).toMatch(/import \{[^}]*\bdrawStarDustTrailToCanvasContext\b[^}]*\} from '\.\.\/render\/starDustTrailCache';/);
-    expect(scene).toMatch(/releaseStarDustTrailCache\(\)/);
+    const cacheModule = readFileSync(join(ROOT, 'src', 'render', 'starDustTrailCache.ts'), 'utf8');
+    expect(cacheModule).toMatch(
+      /export const drawStarDustTrailToCanvasContext: StarDustTrailRenderer = \(ctx, segments, options\) => withCosmeticColours\(\s*\(\) => \(getStarDustTrailRenderOverride\(\) \?\? drawStarDustTrailFullToCanvasContext\)\(ctx, segments, options\)\s*\);/
+    );
     const callers = walk(join(ROOT, 'src'))
       .filter((path) => /\.(ts|tsx|js|mjs)$/.test(path))
       .map((path) => relative(ROOT, path))
       .filter((rel) => !PAGE_ONLY.some((own) => rel === own || rel.startsWith(own)))
-      .filter((rel) => rel !== join('src', 'render', 'starDustTrailCanvas.ts'))
-      .filter((rel) => /drawStarDustTrailFullToCanvasContext/.test(readFileSync(join(ROOT, rel), 'utf8')));
+      .filter((rel) => rel !== join('src', 'render', 'starDustTrailCache.ts'))
+      .filter((rel) => /drawStarDustTrailCachedToCanvasContext|createStarDustTrailCache/.test(readFileSync(join(ROOT, rel), 'utf8')));
     expect(callers).toEqual([]);
   });
 

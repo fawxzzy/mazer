@@ -460,10 +460,9 @@ const drawStarDustTrailToCanvasContextImpl = (
 // MAZER-UI-102: cosmetics keep their own colours under dark mode (src/theme/cosmeticScope.ts).
 export const drawStarDustToGraphics: typeof drawStarDustToGraphicsImpl = (...args: Parameters<typeof drawStarDustToGraphicsImpl>) => withCosmeticColours(() => drawStarDustToGraphicsImpl(...args));
 /**
- * The whole trail repainted in one pass, every layer of every sparkle: the painter the game used until MAZER-PERF-017's
- * cached trail. The game now draws through drawStarDustTrailToCanvasContext in starDustTrailCache.ts (older trail cached,
- * live head painted per frame); this one stays as the reference the cache is checked against, and as the "Before" row of
- * the trail-cost options page.
+ * The whole trail repainted in one pass, every layer of every sparkle, at the real breath: the game's Star Dust painter
+ * (through drawStarDustTrailToCanvasContext in starDustTrailCache.ts). The cached trail replaced it 2026-11-24 and was
+ * withdrawn 2026-11-25 for its look (MAZER-PERF-017 look restore); it is also the "Before" row of the options page.
  */
 export const drawStarDustTrailFullToCanvasContext: typeof drawStarDustTrailToCanvasContextImpl = (...args: Parameters<typeof drawStarDustTrailToCanvasContextImpl>) => withCosmeticColours(() => drawStarDustTrailToCanvasContextImpl(...args));
 

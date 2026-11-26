@@ -1,6 +1,7 @@
 /**
- * MAZER-PERF-017 cached trail (owner pick C + A, 2026-11-24): the game's Star Dust painter caches the older trail in an
- * offscreen layer and repaints only the live head. These tests pin when the cached layer must be rebuilt (anything that
+ * MAZER-PERF-017 cached trail (owner pick C + A, 2026-11-24; withdrawn from the game 2026-11-25, kept for the options
+ * page): caches the older trail in an offscreen layer and repaints only the live head. The game painter is the full
+ * painter again ('the game painter' below). These tests pin when the cached layer must be rebuilt (anything that
  * would make its picture wrong), when it must not be (a pause, a few steps), that it never holds more memory than the
  * cap, and that a cached frame places exactly the sparkles a full paint places (none doubled or lost at the split).
  */
@@ -16,6 +17,7 @@ import {
 import {
   STAR_DUST_TRAIL_CACHE,
   createStarDustTrailCache,
+  drawStarDustTrailCachedToCanvasContext,
   drawStarDustTrailToCanvasContext,
   fingerprintStarDustRoute,
   getStarDustTrailCacheStats,
@@ -374,8 +376,23 @@ describe('cached star-dust trail: same sparkles as a full paint', () => {
 });
 
 describe('the game painter', () => {
-  test('uses the cached painter unless the options page fills the seam; release frees it', () => {
+  test('is the full painter (look restored 2026-11-25): call for call the same, the cache untouched', () => {
     stubDocument();
+    releaseStarDustTrailCache();
+    const statsBefore = { ...getStarDustTrailCacheStats() };
+    const game = loggingContext();
+    const full = loggingContext();
+    const gameSparkles = drawStarDustTrailToCanvasContext(game.ctx, route(100), OPTIONS);
+    const fullSparkles = drawStarDustTrailFullToCanvasContext(full.ctx, route(100), OPTIONS);
+    expect(gameSparkles).toBe(fullSparkles);
+    expect(game.log).toEqual(full.log);
+    expect(getStarDustTrailCacheStats()).toEqual(statsBefore);
+    expect(getStarDustTrailCacheStats().bodyPixels).toBe(0);
+  });
+
+  test('the options page can install the withdrawn cached painter through the seam; release frees it', () => {
+    stubDocument();
+    setStarDustTrailRenderOverride(drawStarDustTrailCachedToCanvasContext);
     const before = getStarDustTrailCacheStats().headPaints + getStarDustTrailCacheStats().fullPaints;
     drawStarDustTrailToCanvasContext(loggingContext().ctx, route(100), OPTIONS);
     drawStarDustTrailToCanvasContext(loggingContext().ctx, route(100), OPTIONS);
