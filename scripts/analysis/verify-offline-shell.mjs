@@ -525,7 +525,7 @@ const runOfflineColdLaunchAndSignIn = async ({ session, server, checks, findings
   evidence.offlineColdLaunch = { appRequests: evaluation.appRequests, appServedFromServiceWorker: evaluation.appServedFromServiceWorker, appFailures: evaluation.appFailures, allowedExternalFailures: evaluation.allowedExternal.length };
   await signInPage.close();
   if (!findings.some((line) => line.includes('Sign in'))) {
-    findings.push('Signed out and offline, the launch itself tries the hand-off to the account host (MAZER-ACCT-040, no Sign in tap), stays on the Mazer fallback screen and shows "Sign-in is unavailable right now. Try again in a few minutes." (provider_unreachable); the sign-in gate stays locked for a signed-out visitor, so a first-time visitor with no saved session cannot play offline (the proof reaches level 1 offline through the QA fixture/preview routes, not through a real saved session).');
+    findings.push('Signed out and offline, the launch itself tries the hand-off to the account host (MAZER-ACCT-040, no Sign in tap), stays on the Mazer fallback screen and shows "Sign-in is unavailable right now. Try again in a minute." (provider_unreachable); the sign-in gate stays locked for a signed-out visitor, so a first-time visitor with no saved session cannot play offline (the proof reaches level 1 offline through the QA fixture/preview routes, not through a real saved session).');
   }
 };
 

@@ -1,3 +1,6 @@
 scripts/** text eol=lf
 docs/PLAYBOOK_NOTES.md merge=union
 docs/ops/sql-proposals/** text eol=lf
+# Generated owner exports are compared byte for byte (npm run project-board:owner-export:check); a CRLF checkout (Windows core.autocrlf=true)
+# made that check report "stale". Keep them LF on every platform. (docs/ops/MAZER-WORK-REPORT.* is already compared CRLF-tolerant.)
+exports/** text eol=lf

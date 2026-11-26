@@ -795,3 +795,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY: the 2026-11-25 look restore (#712) and walked-path trail (#713) left comments describing the withdrawn cached painter and the shortest route as current.
 - Not removed: the `steady*` trail fields and `releaseStarDustTrailCache` in `MenuScene.ts` look dead in the game (the full painter ignores them) but feed the dormant options-page seam's 'CA' row (`trail-perf-options-dormant.test.ts`), so they stay.
 - Status: Applied
+
+## 2026-11-26 Offline shell nightly fixed (stale copy constant), exports kept LF
+
+- WHAT: `scripts/analysis/lib/offline-shell-proof.mjs` expected the signed-out offline failure line "Try again in a few minutes."; the app has shown "Try again in a minute." (copy matrix row `signin.unavailable`) since Auth Surface v2 (#594, 2026-11-15). The proof matched the line word for word, so check `offline-sign-in-shows-provider-unreachable` failed on every scheduled run from 2026-11-16 to 2026-11-26. New `tests/brand/offline-shell-proof-copy.test.ts` (in the Verify "contracts" step via `tests/brand`) compares the constant to `AUTH_SURFACE_MESSAGES['signin.unavailable']`. `.gitattributes` gets `exports/** text eol=lf`: `npm run project-board:owner-export:check` compares bytes, so a Windows CRLF checkout reported the export stale.
+- WHY: not a product regression (precache 24/24, offline reload, offline play and the update flow all passed in every failing run; the one failing check was the copy match). The nightly is not a PR check, so nothing flagged the drift; the new test is the PR-time guard.
+- Evidence: local run of `verify-offline-shell.mjs` reproduced the failure before the fix and passes 22/22 after; `npm run project-board:owner-export:check` stale on a CRLF checkout, ok after renormalising `exports/`; `npx tsc --noEmit`; `npx vitest run tests/brand/offline-shell-proof-copy.test.ts tests/analysis/offline-shell-proof.test.mjs`.
+- Status: Applied
