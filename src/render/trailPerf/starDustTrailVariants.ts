@@ -1,9 +1,9 @@
 /**
  * Trail-cost OPTIONS (MAZER-PERF-017 follow-up): the ways to paint the Star Dust trail that the owner picked from on the
- * options page `trail-perf-options.html`. SHIPPED 2026-11-24: the owner picked C + A, which is now the game's default
- * painter (src/render/starDustTrailCache.ts). This module stays page-only: nothing in a shipping entry imports it; the
- * page installs one of these renderers through starDustRenderOverride.ts on the real scene, or clears the seam for the
- * game's own painter (row 'CA').
+ * options page `trail-perf-options.html`. The owner picked C + A (shipped 2026-11-24, src/render/starDustTrailCache.ts)
+ * and then asked for the old look back (2026-11-25): the game paints with Before (the full painter) again. This module
+ * stays page-only: nothing in a shipping entry imports it; the page installs one of these renderers (or, for row 'CA',
+ * the real cached painter) through starDustRenderOverride.ts on the real scene.
  *
  * The plan painter itself (layers, coarse bloom) moved to src/render/starDustTrailPlan.ts, which the game uses; it is
  * re-exported here for the page and its tests. Page-only knobs on a plan:
@@ -40,8 +40,8 @@ export const TRAIL_PERF_VARIANTS: readonly TrailPerfVariant[] = Object.freeze([
   {
     id: 'shipped',
     name: 'Before (full repaint)',
-    look: 'Star Dust as it shipped until the C + A pick: bloom and thread stroked in ~1,300 small colour pieces and every '
-      + 'sparkle repainted every frame.',
+    look: 'The game\'s Star Dust painter (again since 2026-11-25): bloom and thread stroked in ~1,300 small colour pieces '
+      + 'and every sparkle repainted every frame.',
     plan: SHIPPED_PLAN
   },
   {
@@ -67,10 +67,11 @@ export const TRAIL_PERF_VARIANTS: readonly TrailPerfVariant[] = Object.freeze([
   },
   {
     id: 'CA',
-    name: 'C + A (shipped)',
-    look: 'The owner\'s pick, now the game\'s own painter: C\'s cached older trail (its own full glow, refreshed every 2 s '
-      + 'or 8 steps) with A\'s light glow on the live head. Trails under 48 tiles are painted whole, exactly as Before.',
-    // Not painted from this plan: the page clears the seam so the game's cached painter runs (starDustTrailCache.ts).
+    name: 'C + A (withdrawn)',
+    look: 'Shipped 2026-11-24, withdrawn 2026-11-25 (the game is back on Before): C\'s cached older trail (its own full '
+      + 'glow, refreshed every 2 s or 8 steps) with A\'s light glow on the live head. Trails under 48 tiles are painted '
+      + 'whole, exactly as Before.',
+    // Not painted from this plan: the page installs the real cached painter (starDustTrailCache.ts) through the seam.
     plan: Object.freeze({ ...LIGHT_BLOOM_PLAN, bodyCache: Object.freeze({ headTiles: 8, refreshMs: 2000, minTiles: 48 }) })
   }
 ]);

@@ -25,7 +25,7 @@ import {
   ROUTE_WINDOW,
   STAR_DUST_TRAIL_CACHE,
   createStarDustTrailCache,
-  drawStarDustTrailToCanvasContext,
+  drawStarDustTrailCachedToCanvasContext,
   releaseStarDustTrailCache
 } from '../../src/render/starDustTrailCache';
 import {
@@ -310,9 +310,9 @@ describe('per-frame work', () => {
 });
 
 describe('memory and growth', () => {
-  test('releasing the game cache also frees the coarse bloom scratch canvas', () => {
+  test('releasing the shared cache also frees the coarse bloom scratch canvas', () => {
     const made = stubDocument();
-    drawStarDustTrailToCanvasContext(loggingContext(800, 2000, 2).ctx, route(100), { ...OPTIONS, glowBlurPx: 8 });
+    drawStarDustTrailCachedToCanvasContext(loggingContext(800, 2000, 2).ctx, route(100), { ...OPTIONS, glowBlurPx: 8 });
     expect(hasCoarseBloomScratch()).toBe(true);
     const scratch = made.find((c) => c.width > 0 && c.width < 800)!;
     expect(scratch).toBeDefined();

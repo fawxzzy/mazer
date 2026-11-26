@@ -1,6 +1,7 @@
 /**
  * Entry for trail-perf-options.html (dev/proposal page, not a build input): installs the chosen star-dust painter, then
- * boots the real game unchanged. A small bar picks Before / A / B / C / C + A (shipped, the default), fills a long trail,
+ * boots the real game unchanged. A small bar picks Before (the game's painter, the default) / A / B / C / C + A
+ * (withdrawn 2026-11-25), fills a long trail,
  * walks it, and shows a live frame meter plus the frame times measured headless for each option (trailPerfMeasurements.ts).
  *
  * Open: /trail-perf-options.html?previewLevel=300&runtimeDiagnostics=1&trailVariant=shipped
@@ -10,7 +11,7 @@ import { TRAIL_PERF_SETUP, describeTrailPerfMeasurement } from './trailPerfMeasu
 import { findTrailPerfVariant, TRAIL_PERF_VARIANTS, type TrailPerfVariantId } from './starDustTrailVariants';
 
 const params = new URLSearchParams(window.location.search);
-const harness = createTrailPerfHarness(findTrailPerfVariant(params.get('trailVariant') ?? 'CA').id);
+const harness = createTrailPerfHarness(findTrailPerfVariant(params.get('trailVariant') ?? 'shipped').id);
 (window as unknown as { __MAZER_TRAIL_PERF__?: TrailPerfHarness }).__MAZER_TRAIL_PERF__ = harness;
 
 // The bar's styles are in trail-perf-options.html (kept out of src/ for the colour-literal ratchet).

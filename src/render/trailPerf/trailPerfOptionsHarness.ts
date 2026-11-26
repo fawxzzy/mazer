@@ -4,7 +4,7 @@
  * exposes (window.__MAZER_GAME__, and window.__MAZER_QA__ under ?runtimeDiagnostics=1). Not imported by the game.
  */
 import { setStarDustTrailRenderOverride } from '../starDustRenderOverride';
-import { getStarDustTrailCacheStats } from '../starDustTrailCache';
+import { drawStarDustTrailCachedToCanvasContext, getStarDustTrailCacheStats } from '../starDustTrailCache';
 import { TRAIL_REDRAW_COST_MULTIPLE } from '../trailRedrawGate';
 import {
   createStarDustPlanRenderer,
@@ -90,10 +90,10 @@ export const createTrailPerfHarness = (initial: TrailPerfVariantId): TrailPerfHa
   let plan: Readonly<StarDustRenderPlan> = findTrailPerfVariant(variant).plan;
   let renderer = createStarDustPlanRenderer(plan);
   const install = (): void => {
-    // The shipped painter (C + A, starDustTrailCache.ts) runs through the game's own code path (no override), so that row
-    // is the real thing. 'shipped' (Before) paints the whole trail every time with today's plan, call for call the full
-    // painter (tests/render/starDustTrailVariants.test.ts).
-    setStarDustTrailRenderOverride(variant === 'CA' ? null : renderer);
+    // 'CA' installs the real cached painter as shipped 2026-11-24 (starDustTrailCache.ts; withdrawn from the game
+    // 2026-11-25). 'shipped' (Before) paints the whole trail every time with today's plan, call for call the full painter
+    // the game uses again (tests/render/starDustTrailVariants.test.ts).
+    setStarDustTrailRenderOverride(variant === 'CA' ? drawStarDustTrailCachedToCanvasContext : renderer);
   };
   install();
 
