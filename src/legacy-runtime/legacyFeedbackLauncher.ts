@@ -64,6 +64,12 @@ export interface LegacyFeedbackOpenHooks {
   onSubmitResult?: (result: FeedbackSubmitResult, auth: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>) => void;
   /** After the popup is gone (also on a scene shutdown). shown false = it never appeared (the chunk failed to load). */
   onClosed?: (info: { shown: boolean }) => void;
+  /**
+   * Asked right before the popup mounts, after its code finished loading (a first load can take a while, and the player
+   * may have tapped Play meanwhile). false = do not mount: the open ends as a close with shown false, which records
+   * nothing (no dismissal). Absent = always mount.
+   */
+  canMount?: () => boolean;
 }
 
 export interface LegacyFeedbackLauncher {
@@ -124,9 +130,15 @@ export const createLegacyFeedbackLauncher = (deps: LegacyFeedbackLauncherDeps): 
       shown = false;
       hooks = openHooks;
       const onSubmitResult = openHooks.onSubmitResult;
+      const canMount = openHooks.canMount;
       const resolved = resolveLegacyFeedbackContext(context);
       void loadMount().then(({ mountFeedbackPopup }) => {
         if (!open || destroyed) return;
+        // Eligibility may have changed while the chunk loaded (sign-out, Play tapped, a sheet or run opened).
+        if (!isLegacyFeedbackAvailable(deps.getAuthSnapshot()) || canMount?.() === false) {
+          finish();
+          return;
+        }
         shown = true;
         handle = mountFeedbackPopup({
           onClose: finish,

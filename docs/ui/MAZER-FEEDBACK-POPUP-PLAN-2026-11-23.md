@@ -4,7 +4,7 @@ Status (2026-11-24, MAZER-FB-001): BUILT, in review. The picked layout (A, Card)
 
 Update (Zac, 2026-11-25): Feedback is a RATING, not a bug report. The Menu row is gone from both dropdowns and the popup now offers itself (`src/legacy-runtime/legacyRatingPrompt.ts`):
 - When a signed-in player enters the main menu with a highest level reached of 50 or more (once per entry, after the menu has been idle for 0.9 s; never during play, never in the `?previewLevel` sandbox, never signed out).
-- "Not now" (or any close without a saved rating) waits for the next multiple of 50 above the level it was closed at (50 -> 100, 73 -> 100, 100 -> 150).
+- "Not now" (or any close without a saved rating) waits for 50 more levels of gameplay: the next offer is at highest level >= the level it was closed at + 50 (50 -> 100, 73 -> 123, 100 -> 150). Owner: "only retrigger it every 50 levels of gameplay and only if the player has not submitted".
 - A saved rating ends it for that account. Offline, failed, rate-limited and signed-out sends do not count.
 - State is per account in localStorage (`mazer.ratingPrompt.v1:<userId>`): submitted flag, dismissed-at level, peak level. The server has no "already rated" read, so the flag is per device; a cross-device check needs a new read RPC (not written).
 - A support/Help entry is a separate later lane.

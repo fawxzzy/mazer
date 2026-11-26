@@ -295,6 +295,54 @@ describe('MAZER-FB-001 launcher (rating prompt only, signed in only, popup loade
     live.destroy();
     expect(closes3).toEqual([{ shown: true }]);
   });
+
+  test('eligibility is re-checked after the popup code loads: not eligible any more -> no mount, no dismissal (shown false)', async () => {
+    const mount = makeMount();
+    let release: () => void = () => undefined;
+    const loaded = new Promise<void>((resolveLoad) => { release = resolveLoad; });
+    let eligible = true;
+    const onClosed = vi.fn();
+    const closes: unknown[] = [];
+    const launcher = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => SIGNED_IN,
+      loadMount: async () => { await loaded; return { mountFeedbackPopup: mount.mountFeedbackPopup as never }; },
+      onClosed
+    });
+    expect(launcher.open({ gameMode: 'menu', level: '50', source: 'menu' }, {
+      canMount: () => eligible,
+      onClosed: (info) => closes.push(info)
+    })).toBe(true);
+    // The player taps Play while the chunk is still loading: the mode-select sheet is up when the code arrives.
+    eligible = false;
+    release();
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).not.toHaveBeenCalled();
+    expect(launcher.isOpen()).toBe(false);
+    expect(closes).toEqual([{ shown: false }]);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+
+    // Still eligible: mounts as before. A sign-out while loading also stops the mount.
+    eligible = true;
+    expect(launcher.open({ gameMode: 'menu', level: '50', source: 'menu' }, { canMount: () => eligible })).toBe(true);
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).toHaveBeenCalledTimes(1);
+    mount.close();
+
+    let auth: { status: 'authenticated' | 'unauthenticated'; userId: string | null } = SIGNED_IN;
+    const signOut = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => auth as never,
+      loadMount: async () => { await loaded; return { mountFeedbackPopup: mount.mountFeedbackPopup as never }; },
+      onClosed: vi.fn()
+    });
+    signOut.open({ gameMode: 'menu', level: '50', source: 'menu' });
+    auth = { status: 'unauthenticated', userId: null };
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).toHaveBeenCalledTimes(1);
+    expect(signOut.isOpen()).toBe(false);
+  });
 });
 
 describe('MAZER-FB-001 rainbow stars: real pointed shapes, never a glow', () => {
@@ -388,12 +436,19 @@ describe('MAZER-FB-001 scene wiring stays minimal and hazard-free', () => {
     expect(sync).toContain("onMainMenu: this.mode === 'menu'");
     expect(sync).toContain('sandbox: this.levelPreviewLevel !== null');
     expect(sync).toContain('authResolved: !this.authGateAwaitingResolution');
-    expect(sync).toContain("surfaceIdle: this.overlay === 'none' && !this.menuDropdown.isOpen() && !this.feedbackLauncher.isOpen()");
+    expect(sync).toContain('surfaceIdle: this.isRatingPromptSurfaceIdle() && !this.feedbackLauncher.isOpen()');
+    // The same idle-main-menu check runs again right before the popup mounts (its first load is asynchronous).
+    const idle = sync.slice(sync.indexOf('private isRatingPromptSurfaceIdle('));
+    expect(idle).toContain("this.mode === 'menu'");
+    expect(idle).toContain('this.levelPreviewLevel === null');
+    expect(idle).toContain("this.overlay === 'none'");
+    expect(idle).toContain('!this.menuDropdown.isOpen()');
     expect(sync).toContain('userId: signedIn ? this.authSnapshot.userId : null');
     const open = MENU_SCENE.slice(MENU_SCENE.indexOf('private openLegacyFeedback('), MENU_SCENE.indexOf('private buildLegacyPlayMenuOverlay('));
     // Only a saved rating marks the account as rated; every other outcome is a close without one.
     expect(open).toContain("if (result.status === 'saved') this.ratingPromptGate.markSubmitted(auth.userId);");
     expect(open).toContain('this.ratingPromptGate.markClosed(');
+    expect(open).toContain('canMount: () => this.isRatingPromptSurfaceIdle()');
     expect(MENU_SCENE.split('this.ratingPromptGate.reset();').length - 1).toBe(1);
     const create = MENU_SCENE.slice(MENU_SCENE.indexOf('this.feedbackLauncher.activate();'));
     expect(create.indexOf('this.ratingPromptGate.reset();')).toBeLessThan(create.indexOf('\n  }'));

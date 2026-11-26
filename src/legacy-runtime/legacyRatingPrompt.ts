@@ -5,9 +5,10 @@
  *
  * Rules this module pins:
  *  - First offer at highest level reached >= 50 (49 never, 50 and 51 yes).
- *  - "Not now" (or any close without a saved rating) waits for the next multiple of 50 of the highest level reached:
- *    dismissed at 50 -> next offer at 100, then 150, ... (dismissed at 73 -> 100). A level jump past several steps
- *    offers once, not once per step.
+ *  - "Not now" (or any close without a saved rating) waits for 50 MORE levels of gameplay: after a close at highest
+ *    level L the next offer is at highest level >= L + 50 (closed at 50 -> 100, closed at 73 -> 123: 122 no, 123
+ *    yes). Owner: "only retrigger it every 50 levels of gameplay and only if the player has not submitted". A level
+ *    jump past the threshold offers once.
  *  - A saved rating ends it for that account: never offered again. An offline, failed, rate-limited or signed-out
  *    submit is NOT a saved rating.
  *  - Per account (the storage key carries the user id), kept across reloads (localStorage on this device). A
@@ -71,7 +72,7 @@ export const normalizeLegacyRatingPromptRecord = (value: unknown): LegacyRatingP
   });
 };
 
-/** The level at which the next offer is due, or null when the account has rated. */
+/** The highest level at which the next offer is due (first offer 50, then last close + 50), or null when rated. */
 export const resolveLegacyRatingPromptNextLevel = (record: LegacyRatingPromptRecord): number | null => {
   if (record.submitted) {
     return null;
@@ -79,7 +80,7 @@ export const resolveLegacyRatingPromptNextLevel = (record: LegacyRatingPromptRec
   if (record.dismissedAtLevel === null) {
     return LEGACY_RATING_PROMPT_STEP_LEVELS;
   }
-  return (Math.floor(record.dismissedAtLevel / LEGACY_RATING_PROMPT_STEP_LEVELS) + 1) * LEGACY_RATING_PROMPT_STEP_LEVELS;
+  return record.dismissedAtLevel + LEGACY_RATING_PROMPT_STEP_LEVELS;
 };
 
 /** Highest level reached = the larger of the stored peak and the level now. */
@@ -117,6 +118,19 @@ const storageKey = (userId: string): string => `${LEGACY_RATING_PROMPT_STORAGE_P
 const isUsableUserId = (userId: string | null | undefined): userId is string => (
   typeof userId === 'string' && userId.trim().length > 0
 );
+
+/** Combines two records of one account: the further-along facts win (a saved rating, the later close, the higher peak). */
+export const mergeLegacyRatingPromptRecords = (
+  a: LegacyRatingPromptRecord,
+  b: LegacyRatingPromptRecord
+): LegacyRatingPromptRecord => {
+  const dismissed = Math.max(a.dismissedAtLevel ?? 0, b.dismissedAtLevel ?? 0);
+  return Object.freeze({
+    dismissedAtLevel: dismissed > 0 ? dismissed : null,
+    peakLevel: Math.max(a.peakLevel, b.peakLevel),
+    submitted: a.submitted || b.submitted
+  });
+};
 
 export const readLegacyRatingPromptRecord = (
   storage: LegacyRatingPromptStorage | null | undefined,
@@ -180,7 +194,7 @@ export interface LegacyRatingPromptGate {
   poll: (frame: LegacyRatingPromptFrame) => LegacyRatingPromptStep;
   /** A rating was saved for this account: never offer again. */
   markSubmitted: (userId: string | null) => void;
-  /** An offer closed. Without a saved rating it waits for the next step of 50. `shown` false = the popup never appeared. */
+  /** An offer closed. Without a saved rating it waits for 50 more levels. `shown` false = the popup never appeared. */
   markClosed: (offer: { userId: string; highestLevel: number; shown: boolean }) => void;
   /** Scene (re)create: the next menu frame is a fresh entry. */
   reset: () => void;
@@ -196,13 +210,28 @@ export const createLegacyRatingPromptGate = (deps: {
   let enteredAtMs: number | null = null;
   /** Restarts the settle wait whenever something sits on top of the menu. */
   let idleSinceMs: number | null = null;
+  /**
+   * Session copy per account. A browser-storage write can fail (quota, private mode); without this copy a "Not now" or a
+   * saved rating would be lost and the popup would return at every menu entry. Storage and memory are merged on read.
+   */
+  const memory = new Map<string, LegacyRatingPromptRecord>();
+
+  const load = (userId: string): LegacyRatingPromptRecord => {
+    const stored = readLegacyRatingPromptRecord(deps.storage(), userId);
+    const kept = memory.get(userId);
+    return kept === undefined ? stored : mergeLegacyRatingPromptRecords(stored, kept);
+  };
+
+  const save = (userId: string, record: LegacyRatingPromptRecord): void => {
+    memory.set(userId, record);
+    writeLegacyRatingPromptRecord(deps.storage(), userId, record);
+  };
 
   const update = (userId: string, change: (record: LegacyRatingPromptRecord) => LegacyRatingPromptRecord): void => {
-    const storage = deps.storage();
-    const before = readLegacyRatingPromptRecord(storage, userId);
+    const before = load(userId);
     const after = change(before);
     if (after !== before) {
-      writeLegacyRatingPromptRecord(storage, userId, after);
+      save(userId, after);
     }
   };
 
@@ -256,11 +285,10 @@ export const createLegacyRatingPromptGate = (deps: {
       }
       enteredAtMs = null;
       const userId = frame.userId;
-      const storage = deps.storage();
-      const stored = readLegacyRatingPromptRecord(storage, userId);
+      const stored = load(userId);
       const record = recordLegacyRatingPromptPeak(stored, frame.level);
       if (record !== stored) {
-        writeLegacyRatingPromptRecord(storage, userId, record);
+        save(userId, record);
       }
       if (!shouldOfferLegacyRatingPrompt(record, frame.level)) {
         return { action: 'none' };

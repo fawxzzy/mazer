@@ -14367,7 +14367,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // Rating prompt (Zac, 2026-11-25): on main-menu entry only, signed in, idle menu, from level 50; the decision and the
-  // per-account record live in legacyRatingPrompt.ts. A saved rating ends it; any other close waits for the next 50.
+  // per-account record live in legacyRatingPrompt.ts. A saved rating ends it; any other close waits for 50 more levels.
   private syncLegacyRatingPrompt(time: number): void {
     const signedIn = this.authSnapshot.status === 'authenticated';
     const step = this.ratingPromptGate.poll({
@@ -14377,7 +14377,7 @@ export class MenuScene extends Phaser.Scene {
       nowMs: time,
       onMainMenu: this.mode === 'menu',
       sandbox: this.levelPreviewLevel !== null,
-      surfaceIdle: this.overlay === 'none' && !this.menuDropdown.isOpen() && !this.feedbackLauncher.isOpen(),
+      surfaceIdle: this.isRatingPromptSurfaceIdle() && !this.feedbackLauncher.isOpen(),
       userId: signedIn ? this.authSnapshot.userId : null
     });
     if (step.action === 'offer') {
@@ -14385,9 +14385,19 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Idle main menu: not in a game, not the level preview sandbox, nothing on top (no overlay such as the mode-select
+  // sheet, no open dropdown). Asked again right before the popup mounts, because its first load is asynchronous.
+  private isRatingPromptSurfaceIdle(): boolean {
+    return this.mode === 'menu'
+      && this.levelPreviewLevel === null
+      && this.overlay === 'none'
+      && !this.menuDropdown.isOpen();
+  }
+
   private openLegacyFeedback(offer: Extract<LegacyRatingPromptStep, { action: 'offer' }>): void {
     const level = this.progressionState.tracks.player.level;
     const opened = this.feedbackLauncher.open({ gameMode: this.mode, level, source: 'menu' }, {
+      canMount: () => this.isRatingPromptSurfaceIdle(),
       onClosed: ({ shown }) => this.ratingPromptGate.markClosed({ highestLevel: offer.highestLevel, shown, userId: offer.userId }),
       onSubmitResult: (result, auth) => {
         if (result.status === 'saved') this.ratingPromptGate.markSubmitted(auth.userId);

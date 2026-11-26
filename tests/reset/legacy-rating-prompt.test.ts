@@ -5,6 +5,7 @@ import {
   LEGACY_RATING_PROMPT_STORAGE_PREFIX,
   createLegacyRatingPromptGate,
   createLegacyRatingPromptRecord,
+  mergeLegacyRatingPromptRecords,
   normalizeLegacyRatingPromptRecord,
   readLegacyRatingPromptRecord,
   recordLegacyRatingPromptDismissed,
@@ -17,7 +18,7 @@ import {
   type LegacyRatingPromptStep
 } from '../../src/legacy-runtime/legacyRatingPrompt';
 
-// Rating prompt (Zac, 2026-11-25): offered on main-menu entry from level 50, "Not now" waits for the next 50, a saved
+// Rating prompt (Zac, 2026-11-25): offered on main-menu entry from level 50, "Not now" waits for 50 more levels, a saved
 // rating ends it, per account, signed-in only, never during play.
 
 const memoryStorage = () => {
@@ -79,7 +80,7 @@ describe('rating prompt thresholds (pure)', () => {
     expect(shouldOfferLegacyRatingPrompt(fresh, '1')).toBe(false);
   });
 
-  test('"Not now" at 50 waits for 100 (99 no, 100 yes), then 150; dismissed at 73 waits for 100 too', () => {
+  test('"Not now" waits for 50 MORE levels: at 50 -> 100 (99 no, 100 yes), then 150; closed at 73 -> 123 (122 no, 123 yes)', () => {
     const at50 = recordLegacyRatingPromptDismissed(createLegacyRatingPromptRecord(), 50);
     expect(resolveLegacyRatingPromptNextLevel(at50)).toBe(100);
     expect(shouldOfferLegacyRatingPrompt(at50, '50')).toBe(false);
@@ -89,9 +90,13 @@ describe('rating prompt thresholds (pure)', () => {
     expect(resolveLegacyRatingPromptNextLevel(at100)).toBe(150);
     expect(shouldOfferLegacyRatingPrompt(at100, '149')).toBe(false);
     expect(shouldOfferLegacyRatingPrompt(at100, '150')).toBe(true);
-    expect(resolveLegacyRatingPromptNextLevel(recordLegacyRatingPromptDismissed(createLegacyRatingPromptRecord(), 73))).toBe(100);
-    // A jump past several steps is one offer, and the next one is the step after where it closed.
-    expect(resolveLegacyRatingPromptNextLevel(recordLegacyRatingPromptDismissed(at50, 260))).toBe(300);
+    const at73 = recordLegacyRatingPromptDismissed(createLegacyRatingPromptRecord(), 73);
+    expect(resolveLegacyRatingPromptNextLevel(at73)).toBe(123);
+    expect(shouldOfferLegacyRatingPrompt(at73, '100')).toBe(false);
+    expect(shouldOfferLegacyRatingPrompt(at73, '122')).toBe(false);
+    expect(shouldOfferLegacyRatingPrompt(at73, '123')).toBe(true);
+    // A jump past the threshold is one offer, and the next one is 50 more levels after where it closed.
+    expect(resolveLegacyRatingPromptNextLevel(recordLegacyRatingPromptDismissed(at50, 260))).toBe(310);
   });
 
   test('a saved rating ends it: never again (level 500, 10 000)', () => {
@@ -188,6 +193,38 @@ describe('rating prompt gate (main-menu entry, per frame)', () => {
     expect(reloaded.enterMenu({ level: '1000' })).toEqual([]);
   });
 
+  test('closed at 73: nothing at 100 or 122, offered again at 123 (50 levels of gameplay, not a multiple of 50)', () => {
+    const h = harness();
+    const [offer] = h.enterMenu({ level: '73' });
+    expect(offer).toMatchObject({ action: 'offer', highestLevel: 73 });
+    h.gate.markClosed({ highestLevel: 73, shown: true, userId: 'user-a' });
+    expect(h.enterMenu({ level: '100' })).toEqual([]);
+    expect(h.enterMenu({ level: '122' })).toEqual([]);
+    expect(h.enterMenu({ level: '123' })).toEqual([{ action: 'offer', highestLevel: 123, userId: 'user-a' }]);
+  });
+
+  test('a storage write that fails does not lose "Not now" or a saved rating for the session', () => {
+    const broken = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
+    const h = harness(broken as never);
+    expect(h.enterMenu({ level: '50' })).toHaveLength(1);
+    h.gate.markClosed({ highestLevel: 50, shown: true, userId: 'user-a' });
+    expect(h.enterMenu({ level: '50' })).toEqual([]);
+    expect(h.enterMenu({ level: '99' })).toEqual([]);
+    expect(h.enterMenu({ level: '100' })).toHaveLength(1);
+    h.gate.markSubmitted('user-a');
+    expect(h.enterMenu({ level: '500' })).toEqual([]);
+  });
+
+  test('mergeLegacyRatingPromptRecords keeps the further-along facts', () => {
+    const merged = mergeLegacyRatingPromptRecords(
+      { dismissedAtLevel: 50, peakLevel: 60, submitted: false },
+      { dismissedAtLevel: 73, peakLevel: 70, submitted: true }
+    );
+    expect(merged).toEqual({ dismissedAtLevel: 73, peakLevel: 70, submitted: true });
+    expect(mergeLegacyRatingPromptRecords(createLegacyRatingPromptRecord(), createLegacyRatingPromptRecord()))
+      .toEqual(createLegacyRatingPromptRecord());
+  });
+
   test('"Not now" survives a reload too', () => {
     const storage = memoryStorage();
     const h = harness(storage);
@@ -197,7 +234,7 @@ describe('rating prompt gate (main-menu entry, per frame)', () => {
     expect(harness(storage).enterMenu({ level: '100' })).toHaveLength(1);
   });
 
-  test('offline / failed / rate-limited submit is not a saved rating: only markSubmitted marks it, and a close without one waits for the next 50', () => {
+  test('offline / failed / rate-limited submit is not a saved rating: only markSubmitted marks it, and a close without one waits for 50 more levels', () => {
     const storage = memoryStorage();
     const h = harness(storage);
     h.enterMenu({ level: '50' });
@@ -224,8 +261,8 @@ describe('rating prompt gate (main-menu entry, per frame)', () => {
     expect(h.enterMenu({ level: '60', userId: 'user-b' })).toEqual([{ action: 'offer', highestLevel: 60, userId: 'user-b' }]);
     h.gate.markClosed({ highestLevel: 60, shown: true, userId: 'user-b' });
     expect(h.enterMenu({ level: '120', userId: 'user-a' })).toEqual([]);
-    expect(h.enterMenu({ level: '99', userId: 'user-b' })).toEqual([]);
-    expect(h.enterMenu({ level: '100', userId: 'user-b' })).toHaveLength(1);
+    expect(h.enterMenu({ level: '109', userId: 'user-b' })).toEqual([]);
+    expect(h.enterMenu({ level: '110', userId: 'user-b' })).toHaveLength(1);
     expect([...storage.map.keys()].sort()).toEqual([
       `${LEGACY_RATING_PROMPT_STORAGE_PREFIX}user-a`,
       `${LEGACY_RATING_PROMPT_STORAGE_PREFIX}user-b`
