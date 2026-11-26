@@ -3,11 +3,11 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-25T04:33:41.000Z",
+    "registryUpdatedAt": "2026-11-26T05:47:29.000Z",
     "boardSync": {
-      "at": "2026-11-25T04:33:41.000Z",
-      "appliedEventCount": 552,
-      "lastEventId": "504cdc2ff2ed"
+      "at": "2026-11-26T05:47:29.000Z",
+      "appliedEventCount": 555,
+      "lastEventId": "875e286bae15"
     }
   },
   "counters": {
@@ -2956,7 +2956,7 @@
       "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
       "status": "review",
       "priority": "high",
-      "prs": "#700, #706, #705, #704",
+      "prs": "#700, #706, #705, #704, #710, #712, #714, #716",
       "note": ""
     },
     {
