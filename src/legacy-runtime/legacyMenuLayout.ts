@@ -43,7 +43,6 @@ export interface LegacyMenuLayout {
     controls: LegacyMenuLayoutLane | null;
     hud: LegacyMenuLayoutLane | null;
     maze: LegacyMenuLayoutLane;
-    rank: LegacyMenuLayoutLane | null;
     title: LegacyMenuLayoutLane | null;
   };
 }
@@ -717,7 +716,6 @@ export const resolveLegacyMenuLayout = (
   // on the board instead (the previous portrait behavior) drifted off the
   // actual screen center whenever the board itself sat off-center.
   const titleX = menuTitleFitsInHeader ? menuHeaderTitleCenterX : width / 2;
-  const rankLane = null;
   const actionsLane = isPlaySurface
     ? null
     : createLane(menuDockButtonY - Math.round(buttonHeight / 2), buttonHeight);
@@ -776,7 +774,6 @@ export const resolveLegacyMenuLayout = (
           ? createLane(safeAreaTop, menuTopHudReserve)
           : null,
       maze: createLane(boardTop, snappedBoardHeight),
-      rank: rankLane,
       title: (isPlaySurface || menuTitleFitsInHeader) ? null : createLane(titleLaneTop, menuTitleReserve)
     }
   };

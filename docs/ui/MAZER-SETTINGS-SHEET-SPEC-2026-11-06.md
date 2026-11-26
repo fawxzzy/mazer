@@ -89,7 +89,6 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 | `online-count-calls-menu-counter-chip-draw` | The Online icon calls `drawLegacyPresenceGlyphWord`, the chip draw behind the main-menu online counter (MAZER-UI-024), with a sample two-digit number. |
 | `menu-legend-calls-header-burger-draw` | The Menu row (L6, 2026-11-19) calls `drawMenuBurgerGlyph` from `src/render/menuDropdownArt.ts`, the same draw the main-menu header button uses for its three lines (closed state). |
 | `start-legend-calls-chip-marker-draw` | The Start row (added with Chip) calls `drawBoardMarkers` (start): corner brackets and a centre dot, over a chip tile. The copy names no colour. |
-| `rank-letters-not-visible-anywhere` | Pending row. Rank letters are not shown (`drawLegacyProgressionBadge` draws nothing). No rank copy until a player-facing rank surface exists. |
 | `level1-coach-is-owner-decision` | Pending row. A one-line level-1 coach is a separate owner decision; `src/tutorial/*` is unused. |
 | `hazard-gate-glyph-guide-local-until-board-layer` | Hazard row (slice H6), listed only while the hazard layer is on and the player has met the Pulse Gate. Guide-local glyph in `src/render/guideHazardGlyph.ts` (two posts, broken bar) until the board draws gates (H3); the intro card reuses this row's heading, text and glyph. |
 | `hazard-sentry-glyph-guide-local-until-board-layer` | Hazard row (slice H6) for the Sentry, same rules; guide-local diamond-on-a-loop glyph until H4 draws sentries. |

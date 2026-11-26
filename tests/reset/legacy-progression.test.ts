@@ -1892,9 +1892,10 @@ describe('legacy progression', () => {
     };
     const palette = resolveLegacyProgressionPalette(maxedTrack, 'ai-runner');
 
-    expect(palette.label).toBe('AI Skill Lv 5181 Rank S Runs 5180');
+    expect(palette.label).toBe('AI Skill Lv 5181 Runs 5180');
     expect(palette.label).not.toContain('S400');
     expect(palette.label).not.toContain('R:');
+    expect(palette.label).not.toMatch(/rank/i);
   });
 
   test('caps progression maze scale with the same snapped mobile render math as the board', () => {

@@ -33,7 +33,7 @@ export const TYPE_SCALE: readonly TypeScaleStep[] = Object.freeze([
   { role: 'control', sizePx: 16, weight: 600, face: 'display', uppercase: true, use: 'Button and tab labels, toggle names' },
   { role: 'heading', sizePx: 20, weight: 600, face: 'display', uppercase: true, use: 'Panel and sheet headings' },
   { role: 'title', sizePx: 28, weight: 700, face: 'display', uppercase: true, use: 'Screen titles' },
-  { role: 'display', sizePx: 40, weight: 700, face: 'display', uppercase: true, use: 'Run result and rank figures' }
+  { role: 'display', sizePx: 40, weight: 700, face: 'display', uppercase: true, use: 'Run result figures' }
 ].map((step) => Object.freeze(step) as TypeScaleStep));
 
 export const TYPE_SCALE_SIZES_PX: readonly number[] = Object.freeze(TYPE_SCALE.map((step) => step.sizePx));

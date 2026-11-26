@@ -12788,9 +12788,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveModeSelectItems(): LegacyModeSelectItem[] {
-    // Endless is today's single ladder: its stats are the player's existing level and rank, read, never written.
+    // Endless is today's single ladder: its stat is the player's existing level, read, never written.
     const track = this.progressionState.tracks.player;
-    return buildLegacyModeSelectItems({ level: track.level, rank: track.rank });
+    return buildLegacyModeSelectItems({ level: track.level });
   }
 
   private startModeSelectItem(item: LegacyModeSelectItem): void {

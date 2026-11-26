@@ -33,7 +33,7 @@ export interface LegacyModeSelectItem {
   readonly playable: boolean;
   /** One plain line shown under the rail while the entry is centred. */
   readonly tagline: string;
-  /** Per-mode facts (level, rank). Empty for a locked entry. */
+  /** Per-mode facts (the player's level). Empty for a locked entry. */
   readonly stats: readonly { readonly label: string; readonly value: string }[];
   /** The entry's maze picture, rows of LegacyModeSelectArtCell, every row the same width. */
   readonly art: readonly string[];
@@ -41,7 +41,6 @@ export interface LegacyModeSelectItem {
 
 export interface LegacyModeSelectProgress {
   readonly level: number | string;
-  readonly rank: string;
 }
 
 /** Player-facing line per registered mode. A new registry mode must add one here (pinned by a test). */
@@ -89,7 +88,7 @@ export const LEGACY_MODE_SELECT_LOCKED_ITEMS: readonly LegacyModeSelectItem[] = 
 /**
  * The selector's entries: every registered mode in registry order with that mode's own stats, then the locked
  * entries. Stats are read from the progression the player already has (Endless is today's single ladder, so its stats
- * are the existing level and rank, untouched).
+ * is the existing level, untouched).
  */
 export const buildLegacyModeSelectItems = (progress: LegacyModeSelectProgress): LegacyModeSelectItem[] => [
   ...LEGACY_GAME_MODES.map((mode): LegacyModeSelectItem => ({
@@ -97,7 +96,7 @@ export const buildLegacyModeSelectItems = (progress: LegacyModeSelectProgress): 
     id: mode.id,
     label: mode.label,
     playable: true,
-    stats: [{ label: 'Level', value: String(progress.level) }, { label: 'Rank', value: String(progress.rank) }],
+    stats: [{ label: 'Level', value: String(progress.level) }],
     tagline: LEGACY_MODE_SELECT_TAGLINES[mode.id]
   })),
   ...LEGACY_MODE_SELECT_LOCKED_ITEMS

@@ -5,7 +5,16 @@ import { join, resolve } from 'node:path';
 
 /**
  * Rank-vocabulary guard (board card mazer-player-rank-only-progression-display,
- * residual from the 2026-11-05 message audit).
+ * residual from the 2026-11-05 message audit; extended 2026-11-26 when the player
+ * rank display was removed from the whole app).
+ *
+ * Owner, 2026-11-26: no player rank (E..S letter, name, tier, badge, chip or
+ * progress) is shown anywhere, including the game-mode selector. The one
+ * deliberate exception is the leaderboard's own ordered list and its numeric
+ * positions (legacyLeaderboardView.ts), which is the leaderboard itself. The
+ * stored rank field stays (the menu AI reads it); only its display is gone.
+ * The last describe block below pins that: the player-facing modules carry no
+ * 'rank' in any string literal.
  *
  * Question: the label built by resolveLegacyProgressionPalette in
  * src/legacy-runtime/legacyProgression.ts ('Player Skill Lv ..' / 'AI Skill Lv
@@ -126,9 +135,9 @@ describe('rank vocabulary: Skill wording stays out of player-facing surfaces', {
     }
     expect(
       offenders,
-      'Public progression vocabulary is Rank / AI Rank only (card mazer-player-rank-only-progression-display). '
+      'No Skill or rank wording is player-facing (card mazer-player-rank-only-progression-display). '
       + "'Skill' wording appeared in a string literal outside the diagnostics label builder. "
-      + 'Use Rank wording, or keep the text out of every player-visible surface and extend this allow-list on purpose.'
+      + 'Keep the text out of every player-visible surface, or extend this allow-list on purpose.'
     ).toEqual([]);
   });
 
@@ -187,7 +196,7 @@ describe('rank vocabulary: the palette label has no render path', { timeout: GUA
     expect(
       readers,
       'LegacyProgressionPalette.label gained a reader. The audit found none, so it was diagnostics-only. '
-      + 'If it is meant to be shown, it must use Rank wording and be routed through the player-message/rank display contract first.'
+      + 'If it is meant to be shown, it must be routed through the player-message contract first (and carry no rank wording).'
     ).toEqual([]);
   });
 
@@ -292,7 +301,7 @@ describe('rank vocabulary: the palette label has no render path', { timeout: GUA
     const menu = text(MENU);
     expect(
       menu.match(/\b(?:menuAi)?[pP]rogressionBadge(?:Label)?Text\.(?:setText|text\s*=)/g) ?? [],
-      'A progression badge text object is being written. The badge is retired; if it returns, it must show Rank wording.'
+      'A progression badge text object is being written. The badge is retired and no rank is shown anywhere.'
     ).toEqual([]);
     const sourceFile = parse(MENU);
     let body: string | null = null;
@@ -306,5 +315,44 @@ describe('rank vocabulary: the palette label has no render path', { timeout: GUA
     expect(body).not.toBeNull();
     expect(body).toContain('return null;');
     expect(body).not.toMatch(/label|palette|add\.text|setText/i);
+  });
+});
+
+describe('rank vocabulary: no player rank is displayed anywhere (owner, 2026-11-26)', { timeout: GUARD_TIMEOUT_MS }, () => {
+  // Player-facing modules. legacyLeaderboard*.ts is deliberately absent: its numeric positions are the leaderboard.
+  const PLAYER_FACING = [
+    'src/legacy-runtime/legacyModeSelectPlan.ts',
+    'src/legacy-runtime/legacyGuideContent.ts',
+    'src/legacy-runtime/legacyProgressionResetFlow.ts',
+    'src/legacy-runtime/legacyGameModes.ts',
+    ...srcFiles.filter((file) => /^src\/ui\/.*\.(ts|css|html)$/.test(file))
+  ];
+
+  test("no string literal in a player-facing module contains 'rank'", () => {
+    const offenders: string[] = [];
+    for (const file of PLAYER_FACING.filter((name) => /\.ts$/.test(name))) {
+      const sourceFile = parse(file);
+      const visit = (node: ts.Node): void => {
+        const value = literalValue(node);
+        if (value !== null && /rank/i.test(value)) {
+          const line = sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+          offenders.push(`${file}:${line} ${JSON.stringify(value)}`);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+    }
+    expect(offenders, 'A player-facing module shows rank wording; the player rank display was removed on purpose').toEqual([]);
+  });
+
+  test('the mode-select entries show the level only, never a rank stat', () => {
+    const source = text('src/legacy-runtime/legacyModeSelectPlan.ts');
+    expect(source).not.toMatch(/label:\s*'Rank'/);
+    expect(source).not.toMatch(/\.rank/);
+    expect(source).toContain("{ label: 'Level', value: String(progress.level) }");
+  });
+
+  test('the run-status rank badge module is gone', () => {
+    expect(existsSync(resolve(root, 'src/legacy-runtime/legacyRunStatusViewModel.ts'))).toBe(false);
   });
 });

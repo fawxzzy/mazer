@@ -4,6 +4,8 @@ Board card: `mazer-shared-run-status-panel`. Scope of this packet: the pure view
 
 ## Status
 
+- **Retired (2026-11-26):** the module and its test were deleted when the player rank display was removed from the whole app. It was never wired. `resolveLegacyRunStatusPanelLayout` stays in `legacyUiStandards.ts`. The text below is kept as history.
+
 - Source: `src/legacy-runtime/legacyRunStatusViewModel.ts` (pure; no Phaser, no rendering).
 - Tests: `tests/reset/legacy-run-status-view-model.test.ts`.
 - Not wired. `MenuScene` still does not use the panel or this module, consistent with the no score/rank panel stance in `docs/current-truth.md` and the guard assertions in `tests/scenes/menu-render-frame.test.ts`. `resolveLegacyRunStatusPanelLayout` is reused unchanged.

@@ -1685,7 +1685,7 @@ export const resolveLegacyProgressionPalette = (
 
   return {
     ...palette,
-    label: `${trackLabel} Lv ${String(track.level).padStart(2, '0')} Rank ${track.rank} Runs ${formatLegacyProgressionCycleCount(track.completedCycles)}`,
+    label: `${trackLabel} Lv ${String(track.level).padStart(2, '0')} Runs ${formatLegacyProgressionCycleCount(track.completedCycles)}`,
     tier
   };
 };
