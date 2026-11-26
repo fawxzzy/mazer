@@ -167,7 +167,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'trail',
-    text: `A trail of twinkling star dust marks your route. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
+    text: `Star dust marks your route; step back to wipe it. ${REDUCED_MOTION_SETTING_LABEL} in Settings calms it.`
   },
   {
     heading: 'Wrap',

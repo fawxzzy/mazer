@@ -1,8 +1,9 @@
 /**
  * The grid path the play trail is drawn along, with its live head.
  *
- * The drawn trail is the shortest path over visited tiles from the trail's origin to the player's logical tile
- * (MenuScene.resolveLegacyPlayPerfectPathTrail). While a step glides, the head is drawn at the interpolated point
+ * The drawn trail is the path the player walked, ending on the player's logical tile (src/legacy-runtime/
+ * legacyWalkedTrail.ts via MenuScene.resolveLegacyPlayPerfectPathTrail; until 2026-11-25 the shortest visited route).
+ * While a step glides, the head is drawn at the interpolated point
  * between the tile the player left (`previousTile`) and the tile it arrived on (the path's last point).
  *
  * Two cases, and they are not symmetric (owner, 2026-11-11: "player trail breaks and tweaks when travelling backwards

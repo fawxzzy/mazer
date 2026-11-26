@@ -201,10 +201,15 @@ describe('guide copy only names things that exist', () => {
   });
 
   test('Trail row: the copy says the route is twinkling star dust, and the board and legend draw the Star dust skin', () => {
-    expect(row('trail').text).toMatch(/twinkling star dust marks your route/);
+    expect(row('trail').text).toMatch(/star dust marks your route/i);
     expect(read('src/render/skinRegistry.ts')).toContain("DEFAULT_TRAIL_SKIN: TrailSkinId = 'star-dust'");
     expect(sceneMethod('private drawTrailCanvasSegments(')).toContain('drawStarDustTrailToCanvasContext(');
     expect(read('src/render/trailPalette.ts')).toMatch(/export const sampleIridescentTrail/);
+  });
+
+  test('Trail row: the copy says stepping back wipes the trail, and the scene draws the walked trail (2026-11-25)', () => {
+    expect(row('trail').text).toMatch(/step back to wipe it/);
+    expect(sceneMethod('private computeLegacyPlayPerfectPathTrail(')).toContain('resolveLegacyWalkedTrail(this.trail, this.player)');
   });
 
   test('Trail row names the Settings toggle by its live label, and no Guide row names a removed setting', () => {
