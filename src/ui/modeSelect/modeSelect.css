@@ -1,0 +1,194 @@
+/*
+ * Game-mode selector, look D "Depth and parallax" (owner pick 2026-11-25; the proposal is game-mode-options.html,
+ * option D). Colours come only from the shared tokens (tokens.css, remapped by the dark neon theme) and from custom
+ * properties modeSelectMount.ts fills from src/render/palette.ts, so this file holds no colour literal. Fonts are the
+ * shipped ones: Space Grotesk for text, Oxanium for short uppercase labels.
+ *
+ * The menu canvas behind already draws the overlay dim; this layer adds no backdrop of its own beyond the far star field.
+ */
+
+.mazer-mode-select {
+  --mms-item-w: min(58cqw, 260px);
+  box-sizing: border-box;
+  color: var(--mazer-token-color-text-primary);
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top, 0px)) env(safe-area-inset-right, 0px) max(16px, env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
+  position: fixed;
+  scrollbar-width: none;
+  /* The page itself is touch-action: none; inside the selector a vertical pan may scroll a short (landscape) layout. */
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  /* Above the game canvas and the accessibility surface (30), below the feedback popup (45) and the boot error screen (50). */
+  z-index: 44;
+}
+
+.mazer-mode-select::-webkit-scrollbar { display: none; }
+.mazer-mode-select *, .mazer-mode-select *::before, .mazer-mode-select *::after { box-sizing: border-box; }
+
+/* Far layer: a star field that moves slower than the rail (the parallax). */
+.mms-far {
+  background-image:
+    radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--mazer-token-color-text-primary) 60%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 60%, color-mix(in srgb, var(--mazer-token-color-text-primary) 45%, transparent) 0 1px, transparent 2px),
+    radial-gradient(circle at 45% 85%, color-mix(in srgb, var(--mms-accent-deep) 80%, transparent) 0 2px, transparent 3px);
+  background-position-x: calc(var(--mms-scroll, 0) * -0.35px);
+  background-size: 140px 120px, 190px 160px, 260px 220px;
+  inset: 0;
+  opacity: .9;
+  pointer-events: none;
+  position: fixed;
+}
+
+.mms-stack {
+  align-items: center;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.mms-kicker {
+  color: var(--mazer-token-color-text-muted);
+  font: 600 .78rem/1 "Oxanium", var(--mazer-token-font-ui);
+  letter-spacing: .22em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.mms-tagline {
+  font-size: 1rem;
+  line-height: 1.3;
+  margin: 0;
+  min-height: 1.3em;
+  padding: 0 20px;
+  text-align: center;
+}
+
+.mms-chips { display: flex; gap: 8px; justify-content: center; min-height: 28px; }
+.mms-chip {
+  border: 1px solid var(--mazer-token-color-line-normal);
+  border-radius: var(--mazer-token-radius-round);
+  color: var(--mazer-token-color-semantic-info);
+  font-size: .82rem;
+  padding: 4px 12px;
+}
+
+.mms-actions { align-items: center; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.mms-play, .mms-back { min-height: 48px; width: min(calc(100% - 48px), 320px); }
+/* Locked: a flat, clearly inactive button (the kit's disabled tint stays too saturated on the neon accent). */
+.mms-play:disabled {
+  background: var(--mazer-token-color-bg-elevated);
+  border: 1px solid var(--mazer-token-color-line-subtle);
+  color: var(--mazer-token-color-text-disabled);
+  cursor: default;
+  opacity: 1;
+}
+
+/* Rail: native touch scroll and snap; mouse drag, wheel and keys in modeSelectRail.ts. */
+.mms-rail {
+  container-type: inline-size;
+  cursor: grab;
+  margin-block: -22px;
+  outline: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  padding-block: 22px;
+  position: relative;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+.mms-rail::-webkit-scrollbar { display: none; }
+.mms-rail.is-dragging { cursor: grabbing; scroll-snap-type: none; }
+.mms-track { display: flex; width: max-content; }
+.mms-track::before, .mms-track::after { content: ""; flex: 0 0 var(--mms-pad, 0px); }
+
+.mms-item {
+  align-items: center;
+  appearance: none;
+  /* Solid, so the menu's demo corridor behind the dim never shows through the picture or the name; the neighbours fade
+     through their opacity instead. */
+  background: linear-gradient(180deg, var(--mazer-token-color-bg-elevated), var(--mazer-token-color-bg-panel));
+  border: 1px solid color-mix(in srgb, var(--mazer-token-color-line-normal) 60%, transparent);
+  border-radius: var(--mazer-token-radius-panel);
+  color: var(--mazer-token-color-text-primary);
+  cursor: inherit;
+  display: flex;
+  flex: 0 0 var(--mms-item-w);
+  flex-direction: column;
+  font: inherit;
+  gap: 10px;
+  margin: 0 8px;
+  opacity: calc(1 - var(--ad, 0) * .4);
+  overflow: hidden;
+  padding: 18px 10px 16px;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  text-align: center;
+  transform: perspective(760px) translateZ(calc(var(--ad, 0) * -60px)) rotateY(calc(var(--d, 0) * -34deg));
+  -webkit-tap-highlight-color: transparent;
+}
+.mms-item.is-active {
+  border-color: var(--mazer-token-color-brand-mint);
+  box-shadow: 0 18px 30px -18px var(--mms-accent-deep);
+}
+.mms-item:focus-visible, .mms-rail:focus-visible .mms-item.is-active {
+  outline: 2px solid var(--mazer-token-color-semantic-info);
+  outline-offset: 3px;
+}
+.mms-name { font: 700 1.5rem/1.1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .08em; text-transform: uppercase; }
+.mms-sub { color: var(--mazer-token-color-text-muted); font-size: .85rem; line-height: 1.25; }
+.mms-item.is-locked .mms-name { color: var(--mazer-token-color-text-muted); }
+.mms-art { transform: translateX(calc(var(--d, 0) * -16px)) scale(1.06); }
+.mms-name, .mms-sub { transform: translateX(calc(var(--d, 0) * 34px)); }
+
+/* Maze picture: Chip tiles as DOM boxes (corridor fill, lit rim, rounded), never an image, SVG or canvas. */
+.mms-art { display: grid; gap: 3px; grid-template-columns: repeat(var(--mms-cols), 1fr); pointer-events: none; width: 100%; }
+.mms-tile { aspect-ratio: 1; border-radius: 26%; display: block; position: relative; }
+.mms-tile--wall { background: radial-gradient(circle, var(--mms-socket) 0 16%, transparent 19%); }
+.mms-tile--path, .mms-tile--start, .mms-tile--end, .mms-tile--trail, .mms-tile--gate, .mms-tile--hazard {
+  background: var(--mms-corridor);
+  border: 1px solid var(--mms-corridor-edge);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mazer-token-color-text-primary) 12%, transparent);
+}
+.mms-tile--trail {
+  background: color-mix(in srgb, var(--mms-trail) 34%, var(--mms-corridor));
+  border-color: color-mix(in srgb, var(--mms-trail) 70%, var(--mms-corridor-edge));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--mms-trail-glow) 55%, transparent);
+}
+.mms-tile--start::after { background: radial-gradient(circle, var(--mms-start-core) 0 22%, var(--mms-start) 24% 48%, transparent 52%); content: ""; inset: 0; position: absolute; }
+.mms-tile--end::after { background: var(--mms-goal); clip-path: polygon(50% 6%, 62% 38%, 96% 38%, 68% 58%, 80% 92%, 50% 70%, 20% 92%, 32% 58%, 4% 38%, 38% 38%); content: ""; inset: 6%; position: absolute; }
+.mms-tile--gate { box-shadow: inset 0 0 0 2px var(--mms-gate), 0 0 8px color-mix(in srgb, var(--mms-gate) 60%, transparent); }
+.mms-tile--hazard::after { background: var(--mms-gate); content: ""; inset: 28%; position: absolute; transform: rotate(45deg); }
+.mms-item.is-locked .mms-art { filter: saturate(.55); opacity: .8; }
+
+/* Reduced motion (device setting or the in-game Settings switch): no turn, no depth, no parallax drift. */
+.mazer-mode-select.is-reduced-motion .mms-item,
+.mazer-mode-select.is-reduced-motion .mms-art,
+.mazer-mode-select.is-reduced-motion .mms-name,
+.mazer-mode-select.is-reduced-motion .mms-sub { transform: none; }
+.mazer-mode-select.is-reduced-motion .mms-far { background-position-x: 0; }
+
+/* Short screens (a phone on its side): smaller cards, tighter spacing; the layer scrolls if it still does not fit. */
+@media (max-height: 560px) {
+  .mazer-mode-select { --mms-item-w: min(30cqw, 190px); padding-top: max(10px, env(safe-area-inset-top, 0px)); padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .mms-stack { gap: 8px; }
+  .mms-item { gap: 6px; padding: 12px 8px 10px; }
+  .mms-name { font-size: 1.15rem; }
+  .mms-actions { flex-direction: row; justify-content: center; }
+  .mms-play, .mms-back { width: min(calc(50% - 32px), 240px); }
+}
