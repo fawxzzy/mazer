@@ -1465,7 +1465,9 @@ const getPauseButtonPoint = (visual) => {
     : null;
 };
 
-// Clicks the Endless card when the mode-select sheet is open (a no-op when the tap was swallowed or play started).
+// Clicks "Play Endless" when the mode-select selector is open (a no-op when the tap was swallowed or play started).
+// Look D (2026-11-25): the selector is a DOM layer over the canvas that opens centred on Endless; its Play button is
+// [data-mode-select-play].
 export const chooseEndlessIfModeSelectOpen = async (page, { timeoutMs = 700 } = {}) => {
   try {
     await page.waitForFunction((attribute) => {
@@ -1480,12 +1482,13 @@ export const chooseEndlessIfModeSelectOpen = async (page, { timeoutMs = 700 } = 
   }
   // The sheet ignores taps for its input guard window (LEGACY_MODE_SELECT_INPUT_GUARD_MS = 250) after it opens.
   await page.waitForTimeout(350);
-  const raw = await page.evaluate((attribute) => document.documentElement.getAttribute(attribute), VISUAL_DIAGNOSTICS_ATTRIBUTE);
-  const point = getVisualButtonPoint(JSON.parse(raw ?? 'null'), 'Endless');
-  if (!point) {
+  const play = page.locator('[data-mode-select-play]:not([disabled])');
+  try {
+    await play.waitFor({ state: 'visible', timeout: 3_000 });
+  } catch {
     return false;
   }
-  await page.mouse.click(point.x, point.y);
+  await play.click();
   return true;
 };
 

@@ -12,6 +12,7 @@ import {
 const read = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8').replace(/\r\n/g, '\n');
 const menuScene = read('src/scenes/MenuScene.ts');
 const planSource = read('src/legacy-runtime/legacyModeSelectPlan.ts');
+const layerSource = read('src/legacy-runtime/legacyModeSelectLayer.ts');
 
 /** The scene code the sheet adds: from requestLegacyPlayStart up to (not including) buildLeaderboardOverlay. */
 const sheetRegion = (): string => {
@@ -22,7 +23,7 @@ const sheetRegion = (): string => {
   return menuScene.slice(start, end);
 };
 
-describe('mode-select flow contract (MAZER-MODE-002)', () => {
+describe('mode-select flow contract (MAZER-MODE-002, look D)', () => {
   test('both Play entry points (tap anywhere and the Play button) go through the one mode-select hook', () => {
     // tap anywhere, the Play button and keyboard Enter on the menu.
     expect(menuScene.match(/this\.requestLegacyPlayStart\(\)/g)).toHaveLength(3);
@@ -35,7 +36,7 @@ describe('mode-select flow contract (MAZER-MODE-002)', () => {
   test('choosing Endless closes the sheet and starts the run through the existing START_RUN path', () => {
     const region = sheetRegion();
     const start = region.indexOf('private startModeSelectItem(item: LegacyModeSelectItem): void {');
-    const body = region.slice(start, region.indexOf('private createModeSelectHitZone('));
+    const body = region.slice(start, region.indexOf('private startModeSelectFallback('));
     expect(body).toContain('if (!item.playable || this.isModeSelectInputGuarded()) {');
     expect(body.indexOf('this.closeOverlay();')).toBeGreaterThan(0);
     expect(body.indexOf("{ type: 'START_RUN' }")).toBeGreaterThan(body.indexOf('this.closeOverlay();'));
@@ -62,17 +63,32 @@ describe('mode-select flow contract (MAZER-MODE-002)', () => {
     expect(menuScene).toContain("if (event.key === 'Escape') {\n      event.preventDefault();\n      // The open menu dropdown is the topmost surface: Esc closes it before anything else.\n      if (!this.menuDropdown.close()) {\n        this.handleBackAction();");
   });
 
-  test('input guard: opening and closing the sheet start a window in which Play, cards and Back are ignored', () => {
+  test('input guard: opening and closing the selector start a window in which Play, the rail and Back are ignored', () => {
     const region = sheetRegion();
     expect(menuScene).toContain('private modeSelectInputGuardStartedAt: number | null = null;');
     // open: the hook ignores Play inside the window and stamps the window when it opens
     expect(region).toContain('if (this.isModeSelectInputGuarded()) {\n        return;\n      }\n      this.modeSelectInputGuardStartedAt = this.time.now;');
-    // cards, the Play button path (startModeSelectItem), Enter, and Back all check the guard
-    expect(region).toContain('if (this.isModeSelectInputGuarded()) {\n          return;\n        }\n        this.modeSelectIndex = entry.index;');
-    expect(region).toContain('if (!this.isModeSelectInputGuarded()) {\n          this.handleBackAction();');
+    // the rail's Play (button, centred-card tap, Enter on the rail), startModeSelectItem, scene Enter and Back all check it
+    // measured from the press (pressAgeMs from the rail): a DOM tap lands on release, the old canvas path on pointerdown
+    expect(region).toContain('onPlay: (index, pressAgeMs) => {\n        if (this.isModeSelectInputGuarded(pressAgeMs)) {\n          return;\n        }\n        this.modeSelectIndex = index;\n        this.startModeSelectItem(items[index]!);');
+    expect(region).toContain('onBack: (pressAgeMs) => {\n        if (!this.isModeSelectInputGuarded(pressAgeMs)) {\n          this.handleBackAction();');
+    expect(region).toContain('return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt, pressAgeMs);');
     // close: closeOverlay stamps the window before the sheet state is cleared
     const close = menuScene.slice(menuScene.indexOf('private closeOverlay(): void {'));
     expect(close.slice(0, 700)).toContain("if (this.overlay === 'mode-select') {\n      this.modeSelectInputGuardStartedAt = this.time.now;");
+  });
+
+  test('a held Enter / Space never plays: the rail drops key auto-repeat before any play or native button meaning', () => {
+    const rail = read('src/ui/modeSelect/modeSelectRail.ts');
+    const handleKey = rail.slice(rail.indexOf('const handleKey = (event: KeyboardEvent): boolean => {'));
+    const held = handleKey.indexOf('if (isModeSelectHeldActivationKey(event.key, event.repeat)) {\n      event.preventDefault();\n      return false;');
+    expect(held).toBeGreaterThan(0);
+    expect(held).toBeLessThan(handleKey.indexOf("(target === play || target === back)) return false;"));
+    expect(held).toBeLessThan(handleKey.indexOf("case 'play':"));
+    // the scene's own key handler already drops repeats before its Enter branches
+    const sceneRepeat = menuScene.indexOf('    if (event.repeat) {\n      return false;\n    }');
+    expect(sceneRepeat).toBeGreaterThan(0);
+    expect(sceneRepeat).toBeLessThan(menuScene.indexOf("if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {"));
   });
 
   test('the sheet code reads progression but never writes storage, progression, the outbox, the network or a leaderboard', () => {
@@ -99,13 +115,27 @@ describe('mode-select flow contract (MAZER-MODE-002)', () => {
   });
 
   test('the plan module is pure: no Phaser, DOM, storage, network or progression imports', () => {
-    const imports = planSource.match(/^import .* from '.*';$/gm) ?? [];
-    expect(imports.sort()).toEqual([
-      "import { LEGACY_GAME_MODES, type LegacyGameModeId } from './legacyGameModes';",
-      "import { LEGACY_SETTINGS_SIZES, type LegacySettingsRect } from './legacySettingsSheetPlan';",
-      "import { LEGACY_UI_COMPACT_BREAKPOINT, resolveLegacyOverlayPanelLayout } from './legacyUiStandards';"
-    ].sort());
+    const imports = planSource.match(/^import [\s\S]*? from '.*';$/gm) ?? [];
+    expect(imports).toEqual([
+      "import { LEGACY_DEFAULT_GAME_MODE_ID, LEGACY_GAME_MODES, type LegacyGameModeId } from './legacyGameModes';"
+    ]);
     expect(planSource).not.toMatch(/localStorage|sessionStorage|window\.|document\.|fetch\(/);
+  });
+
+  test('the selector DOM is one lazily loaded layer: the scene wires the controller, never the DOM module', () => {
+    // MenuScene imports the controller only; the controller reaches the DOM mount through a dynamic import.
+    expect(menuScene).toContain("import { createLegacyModeSelectLayer } from '../legacy-runtime/legacyModeSelectLayer';");
+    expect(menuScene).not.toContain('ui/modeSelect/');
+    expect(layerSource).toContain("import('../ui/modeSelect/modeSelectMount')");
+    expect(layerSource).not.toMatch(/^import (?!type )[^;]*? from '\.\.\/ui\//m);
+    expect(layerSource).not.toMatch(/from 'phaser'|localStorage|sessionStorage|\bfetch\(/);
+    // rebuilds keep it in step with the overlay (exactly one), close takes it down, shutdown destroys it
+    expect(menuScene).toContain("this.modeSelectLayer.syncVisibility(this.overlay === 'mode-select' && this.mode === 'menu');");
+    expect(menuScene).toContain('this.modeSelectLayer.hide();');
+    expect(menuScene).toContain('this.modeSelectLayer.destroy()');
+    // the canvas no longer paints mode cards or owns hit zones for them
+    expect(menuScene).not.toContain('createModeSelectHitZone');
+    expect(menuScene).not.toContain('paintModeSelect');
   });
 
   test('Endless keeps its legacy storage keys: the sheet adds no key and renames none', () => {
@@ -116,11 +146,14 @@ describe('mode-select flow contract (MAZER-MODE-002)', () => {
     expect(planSource).not.toMatch(/mazer\.[a-z-]+\.v\d/);
   });
 
-  test('the registry is unchanged: Endless is the only mode, Hazards is reserved and unreachable', () => {
+  test('the registry is unchanged: Endless is the only mode; Hazards is shown locked but never registered or startable', () => {
     expect(LEGACY_GAME_MODES.map((mode) => mode.id)).toEqual(['endless']);
     expect(LEGACY_RESERVED_GAME_MODE_SLOTS.map((slot) => slot.slot)).toEqual(['hazards']);
     expect(isLegacyGameModeId('hazards')).toBe(false);
-    expect(planSource.toLowerCase()).not.toContain('hazards');
+    // Look D shows Hazards, Sprint and Daily as locked "Coming soon" names (owner pick 2026-11-25). The plan names it
+    // only in the locked list; the scene never names it, and the ?lab=hazards flag is not read here.
+    expect(planSource).toMatch(/id: 'hazards',[^}]*playable: false/);
+    expect(planSource).not.toMatch(/URLSearchParams|location\.|isLegacyHazard|legacyHazardLab/);
     expect(sheetRegion().toLowerCase()).not.toContain('hazards');
   });
 });

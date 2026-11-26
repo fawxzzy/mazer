@@ -1,0 +1,5 @@
+- WHAT changed: The real menu's game-mode selector is now look D "Depth and parallax" from `game-mode-options.html` (PR #711), replacing the canvas mode-select sheet. It is a DOM layer over the dimmed menu canvas (`src/ui/modeSelect/`), driven by a one-layer controller (`src/legacy-runtime/legacyModeSelectLayer.ts`, lazy import, prefetch, fallback to starting Endless). Endless is playable as before; Hazards, Sprint and Daily are locked with "Coming soon". `MenuScene.ts` only wires it.
+- WHY it changed: Zac picked D on 2026-11-25 and asked for it in the real menu.
+- Rule: a DOM overlay over the canvas owns its keys (stop propagation at the root, Tab trap, focus restore) and only its scroller pans; a click on a card must not take focus off the scroller.
+- Checked: headless Chromium and WebKit at 393x851 DPR 2.625 and 1280x720 (plus Chromium reduced motion), every PNG read. Not checked: a real phone, WebKit touch swipe.
+- Status: Applied

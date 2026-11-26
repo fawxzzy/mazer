@@ -627,13 +627,12 @@ import {
 } from '../legacy-runtime/legacyLeaderboardOverlayPlan';
 import {
   buildLegacyModeSelectItems,
-  buildLegacyModeSelectPlan,
   isLegacyModeSelectInputGuarded,
+  resolveLegacyModeSelectInitialIndex,
   resolveLegacyModeSelectKeyboardChoice,
-  type LegacyModeSelectItem,
-  type LegacyModeSelectPlan,
-  type LegacyModeSelectRect
+  type LegacyModeSelectItem
 } from '../legacy-runtime/legacyModeSelectPlan';
+import { createLegacyModeSelectLayer } from '../legacy-runtime/legacyModeSelectLayer';
 import {
   buildLegacyLeaderboardViewModel,
   resolveLegacyLeaderboardRequest,
@@ -1985,6 +1984,8 @@ export class MenuScene extends Phaser.Scene {
     isDarkTheme: () => this.darkModeEnabled,
     onClosed: () => { this.uiDirty = true; }
   });
+  // MAZER-MODE-002 look D: the game-mode selector is a DOM layer over the dimmed menu canvas (loaded on demand).
+  private readonly modeSelectLayer = createLegacyModeSelectLayer({ onUnavailable: () => this.startModeSelectFallback() });
   private readonly ratingPromptGate = createLegacyRatingPromptGate({ storage: () => this.resolveBrowserLocalStorage() });
   private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
     coarsePointer: true,
@@ -2609,6 +2610,9 @@ export class MenuScene extends Phaser.Scene {
     // A restarted scene keeps its fields: re-arm the launcher the previous SHUTDOWN destroyed.
     this.feedbackLauncher.activate();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.feedbackLauncher.destroy());
+    this.modeSelectLayer.activate();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.modeSelectLayer.destroy());
+    this.time.delayedCall(1200, () => this.modeSelectLayer.prefetch());
     // The rating prompt treats the first menu frame after a (re)create as a fresh main-menu entry.
     this.ratingPromptGate.reset();
     // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
@@ -11628,6 +11632,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.clear();
     this.clearUi();
     this.menuDropdown.syncVisibility(this.overlay === 'none' && this.mode === 'menu');
+    this.modeSelectLayer.syncVisibility(this.overlay === 'mode-select' && this.mode === 'menu');
     this.playMenu.syncVisibility(this.isLegacyPlayMenuDropdownView());
     this.overlayScrimCloseBounds = null;
     this.overlayGuideBounds = null;
@@ -12766,11 +12771,12 @@ export class MenuScene extends Phaser.Scene {
     this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
   }
 
-  private isModeSelectInputGuarded(): boolean {
-    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt);
+  // pressAgeMs: a DOM tap lands on release, so the guard is measured from when its press began (the rail reports it).
+  private isModeSelectInputGuarded(pressAgeMs = 0): boolean {
+    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt, pressAgeMs);
   }
 
-  // Keyboard Enter on the sheet: the selected playable entry, or the only playable one; never a locked slot.
+  // Keyboard Enter on the selector before its DOM layer has focus: the centred entry if it is playable; never a locked one.
   private pressModeSelectEnter(): void {
     if (this.isModeSelectInputGuarded()) {
       return;
@@ -12796,183 +12802,46 @@ export class MenuScene extends Phaser.Scene {
     this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
   }
 
-  private createModeSelectHitZone(rect: LegacyModeSelectRect, text: string, onClick: () => void): UiButton {
-    const cx = rect.left + (rect.width / 2);
-    const cy = rect.top + (rect.height / 2);
-    const background = this.add.rectangle(cx, cy, rect.width, rect.height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', onClick);
-    const label = this.add.text(cx, cy, '', { fontSize: '1px' }).setVisible(false);
-    return {
-      background,
-      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      },
-      label,
-      setActive: () => undefined,
-      text
-    };
-  }
-
-  private paintModeSelectLock(cx: number, cy: number, color: number, alpha: number): void {
-    const g = this.overlayGraphics;
-    g.lineStyle(2, color, alpha);
-    g.beginPath();
-    g.arc(cx, cy - 3, 5, Math.PI, 0, false);
-    g.strokePath();
-    g.fillStyle(color, alpha);
-    g.fillRoundedRect(cx - 7, cy - 3, 14, 11, 3);
-  }
-
-  private paintModeSelectGlyph(id: string, cx: number, cy: number, color: number, alpha: number): void {
-    const g = this.overlayGraphics;
-    if (id === 'endless') {
-      // A corridor with a star at its end: the one-line summary of Endless.
-      g.lineStyle(3, color, alpha);
-      g.beginPath();
-      g.moveTo(cx - 22, cy + 10);
-      g.lineTo(cx - 6, cy + 10);
-      g.lineTo(cx - 6, cy - 8);
-      g.lineTo(cx + 14, cy - 8);
-      g.strokePath();
-      g.fillStyle(color, alpha);
-      g.fillCircle(cx + 20, cy - 8, 4);
+  // The selector's code could not load (offline after an update): Play still has to start a run, so start Endless
+  // through the same item path (the guard is cleared first: this is not a second tap).
+  private startModeSelectFallback(): void {
+    if (this.mode !== 'menu' || this.overlay !== 'mode-select') {
       return;
     }
-    g.lineStyle(3, color, alpha);
-    g.beginPath();
-    g.moveTo(cx - 10, cy);
-    g.lineTo(cx + 10, cy);
-    g.moveTo(cx, cy - 10);
-    g.lineTo(cx, cy + 10);
-    g.strokePath();
+    const items = this.resolveModeSelectItems();
+    this.modeSelectInputGuardStartedAt = null;
+    this.startModeSelectItem(items[resolveLegacyModeSelectInitialIndex(items)]!);
   }
 
-  private paintModeSelectCardChrome(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): { accent: number; textColor: number; alpha: number } {
-    const material = cyberArcadeMaterial;
-    const g = this.overlayGraphics;
-    const accent = item.playable ? material.rail.mint : material.rail.muted;
-    const lit = item.playable && selected;
-    g.fillStyle(accent, lit ? 0.14 : (item.playable ? 0.07 : 0.04));
-    g.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, LEGACY_UI_CONTROL_RADIUS);
-    const lockedSelected = selected && !item.playable;
-    g.lineStyle(lit || lockedSelected ? 2 : 1, accent, lit ? 0.85 : (lockedSelected ? 0.75 : (item.playable ? 0.45 : 0.3)));
-    g.strokeRoundedRect(rect.left + 0.5, rect.top + 0.5, rect.width - 1, rect.height - 1, LEGACY_UI_CONTROL_RADIUS);
-    return { accent, alpha: item.playable ? 1 : 0.6, textColor: item.playable ? 0xecfff5 : material.rail.muted };
-  }
-
-  private formatModeSelectStats(item: LegacyModeSelectItem): string {
-    return item.stats.map((stat) => `${stat.label} ${stat.value}`).join('   ');
-  }
-
-  private paintModeSelectStackCard(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
-    const material = cyberArcadeMaterial;
-    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
-    const textLeft = rect.left + 68;
-    this.paintModeSelectGlyph(item.id, rect.left + 36, rect.top + (rect.height / 2), chrome.accent, chrome.alpha);
-    // A locked card has no stats row, so its two lines sit lower to stay centred in the card.
-    const labelTop = item.playable ? 26 : 34;
-    this.addLegacyLeaderboardText(textLeft, rect.top + labelTop, item.label, chrome.textColor, 18, 0, rect.width - 68 - 44, { bold: true });
-    this.addLegacyLeaderboardText(textLeft, rect.top + labelTop + 23, item.tagline, material.rail.muted, 12, 0, rect.width - 68 - 44);
-    if (item.playable) {
-      this.addLegacyLeaderboardText(textLeft, rect.top + 71, this.formatModeSelectStats(item), material.rail.mint, 12, 0, rect.width - 68 - 44, { bold: true });
-      this.addLegacyLeaderboardText(rect.left + rect.width - 22, rect.top + (rect.height / 2), '>', material.rail.mint, 22, 0.5, 24, { bold: true });
-    } else {
-      this.paintModeSelectLock(rect.left + rect.width - 26, rect.top + (rect.height / 2), material.rail.muted, 0.8);
-    }
-  }
-
-  private paintModeSelectTile(rect: LegacyModeSelectRect, item: LegacyModeSelectItem, selected: boolean): void {
-    const material = cyberArcadeMaterial;
-    const chrome = this.paintModeSelectCardChrome(rect, item, selected);
-    const cx = rect.left + (rect.width / 2);
-    this.paintModeSelectGlyph(item.id, cx, rect.top + 36, chrome.accent, chrome.alpha);
-    this.addLegacyLeaderboardText(cx, rect.top + 82, item.label, chrome.textColor, 17, 0.5, rect.width - 16, { bold: true });
-    if (item.playable) {
-      this.addLegacyLeaderboardText(cx, rect.top + 108, this.formatModeSelectStats(item).replace('Level ', 'Lv '), material.rail.mint, 13, 0.5, rect.width - 16, { bold: true });
-    } else {
-      this.paintModeSelectLock(cx, rect.top + 112, material.rail.muted, 0.8);
-    }
-    this.addLegacyLeaderboardText(cx, rect.top + 136, item.playable ? 'Tap to select' : item.tagline, material.rail.muted, 11, 0.5, rect.width - 16);
-  }
-
+  // Look D (owner pick 2026-11-25): a DOM rail of modes over the dimmed canvas (legacyModeSelectLayer.ts,
+  // src/ui/modeSelect). The canvas only draws the dim (drawOverlayPanel); show() is idempotent across rebuilds.
   private buildModeSelectOverlay(): void {
     const items = this.resolveModeSelectItems();
-    const plan: LegacyModeSelectPlan = buildLegacyModeSelectPlan(
+    const initialIndex = resolveLegacyModeSelectInitialIndex(items);
+    if (!this.modeSelectLayer.isOpen()) {
+      this.modeSelectIndex = initialIndex;
+    }
+    this.modeSelectLayer.show({
+      initialIndex,
       items,
-      this.modeSelectIndex,
-      this.layout.width,
-      this.layout.height,
-      readMazerViewportGeometry().safeArea
-    );
-    const material = cyberArcadeMaterial;
-    const variant = plan.variant;
-    this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
-    this.drawLegacySheetCard(plan.card);
-    this.createOverlayTitle(plan.title.text, plan.title.centerY);
-
-    for (const entry of plan.items) {
-      const select = (): void => {
-        if (this.isModeSelectInputGuarded()) {
-          return;
-        }
-        this.modeSelectIndex = entry.index;
-        if (variant === 'stack' && entry.item.playable) {
-          this.startModeSelectItem(entry.item);
-          return;
-        }
-        this.uiDirty = true;
-      };
-      if (variant === 'stack') {
-        this.paintModeSelectStackCard(entry.rect, entry.item, entry.item.playable);
-        if (entry.item.playable) {
-          this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
-        }
-      } else {
-        this.paintModeSelectTile(entry.rect, entry.item, entry.selected);
-        this.uiButtons.push(this.createModeSelectHitZone(entry.rect, entry.item.label, select));
-      }
-    }
-
-    if (plan.detail !== null) {
-      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
-      const d = plan.detail;
-      this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.4);
-      this.overlayGraphics.lineBetween(d.left, d.top + 0.5, d.left + d.width, d.top + 0.5);
-      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 20, current.playable ? `${current.label}: ${current.tagline}` : current.label, 0xecfff5, 13, 0.5, d.width, { bold: true });
-      this.addLegacyLeaderboardText(d.left + (d.width / 2), d.top + 44, current.playable ? 'Your level and score live in this mode.' : 'Locked for now. Your Endless progress is unaffected.', material.rail.muted, 12, 0.5, d.width);
-    }
-
-    if (plan.play !== null) {
-      const current = items[Math.min(items.length - 1, this.modeSelectIndex)]!;
-      this.uiButtons.push(this.createLegacyAuthActionButton(
-        plan.play.rect.left + (plan.play.rect.width / 2),
-        plan.play.rect.top + (plan.play.rect.height / 2),
-        plan.play.rect.width,
-        plan.play.rect.height,
-        plan.play.label,
-        () => this.startModeSelectItem(current),
-        plan.play.disabled ? 'secondary' : 'primary',
-        undefined,
-        { disabled: plan.play.disabled }
-      ));
-    }
-
-    this.uiButtons.push(this.createLegacyAuthActionButton(
-      plan.back.left + (plan.back.width / 2),
-      plan.back.top + (plan.back.height / 2),
-      plan.back.width,
-      plan.back.height,
-      plan.backLabel,
-      () => {
-        if (!this.isModeSelectInputGuarded()) {
+      onBack: (pressAgeMs) => {
+        if (!this.isModeSelectInputGuarded(pressAgeMs)) {
           this.handleBackAction();
         }
       },
-      'secondary'
-    ));
+      onPlay: (index, pressAgeMs) => {
+        if (this.isModeSelectInputGuarded(pressAgeMs)) {
+          return;
+        }
+        this.modeSelectIndex = index;
+        this.startModeSelectItem(items[index]!);
+      },
+      onSelect: (index) => {
+        this.modeSelectIndex = index;
+      },
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      theme: this.darkModeEnabled ? 'dark' : 'default'
+    });
   }
 
   private buildLeaderboardOverlay(): void {
@@ -14719,6 +14588,7 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.overlay === 'mode-select') {
       this.modeSelectInputGuardStartedAt = this.time.now;
+      this.modeSelectLayer.hide();
     }
     this.orientationFlipOriginLandscape = null;
     this.settingsGuideOpen = false;

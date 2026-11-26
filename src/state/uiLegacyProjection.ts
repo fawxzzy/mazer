@@ -17,7 +17,9 @@ export const LEGACY_UI_OVERLAYS = [
   'pause',
   'auth',
   'confirm-progression-reset',
-  'leaderboard'
+  'leaderboard',
+  // MAZER-MODE-002: the game-mode selector is a sheet over the home menu (projects to primarySurface 'home').
+  'mode-select'
 ] as const;
 
 export interface LegacyUiProjectionViolation {
