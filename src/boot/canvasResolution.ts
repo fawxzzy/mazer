@@ -161,7 +161,7 @@ type MazerPatchedCanvasContext = CanvasRenderingContext2D & {
   [MAZER_CONTEXT_SET_TRANSFORM_KEY]?: (...args: unknown[]) => void;
 };
 
-const patchCanvasContextResolution = (
+export const patchCanvasContextResolution = (
   context: CanvasRenderingContext2D,
   resolution: number
 ): void => {
@@ -197,6 +197,11 @@ const patchCanvasContextResolution = (
 
   patchedContext[MAZER_CONTEXT_RESOLUTION_KEY] = resolution;
 };
+
+/** The resolution a context's setTransform multiplies by (1 for an unpatched context). */
+export const readCanvasContextResolution = (context: unknown): number => (
+  (context as MazerPatchedCanvasContext)[MAZER_CONTEXT_RESOLUTION_KEY] ?? MAZER_CANVAS_RESOLUTION_MIN
+);
 
 export const applyMazerCanvasBackingResolution = (
   target: MazerCanvasBackingResolutionTarget
