@@ -324,6 +324,7 @@ import {
   type LegacyPlayMoveFlags,
   type LegacyPlayPointerStart
 } from '../legacy-runtime/legacyPlayStep';
+import { resolveLegacyWalkedTrail } from '../legacy-runtime/legacyWalkedTrail';
 import {
   LegacyDirectionalIntentResolver,
   resolveLegacyCardinalDirectionsFromVector,
@@ -9429,30 +9430,12 @@ export class MenuScene extends Phaser.Scene {
     return resolveWrapEndStationIds(this.resolveBleedOffDockVisualEligibility(), this.maze);
   }
 
-  // Play mode's trail/pulse should only ever show the perfect route from the
-  // route's own origin to wherever the player currently stands -- not the
-  // player's raw, append-only move history (which grows to cover dead ends
-  // and backtracks and was the source of both the "colored in weird" look
-  // and the messy ping-pong pulse the player actually walked).
-  // Restricted to tiles the player has actually stepped on -- searching the
-  // full maze grid (as this originally did) can route the "perfect path"
-  // through a shortcut the player never walked, which reads as the trail
-  // jumping onto tiles they didn't visit. Building a visited-only grid and
-  // running the same shortest-path search against that instead guarantees
-  // every tile in the result is one the player's own trail already covers.
-  //
-  // The route's origin is this.trail's own first point, not always
-  // maze.start: Trail Fade bounds this.trail to its most recent
-  // TRAIL_FADE_TAIL points (see advanceLegacyPlayStep), so once the player
-  // has moved further than that from start, maze.start is no longer even in
-  // the visited set. Searching from maze.start regardless (the original bug)
-  // made the shortest-path search fail entirely once that gap opened, which
-  // collapsed the whole visible trail to a single point at the player -- not
-  // merely a shorter trail, an invisible one. Using this.trail's own first
-  // (oldest still-retained) point as the origin instead is always reachable
-  // by construction, since every consecutive pair in this.trail is a real
-  // accepted move (grid-adjacent), so a path through the visited set from
-  // that origin to the player always exists.
+  // Play mode's drawn trail (MAZER trail walked path, owner 2026-11-25): the path the player actually walked, built
+  // from this.trail (one tile per accepted move; Trail Fade keeps the newest moves only, so the oldest kept move is the
+  // origin). It unwrites only when the player steps back onto the tile it came from; loops and self-crossings keep both
+  // passes, and wrap crossings stay non-adjacent pairs that the path builder splits (navigationCoreTrail.ts). It used to
+  // be the shortest route over the visited tiles, which jumped across loops. Rule and edge cases:
+  // src/legacy-runtime/legacyWalkedTrail.ts. Memoised by route identity (trailPerfectPathCache.ts).
   private resolveLegacyPlayPerfectPathTrail(): LegacyPoint[] {
     return this.trailPerfectPathCache.resolve(
       this.maze,
@@ -9463,24 +9446,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private computeLegacyPlayPerfectPathTrail(): LegacyPoint[] {
-    const visitedGrid = this.maze.grid.map((row) => row.map(() => false));
-    const markVisited = (point: LegacyPoint): void => {
-      if (visitedGrid[point.y]?.[point.x] !== undefined) {
-        visitedGrid[point.y]![point.x] = true;
-      }
-    };
-    for (const point of this.trail) {
-      markVisited(point);
-    }
-    markVisited(this.maze.start);
-    markVisited(this.player);
-
-    const origin = this.trail.length > 0 ? this.trail[0]! : this.maze.start;
-    const result = resolveLegacyPlayableShortestPath(visitedGrid, origin, this.player);
-    if (result.found && result.path.length > 0) {
-      return result.path;
-    }
-    return [copyPoint(this.player)];
+    return resolveLegacyWalkedTrail(this.trail, this.player);
   }
 
   private drawDynamicBoard(time: number): void {

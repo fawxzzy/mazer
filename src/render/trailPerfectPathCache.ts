@@ -1,8 +1,9 @@
 /**
  * Memo for the trail's shortest route (MAZER-PERF-002).
  *
- * The drawn trail is the shortest path over the visited tiles from the trail's origin to the player's tile
- * (MenuScene.resolveLegacyPlayPerfectPathTrail). It was recomputed from scratch on every dynamic redraw: a fresh
+ * The drawn trail was the shortest path over the visited tiles from the trail's origin to the player's tile; since
+ * 2026-11-25 it is the path actually walked (src/legacy-runtime/legacyWalkedTrail.ts, one pass over the move history),
+ * still resolved through this memo (MenuScene.resolveLegacyPlayPerfectPathTrail). The shortest route was recomputed from scratch on every dynamic redraw: a fresh
  * boolean grid of the whole maze (25x51 on a phone, 45x27 on desktop), marking every trail point, then a breadth-first
  * search. The inputs only change when the player steps or the maze is replaced, and the scene replaces `trail` and
  * `player` with new objects each time (advanceLegacyPlayStep never mutates them), so identity is a sound cache key.
