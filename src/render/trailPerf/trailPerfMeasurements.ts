@@ -63,7 +63,7 @@ export const TRAIL_PERF_RUNS: readonly TrailPerfRun[] = [
       C: { idleMs: 13.3, walkMs: 58.8 }
     }
   },
-  // MAZER-PERF-017 C + A shipped as the game's painter (2026-11-24); 'CA' is the game's own cached painter.
+  // MAZER-PERF-017 C + A was the game's painter 2026-11-24 to 2026-11-25 (withdrawn for its look); 'CA' is that cached painter, kept for the options page.
   { engine: 'webkit', label: 'WebKit run 3', frames: { shipped: { idleMs: 268.5, walkMs: 199.1 }, CA: { idleMs: 94.3, walkMs: 262.3 } } },
   {
     engine: 'webkit',

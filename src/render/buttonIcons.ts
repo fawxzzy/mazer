@@ -24,7 +24,7 @@ export const BUTTON_ICON_STROKE_UNITS = 2;
 /** Spark keyline width in authoring units (the spark is filled and stroked so its points read at 20 px). */
 export const BUTTON_ICON_SPARK_STROKE_UNITS = 1.1;
 
-/** The 19 buttons of the icon options page plus Reset level (in-game menu row). */
+/** The 21 button icons: the icon options page set, Reset level (in-game menu row) and the Feedback bubble. */
 export const BUTTON_ICON_IDS = [
   'menu', 'menuOpen', 'settings', 'profile', 'leaderboard', 'pause', 'resume', 'home', 'back', 'close',
   'soundOn', 'soundOff', 'guide', 'signIn', 'eye', 'eyeOff', 'check', 'share', 'install', 'reset', 'feedback'
@@ -290,7 +290,7 @@ export const BUTTON_ICON_SOURCES: Readonly<Record<ButtonIconId, ButtonIconSource
   share: g(['M8.6 10.8l6.8-3.4M8.6 13.2l6.8 3.4'], [[6, 12, 3], [18, 6, 3], [18, 18, 3]]),
   install: g(['M12 4v10M8 10.5l4 4 4-4M5 17v3h14v-3'], [[19.5, 4.5, 2]]),
   reset: g(['M19 12.5a7 7 0 1 1-2.2-5.6', 'M18.5 3.8v3.7h-3.7'], [[12, 12.5, 2.4]]),
-  /** MAZER-FB-001: a speech bubble with the Star Dust spark inside (the Menu's Feedback row). */
+  /** MAZER-FB-001: a speech bubble with the Star Dust spark inside. No menu row uses it since 2026-11-25 (the rating prompt is the only entry); kept as part of the icon set. */
   feedback: g(['M4.5 5.5h15v10.5h-7.5l-4.2 3.6V16H4.5z'], [[12, 10.8, 2.6]])
 });
 
