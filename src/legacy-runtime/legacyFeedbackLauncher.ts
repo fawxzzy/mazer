@@ -1,9 +1,10 @@
 /**
- * MAZER-FB-001: opens the in-game feedback popup from the Menu's Feedback row. No Phaser, no scene state: the scene
- * hands in what it knows (auth, level, mode) and a callback for when the popup is gone.
+ * MAZER-FB-001: opens the in-game 1-5 star rating popup. No Phaser, no scene state: the scene hands in what it knows
+ * (auth, level, mode) and a callback for when the popup is gone.
  *
- * Settled rules (owner, 2026-11-23/24): the Menu row is the ONLY entry (no auto prompt); the row and the popup are for a
- * signed-in player only (the RPC is signed-in only); the popup opens with no star picked; failures are an in-flow
+ * Settled rules (owner, 2026-11-23/24/25): Feedback is a RATING, not a bug report. There is no Menu row any more
+ * (2026-11-25): the only entry is the rating prompt on main-menu entry (legacyRatingPrompt.ts decides when). The popup
+ * is for a signed-in player only (the RPC is signed-in only); it opens with no star picked; failures are an in-flow
  * notice, never red text, and never lose the draft.
  *
  * The popup, its CSS and the kit buttons load on demand (a dynamic import), so the boot bundle does not grow.
@@ -41,7 +42,7 @@ export const resolveLegacyFeedbackContext = (
   };
 };
 
-/** The Feedback row shows only for a signed-in player (menu row only, no auto prompt). */
+/** The rating popup is offered only to a signed-in player. */
 export const isLegacyFeedbackAvailable = (snapshot: Pick<LegacyAuthSessionSnapshot, 'status'>): boolean => (
   snapshot.status === 'authenticated'
 );
@@ -57,10 +58,24 @@ export interface LegacyFeedbackLauncherDeps {
   submit?: (payload: ReturnType<typeof buildFeedbackPayload>, auth: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>) => Promise<FeedbackSubmitResult>;
 }
 
+/** Per-open hooks: the rating prompt records a saved rating and a close without one (legacyRatingPrompt.ts). */
+export interface LegacyFeedbackOpenHooks {
+  /** Every submit outcome, with the auth snapshot the submit went out under. */
+  onSubmitResult?: (result: FeedbackSubmitResult, auth: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>) => void;
+  /** After the popup is gone (also on a scene shutdown). shown false = it never appeared (the chunk failed to load). */
+  onClosed?: (info: { shown: boolean }) => void;
+  /**
+   * Asked right before the popup mounts, after its code finished loading (a first load can take a while, and the player
+   * may have tapped Play meanwhile). false = do not mount: the open ends as a close with shown false, which records
+   * nothing (no dismissal). Absent = always mount.
+   */
+  canMount?: () => boolean;
+}
+
 export interface LegacyFeedbackLauncher {
   /** True from the moment open() is accepted until the popup is gone. The scene hides what sits behind it. */
   isOpen: () => boolean;
-  open: (context: LegacyFeedbackContextInput) => boolean;
+  open: (context: LegacyFeedbackContextInput, hooks?: LegacyFeedbackOpenHooks) => boolean;
   /** Closes the popup if open (scene shutdown). Never calls onClosed after destroy. */
   destroy: () => void;
   /** Re-arms the launcher after a destroy: the scene calls it from create(), since a restarted scene keeps its fields. */
@@ -71,11 +86,20 @@ export const createLegacyFeedbackLauncher = (deps: LegacyFeedbackLauncherDeps): 
   let open = false;
   let destroyed = false;
   let handle: FeedbackMountHandle | null = null;
+  let hooks: LegacyFeedbackOpenHooks = {};
+  let shown = false;
+
+  const takeHooks = (): LegacyFeedbackOpenHooks => {
+    const current = hooks;
+    hooks = {};
+    return current;
+  };
 
   const finish = (): void => {
     if (!open) return;
     open = false;
     handle = null;
+    takeHooks().onClosed?.({ shown });
     if (!destroyed) deps.onClosed();
   };
 
@@ -89,26 +113,46 @@ export const createLegacyFeedbackLauncher = (deps: LegacyFeedbackLauncherDeps): 
     destroy: () => {
       destroyed = true;
       const current = handle;
+      const wasOpen = open;
+      const currentHooks = takeHooks();
       open = false;
       handle = null;
       current?.close();
+      // A scene shutdown with the popup up is a close without a rating (never a saved one).
+      if (wasOpen) currentHooks.onClosed?.({ shown });
     },
     isOpen: () => open,
-    open: (context) => {
+    open: (context, openHooks = {}) => {
       if (open || destroyed || !isLegacyFeedbackAvailable(deps.getAuthSnapshot())) {
         return false;
       }
       open = true;
+      shown = false;
+      hooks = openHooks;
+      const onSubmitResult = openHooks.onSubmitResult;
+      const canMount = openHooks.canMount;
       const resolved = resolveLegacyFeedbackContext(context);
       void loadMount().then(({ mountFeedbackPopup }) => {
         if (!open || destroyed) return;
+        // Eligibility may have changed while the chunk loaded (sign-out, Play tapped, a sheet or run opened).
+        if (!isLegacyFeedbackAvailable(deps.getAuthSnapshot()) || canMount?.() === false) {
+          finish();
+          return;
+        }
+        shown = true;
         handle = mountFeedbackPopup({
           onClose: finish,
-          submit: (draft: FeedbackDraft) => send(buildFeedbackPayload(draft, resolved), deps.getAuthSnapshot()),
+          submit: (draft: FeedbackDraft) => {
+            const auth = deps.getAuthSnapshot();
+            return send(buildFeedbackPayload(draft, resolved), auth).then((result) => {
+              onSubmitResult?.(result, auth);
+              return result;
+            });
+          },
           theme: deps.isDarkTheme?.() === true ? 'dark' : 'default'
         });
       }).catch(() => {
-        // A failed chunk load (offline) just means no popup: the row stays, the game is untouched.
+        // A failed chunk load (offline) just means no popup (shown stays false): the game is untouched.
         finish();
       });
       return true;

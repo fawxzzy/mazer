@@ -162,7 +162,7 @@ describe('MAZER-FB-001 build id and context', () => {
   });
 });
 
-describe('MAZER-FB-001 launcher (menu row only, signed in only, popup loaded on demand)', () => {
+describe('MAZER-FB-001 launcher (rating prompt only, signed in only, popup loaded on demand)', () => {
   const makeMount = () => {
     let onClose: () => void = () => undefined;
     let submit: (draft: ReturnType<typeof createFeedbackDraft>) => Promise<unknown> = async () => null;
@@ -251,6 +251,98 @@ describe('MAZER-FB-001 launcher (menu row only, signed in only, popup loaded on 
     expect(live.isOpen()).toBe(false);
     expect(onClosed2).toHaveBeenCalledTimes(1);
   });
+
+  test('rating prompt hooks: every submit outcome reaches onSubmitResult with the auth it went out under; onClosed says whether the popup was shown', async () => {
+    const mount = makeMount();
+    const results: unknown[] = [];
+    const closes: unknown[] = [];
+    let outcome: { status: string } = { status: 'offline' };
+    const launcher = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => SIGNED_IN,
+      loadMount: async () => ({ mountFeedbackPopup: mount.mountFeedbackPopup as never }),
+      onClosed: vi.fn(),
+      submit: vi.fn(async () => outcome as never)
+    });
+    launcher.open({ gameMode: 'menu', level: '50', source: 'menu' }, {
+      onClosed: (info) => closes.push(info),
+      onSubmitResult: (result, auth) => results.push([result.status, auth.userId])
+    });
+    await flush();
+    await mount.submit({ ...createFeedbackDraft(), rating: 3 });
+    outcome = { status: 'saved' };
+    await mount.submit({ ...createFeedbackDraft(), rating: 3 });
+    expect(results).toEqual([['offline', 'user-1'], ['saved', 'user-1']]);
+    mount.close();
+    expect(closes).toEqual([{ shown: true }]);
+
+    // A failed chunk load: closed, never shown, no submit.
+    const closesBroken: unknown[] = [];
+    const broken = createLegacyFeedbackLauncher({ getAuthSnapshot: () => SIGNED_IN, loadMount: async () => { throw new Error('chunk'); }, onClosed: vi.fn() });
+    broken.open({ gameMode: 'menu', level: '50', source: 'menu' }, { onClosed: (info) => closesBroken.push(info) });
+    await flush();
+    expect(closesBroken).toEqual([{ shown: false }]);
+
+    // A scene shutdown with the popup up still reports one close (a close without a rating), exactly once.
+    const mount3 = makeMount();
+    const closes3: unknown[] = [];
+    const live = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => SIGNED_IN,
+      loadMount: async () => ({ mountFeedbackPopup: mount3.mountFeedbackPopup as never }),
+      onClosed: vi.fn()
+    });
+    live.open({ gameMode: 'menu', level: '50', source: 'menu' }, { onClosed: (info) => closes3.push(info) });
+    await flush();
+    live.destroy();
+    expect(closes3).toEqual([{ shown: true }]);
+  });
+
+  test('eligibility is re-checked after the popup code loads: not eligible any more -> no mount, no dismissal (shown false)', async () => {
+    const mount = makeMount();
+    let release: () => void = () => undefined;
+    const loaded = new Promise<void>((resolveLoad) => { release = resolveLoad; });
+    let eligible = true;
+    const onClosed = vi.fn();
+    const closes: unknown[] = [];
+    const launcher = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => SIGNED_IN,
+      loadMount: async () => { await loaded; return { mountFeedbackPopup: mount.mountFeedbackPopup as never }; },
+      onClosed
+    });
+    expect(launcher.open({ gameMode: 'menu', level: '50', source: 'menu' }, {
+      canMount: () => eligible,
+      onClosed: (info) => closes.push(info)
+    })).toBe(true);
+    // The player taps Play while the chunk is still loading: the mode-select sheet is up when the code arrives.
+    eligible = false;
+    release();
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).not.toHaveBeenCalled();
+    expect(launcher.isOpen()).toBe(false);
+    expect(closes).toEqual([{ shown: false }]);
+    expect(onClosed).toHaveBeenCalledTimes(1);
+
+    // Still eligible: mounts as before. A sign-out while loading also stops the mount.
+    eligible = true;
+    expect(launcher.open({ gameMode: 'menu', level: '50', source: 'menu' }, { canMount: () => eligible })).toBe(true);
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).toHaveBeenCalledTimes(1);
+    mount.close();
+
+    let auth: { status: 'authenticated' | 'unauthenticated'; userId: string | null } = SIGNED_IN;
+    const signOut = createLegacyFeedbackLauncher({
+      getAuthSnapshot: () => auth as never,
+      loadMount: async () => { await loaded; return { mountFeedbackPopup: mount.mountFeedbackPopup as never }; },
+      onClosed: vi.fn()
+    });
+    signOut.open({ gameMode: 'menu', level: '50', source: 'menu' });
+    auth = { status: 'unauthenticated', userId: null };
+    await flush();
+    await flush();
+    expect(mount.mountFeedbackPopup).toHaveBeenCalledTimes(1);
+    expect(signOut.isOpen()).toBe(false);
+  });
 });
 
 describe('MAZER-FB-001 rainbow stars: real pointed shapes, never a glow', () => {
@@ -322,13 +414,10 @@ describe('MAZER-FB-001 safety of the popup DOM', () => {
 });
 
 describe('MAZER-FB-001 scene wiring stays minimal and hazard-free', () => {
-  test('both Menu screens route the Feedback row to openLegacyFeedback with the right source', () => {
-    expect(MENU_SCENE).toMatch(/case 'feedback':\n\s+this\.openLegacyFeedback\('menu'\);/);
-    expect(MENU_SCENE).toMatch(/case 'feedback':\n\s+this\.openLegacyFeedback\('pause'\);/);
-  });
-
-  test('the row is offered only to a signed-in player on both screens', () => {
-    expect(MENU_SCENE.split('feedbackAvailable: isLegacyFeedbackAvailable(this.authSnapshot)').length - 1).toBe(2);
+  test('Zac 2026-11-25: no Feedback row on either Menu (no row case, no row availability flag)', () => {
+    expect(MENU_SCENE).not.toContain("case 'feedback':");
+    expect(MENU_SCENE).not.toContain('feedbackAvailable');
+    expect(MENU_SCENE).not.toContain('isLegacyFeedbackAvailable');
   });
 
   test('while the popup is open the paused dropdown and the Settings sheet are not built behind it, and the launcher is cleaned up on shutdown', () => {
@@ -337,9 +426,32 @@ describe('MAZER-FB-001 scene wiring stays minimal and hazard-free', () => {
     expect(MENU_SCENE).toMatch(/this\.feedbackLauncher\.activate\(\);\n\s+this\.events\.once\(Phaser\.Scenes\.Events\.SHUTDOWN, \(\) => this\.feedbackLauncher\.destroy\(\)\);/);
   });
 
-  test('there is no auto prompt: nothing but the Feedback row opens the popup', () => {
+  test('the only way in is the rating prompt gate, polled once per frame after the auth/account steps', () => {
     expect(MENU_SCENE.split('feedbackLauncher.open(').length - 1).toBe(1);
-    expect(MENU_SCENE.split('openLegacyFeedback(').length - 1).toBe(3);
+    // The definition plus the one call from syncLegacyRatingPrompt.
+    expect(MENU_SCENE.split('openLegacyFeedback(').length - 1).toBe(2);
+    expect(MENU_SCENE).toMatch(/this\.consumePendingMazerAccountAction\(\);\n\s+this\.syncLegacyRatingPrompt\(time\);/);
+    expect(MENU_SCENE.split('this.syncLegacyRatingPrompt(').length - 1).toBe(1);
+    const sync = MENU_SCENE.slice(MENU_SCENE.indexOf('private syncLegacyRatingPrompt('), MENU_SCENE.indexOf('private openLegacyFeedback('));
+    expect(sync).toContain("onMainMenu: this.mode === 'menu'");
+    expect(sync).toContain('sandbox: this.levelPreviewLevel !== null');
+    expect(sync).toContain('authResolved: !this.authGateAwaitingResolution');
+    expect(sync).toContain('surfaceIdle: this.isRatingPromptSurfaceIdle() && !this.feedbackLauncher.isOpen()');
+    // The same idle-main-menu check runs again right before the popup mounts (its first load is asynchronous).
+    const idle = sync.slice(sync.indexOf('private isRatingPromptSurfaceIdle('));
+    expect(idle).toContain("this.mode === 'menu'");
+    expect(idle).toContain('this.levelPreviewLevel === null');
+    expect(idle).toContain("this.overlay === 'none'");
+    expect(idle).toContain('!this.menuDropdown.isOpen()');
+    expect(sync).toContain('userId: signedIn ? this.authSnapshot.userId : null');
+    const open = MENU_SCENE.slice(MENU_SCENE.indexOf('private openLegacyFeedback('), MENU_SCENE.indexOf('private buildLegacyPlayMenuOverlay('));
+    // Only a saved rating marks the account as rated; every other outcome is a close without one.
+    expect(open).toContain("if (result.status === 'saved') this.ratingPromptGate.markSubmitted(auth.userId);");
+    expect(open).toContain('this.ratingPromptGate.markClosed(');
+    expect(open).toContain('canMount: () => this.isRatingPromptSurfaceIdle()');
+    expect(MENU_SCENE.split('this.ratingPromptGate.reset();').length - 1).toBe(1);
+    const create = MENU_SCENE.slice(MENU_SCENE.indexOf('this.feedbackLauncher.activate();'));
+    expect(create.indexOf('this.ratingPromptGate.reset();')).toBeLessThan(create.indexOf('\n  }'));
   });
 
   test('the popup copy never names Hazards', () => {

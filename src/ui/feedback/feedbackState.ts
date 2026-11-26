@@ -1,6 +1,7 @@
 /**
- * In-game feedback popup: pure state and copy (no DOM, no network). MAZER-FB-001: wired into the Menu dropdown by
- * src/legacy-runtime/legacyFeedbackLauncher.ts (signed-in only, menu row only, no auto prompt). See
+ * In-game feedback popup: pure state and copy (no DOM, no network). MAZER-FB-001: opened by
+ * src/legacy-runtime/legacyFeedbackLauncher.ts, offered on main-menu entry by legacyRatingPrompt.ts (signed-in only,
+ * from level 50, no Menu row since 2026-11-25). See
  * docs/ui/MAZER-FEEDBACK-POPUP-PLAN-2026-11-23.md and docs/ops/sql-proposals/mazer-feedback-20261124-v2/.
  *
  * Rules this module pins:
@@ -142,8 +143,8 @@ export const buildFeedbackPayload = (
 };
 
 /**
- * Where the popup may open. It is NEVER opened automatically while a run is active: only from the menu row,
- * and (later) at the end of a level once N levels have been completed, once per cooldown.
+ * Superseded 2026-11-25 by src/legacy-runtime/legacyRatingPrompt.ts (main-menu entry from level 50, then every further
+ * 50 until a saved rating); kept only because tests/ui/feedback-state.test.ts still pins it. Never during a run.
  */
 export const FEEDBACK_AUTO_PROMPT_EVERY_LEVELS = 10;
 export const FEEDBACK_AUTO_PROMPT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;

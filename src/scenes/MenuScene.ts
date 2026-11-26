@@ -360,7 +360,8 @@ import {
   type LegacyMainMenuRowId,
   type LegacyMenuRowId
 } from '../legacy-runtime/legacyMenuRows';
-import { createLegacyFeedbackLauncher, isLegacyFeedbackAvailable } from '../legacy-runtime/legacyFeedbackLauncher';
+import { createLegacyFeedbackLauncher } from '../legacy-runtime/legacyFeedbackLauncher';
+import { createLegacyRatingPromptGate, type LegacyRatingPromptStep } from '../legacy-runtime/legacyRatingPrompt';
 import { LegacyMenuDropdownController, type MenuDropdownHost } from '../render/menuDropdownButtons';
 import {
   IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE,
@@ -1976,13 +1977,15 @@ export class MenuScene extends Phaser.Scene {
   // MAZER-UI-102: Settings > Dark mode. The theme itself is installed at boot (src/theme/themeBoot.ts); this mirrors the
   // stored switch for the row, and flipping it saves and reloads so every baked piece is built under one theme.
   private darkModeEnabled = false;
-  // MAZER-FB-001: the Menu's Feedback row opens the 1-5 star popup (a DOM modal, loaded on demand). While it is open
-  // the pause surfaces behind it are not built (see isLegacyPlayMenuDropdownView / buildPauseOverlay).
+  // MAZER-FB-001: the 1-5 star rating popup (a DOM modal, loaded on demand). No Menu row (Zac, 2026-11-25): the rating
+  // prompt gate offers it on main-menu entry from level 50 (legacyRatingPrompt.ts). While it is open the pause
+  // surfaces behind it are not built (see isLegacyPlayMenuDropdownView / buildPauseOverlay).
   private readonly feedbackLauncher = createLegacyFeedbackLauncher({
     getAuthSnapshot: () => this.authSnapshot,
     isDarkTheme: () => this.darkModeEnabled,
     onClosed: () => { this.uiDirty = true; }
   });
+  private readonly ratingPromptGate = createLegacyRatingPromptGate({ storage: () => this.resolveBrowserLocalStorage() });
   private readonly floatingAnchor = createFloatingAnchorController(resolveFloatingAnchorConfig({
     coarsePointer: true,
     devicePixelRatio: 3
@@ -2606,6 +2609,8 @@ export class MenuScene extends Phaser.Scene {
     // A restarted scene keeps its fields: re-arm the launcher the previous SHUTDOWN destroyed.
     this.feedbackLauncher.activate();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.feedbackLauncher.destroy());
+    // The rating prompt treats the first menu frame after a (re)create as a fresh main-menu entry.
+    this.ratingPromptGate.reset();
     // MAZER-AUDIO-004: sound is on by default, but a drag step is not a valid activation gesture, so unlock the audio
     // context on the first real pointerdown/touchend/keydown (no context is built while the setting is off).
     const disposeAudioUnlock = installLegacyAudioUnlock(
@@ -3470,6 +3475,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
     this.consumePendingMazerAccountAction();
+    this.syncLegacyRatingPrompt(time);
     this.syncLegacyAuthOpeningTimeout(time);
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
@@ -14282,7 +14288,6 @@ export class MenuScene extends Phaser.Scene {
   // of Settings), the same as in a game; no pause, so the X just closes.
   private createLegacyMenuDropdown(): LegacyMenuDropdownController<LegacyMainMenuRowId> {
     let profileShown = true;
-    let feedbackShown = false;
     return new LegacyMenuDropdownController<LegacyMainMenuRowId>({
       ...this.resolveLegacyMenuDropdownSharedHost<LegacyMainMenuRowId>(),
       keepOpenOnSelect: (id) => isLegacyMenuRowToggle(id),
@@ -14296,11 +14301,6 @@ export class MenuScene extends Phaser.Scene {
         const shown = this.authSnapshot.status !== 'unavailable';
         if (shown !== profileShown) {
           profileShown = shown;
-          this.uiDirty = true;
-        }
-        const feedbackNow = isLegacyFeedbackAvailable(this.authSnapshot);
-        if (feedbackNow !== feedbackShown) {
-          feedbackShown = feedbackNow;
           this.uiDirty = true;
         }
       }
@@ -14352,9 +14352,6 @@ export class MenuScene extends Phaser.Scene {
       case 'leaderboard':
         this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'leaderboard' }, () => this.openOverlay('leaderboard'));
         return;
-      case 'feedback':
-        this.openLegacyFeedback('menu');
-        return;
       case 'profile':
         // Signed out, a Profile-row sign-in continues to the account page (legacySignInContinuation.ts).
         withMazerSignInContinuation('account', () => (
@@ -14369,12 +14366,44 @@ export class MenuScene extends Phaser.Scene {
       && !this.feedbackLauncher.isOpen();
   }
 
-  // MAZER-FB-001: Menu > Feedback. Signed-in only (the row is hidden otherwise). The run stays paused; closing the popup
-  // brings back the dropdown it came from (in a game) or the plain main menu.
-  private openLegacyFeedback(source: 'menu' | 'pause'): void {
-    // The raw ordinal string, never formatLegacyProgressionOrdinal: its display form ("1,234") would send no level.
+  // Rating prompt (Zac, 2026-11-25): on main-menu entry only, signed in, idle menu, from level 50; the decision and the
+  // per-account record live in legacyRatingPrompt.ts. A saved rating ends it; any other close waits for 50 more levels.
+  private syncLegacyRatingPrompt(time: number): void {
+    const signedIn = this.authSnapshot.status === 'authenticated';
+    const step = this.ratingPromptGate.poll({
+      authResolved: !this.authGateAwaitingResolution,
+      // The raw ordinal string, never formatLegacyProgressionOrdinal: its display form ("1,234") would read as junk.
+      level: this.progressionState.tracks.player.level,
+      nowMs: time,
+      onMainMenu: this.mode === 'menu',
+      sandbox: this.levelPreviewLevel !== null,
+      surfaceIdle: this.isRatingPromptSurfaceIdle() && !this.feedbackLauncher.isOpen(),
+      userId: signedIn ? this.authSnapshot.userId : null
+    });
+    if (step.action === 'offer') {
+      this.openLegacyFeedback(step);
+    }
+  }
+
+  // Idle main menu: not in a game, not the level preview sandbox, nothing on top (no overlay such as the mode-select
+  // sheet, no open dropdown). Asked again right before the popup mounts, because its first load is asynchronous.
+  private isRatingPromptSurfaceIdle(): boolean {
+    return this.mode === 'menu'
+      && this.levelPreviewLevel === null
+      && this.overlay === 'none'
+      && !this.menuDropdown.isOpen();
+  }
+
+  private openLegacyFeedback(offer: Extract<LegacyRatingPromptStep, { action: 'offer' }>): void {
     const level = this.progressionState.tracks.player.level;
-    if (this.feedbackLauncher.open({ gameMode: this.mode, level, source })) {
+    const opened = this.feedbackLauncher.open({ gameMode: this.mode, level, source: 'menu' }, {
+      canMount: () => this.isRatingPromptSurfaceIdle(),
+      onClosed: ({ shown }) => this.ratingPromptGate.markClosed({ highestLevel: offer.highestLevel, shown, userId: offer.userId }),
+      onSubmitResult: (result, auth) => {
+        if (result.status === 'saved') this.ratingPromptGate.markSubmitted(auth.userId);
+      }
+    });
+    if (opened) {
       this.uiDirty = true;
     }
   }
@@ -14396,7 +14425,6 @@ export class MenuScene extends Phaser.Scene {
           resetPending: hasPendingLegacyResetRequest(this.pendingResetRequest),
           runCompleted: this.playCompletedAtMs !== null
         }),
-        feedbackAvailable: isLegacyFeedbackAvailable(this.authSnapshot),
         soundEnabled: this.settings.soundEnabled
       }),
       panelWidth: LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
@@ -14429,9 +14457,6 @@ export class MenuScene extends Phaser.Scene {
       case 'sound':
         this.applyOverlayToggleFieldChange('soundEnabled');
         this.uiDirty = true;
-        return;
-      case 'feedback':
-        this.openLegacyFeedback('pause');
         return;
       case 'reset-level':
         this.pressLegacyPlayResetLevel();
@@ -14471,7 +14496,6 @@ export class MenuScene extends Phaser.Scene {
     // Visual glyph stays 32-40px; the touch target is grown to the 44px floor (legacyHitTarget.ts).
     const hit = resolveLegacyMinHitRect(frame, this.layout);
     const items = buildLegacyMenuRows('main', {
-      feedbackAvailable: isLegacyFeedbackAvailable(this.authSnapshot),
       profileAvailable: this.authSnapshot.status !== 'unavailable',
       soundEnabled: this.settings.soundEnabled
     });

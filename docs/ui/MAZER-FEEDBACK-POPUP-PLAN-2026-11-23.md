@@ -2,7 +2,14 @@
 
 Status (2026-11-24, MAZER-FB-001): BUILT, in review. The picked layout (A, Card) is wired into the game as a menu-row entry. The SQL side (`mazer.mazer_submit_feedback_v1(integer,text,text,integer,text,text)`) is applied and live (see `docs/ops/sql-proposals/mazer-feedback-20261124-v2/`). Nothing is deployed from this branch until the PR merges, and nothing was checked on a real phone.
 
-What the build does (settled decisions):
+Update (Zac, 2026-11-25): Feedback is a RATING, not a bug report. The Menu row is gone from both dropdowns and the popup now offers itself (`src/legacy-runtime/legacyRatingPrompt.ts`):
+- When a signed-in player enters the main menu with a highest level reached of 50 or more (once per entry, after the menu has been idle for 0.9 s; never during play, never in the `?previewLevel` sandbox, never signed out).
+- "Not now" (or any close without a saved rating) waits for 50 more levels of gameplay: the next offer is at highest level >= the level it was closed at + 50 (50 -> 100, 73 -> 123, 100 -> 150). Owner: "only retrigger it every 50 levels of gameplay and only if the player has not submitted".
+- A saved rating ends it for that account. Offline, failed, rate-limited and signed-out sends do not count.
+- State is per account in localStorage (`mazer.ratingPrompt.v1:<userId>`): submitted flag, dismissed-at level, peak level. The server has no "already rated" read, so the flag is per device; a cross-device check needs a new read RPC (not written).
+- A support/Help entry is a separate later lane.
+
+What the build did on 2026-11-24 (the entry rule below is superseded by the update above):
 - Entry: a signed-in-only **Feedback** row in the Menu dropdown, on both the main menu and the in-game pause menu. No auto-prompt anywhere. The row is hidden when signed out.
 - The popup loads on demand (`legacyFeedbackLauncher.ts` -> dynamic import of `feedbackMount.ts`), so it is not in the boot bundle. Keys typed in the note stop at the scrim and never reach the game; Escape and "Not now" close; a tap on the backdrop closes only a sent popup.
 - `build_id` comes from the Vite-injected `__MAZER_BUILD_ID__` constant (git sha), validated against the database pattern. Level and mode are clamped to the function's limits.

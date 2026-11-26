@@ -238,7 +238,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'menu',
-    text: 'Top right: Settings (Dark mode), Guide, Sound, Profile, Leaderboard. Signed in: Feedback.'
+    text: 'Top right: Settings (Dark mode), Guide, Sound, Profile, Leaderboard.'
   },
   {
     heading: 'In a maze',
