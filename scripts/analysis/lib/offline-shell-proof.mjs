@@ -14,8 +14,8 @@ export const OFFLINE_ALLOWED_EXTERNAL_HOSTS = Object.freeze([
   'bxtcuhkotumitoqtrcej.supabase.co'
 ]);
 
-/** The exact line the player sees when the pre-flight finds the account service unreachable. */
-export const PROVIDER_UNREACHABLE_MESSAGE = 'Sign-in is unavailable right now. Try again in a few minutes.';
+/** The exact line the player sees when the pre-flight finds the account service unreachable (copy matrix row signin.unavailable; tests/brand/offline-shell-proof-copy.test.ts fails if the two drift). */
+export const PROVIDER_UNREACHABLE_MESSAGE = 'Sign-in is unavailable right now. Try again in a minute.';
 
 /**
  * Pulls the precache manifest out of a generated Workbox service worker
