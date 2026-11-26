@@ -157,8 +157,8 @@ describe('guide copy only names things that exist', () => {
       expect(row('menu').text, item.id).toContain(item.label);
     }
     expect(row('menu').text).toMatch(/top right/i);
-    // MAZER-FB-001: the signed-in-only Feedback row is named too (it is not in the default, signed-out item list).
-    expect(row('menu').text).toContain('Signed in: Feedback.');
+    // Zac 2026-11-25: no Feedback row any more (the rating offers itself on main-menu entry), so the Guide names none.
+    expect(row('menu').text).not.toMatch(/feedback/i);
     expect(row('online').text).not.toMatch(/icon/);
     expect(MENU_SCENE).not.toContain('createLegacyMenuLeaderboardButton');
     expect(MENU_SCENE).not.toContain('createLegacyMenuProfileButton');

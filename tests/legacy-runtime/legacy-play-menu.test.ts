@@ -81,14 +81,14 @@ const memoryStorage = () => {
   };
 };
 
-const MAIN_ROWS_SIGNED_OUT = LEGACY_MAIN_MENU_ROW_IDS.filter((id) => id !== 'feedback');
-const PLAY_ROWS_SIGNED_OUT = LEGACY_PLAY_MENU_ROW_IDS.filter((id) => id !== 'feedback');
+const MAIN_ROWS_SIGNED_OUT = [...LEGACY_MAIN_MENU_ROW_IDS];
+const PLAY_ROWS_SIGNED_OUT = [...LEGACY_PLAY_MENU_ROW_IDS];
 
 describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (legacyMenuRows.ts)', () => {
-  test('both screens open on Settings, Guide, Sound; the main menu adds Profile, Leaderboard; a game adds Reset level, Main menu (Feedback is signed-in only, MAZER-FB-001)', () => {
+  test('both screens open on Settings, Guide, Sound; the main menu adds Profile, Leaderboard; a game adds Reset level, Main menu (no Feedback row, Zac 2026-11-25)', () => {
     expect(LEGACY_SHARED_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound']);
-    expect(LEGACY_MAIN_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'profile', 'leaderboard', 'feedback']);
-    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'feedback', 'reset-level', 'main-menu']);
+    expect(LEGACY_MAIN_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'profile', 'leaderboard']);
+    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'reset-level', 'main-menu']);
     const main = buildLegacyMenuRows('main', { soundEnabled: true });
     expect(main.map((row) => row.label)).toEqual(['Settings', 'Guide', 'Sound', 'Profile', 'Leaderboard']);
     // Profile keeps the retired corner button's published name so QA harnesses keep finding it.
@@ -111,17 +111,15 @@ describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (leg
     expect(LEGACY_MENU_DROPDOWN_ITEMS.map((item) => item.id)).toEqual(MAIN_ROWS_SIGNED_OUT);
   });
 
-  test('MAZER-FB-001: the Feedback row is shown only when feedbackAvailable (signed in), on both screens, after the destinations and before the play-only rows', () => {
-    expect(resolveLegacyMenuRowIds('main', {})).not.toContain('feedback');
-    expect(resolveLegacyMenuRowIds('play', {})).not.toContain('feedback');
-    expect(resolveLegacyMenuRowIds('main', { feedbackAvailable: false })).not.toContain('feedback');
-    expect(resolveLegacyMenuRowIds('main', { feedbackAvailable: true })).toEqual([...LEGACY_MAIN_MENU_ROW_IDS]);
-    expect(resolveLegacyMenuRowIds('play', { feedbackAvailable: true })).toEqual([...LEGACY_PLAY_MENU_ROW_IDS]);
-    const row = buildLegacyMenuRows('main', { feedbackAvailable: true, soundEnabled: true }).find((item) => item.id === 'feedback');
-    expect(row).toMatchObject({ disabled: false, label: 'Feedback', semanticAction: 'Feedback', stateText: null });
-    expect(buildLegacyPlayMenuRows({ feedbackAvailable: true, quitArmed: false, resetArmed: false, resetAvailable: true, soundEnabled: true }).map((item) => item.label))
-      .toEqual(['Settings', 'Guide', 'Sound', 'Feedback', 'Reset level', 'Main menu']);
-    expect(isLegacyMenuRowToggle('feedback')).toBe(false);
+  test('Zac 2026-11-25: no Feedback row on either dropdown, signed in or not (the rating offers itself on main-menu entry)', () => {
+    for (const id of [...LEGACY_MAIN_MENU_ROW_IDS, ...LEGACY_PLAY_MENU_ROW_IDS]) {
+      expect(id).not.toBe('feedback');
+    }
+    const labels = [
+      ...buildLegacyMenuRows('main', { soundEnabled: true }),
+      ...buildLegacyPlayMenuRows({ quitArmed: false, resetArmed: false, resetAvailable: true, soundEnabled: true })
+    ].flatMap((item) => [item.label, item.semanticAction]);
+    expect(labels.join(' ')).not.toMatch(/feedback/i);
   });
 
   test('Sound is the only toggle row on either screen (the panel stays open on it)', () => {
@@ -149,8 +147,8 @@ describe('MAZER-UI-095 / MAZER-UI-096 one row model for both Menu dropdowns (leg
 });
 
 describe('MAZER-UI-095 in-game Menu rows (legacyPlayMenu.ts)', () => {
-  test('rows are Settings, Guide, Sound, Reset level, Main menu, in that order, with those words (signed out: no Feedback)', () => {
-    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'feedback', 'reset-level', 'main-menu']);
+  test('rows are Settings, Guide, Sound, Reset level, Main menu, in that order, with those words (no Feedback)', () => {
+    expect(LEGACY_PLAY_MENU_ROW_IDS).toEqual(['settings', 'guide', 'sound', 'reset-level', 'main-menu']);
     expect(rows().map((row) => row.id)).toEqual(PLAY_ROWS_SIGNED_OUT);
     expect(rows().map((row) => row.label)).toEqual(['Settings', 'Guide', 'Sound', 'Reset level', 'Main menu']);
     expect(rows().map((row) => row.semanticAction)).toEqual(['Settings', 'Guide', 'Sound', 'Reset level', 'Main menu']);
