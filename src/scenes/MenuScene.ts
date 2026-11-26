@@ -1383,7 +1383,7 @@ interface LegacyTrailPerfDiagnostics {
   /** Trail rebuilds and skipped (kept-as-is) redraws since the scene started: MAZER-PERF-002, src/render/trailRedrawGate.ts. */
   trailRebuildCount: number;
   trailSkippedRedrawCount: number;
-  /** Shortest-route computations since the scene started (src/render/trailPerfectPathCache.ts). */
+  /** Trail-route computations since the scene started (src/render/trailPerfectPathCache.ts). */
   perfectPathComputeCount: number;
 }
 
@@ -2353,7 +2353,7 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyContinuousPlayTrail call in play mode; null until the first
   // one runs (or if the trail is empty/off-screen that frame).
   private lastTrailPerfDiagnostics: LegacyTrailPerfDiagnostics | null = null;
-  // MAZER-PERF-002: the shortest route is memoised per (maze, trail, player), and the trail canvas is rebuilt only when
+  // MAZER-PERF-002: the walked trail's route is memoised per (maze, trail, player), and the trail canvas is rebuilt only when
   // its picture can differ (src/render/trailPerfectPathCache.ts, trailRedrawGate.ts).
   private readonly trailPerfectPathCache = new TrailPerfectPathCache();
   private trailDrawRecord: TrailDrawRecord | null = null;
@@ -9477,11 +9477,10 @@ export class MenuScene extends Phaser.Scene {
     // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
     // this.player -- the exact same shared fields the menu demo AI already
     // populates every step, so it was never actually play-specific, just
-    // wired to only run there. The menu AI's own raw movement history could
-    // include backtracking/dead-ends the player never needed on the real
-    // shortest route back to start; deriving the same shortest-path-through-
-    // visited-tiles trail for both surfaces carries play's exact trail
-    // behavior over to the menu demo, as asked.
+    // wired to only run there. Both surfaces draw the same walked trail
+    // (legacyWalkedTrail.ts: the path actually walked, unwritten only by
+    // stepping back along it), so the menu demo's walker, dead-end backtracks
+    // included, gets play's exact trail behavior, as asked.
     // resolveLegacyMenuDeconstructTrailAlpha only reads menuStaticDrawLifecyclePhase
     // (shared by both surfaces, "menu" in the name is just legacy) -- it was
     // gated to menu mode here for no reason tied to the function itself, which

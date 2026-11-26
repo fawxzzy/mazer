@@ -215,7 +215,7 @@ describe('trail rebuild: canvas work per rebuild (long route, 3x phone)', () => 
     expect(target.count('save')).toBe(target.count('restore'));
   });
 
-  test('star dust, cached (the game painter since MAZER-PERF-017 C + A): a walking frame repaints only the head', async () => {
+  test('star dust, cached painter (withdrawn from the game 2026-11-25, still on the trail-cost options page): a walking frame repaints only the head', async () => {
     const doc = freshDocument();
     const { createStarDustTrailCache, STAR_DUST_TRAIL_CACHE } = await import('../../src/render/starDustTrailCache');
     const segments = buildSegments();

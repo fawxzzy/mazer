@@ -113,6 +113,8 @@ jobs:
           tests/scenes/menu-intent-runtime.test.ts
           tests/reset/legacy-player-message-inventory.test.ts
           tests/reset/work-report.test.ts
+          tests/legacy-runtime
+          tests/reset/legacy-feedback-launch.test.ts
           --maxWorkers=1
 
       # The "generated work report is current" check moved to the Owner export workflow (ci.yml): it is a function of the

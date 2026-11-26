@@ -11,7 +11,7 @@
  *     redraw gate owns that gap; the options page holds it open (trailPerfOptionsHarness.ts) as the game would;
  *   - bodyCache: everything older than the last `headTiles` of route is painted once into a cached layer, re-painted
  *     every `refreshMs` (or when the route changes); only the head is painted per frame (the page's first cut of C; the
- *     shipped cache is starDustTrailCache.ts).
+ *     real cached painter, withdrawn from the game, is starDustTrailCache.ts).
  */
 import type { StarDustSegment } from '../starDustTrailCanvas';
 import type { StarDustTrailRenderer } from '../starDustRenderOverride';
