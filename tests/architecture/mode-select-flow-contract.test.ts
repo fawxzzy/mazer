@@ -69,11 +69,26 @@ describe('mode-select flow contract (MAZER-MODE-002, look D)', () => {
     // open: the hook ignores Play inside the window and stamps the window when it opens
     expect(region).toContain('if (this.isModeSelectInputGuarded()) {\n        return;\n      }\n      this.modeSelectInputGuardStartedAt = this.time.now;');
     // the rail's Play (button, centred-card tap, Enter on the rail), startModeSelectItem, scene Enter and Back all check it
-    expect(region).toContain('onPlay: (index) => {\n        if (this.isModeSelectInputGuarded()) {\n          return;\n        }\n        this.modeSelectIndex = index;\n        this.startModeSelectItem(items[index]!);');
-    expect(region).toContain('if (!this.isModeSelectInputGuarded()) {\n          this.handleBackAction();');
+    // measured from the press (pressAgeMs from the rail): a DOM tap lands on release, the old canvas path on pointerdown
+    expect(region).toContain('onPlay: (index, pressAgeMs) => {\n        if (this.isModeSelectInputGuarded(pressAgeMs)) {\n          return;\n        }\n        this.modeSelectIndex = index;\n        this.startModeSelectItem(items[index]!);');
+    expect(region).toContain('onBack: (pressAgeMs) => {\n        if (!this.isModeSelectInputGuarded(pressAgeMs)) {\n          this.handleBackAction();');
+    expect(region).toContain('return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt, pressAgeMs);');
     // close: closeOverlay stamps the window before the sheet state is cleared
     const close = menuScene.slice(menuScene.indexOf('private closeOverlay(): void {'));
     expect(close.slice(0, 700)).toContain("if (this.overlay === 'mode-select') {\n      this.modeSelectInputGuardStartedAt = this.time.now;");
+  });
+
+  test('a held Enter / Space never plays: the rail drops key auto-repeat before any play or native button meaning', () => {
+    const rail = read('src/ui/modeSelect/modeSelectRail.ts');
+    const handleKey = rail.slice(rail.indexOf('const handleKey = (event: KeyboardEvent): boolean => {'));
+    const held = handleKey.indexOf('if (isModeSelectHeldActivationKey(event.key, event.repeat)) {\n      event.preventDefault();\n      return false;');
+    expect(held).toBeGreaterThan(0);
+    expect(held).toBeLessThan(handleKey.indexOf("(target === play || target === back)) return false;"));
+    expect(held).toBeLessThan(handleKey.indexOf("case 'play':"));
+    // the scene's own key handler already drops repeats before its Enter branches
+    const sceneRepeat = menuScene.indexOf('    if (event.repeat) {\n      return false;\n    }');
+    expect(sceneRepeat).toBeGreaterThan(0);
+    expect(sceneRepeat).toBeLessThan(menuScene.indexOf("if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'mode-select') {"));
   });
 
   test('the sheet code reads progression but never writes storage, progression, the outbox, the network or a leaderboard', () => {

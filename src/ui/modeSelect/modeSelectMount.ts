@@ -2,7 +2,7 @@ import '../dom/primitives.css';
 import './modeSelect.css';
 import { HAZARD_GATE_MAGENTA, palette } from '../../render/palette';
 import { DARK_THEME_TOKENS } from '../../theme/themes';
-import { applyFeedbackTheme } from '../feedback/feedbackTheme';
+import { applyFeedbackTheme, feedbackDarkTokenMap } from '../feedback/feedbackTheme';
 import { createModeSelectRail, type ModeSelectRailHandle, type ModeSelectRailOptions } from './modeSelectRail';
 
 /**
@@ -29,6 +29,8 @@ export interface ModeSelectMountOptions extends Omit<ModeSelectRailOptions, 'doc
 export interface ModeSelectMountHandle {
   readonly layer: HTMLElement;
   readonly rail: ModeSelectRailHandle;
+  /** Theme or reduced motion changed while the selector is up: repaints the layer and the rail's scroll behaviour. */
+  applyLook: (theme: 'default' | 'dark', reducedMotion: boolean) => void;
   close: () => void;
   isClosed: () => boolean;
 }
@@ -57,12 +59,17 @@ export const mountModeSelect = (options: ModeSelectMountOptions): ModeSelectMoun
   const host = options.host ?? doc.body;
   const layer = doc.createElement('div');
   layer.className = MODE_SELECT_LAYER_CLASS;
-  layer.classList.toggle('is-reduced-motion', options.reducedMotion);
   layer.setAttribute('role', 'dialog');
   layer.setAttribute('aria-modal', 'true');
   layer.setAttribute('aria-label', options.title);
-  applyFeedbackTheme(layer, options.theme);
-  for (const [name, value] of Object.entries(resolveModeSelectPaletteVars(options.theme))) layer.style.setProperty(name, value);
+  const paintLook = (theme: 'default' | 'dark', reducedMotion: boolean): void => {
+    layer.classList.toggle('is-reduced-motion', reducedMotion);
+    // Back to the default theme: drop the dark remap (applyFeedbackTheme only ever sets it).
+    if (theme !== 'dark') for (const name of Object.keys(feedbackDarkTokenMap(DARK_THEME_TOKENS))) layer.style.removeProperty(name);
+    applyFeedbackTheme(layer, theme);
+    for (const [name, value] of Object.entries(resolveModeSelectPaletteVars(theme))) layer.style.setProperty(name, value);
+  };
+  paintLook(options.theme, options.reducedMotion);
 
   const far = doc.createElement('div');
   far.className = 'mms-far';
@@ -117,6 +124,11 @@ export const mountModeSelect = (options: ModeSelectMountOptions): ModeSelectMoun
   rail.rail.focus({ preventScroll: true });
 
   return {
+    applyLook: (theme, reducedMotion) => {
+      if (closed) return;
+      paintLook(theme, reducedMotion);
+      rail.setReducedMotion(reducedMotion);
+    },
     close: () => {
       if (closed) return;
       closed = true;

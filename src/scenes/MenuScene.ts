@@ -12771,8 +12771,9 @@ export class MenuScene extends Phaser.Scene {
     this.dispatchUiBridgeCommand({ type: 'START_RUN' }, () => this.startPlayMode());
   }
 
-  private isModeSelectInputGuarded(): boolean {
-    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt);
+  // pressAgeMs: a DOM tap lands on release, so the guard is measured from when its press began (the rail reports it).
+  private isModeSelectInputGuarded(pressAgeMs = 0): boolean {
+    return isLegacyModeSelectInputGuarded(this.time.now, this.modeSelectInputGuardStartedAt, pressAgeMs);
   }
 
   // Keyboard Enter on the selector before its DOM layer has focus: the centred entry if it is playable; never a locked one.
@@ -12823,13 +12824,13 @@ export class MenuScene extends Phaser.Scene {
     this.modeSelectLayer.show({
       initialIndex,
       items,
-      onBack: () => {
-        if (!this.isModeSelectInputGuarded()) {
+      onBack: (pressAgeMs) => {
+        if (!this.isModeSelectInputGuarded(pressAgeMs)) {
           this.handleBackAction();
         }
       },
-      onPlay: (index) => {
-        if (this.isModeSelectInputGuarded()) {
+      onPlay: (index, pressAgeMs) => {
+        if (this.isModeSelectInputGuarded(pressAgeMs)) {
           return;
         }
         this.modeSelectIndex = index;

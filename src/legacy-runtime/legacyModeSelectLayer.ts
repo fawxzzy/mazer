@@ -4,7 +4,8 @@
  *
  * The selector, its CSS and the kit buttons load on demand (a dynamic import of src/ui/modeSelect/modeSelectMount.ts),
  * so the boot bundle does not grow; prefetch() warms that chunk while the menu idles, so the first Play opens at once.
- * Exactly one layer exists at a time: show() while up (or while the chunk loads) only refreshes the callbacks.
+ * Exactly one layer exists at a time: show() while up (or while the chunk loads) only refreshes the callbacks and
+ * repaints the theme / reduced motion when either changed.
  */
 import type { ModeSelectMountHandle, ModeSelectMountOptions } from '../ui/modeSelect/modeSelectMount';
 import {
@@ -23,8 +24,9 @@ export interface LegacyModeSelectLayerShowOptions {
   readonly initialIndex: number;
   readonly theme: 'default' | 'dark';
   readonly reducedMotion: boolean;
-  readonly onPlay: (index: number) => void;
-  readonly onBack: () => void;
+  /** `pressAgeMs`: how long before the call the press began (0 for keys); the scene measures its open guard from it. */
+  readonly onPlay: (index: number, pressAgeMs: number) => void;
+  readonly onBack: (pressAgeMs: number) => void;
   readonly onSelect: (index: number) => void;
 }
 
@@ -61,6 +63,8 @@ export const createLegacyModeSelectLayer = (deps: LegacyModeSelectLayerDeps): Le
   let destroyed = false;
   let handle: ModeSelectMountHandle | null = null;
   let current: LegacyModeSelectLayerShowOptions | null = null;
+  // The look the mounted layer shows now (null while nothing is mounted).
+  let painted: { theme: 'default' | 'dark'; reducedMotion: boolean } | null = null;
   let generation = 0;
 
   const loadOnce = (): Promise<MountModule> => {
@@ -77,6 +81,7 @@ export const createLegacyModeSelectLayer = (deps: LegacyModeSelectLayerDeps): Le
     open = false;
     generation += 1;
     current = null;
+    painted = null;
     const mounted = handle;
     handle = null;
     mounted?.close();
@@ -99,7 +104,15 @@ export const createLegacyModeSelectLayer = (deps: LegacyModeSelectLayerDeps): Le
     show: (options) => {
       if (destroyed) return;
       current = options;
-      if (open) return;
+      if (open) {
+        // A theme or reduced-motion change made while the selector is up shows at once.
+        if (handle !== null && painted !== null
+          && (painted.theme !== options.theme || painted.reducedMotion !== options.reducedMotion)) {
+          handle.applyLook(options.theme, options.reducedMotion);
+          painted = { reducedMotion: options.reducedMotion, theme: options.theme };
+        }
+        return;
+      }
       open = true;
       generation += 1;
       const ticket = generation;
@@ -112,14 +125,15 @@ export const createLegacyModeSelectLayer = (deps: LegacyModeSelectLayerDeps): Le
           initialIndex: opts.initialIndex,
           items: opts.items,
           // The latest show() wins: callbacks are read at call time.
-          onBack: () => current?.onBack(),
-          onPlay: (index) => current?.onPlay(index),
+          onBack: (pressAgeMs) => current?.onBack(pressAgeMs),
+          onPlay: (index, pressAgeMs) => current?.onPlay(index, pressAgeMs),
           onSelect: (index) => current?.onSelect(index),
           reducedMotion: opts.reducedMotion,
           resolvePlay: (item) => resolveLegacyModeSelectPlayAction(item as LegacyModeSelectItem | undefined),
           theme: opts.theme,
           title: LEGACY_MODE_SELECT_TITLE
         });
+        painted = { reducedMotion: opts.reducedMotion, theme: opts.theme };
       }).catch(() => {
         if (!open || destroyed || ticket !== generation) return;
         hide();

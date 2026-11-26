@@ -466,6 +466,11 @@ describe('Mazer UI rework state model contract', () => {
         ok: true,
         snapshot: expect.objectContaining({ primarySurface: 'leaderboard', modalSurface: 'none' })
       });
+      // The mode-select sheet is a legal overlay (a scene restart with it open must not fail the first projection).
+      expect(projectLegacyUiState({ ...input, mode: 'menu', overlay: 'mode-select' })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({ primarySurface: 'home', modalSurface: 'none' })
+      });
       const throwingPrototype = new Proxy({}, { getPrototypeOf: () => { throw new Error('trap'); } });
       expect(() => projectLegacyUiState(throwingPrototype)).not.toThrow();
       expect(projectLegacyUiState(throwingPrototype)).toEqual({

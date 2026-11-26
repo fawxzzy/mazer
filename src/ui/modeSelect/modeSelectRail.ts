@@ -3,12 +3,14 @@ import {
   INITIAL_MODE_SELECT_WHEEL_STATE,
   MODE_SELECT_DRAG_THRESHOLD_PX,
   clampModeSelectIndex,
+  isModeSelectHeldActivationKey,
   reduceModeSelectWheel,
   resolveModeSelectRailDepth,
   resolveModeSelectRailEdgePad,
   resolveModeSelectRailKeyAction,
   resolveModeSelectRailNearestIndex,
   resolveModeSelectRailScrollFor,
+  resolveModeSelectPressAgeMs,
   type ModeSelectWheelState
 } from './modeSelectRailMath';
 
@@ -42,10 +44,13 @@ export interface ModeSelectRailOptions {
   readonly resolvePlay: (item: ModeSelectRailItem | undefined) => { readonly label: string; readonly disabled: boolean };
   /** Parallax and the perspective turn off, scrolling jumps instead of gliding. */
   readonly reducedMotion: boolean;
-  /** The centred playable mode should start (Play, Enter, or a tap on the centred card). */
-  readonly onPlay: (index: number) => void;
-  /** Back to Menu (the button or Escape). */
-  readonly onBack: () => void;
+  /**
+   * The centred playable mode should start (Play, Enter, or a tap on the centred card). `pressAgeMs`: how long before
+   * this call the press began (0 for keys), so the caller's open guard can be measured from the press.
+   */
+  readonly onPlay: (index: number, pressAgeMs: number) => void;
+  /** Back to Menu (the button or Escape); `pressAgeMs` as for onPlay. */
+  readonly onBack: (pressAgeMs: number) => void;
   /** The centred entry changed. */
   readonly onSelect?: (index: number) => void;
   /** After every measure: the rail's scroll position in css px (drives the far layer's parallax). */
@@ -68,6 +73,8 @@ export interface ModeSelectRailHandle {
   handleKey: (event: KeyboardEvent) => boolean;
   /** A vertical wheel anywhere on the selector steps one mode per notch (the layer forwards it). */
   handleWheel: (event: WheelEvent) => void;
+  /** Reduced motion changed while the selector is up: scrolling jumps instead of gliding from now on. */
+  setReducedMotion: (reducedMotion: boolean) => void;
   /** Re-reads sizes and re-centres the current entry (layout changed). */
   remeasure: () => void;
   destroy: () => void;
@@ -105,6 +112,7 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
   const win = doc.defaultView ?? window;
   const now = options.now ?? (() => win.performance.now());
   const { items: modes } = options;
+  let reducedMotion = options.reducedMotion;
   const controller = new AbortController();
   const { signal } = controller;
 
@@ -187,7 +195,7 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
     if (items.length === 0) return;
     const item = items[clampModeSelectIndex(index, items.length)]!;
     const left = resolveModeSelectRailScrollFor({ left: item.offsetLeft, width: item.offsetWidth }, rail.clientWidth);
-    rail.scrollTo({ behavior: instant || options.reducedMotion ? 'auto' : 'smooth', left });
+    rail.scrollTo({ behavior: instant || reducedMotion ? 'auto' : 'smooth', left });
   };
 
   let frame = 0;
@@ -237,6 +245,17 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
     if ((event.target as Element | null)?.closest?.('.mms-item')) event.preventDefault();
   }, { signal });
 
+  // When the press behind the next click began (pointerdown anywhere on the selector, captured before the drag code).
+  let pressStartedAt: number | null = null;
+  root.addEventListener('pointerdown', () => { pressStartedAt = now(); }, { capture: true, signal });
+  root.addEventListener('pointercancel', () => { pressStartedAt = null; }, { capture: true, signal });
+  // A keyboard-made click has detail 0; a pointer click counts its press from the pointerdown.
+  const pressAge = (event: MouseEvent): number => {
+    const age = resolveModeSelectPressAgeMs(now(), pressStartedAt, event.detail > 0);
+    pressStartedAt = null;
+    return age;
+  };
+
   rail.addEventListener('click', (event) => {
     if (rail.classList.contains('is-dragging')) return;
     const hit = (event.target as Element | null)?.closest?.('.mms-item') as HTMLElement | null | undefined;
@@ -248,13 +267,13 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
       return;
     }
     // The centred card: a playable mode plays, a locked one stays put (its card and the Play button say Coming soon).
-    if (modes[index]?.playable === true) options.onPlay(index);
+    if (modes[index]?.playable === true) options.onPlay(index, pressAge(event));
   }, { signal });
 
-  play.addEventListener('click', () => {
-    if (current >= 0 && modes[current]?.playable === true) options.onPlay(current);
+  play.addEventListener('click', (event) => {
+    if (current >= 0 && modes[current]?.playable === true) options.onPlay(current, pressAge(event));
   }, { signal });
-  back.addEventListener('click', () => options.onBack(), { signal });
+  back.addEventListener('click', (event) => options.onBack(pressAge(event)), { signal });
 
   let wheel: ModeSelectWheelState = INITIAL_MODE_SELECT_WHEEL_STATE;
   const onWheel = (event: WheelEvent): void => {
@@ -269,6 +288,11 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
 
   const handleKey = (event: KeyboardEvent): boolean => {
     const target = event.target as Element | null;
+    // A held Enter / Space never activates anything (also blocks a focused button's native repeat click).
+    if (isModeSelectHeldActivationKey(event.key, event.repeat)) {
+      event.preventDefault();
+      return false;
+    }
     // Enter / Space on Play or Back keep their native button meaning.
     if ((event.key === 'Enter' || event.key === ' ') && (target === play || target === back)) return false;
     const action = resolveModeSelectRailKeyAction(event.key, current, items.length);
@@ -279,11 +303,11 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
         return true;
       case 'play':
         event.preventDefault();
-        if (current >= 0 && modes[current]?.playable === true) options.onPlay(current);
+        if (current >= 0 && modes[current]?.playable === true) options.onPlay(current, 0);
         return true;
       case 'back':
         event.preventDefault();
-        options.onBack();
+        options.onBack(0);
         return true;
       default:
         return false;
@@ -324,6 +348,9 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
     rail,
     remeasure,
     root,
+    setReducedMotion: (value) => {
+      reducedMotion = value;
+    },
     handleWheel: onWheel,
     select: (index, instant = false) => scrollToIndex(index, instant)
   };

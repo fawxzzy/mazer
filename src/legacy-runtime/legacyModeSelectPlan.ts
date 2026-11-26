@@ -137,9 +137,13 @@ export const LEGACY_MODE_SELECT_TITLE = 'Choose a mode';
  */
 export const LEGACY_MODE_SELECT_INPUT_GUARD_MS = 250;
 
-/** True while selector input is still inside the guard window that started at `guardStartedAtMs`. */
-export const isLegacyModeSelectInputGuarded = (nowMs: number, guardStartedAtMs: number | null): boolean => (
-  guardStartedAtMs !== null && nowMs - guardStartedAtMs < LEGACY_MODE_SELECT_INPUT_GUARD_MS
+/**
+ * True while selector input is still inside the guard window that started at `guardStartedAtMs`. `pressAgeMs` is how
+ * long before `nowMs` the input's press began: a DOM click lands on release, and the guard is measured from the press
+ * (as the old canvas pointerdown path did), so a slow double-tap whose second press began inside the window is ignored.
+ */
+export const isLegacyModeSelectInputGuarded = (nowMs: number, guardStartedAtMs: number | null, pressAgeMs = 0): boolean => (
+  guardStartedAtMs !== null && nowMs - Math.max(0, pressAgeMs) - guardStartedAtMs < LEGACY_MODE_SELECT_INPUT_GUARD_MS
 );
 
 /**

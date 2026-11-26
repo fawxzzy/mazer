@@ -8,11 +8,12 @@ const flush = async (): Promise<void> => {
 };
 
 const fakeMount = () => {
-  const mounts: { options: ModeSelectMountOptions; closed: boolean }[] = [];
+  const mounts: { options: ModeSelectMountOptions; closed: boolean; looks: [string, boolean][] }[] = [];
   const mountModeSelect = (options: ModeSelectMountOptions): ModeSelectMountHandle => {
-    const entry = { closed: false, options };
+    const entry = { closed: false, looks: [] as [string, boolean][], options };
     mounts.push(entry);
     return {
+      applyLook: (theme, reducedMotion) => { entry.looks.push([theme, reducedMotion]); },
       close: () => { entry.closed = true; },
       isClosed: () => entry.closed,
       layer: {} as HTMLElement,
@@ -62,13 +63,30 @@ describe('mode-select layer controller (MAZER-MODE-002 look D)', () => {
     await flush();
     const second = showOptions();
     layer.show(second);
-    mounts[0]!.options.onPlay(0);
-    mounts[0]!.options.onBack();
+    mounts[0]!.options.onPlay(0, 120);
+    mounts[0]!.options.onBack(0);
     mounts[0]!.options.onSelect?.(2);
     expect(first.onPlay).not.toHaveBeenCalled();
-    expect(second.onPlay).toHaveBeenCalledWith(0);
-    expect(second.onBack).toHaveBeenCalledTimes(1);
+    // the press age reaches the scene, which measures its open guard from the press
+    expect(second.onPlay).toHaveBeenCalledWith(0, 120);
+    expect(second.onBack).toHaveBeenCalledWith(0);
     expect(second.onSelect).toHaveBeenCalledWith(2);
+  });
+
+  it('show() while up repaints only when the theme or reduced motion changed; a show() during the load mounts with the latest look', async () => {
+    const { load, mounts } = fakeMount();
+    const layer = createLegacyModeSelectLayer({ loadMount: load, onUnavailable: vi.fn() });
+    layer.show(showOptions());
+    layer.show(showOptions({ theme: 'dark' }));
+    await flush();
+    expect(mounts[0]!.options.theme).toBe('dark');
+    layer.show(showOptions({ theme: 'dark' }));
+    expect(mounts[0]!.looks).toEqual([]);
+    layer.show(showOptions({ reducedMotion: true, theme: 'dark' }));
+    layer.show(showOptions({ reducedMotion: true, theme: 'default' }));
+    layer.show(showOptions({ reducedMotion: true, theme: 'default' }));
+    expect(mounts[0]!.looks).toEqual([['dark', true], ['default', true]]);
+    expect(mounts).toHaveLength(1);
   });
 
   it('hide() closes the layer; syncVisibility(false) hides, syncVisibility(true) never mounts by itself', async () => {

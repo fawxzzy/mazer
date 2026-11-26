@@ -4,12 +4,14 @@ import {
   MODE_SELECT_WHEEL_COOLDOWN_MS,
   MODE_SELECT_WHEEL_STEP_PX,
   clampModeSelectIndex,
+  isModeSelectHeldActivationKey,
   reduceModeSelectWheel,
   resolveModeSelectRailDepth,
   resolveModeSelectRailEdgePad,
   resolveModeSelectRailKeyAction,
   resolveModeSelectRailNearestIndex,
-  resolveModeSelectRailScrollFor
+  resolveModeSelectRailScrollFor,
+  resolveModeSelectPressAgeMs
 } from '../../src/ui/modeSelect/modeSelectRailMath';
 
 // A 393 px rail with 228 px cards and 8 px side margins, laid out as the CSS does: pad, then margin + card + margin.
@@ -98,5 +100,23 @@ describe('mode-select rail wheel', () => {
     expect(during.step).toBe(0);
     const after = reduceModeSelectWheel(during.state, 100, 1000 + MODE_SELECT_WHEEL_COOLDOWN_MS);
     expect(after.step).toBe(1);
+  });
+});
+
+describe('mode-select activation input', () => {
+  it('a held Enter or Space (auto-repeat) never activates; the first press and other keys are not filtered', () => {
+    expect(isModeSelectHeldActivationKey('Enter', true)).toBe(true);
+    expect(isModeSelectHeldActivationKey(' ', true)).toBe(true);
+    expect(isModeSelectHeldActivationKey('Enter', false)).toBe(false);
+    expect(isModeSelectHeldActivationKey(' ', false)).toBe(false);
+    // arrows keep stepping while held
+    expect(isModeSelectHeldActivationKey('ArrowRight', true)).toBe(false);
+  });
+
+  it('press age: pointer clicks count from their pointerdown; keyboard clicks and unrecorded presses are 0', () => {
+    expect(resolveModeSelectPressAgeMs(1300, 1200, true)).toBe(100);
+    expect(resolveModeSelectPressAgeMs(1300, 1200, false)).toBe(0);
+    expect(resolveModeSelectPressAgeMs(1300, null, true)).toBe(0);
+    expect(resolveModeSelectPressAgeMs(1300, 1400, true)).toBe(0);
   });
 });

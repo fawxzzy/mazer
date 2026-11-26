@@ -94,6 +94,16 @@ describe('mode-select input guard and keyboard choice (MAZER-MODE-002 review)', 
     expect(isLegacyModeSelectInputGuarded(5000, 1000)).toBe(false);
   });
 
+  it('the guard is measured from the press: a slow double-tap whose press began inside the window is ignored', () => {
+    // opened at 1000; the second press began at 1200 and the click landed on release at 1300
+    expect(isLegacyModeSelectInputGuarded(1300, 1000)).toBe(false);
+    expect(isLegacyModeSelectInputGuarded(1300, 1000, 100)).toBe(true);
+    // a press that began after the window still plays
+    expect(isLegacyModeSelectInputGuarded(1400, 1000, 100)).toBe(false);
+    // a negative age (clock skew) never widens the window
+    expect(isLegacyModeSelectInputGuarded(1300, 1000, -500)).toBe(false);
+  });
+
   it('Enter picks the centred playable entry', () => {
     expect(resolveLegacyModeSelectKeyboardChoice(items, 0)).toBe(0);
   });

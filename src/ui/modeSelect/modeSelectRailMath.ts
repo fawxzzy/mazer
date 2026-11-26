@@ -85,6 +85,23 @@ export const resolveModeSelectRailKeyAction = (key: string, current: number, cou
   }
 };
 
+/**
+ * Enter / Space held down: the OS auto-repeat is ignored (not even a focused button's native activation), so a held
+ * key cannot start a mode the player never chose. The old canvas selector ignored repeats the same way.
+ */
+export const isModeSelectHeldActivationKey = (key: string, repeat: boolean): boolean => (
+  repeat && (key === 'Enter' || key === ' ')
+);
+
+/**
+ * How long before a click its press began, in ms. A DOM click lands on release (touchend), but the selector's open
+ * guard has to be measured from the press, as the old canvas pointerdown path was, so a slow double-tap on the menu's
+ * Play is still caught. Keyboard clicks (`fromPointer` false) and clicks with no recorded press count as age 0.
+ */
+export const resolveModeSelectPressAgeMs = (clickAtMs: number, pressStartedAtMs: number | null, fromPointer: boolean): number => (
+  !fromPointer || pressStartedAtMs === null ? 0 : Math.max(0, clickAtMs - pressStartedAtMs)
+);
+
 /** A vertical mouse wheel steps one mode per notch: the accumulated delta must pass this many css px. */
 export const MODE_SELECT_WHEEL_STEP_PX = 40;
 /** After a wheel step, further wheel input is ignored this long (trackpad inertia would otherwise skip every mode). */
