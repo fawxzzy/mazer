@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_440b12549ce7",
+  "export_id": "pbe_mazer_owner_registry_d8c7f569667a",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:440b12549ce776cab9cadbfb42134e21593ddea782de00c56ce341a51ac9cad9",
-  "generated_at": "2026-11-25T04:33:41.000Z",
+  "source_revision": "sha256:d8c7f569667ae65e277b7874967d2155dda27abe82f81a65f134f221696d5a88",
+  "generated_at": "2026-11-26T05:47:29.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:d2c15d89bdad433de68964563a52d190a9706ed3e26cc316884765b14b8430d9",
-      "observed_at": "2026-11-25T04:33:41.000Z"
+      "revision": "sha256:9437701da4a59928edc78e0fd330be4e32cf96f5bce72bd0a0738b3af24e8a00",
+      "observed_at": "2026-11-26T05:47:29.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-25T04:33:41.000Z"
+      "observed_at": "2026-11-26T05:47:29.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-25T04:33:41.000Z"
+      "observed_at": "2026-11-26T05:47:29.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-25T04:33:41.000Z"
+      "observed_at": "2026-11-26T05:47:29.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-25T04:33:41.000Z"
+      "observed_at": "2026-11-26T05:47:29.000Z"
     }
   ],
   "cards": [
@@ -8911,7 +8911,7 @@
         "project_id": "mazer",
         "board_id": "discordos:project-feedback:mazer",
         "title": "Fix phone lag with a long trail: batch star-dust keylines and measure the rest",
-        "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "description": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cache follow-ups live in build main-CMQ__KQr (PR 710): old trail steady, only the head breathes; per-frame allocations removed; build stamp now carries the commit sha; headless only, no phone check PR #710 merged (8fe6bcaf). Deployed: production build main-CMQ__KQr. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 333912cfa2d4: old Star Dust look back (PR 712), board frame cache (PR 714), walked-path trail (PR 713), rating popup (PR 715); headless only, not device-checked PR #712 merged (380a883e), PR #714 merged (cb7ade5a). Deployed: production build 333912cfa2d4. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 2fb6136b71c3: game-mode selector D (PR 716) in the real menu; headless Chromium+WebKit only, not device-checked PR #716 merged (2fb6136b). Deployed: production build 2fb6136b71c3. Checked only in headless Chromium, not on a real phone.",
         "card_type": "reliability",
         "lifecycle": "review",
         "priority": "high",
@@ -8920,7 +8920,7 @@
           "MAZER-PERF-016"
         ],
         "board_version": 1,
-        "updated_at": "2026-11-25T04:33:16.000Z",
+        "updated_at": "2026-11-26T05:47:29.000Z",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
         "extensions": {
           "owner_status": "review",
@@ -8931,11 +8931,11 @@
         "source_id": "mazer-owner-work-registry",
         "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-PERF-017",
         "source_status": "current",
-        "source_updated_at": "2026-11-25T04:33:16.000Z"
+        "source_updated_at": "2026-11-26T05:47:29.000Z"
       },
       "content": {
-        "summary": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
-        "objective": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cost: cached older trail with a light live head (PR 706) and the trail and board-cost options pages (PRs 704, 705) live in build main-CB24t84j; headless only, no phone check PR #706 merged (95af9468), PR #705 merged (e928e24e), PR #704 merged (8fd0b634). Deployed: production build main-CB24t84j. Checked only in headless Chromium, not on a real phone.",
+        "summary": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cache follow-ups live in build main-CMQ__KQr (PR 710): old trail steady, only the head breathes; per-frame allocations removed; build stamp now carries the commit sha; headless only, no phone check PR #710 merged (8fe6bcaf). Deployed: production build main-CMQ__KQr. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 333912cfa2d4: old Star Dust look back (PR 712), board frame cache (PR 714), walked-path trail (PR 713), rating popup (PR 715); headless only, not device-checked PR #712 merged (380a883e), PR #714 merged (cb7ade5a). Deployed: production build 333912cfa2d4. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 2fb6136b71c3: game-mode selector D (PR 716) in the real menu; headless Chromium+WebKit only, not device-checked PR #716 merged (2fb6136b). Deployed: production build 2fb6136b71c3. Checked only in headless Chromium, not on a real phone.",
+        "objective": "Measure per-phase frame cost at a late level with a long trail under phone emulation, fix the top cost with identical pixels, and list the remaining costs (bloom about 44 ms, sparkle fills about 31 ms per walking frame) for an owner-picked cheaper look. Board update 2026-11-25: Trail cache follow-ups live in build main-CMQ__KQr (PR 710): old trail steady, only the head breathes; per-frame allocations removed; build stamp now carries the commit sha; headless only, no phone check PR #710 merged (8fe6bcaf). Deployed: production build main-CMQ__KQr. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 333912cfa2d4: old Star Dust look back (PR 712), board frame cache (PR 714), walked-path trail (PR 713), rating popup (PR 715); headless only, not device-checked PR #712 merged (380a883e), PR #714 merged (cb7ade5a). Deployed: production build 333912cfa2d4. Checked only in headless Chromium, not on a real phone. Board update 2026-11-26: Live build 2fb6136b71c3: game-mode selector D (PR 716) in the real menu; headless Chromium+WebKit only, not device-checked PR #716 merged (2fb6136b). Deployed: production build 2fb6136b71c3. Checked only in headless Chromium, not on a real phone.",
         "acceptance_criteria": [
           "Per-phase frame cost table measured at level 300 with a long trail under phone emulation",
           "Top cost fixed with a zero-difference pixel check at several device scales",
