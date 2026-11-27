@@ -94,7 +94,7 @@ jobs:
       # The PR #284 maze-parity tests in legacy-reset.test.ts and legacy-topology-scale-audit.test.ts used to be run here
       # by name (-t "PR #284") and again in the whole tests/reset folder step below; the folder step runs them once.
       # Only the process.chdir fixture, which a worker thread cannot run, still needs its own process.
-      - name: Verify the legacy Unreal source fixture contract (own process: it calls process.chdir)
+      - name: Verify the legacy Unreal source fixture contract (own process, it calls process.chdir)
         run: >-
           npx --no-install vitest run
           tests/reset/legacy-unreal-source-fixture.test.ts
@@ -118,7 +118,7 @@ jobs:
       # The whole tests/reset folder (the same directory `npm test` and `npm run verify` run), so a
       # broken reset test can no longer merge green. Two named exclusions, both still covered:
       # - legacy-unreal-source-fixture.test.ts calls process.chdir, which a worker thread cannot do;
-      #   it runs in its own process in the "PR 284" step above.
+      #   it runs in its own process in the "legacy Unreal source fixture" step above.
       # - legacy-reset.test.ts runs in the second command, minus the four tests that read the
       #   local-only mazer-legacy-unreal-restore fixture (not in this repo and not on a CI runner;
       #   they fail with "Missing local mazer-legacy-unreal-restore fixture" here and run locally
