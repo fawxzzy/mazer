@@ -12,10 +12,10 @@
  * ran these files -- confirmed by adding tests to tests/render/ repeatedly
  * across a long session and observing neither pipeline's own reported test
  * count ever change. (Since PR #727 CI globs the whole tests/reset folder and
- * tests/core, cosmetics, tutorial, architecture, brand and legacy-runtime, so
- * the tests/reset and tests/architecture entries below are now also reached
- * there; tests/render and tests/analysis are still not globbed by CI, which
- * lists a fixed set of tests/render files by name.) This module is the single
+ * tests/core, cosmetics, tutorial, architecture, brand and legacy-runtime, and
+ * its "whole tests/render folder" step globs tests/render, so the tests/reset,
+ * tests/architecture and tests/render entries below are now also reached
+ * there; tests/analysis is still not globbed by CI.) This module is the single
  * canonical list both the local runner and CI import from, so they can't
  * drift apart again.
  *
