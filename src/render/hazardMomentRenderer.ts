@@ -12,6 +12,7 @@ import Phaser from 'phaser';
 import { designTokens } from '../theme/tokens';
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent, type GuideHazardGlyph } from './guideHazardGlyph';
+import { drawMechanicIconGlyph, resolveHazardGlyphMechanicIcon } from './mechanicIcons';
 
 export interface HazardMomentCardContent {
   readonly glyph: GuideHazardGlyph;
@@ -208,7 +209,10 @@ export class HazardMomentView {
       g.fillCircle(iconX, iconY, sizes.iconSize / 2);
       g.lineStyle(1.2, accent, 0.7 * cardAlpha);
       g.strokeCircle(iconX, iconY, sizes.iconSize / 2);
-      drawGuideHazardGlyph(g, this.card.content.glyph, iconX, iconY, (sizes.iconSize / 2) * 0.9, accent);
+      // Pulse Gate and Shard: the board art from the mechanic icon registry (the same image as their Guide row).
+      const mechanic = resolveHazardGlyphMechanicIcon(this.card.content.glyph);
+      if (mechanic !== null) drawMechanicIconGlyph(g, mechanic, iconX, iconY, sizes.iconSize / 2);
+      else drawGuideHazardGlyph(g, this.card.content.glyph, iconX, iconY, (sizes.iconSize / 2) * 0.9, accent);
       const textLeft = frame.cardLeft + textLeftOffset;
       this.heading.setPosition(textLeft, frame.cardTop + sizes.padY).setAlpha(cardAlpha).setVisible(true);
       this.body.setPosition(textLeft, Math.round(frame.cardTop + sizes.padY + this.heading.height + sizes.lineGap))

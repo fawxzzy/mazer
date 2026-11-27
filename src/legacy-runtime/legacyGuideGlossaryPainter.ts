@@ -17,6 +17,7 @@ import {
 } from './legacyGuideSheetPlan';
 import { cyberArcadeMaterial, toCyberArcadeCssHex } from '../render/cyberArcadeMaterial';
 import { readMazerViewportGeometry } from '../boot/viewportGeometry';
+import { drawLegacyGuideRowIcon } from './legacyGuideIconRoute';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Host = any;
@@ -78,7 +79,7 @@ const buildItems = (host: Host, model: LegacyGuideSheetModel, width: number): It
           top: tileTop,
           width: tileW
         });
-        host.drawLegacyGuideIcon(row.icon, tileLeft + (tileW / 2), tileTop + 26, host.resolveLegacyGuideAccent(row.icon.glyph), g);
+        drawLegacyGuideRowIcon(host, row.icon, tileLeft + (tileW / 2), tileTop + 26, host.resolveLegacyGuideAccent(row.icon.glyph), g);
         const centerX = tileLeft + (tileW / 2);
         const centerY = tileTop + GUIDE_GLOSSARY_TILE_HEIGHT - 14;
         mask(host.addLegacySheetWrappedText(row.heading, tileLeft, centerY, tileW + 8, selected ? MINT_CSS() : WHITE(), 14, 12, 1,
@@ -107,7 +108,7 @@ const buildItems = (host: Host, model: LegacyGuideSheetModel, width: number): It
       const rowHeight = detailHeight - (PANEL_PAD * 2) + 20;
       const rowTop = top + PANEL_PAD - 10;
       const accent = host.resolveLegacyGuideAccent(row.icon.glyph) as number;
-      host.drawLegacyGuideIcon(row.icon, rowLeft + (S.badgeSize / 2), rowTop + (rowHeight / 2), accent, g);
+      drawLegacyGuideRowIcon(host, row.icon, rowLeft + (S.badgeSize / 2), rowTop + (rowHeight / 2), accent, g);
       const textLeft = rowLeft + S.badgeSize + S.badgeTextGap;
       const textWidth = Math.max(1, rowWidth - S.badgeSize - S.badgeTextGap);
       const copyLines = Math.max(1, Math.round((rowHeight - (S.rowPaddingY * 2) - S.headingLineHeight) / S.copyLineHeight));

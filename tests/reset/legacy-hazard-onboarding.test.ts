@@ -61,7 +61,10 @@ describe('hazard Guide rows (slice H6, HAZ-008 copy source)', () => {
     expect(LEGACY_GUIDE_HAZARD_ROWS.map((row) => row.id)).toEqual(['hazard-gate', 'hazard-sentry', 'hazard-hunter', 'hazard-shard']);
     for (const row of LEGACY_GUIDE_HAZARD_ROWS) {
       expect(row.icon.glyph).toBe(row.id);
-      expect(row.icon.status).toBe('guide-local');
+      // Rich-text skin (2026-11-27): Pulse Gate and Shard draw with the board painters (icon registry); the
+      // enemies have no board look yet, so their icons stay Guide-local.
+      const shared = row.kind === 'pulseGate' || row.kind === 'shard';
+      expect(row.icon.status, row.id).toBe(shared ? 'shared-with-board' : 'guide-local');
       expect(row.heading.length, row.id).toBeLessThanOrEqual(12);
       expect(row.text.length, row.id).toBeLessThanOrEqual(90);
     }

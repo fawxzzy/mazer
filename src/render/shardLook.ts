@@ -333,3 +333,37 @@ export const drawShardGem = (
   graphics.fillStyle(SHARD_GEM_HIGHLIGHT, alpha * SHARD_LOOK.gem.sliverAlpha);
   graphics.fillPoints(resolveShardGemSliver(gem).map((p) => ({ x: p.x, y: p.y })), true);
 };
+
+/** The minimal Graphics surface the cage ring needs (Phaser Graphics, the icon registry, test fakes). */
+export interface ShardCageGraphics {
+  fillStyle(color: number, alpha?: number): unknown;
+  fillCircle(x: number, y: number, radius: number): unknown;
+}
+
+/** The cage dot radius for a tile (never under the minimum CSS size). */
+export const resolveShardCageDotRadius = (tileSize: number): number => (
+  Math.max(SHARD_LOOK.cage.minDotRadiusCss, tileSize * SHARD_LOOK.cage.dotRadiusOfTile)
+);
+
+/**
+ * The dotted cage ring round the locked end star: `dots` dots on a circle, turned by `rotation`. The board
+ * (shardSceneLayer.ts) and the locked-star icon (mechanicIcons.ts) both paint it through this one function.
+ */
+export const drawShardCageRing = (
+  graphics: ShardCageGraphics,
+  cx: number,
+  cy: number,
+  radius: number,
+  dots: number,
+  dotRadius: number,
+  rotation: number,
+  color: number,
+  alpha: number
+): void => {
+  if (alpha <= 0) return;
+  graphics.fillStyle(color, Math.min(1, alpha));
+  for (let i = 0; i < dots; i += 1) {
+    const a = rotation + ((i / dots) * Math.PI * 2);
+    graphics.fillCircle(cx + (Math.cos(a) * radius), cy + (Math.sin(a) * radius), dotRadius);
+  }
+};
