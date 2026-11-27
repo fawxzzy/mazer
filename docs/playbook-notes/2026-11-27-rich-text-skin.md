@@ -1,0 +1,21 @@
+# 2026-11-27 - Rich text skin (pick B Neon edge), one board-painter icon registry, card placement rule
+
+- WHAT changed:
+  - New `src/ui/skin/neonTextSkin.ts`: one neon edge text skin (opaque void fill, accent rim, soft glow, heading + body hierarchy). The CSS half lives in `src/ui/dom/primitives.css` (`.mazer-status-banner`) and `src/ui/notice/inFlowNotice.css`. The Phaser half reads the same numbers.
+  - The skin now covers 5 surfaces: in-flow notice (`inFlowNotice.ts`), kit StatusBanner, level-1 control hint (`legacyControlHintOverlay.ts`), sign-in return notice (`legacyAccountStatusState.ts` colours), online counter (`presenceCounterView.ts` pill). The coach mark pill (`coachMarkView.ts`, `drawCoachMarkNeonPill`) uses the same painter. The heading/body structure, the "New" marker and the dotted coach ring are unchanged.
+  - New `src/render/iconGraphics.ts` + `src/render/mechanicIcons.ts`: ONE icon registry drawn by the board painters themselves (tile, switch, wrap, shard, locked star, pulse gate, player, trail, goal). The notice glyph, the coach mark and the Guide rows (`legacyGuideIconRoute.ts`) all read it.
+  - New `src/render/textCardPlacement.ts`: the placement rule. Order: top band under the HUD, then bottom band, then a scan down (`prefer: 'bottom'` gives bottom band, scan up, top band). A card never covers the player, end star, pointed-at target, Switch tiles, wrap mouths or the HUD. When every spot covers something, the card covers the least important thing. `resolveTextCardBoardView` maps the live scene into page px for DOM cards.
+  - The level-1 control hint now steps above the end star when its bottom anchor would cover it. Before, it covered the goal by about 18 px at 390x844.
+- WHY it changed:
+  - Zac picked rich-text look B (2026-11-27). He wants "consistent lil icon images for everything" that look EXACTLY like the in-game reference. Copied icons drift, so the board painters must be the only source.
+- Rule: a text card icon is drawn by the board's own painter through one registry. A test pins each icon to its painter, so a Guide row, notice or coach mark cannot drift from the board. A card picks its spot with the placement rule, never with a fixed edge.
+- Evidence:
+  - Tests:
+    - `tests/render/mechanic-icons.test.ts`: icons pinned to the painters
+    - `tests/render/text-card-placement.test.ts`: rule + live-scene mapping
+    - `tests/render/neon-text-skin.test.ts`: CSS and Phaser halves agree; control hint placement
+    - updated: hazard onboarding, shard hint/ui, control hint, type-scale ratchet
+  - Real-board proof (`?lab=hazards&previewLevel=1|10|22|200`, chromium + webkit, 390x844@3 and 412x915@2.625; 16 captures): 0 card overlaps, 0 control-hint overlaps, no page errors. L200 used the real shard presenter.
+  - Menu captures in the real scene: sign-in return notice and online counter, both engines, both sizes.
+- Decision (delegated to the worker): the auth notice uses an opaque fill and a full-strength rim but no outer glow. A glow needs a MenuScene draw change, and MenuScene stays at 0 changed lines.
+- Status: source only, not merged, not deployed, nothing checked on a real phone.
