@@ -1,6 +1,8 @@
 import '../dom/primitives.css';
 import './inFlowNotice.css';
 import { createStatusBanner, type StatusBannerTone } from '../dom/StatusBanner';
+import { NEON_TEXT_SKIN } from '../skin/neonTextSkin';
+import { paintMechanicIconCanvas, resolveMechanicIconAccentCss, type MechanicIconId } from '../../render/mechanicIcons';
 
 /**
  * In-flow notice (reusable): one calm kit StatusBanner floating at the top of the play view, under the header
@@ -11,7 +13,12 @@ import { createStatusBanner, type StatusBannerTone } from '../dom/StatusBanner';
  * bundle. First user: the shard first-time hint and the star-unlocked notice; the planned first-time card system can
  * mount it unchanged.
  *
- * Reduced motion: no slide, a short opacity crossfade only (same meaning).
+ * Skin: the neon edge text skin (pick B, 2026-11-27) through the kit StatusBanner. With a `heading` the card is the
+ * rich layout: icon well (a mechanic icon registry image, drawn by the board's own painter), the small marker as the
+ * kicker, the heading in the accent, then the body. The accent is the icon's board colour unless `accent` is given.
+ * The rim light runs round while the card is up (a still rim under reduced motion).
+ *
+ * Reduced motion: no slide, no flicker, no rim spin, a short opacity crossfade only (same meaning).
  */
 
 export type InFlowNoticeDismissReason = 'action' | 'timeout' | 'replaced' | 'closed';
@@ -20,6 +27,12 @@ export interface InFlowNoticeProps {
   /** Short tag before the body (e.g. "New"); empty falls back to the tone's own label. */
   readonly title?: string;
   readonly body: string;
+  /** Optional heading line between the marker and the body (the rich card layout). */
+  readonly heading?: string;
+  /** Optional registry icon shown in the icon well (rich layout only). */
+  readonly icon?: MechanicIconId;
+  /** Optional accent (CSS colour); defaults to the icon's board colour, else the tone's. */
+  readonly accent?: string;
   readonly tone?: StatusBannerTone;
   /** Button label (e.g. "Got it"). No label = no button. */
   readonly actionLabel?: string;
@@ -48,6 +61,8 @@ export interface InFlowNoticeHandle {
 export const IN_FLOW_NOTICE_HOST_CLASS = 'mazer-inflow-notice-host';
 /** Matches --mazer-token-motion-duration-base (the slide-out before removal). */
 const CLOSE_TRANSITION_MS = 200;
+/** The registry icon inside the icon well. */
+const NOTICE_ICON_PX = NEON_TEXT_SKIN.glyph.iconPx;
 
 export const mountInFlowNotice = (props: InFlowNoticeProps, ownerDocument: Document = document): InFlowNoticeHandle => {
   const host = ownerDocument.createElement('div');
@@ -71,26 +86,46 @@ export const mountInFlowNotice = (props: InFlowNoticeProps, ownerDocument: Docum
     props.onDismiss?.(reason);
   };
 
+  const rich = Boolean(props.heading);
   const banner = createStatusBanner({
     message: props.body,
     tone: props.tone ?? 'info',
     className: [
       'mazer-inflow-notice',
       fromBottom ? 'mazer-inflow-notice--bottom' : '',
-      props.reducedMotion ? 'mazer-inflow-notice--reduced' : ''
+      props.reducedMotion ? 'mazer-inflow-notice--reduced' : 'mazer-status-banner--live',
+      rich ? 'mazer-status-banner--rich' : ''
     ].filter(Boolean).join(' '),
     actionLabel: props.actionLabel,
     onAction: props.actionLabel ? () => close('action') : undefined
   }, ownerDocument);
   banner.dataset.mazerComponent = 'InFlowNotice';
+  const accent = props.accent ?? (props.icon ? resolveMechanicIconAccentCss(props.icon) : undefined);
+  if (accent) banner.style.setProperty('--mazer-neon-accent', accent);
   const marker = banner.querySelector('.mazer-status-banner__marker');
   const message = banner.querySelector('.mazer-status-banner__message');
+  let heading: HTMLElement | null = null;
+  if (rich) {
+    heading = ownerDocument.createElement('span');
+    heading.className = 'mazer-status-banner__heading';
+    message?.before(heading);
+    if (props.icon) {
+      const well = ownerDocument.createElement('span');
+      well.className = 'mazer-status-banner__glyph';
+      well.setAttribute('aria-hidden', 'true');
+      const canvas = ownerDocument.createElement('canvas');
+      const dpr = ownerDocument.defaultView?.devicePixelRatio ?? 1;
+      if (paintMechanicIconCanvas(canvas as never, props.icon, NOTICE_ICON_PX, dpr)) well.append(canvas);
+      banner.prepend(well);
+    }
+  }
   const markerText = props.title || (marker?.textContent ?? '');
   // A live region announces changes, not the text it was inserted with: insert it empty, fill it once it is in the page.
   if (marker) marker.textContent = '';
   if (message) message.textContent = '';
   const fill = (): void => {
     if (marker) marker.textContent = markerText;
+    if (heading) heading.textContent = props.heading ?? '';
     if (message) message.textContent = props.body;
   };
 

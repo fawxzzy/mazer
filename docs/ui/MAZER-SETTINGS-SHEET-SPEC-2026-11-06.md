@@ -91,10 +91,10 @@ See the investigation closeout (kept outside the repo, settings-reset-progress-2
 | `in-maze-pause-icon-guide-local-no-board-counterpart` | The In a maze row (2026-11-26) draws the icon set's existing `pause` bars via `drawGuidePauseGlyph` (`src/render/guidePauseGlyph.ts`) so its badge differs from the Menu row's burger. Guide-local: the board has no pause mark. |
 | `start-legend-calls-chip-marker-draw` | The Start row (added with Chip) calls `drawBoardMarkers` (start): corner brackets and a centre dot, over a chip tile. The copy names no colour. |
 | `level1-coach-is-owner-decision` | Pending row. A one-line level-1 coach is a separate owner decision; `src/tutorial/*` is unused. |
-| `hazard-gate-glyph-guide-local-until-board-layer` | Hazard row (slice H6), listed only while the hazard layer is on and the player has met the Pulse Gate. Guide-local glyph in `src/render/guideHazardGlyph.ts` (two posts, broken bar) until the board draws gates (H3); the intro card reuses this row's heading, text and glyph. |
+| `hazard-gate-icon-calls-board-gate-draw` | Hazard row (slice H6), listed only while the hazard layer is on and the player has met the Pulse Gate. Since the rich-text skin lane (2026-11-27) the icon is the mechanic icon registry's `pulse-gate` (`src/render/mechanicIcons.ts`): a chip tile with the board's own gate bars drawn by `drawHazardGatesToCanvasContext` (closed, still). The intro card still reuses this row's heading and text. |
 | `hazard-sentry-glyph-guide-local-until-board-layer` | Hazard row (slice H6) for the Sentry, same rules; guide-local diamond-on-a-loop glyph until H4 draws sentries. |
 | `hazard-hunter-glyph-guide-local-until-board-layer` | Hazard row (slice H6) for the Hunter, same rules; guide-local chevron glyph until H5 draws hunters. The "three catches" copy is pinned to the manifest `hunterBurnoutContacts`. |
-| `hazard-shard-glyph-guide-local-until-board-layer` | Hazard row (slice H6) for the Shard, same rules; guide-local crystal glyph until H8 draws shards. The "star stays locked" copy is pinned to the manifest `locksStar`. |
+| `hazard-shard-icon-calls-board-gem-draw` | Hazard row (slice H6) for the Shard, same rules. Since the rich-text skin lane (2026-11-27) the icon is the registry's `shard`: a chip tile with the board's own gem (`drawShardGem`). The "star stays locked" copy is pinned to the manifest `locksStar`. |
 
 ## Board Zoom removed (2026-11-06)
 

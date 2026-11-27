@@ -170,7 +170,9 @@ describe('in-flow notice DOM (reusable)', () => {
   class FakeElement {
     className = '';
     textContent = '';
-    style: Record<string, string> = {};
+    style: Record<string, string> & { setProperty?: (name: string, value: string) => void } = {
+      setProperty: (name: string, value: string) => { this.style[name] = value; }
+    };
     dataset: Record<string, string> = {};
     children: FakeElement[] = [];
     parent: FakeElement | null = null;
@@ -183,6 +185,12 @@ describe('in-flow notice DOM (reusable)', () => {
     setAttribute(name: string, value: string): void { this.attrs.set(name, value); }
     getAttribute(name: string): string | null { return this.attrs.get(name) ?? null; }
     append(...nodes: FakeElement[]): void { for (const node of nodes) { node.parent = this; this.children.push(node); } }
+    prepend(node: FakeElement): void { node.parent = this; this.children.unshift(node); }
+    before(node: FakeElement): void {
+      const parent = this.parent!;
+      node.parent = parent;
+      parent.children.splice(parent.children.indexOf(this), 0, node);
+    }
     remove(): void { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
     querySelector(selector: string): FakeElement | null {
       const name = selector.slice(1);
@@ -216,6 +224,40 @@ describe('in-flow notice DOM (reusable)', () => {
     expect(banner.querySelector('.mazer-status-banner__message')!.textContent).toBe('Hello there');
     expect(banner.querySelector('.mazer-status-banner__marker')!.textContent).toBe('New');
     expect(banner.classList.contains('mazer-inflow-notice--open')).toBe(true);
+    handle.close();
+  });
+
+  test('rich card (neon skin): icon well first, kicker, heading before the body, accent from the registry icon', async () => {
+    const { mountInFlowNotice } = await import('../../src/ui/notice/inFlowNotice');
+    const { resolveMechanicIconAccentCss } = await import('../../src/render/mechanicIcons');
+    const { doc, frames } = fakeDocument(true);
+    const handle = mountInFlowNotice({ title: 'New', heading: 'Shard', icon: 'shard', body: 'Take the 3 shards in order.', topPx: 40, reducedMotion: false }, doc);
+    const banner = handle.element as unknown as FakeElement;
+    expect(banner.children[0]!.className).toBe('mazer-status-banner__glyph');
+    expect(banner.children[0]!.getAttribute('aria-hidden')).toBe('true');
+    const names = banner.children.map((child) => child.className);
+    expect(names.indexOf('mazer-status-banner__heading')).toBe(names.indexOf('mazer-status-banner__message') - 1);
+    expect(banner.style['--mazer-neon-accent']).toBe(resolveMechanicIconAccentCss('shard'));
+    expect(banner.classList.contains('mazer-status-banner--rich')).toBe(true);
+    expect(banner.classList.contains('mazer-status-banner--live')).toBe(true);
+    // Copy stays out of the live region until the next frame (same as the plain card).
+    expect(banner.querySelector('.mazer-status-banner__heading')!.textContent).toBe('');
+    frames.forEach((frame) => frame());
+    expect(banner.querySelector('.mazer-status-banner__heading')!.textContent).toBe('Shard');
+    expect(banner.querySelector('.mazer-status-banner__marker')!.textContent).toBe('New');
+    expect(banner.querySelector('.mazer-status-banner__message')!.textContent).toBe('Take the 3 shards in order.');
+    handle.close();
+  });
+
+  test('plain card keeps the old structure; reduced motion drops the running rim', async () => {
+    const { mountInFlowNotice } = await import('../../src/ui/notice/inFlowNotice');
+    const { doc } = fakeDocument(false);
+    const handle = mountInFlowNotice({ body: 'Hi', topPx: 0, reducedMotion: true }, doc);
+    const banner = handle.element as unknown as FakeElement;
+    expect(banner.querySelector('.mazer-status-banner__heading')).toBeNull();
+    expect(banner.querySelector('.mazer-status-banner__glyph')).toBeNull();
+    expect(banner.classList.contains('mazer-status-banner--live')).toBe(false);
+    expect(banner.classList.contains('mazer-status-banner--rich')).toBe(false);
     handle.close();
   });
 
