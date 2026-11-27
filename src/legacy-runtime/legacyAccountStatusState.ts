@@ -23,6 +23,7 @@ import {
   resolveLegacyOverlayPanelLayout
 } from './legacyUiStandards';
 import { designTokens } from '../theme/tokens';
+import { NEON_TEXT_SKIN } from '../ui/skin/neonTextSkin';
 import { AUTH_SURFACE_LABELS, AUTH_SURFACE_MESSAGES } from '../brand/authSurfaceCopy';
 import { LEGACY_AUTH_MESSAGE_COPY, LEGACY_OAUTH_FAILURE_MESSAGE_COPY } from './legacyPlayerMessage';
 
@@ -58,10 +59,15 @@ export const LEGACY_ACCOUNT_STATUS_COLORS = Object.freeze({
   /** The loader's label ("Opening Mazer…" / "Signing in…") under the spinning icon. */
   loaderLabel: designTokens.color['text.muted'],
   leadAlpha: 0.68,
+  /*
+   * The sign-in return notice wears the neon edge text skin (pick B, 2026-11-27; src/ui/skin/neonTextSkin.ts): an
+   * OPAQUE void fill with a faint wash of the accent (the skin's inner wash, baked in: the scene's Graphics has no
+   * blur) and a full-strength accent rim, so the board or menu never shows through the message.
+   */
   noticeBorder: designTokens.color['tone.error'],
-  noticeBorderAlpha: 0.55,
-  noticeFill: designTokens.color['tone.error'],
-  noticeFillAlpha: 0.1,
+  noticeBorderAlpha: 1,
+  noticeFill: mixHex(designTokens.color['bg.canvas'], designTokens.color['tone.error'], NEON_TEXT_SKIN.washAlpha),
+  noticeFillAlpha: NEON_TEXT_SKIN.fillAlpha,
   noticeText: mixHex(designTokens.color['text.primary'], designTokens.color['tone.error'], 0.22),
   title: designTokens.color['text.primary']
 });

@@ -22,7 +22,9 @@ import { resolveStarPoints } from './endpointTileSkins';
 import { getTypeScaleStep, resolveTypeFaceStack } from './typeScale';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 import {
+  drawShardCageRing,
   drawShardGem,
+  resolveShardCageDotRadius,
   resolveShardBreathScale,
   resolveShardCageRotation,
   resolveShardCollectPop,
@@ -217,14 +219,7 @@ export class ShardSceneLayer {
   }
 
   private drawDottedRing(c: ShardPoint, radius: number, dots: number, tile: number, rotation: number, color: number, alpha: number): void {
-    if (alpha <= 0) return;
-    const g = this.boardGraphics;
-    const dot = Math.max(SHARD_LOOK.cage.minDotRadiusCss, tile * SHARD_LOOK.cage.dotRadiusOfTile);
-    g.fillStyle(color, Math.min(1, alpha));
-    for (let i = 0; i < dots; i += 1) {
-      const a = rotation + ((i / dots) * Math.PI * 2);
-      g.fillCircle(c.x + (Math.cos(a) * radius), c.y + (Math.sin(a) * radius), dot);
-    }
+    drawShardCageRing(this.boardGraphics, c.x, c.y, radius, dots, resolveShardCageDotRadius(tile), rotation, color, alpha);
   }
 
   private drawBurst(c: ShardPoint, tile: number, t: number, fade: number): void {

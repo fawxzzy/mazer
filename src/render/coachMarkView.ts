@@ -6,6 +6,10 @@
  * First user: the shard first-time hint (legacyShardHint.ts). The planned first-time card system can
  * reuse it unchanged: give it an anchor, a label, an accent and whether to show it.
  *
+ * Skin: the pill wears the neon edge text skin (pick B, 2026-11-27; src/ui/skin/neonTextSkin.ts): an opaque void
+ * fill, faint wide accent strokes for the glow, the accent rim, the label in the accent, and optionally the mechanic
+ * icon registry image of the thing it points at (the same painter as the board and the Guide). The ring is unchanged.
+ *
  * Reduced motion: the ring holds still at full size (same meaning, no pulse). Sizes come from the type
  * scale and the spacing/stroke tokens; durations from the motion scale.
  */
@@ -13,6 +17,8 @@ import Phaser from 'phaser';
 import { MOTION_LOOP_MS } from './motionScale';
 import { getTypeScaleStep, resolveTypeFaceStack } from './typeScale';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
+import { NEON_PILL_GLOW_STEPS, NEON_TEXT_SKIN } from '../ui/skin/neonTextSkin';
+import { drawMechanicIconGlyph, type MechanicIconEnv, type MechanicIconId } from './mechanicIcons';
 
 export interface CoachMarkPoint { readonly x: number; readonly y: number }
 
@@ -36,7 +42,13 @@ export interface CoachMarkProps {
   /** The pill never goes above this screen y (keeps clear of the header). */
   readonly minTop: number;
   readonly viewWidth: number;
+  /** Optional registry icon at the start of the pill (the thing the mark points at). */
+  readonly icon?: MechanicIconId;
+  readonly iconEnv?: MechanicIconEnv;
 }
+
+/** A screen rect (CSS px). */
+export interface CoachMarkRect { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
 
 export const COACH_MARK = Object.freeze({
   dots: 10,
@@ -79,11 +91,47 @@ export const resolveCoachMarkPill = (input: {
   return { left: Math.round(cx - half), top: Math.round(top), side };
 };
 
+const colorOf = (color: number): string => `#${color.toString(16).padStart(6, '0').toUpperCase()}`;
+
+/** The pill surface the neon pill paints on (Phaser Graphics; tests pass a recorder). */
+export interface CoachMarkPillGraphics {
+  fillStyle(color: number, alpha?: number): unknown;
+  fillRoundedRect(x: number, y: number, width: number, height: number, radius?: number): unknown;
+  lineStyle(width: number, color: number, alpha?: number): unknown;
+  strokeRoundedRect(x: number, y: number, width: number, height: number, radius?: number): unknown;
+}
+
+/**
+ * The neon edge pill: faint wide accent strokes for the glow (outermost first), the opaque void fill, then the accent
+ * rim. Shared by every canvas-drawn pill (coach mark, online counter).
+ */
+export const drawCoachMarkNeonPill = (
+  g: CoachMarkPillGraphics,
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  accent: number,
+  alpha: number
+): void => {
+  const radius = height / 2;
+  for (const step of NEON_PILL_GLOW_STEPS) {
+    g.lineStyle(step.widthPx, accent, step.alpha * alpha);
+    g.strokeRoundedRect(left, top, width, height, radius);
+  }
+  g.fillStyle(phaserMaterialAliases[NEON_TEXT_SKIN.fillToken], NEON_TEXT_SKIN.fillAlpha * alpha);
+  g.fillRoundedRect(left, top, width, height, radius);
+  const rim = NEON_TEXT_SKIN.rimPx;
+  g.lineStyle(rim, accent, alpha);
+  g.strokeRoundedRect(left + (rim / 2), top + (rim / 2), width - rim, height - rim, (height - rim) / 2);
+};
+
 export class CoachMarkView {
   /** Add this to the board container (ring space). */
   readonly ringGraphics: Phaser.GameObjects.Graphics;
   private readonly pillGraphics: Phaser.GameObjects.Graphics;
   private readonly labelText: Phaser.GameObjects.Text;
+  private pill: CoachMarkRect | null = null;
 
   constructor(scene: Phaser.Scene, options: { depth: number; crisp?: (text: Phaser.GameObjects.Text) => void }) {
     this.ringGraphics = scene.add.graphics().setVisible(false);
@@ -103,6 +151,7 @@ export class CoachMarkView {
     const pill = this.pillGraphics;
     ring.clear();
     pill.clear();
+    this.pill = null;
     if (props === null || props.alpha <= 0) {
       ring.setVisible(false);
       this.labelText.setVisible(false);
@@ -123,8 +172,10 @@ export class CoachMarkView {
     if (this.labelText.text !== props.label) this.labelText.setText(props.label);
     const centre = props.toScreen(props.anchor);
     const edge = props.toScreen({ x: props.anchor.x, y: props.anchor.y + (props.ringRadius * (1 + COACH_MARK.pulseScale)) });
-    const width = Math.ceil(this.labelText.width) + (COACH_MARK.padX * 2);
     const height = Math.ceil(this.labelText.height) + (COACH_MARK.padY * 2);
+    const iconSize = props.icon ? Math.ceil(this.labelText.height) : 0;
+    const iconRoom = props.icon ? iconSize + COACH_MARK.gap : 0;
+    const width = Math.ceil(this.labelText.width) + (COACH_MARK.padX * 2) + iconRoom;
     const place = resolveCoachMarkPill({
       centre,
       ringBelow: Math.max(0, edge.y - centre.y),
@@ -133,14 +184,21 @@ export class CoachMarkView {
       minTop: props.minTop,
       viewWidth: props.viewWidth
     });
-    pill.fillStyle(phaserMaterialAliases['bg.panel'], 0.92 * props.alpha);
-    pill.fillRoundedRect(place.left, place.top, width, height, height / 2);
-    pill.lineStyle(designTokens.strokePx.hairline, props.accent, props.alpha);
-    pill.strokeRoundedRect(place.left + 0.5, place.top + 0.5, width - 1, height - 1, (height - 1) / 2);
+    drawCoachMarkNeonPill(pill, place.left, place.top, width, height, props.accent, props.alpha);
+    if (props.icon) {
+      drawMechanicIconGlyph(pill, props.icon, place.left + COACH_MARK.padX + (iconSize / 2), place.top + (height / 2), iconSize / 2, props.iconEnv);
+    }
+    this.pill = { x: place.left, y: place.top, width, height };
     this.labelText
+      .setColor(colorOf(props.accent))
       .setAlpha(props.alpha)
-      .setPosition(Math.round(place.left + (width / 2)), Math.round(place.top + (height / 2)))
+      .setPosition(Math.round(place.left + (iconRoom / 2) + (width / 2)), Math.round(place.top + (height / 2)))
       .setVisible(true);
+  }
+
+  /** The label pill's screen rect this frame (null = no pill), so a text card can keep clear of it. */
+  get pillRect(): CoachMarkRect | null {
+    return this.pill;
   }
 
   destroy(): void {

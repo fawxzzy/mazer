@@ -3,8 +3,13 @@
  * Owns one Text ("7 online", bright with a dark outline, tabular) and draws the dot into the caller's Graphics: accent circle with a
  * soft glow and the web's 2.6s opacity pulse when live, a dim dot alone when idle. Geometry is the pure layout in
  * legacy-runtime/legacyPresenceCounterLayout.ts.
+ *
+ * Skin: while the count shows, it sits on a neon edge pill (pick B, 2026-11-27; src/ui/skin/neonTextSkin.ts) in the
+ * dot's colour: opaque void fill, faint glow strokes, accent rim, the same pill painter as the coach mark. The pill
+ * only grows outward from the text and dot by `PRESENCE_PILL_PAD`, so the layout's fit tiers are unchanged.
  */
 import Phaser from 'phaser';
+import { drawCoachMarkNeonPill } from './coachMarkView';
 import {
   LEGACY_PRESENCE_COUNTER_NAME,
   LEGACY_PRESENCE_FONT_PX,
@@ -24,6 +29,22 @@ export interface PresenceCounterViewStyle {
   /** 0xRRGGBB accent for the dot. */
   readonly dotColor: number;
 }
+
+/** The pill's padding round the dot and text (CSS px). */
+export const PRESENCE_PILL_PAD = Object.freeze({ x: 8, y: 3 });
+
+/** Pure: the pill rect round the dot and the measured text (whole pixels). */
+export const resolvePresencePillRect = (
+  dot: { readonly centerX: number; readonly centerY: number; readonly radius: number },
+  text: { readonly left: number; readonly centerY: number },
+  textWidth: number,
+  textHeight: number
+): { left: number; top: number; width: number; height: number } => {
+  const left = Math.floor(dot.centerX - dot.radius - PRESENCE_PILL_PAD.x);
+  const right = Math.ceil(text.left + textWidth + PRESENCE_PILL_PAD.x);
+  const height = Math.ceil(Math.max(textHeight, dot.radius * 2) + (PRESENCE_PILL_PAD.y * 2));
+  return { left, top: Math.round(text.centerY - (height / 2)), width: right - left, height };
+};
 
 export class PresenceCounterView {
   private readonly label: Phaser.GameObjects.Text;
@@ -64,6 +85,13 @@ export class PresenceCounterView {
     }
     const alpha = resolveLegacyPresenceDotAlpha(options.live, options.timeMs, options.reducedMotion);
     const { centerX, centerY, radius } = layout.dot;
+    if (layout.text !== null) {
+      if (this.label.text !== layout.text.value) {
+        this.label.setText(layout.text.value);
+      }
+      const pill = resolvePresencePillRect(layout.dot, layout.text, this.label.width, this.label.height);
+      drawCoachMarkNeonPill(graphics, pill.left, pill.top, pill.width, pill.height, this.style.dotColor, options.textAlpha);
+    }
     if (options.live) {
       // box-shadow 0 0 10px accent/0.55: a few stacked translucent rings, strongest at the dot.
       const rings = 4;
@@ -78,9 +106,6 @@ export class PresenceCounterView {
     if (layout.text === null) {
       this.label.setVisible(false);
       return;
-    }
-    if (this.label.text !== layout.text.value) {
-      this.label.setText(layout.text.value);
     }
     this.label
       .setPosition(Math.round(layout.text.left), Math.round(layout.text.centerY))

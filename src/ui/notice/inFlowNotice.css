@@ -1,6 +1,6 @@
 /*
- * In-flow notice (reusable): one calm kit StatusBanner floating over the top of the play view, under the header
- * controls. Tokens only (no colour literal). It never blocks the board: only the banner itself takes pointer input.
+ * In-flow notice (reusable): one kit StatusBanner (neon edge text skin, see the kit stylesheet) floating over the play
+ * view, placed clear of the player, goal, active wrap/switch and HUD by the caller. Tokens only (no colour literal). It never blocks the board: only the banner itself takes pointer input.
  */
 
 .mazer-inflow-notice-host {
@@ -17,7 +17,6 @@
 }
 
 .mazer-inflow-notice {
-  box-shadow: 0 var(--mazer-token-spacing-4) var(--mazer-token-spacing-16) color-mix(in srgb, var(--mazer-token-color-bg-canvas) 70%, transparent);
   font: 400 var(--mazer-token-legacy-font-size-body)/1.35 var(--mazer-token-font-ui);
   max-width: 360px;
   opacity: 0;
@@ -36,6 +35,11 @@
 .mazer-inflow-notice--open {
   opacity: 1;
   transform: none;
+}
+
+/* Neon skin entry: a short flicker as the card lights up (never under reduced motion). */
+.mazer-inflow-notice--open:not(.mazer-inflow-notice--reduced) {
+  animation: mazer-neon-flicker 320ms steps(1, end);
 }
 
 .mazer-inflow-notice--reduced {

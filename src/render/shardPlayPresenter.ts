@@ -28,6 +28,17 @@ import { CoachMarkView } from './coachMarkView';
 import { SHARD_LOCKED_GOAL_BEACON_VISIBLE, SHARD_LOOK, type ShardPoint } from './shardLook';
 import { ShardSceneLayer, type ShardBoardLayout, type ShardHudFrame } from './shardSceneLayer';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
+import { LEGACY_GUIDE_ROWS, resolveLegacyGuideHazardRow } from '../legacy-runtime/legacyGuideContent';
+import { DEFAULT_BOARD_TILE_STYLE } from './boardTileStyle';
+import type { MechanicIconId } from './mechanicIcons';
+import {
+  estimateTextCardHeight,
+  resolveTextCardCellRect,
+  resolveTextCardMechanicCells,
+  resolveTextCardPlacement,
+  resolveTextCardWidth,
+  type TextCardRect
+} from './textCardPlacement';
 
 /** How the scene should paint the end star this frame (null = the shard layer has no say: normal star). */
 export interface ShardGoalMarker {
@@ -85,30 +96,13 @@ export interface ShardPlayPresenterOptions {
 export const SHARD_COACH_RING_OF_TILE = 0.72;
 
 /**
- * A notice at the top would hide anything within this many CSS px under its top: a two-line banner plus the
- * coach label, which sits above the shard.
+ * The two shard cards wear the rich neon layout: the heading and icon are the Guide row's (no new copy), so the card,
+ * the coach mark and the Guide name and draw the same thing.
  */
-export const SHARD_NOTICE_CLEAR_TOP_PX = 128;
-/** A notice at the bottom would hide anything within this many CSS px of the view's bottom (banner, gap, half a tile). */
-export const SHARD_NOTICE_CLEAR_BOTTOM_PX = 96;
-
-/**
- * Pure: which edge the notice takes so it hides as little as possible. `keepClear` lists screen ys, most
- * important first (null = not on screen). Top when nothing sits in the top band; else the bottom when nothing
- * sits in the bottom band; when both bands hide something, the edge whose most important hidden thing matters least.
- */
-export const resolveShardNoticeEdge = (
-  keepClear: readonly (number | null)[],
-  noticeTop: number,
-  viewHeight: number
-): 'top' | 'bottom' => {
-  const hiddenAt = (inBand: (y: number) => boolean): number => keepClear.findIndex((y) => y !== null && inBand(y));
-  const top = hiddenAt((y) => y < noticeTop + SHARD_NOTICE_CLEAR_TOP_PX);
-  if (top === -1) return 'top';
-  const bottom = hiddenAt((y) => y > viewHeight - SHARD_NOTICE_CLEAR_BOTTOM_PX);
-  if (bottom === -1) return 'bottom';
-  return bottom > top ? 'bottom' : 'top';
-};
+const SHARD_CARD_RICH: Readonly<Record<string, { heading: string; icon: MechanicIconId }>> = Object.freeze({
+  [SHARD_HINT_KEYS.first]: { heading: resolveLegacyGuideHazardRow('shard').heading, icon: 'shard' },
+  [SHARD_HINT_KEYS.unlocked]: { heading: LEGACY_GUIDE_ROWS.find((row) => row.icon.glyph === 'goal-star')?.heading ?? '', icon: 'goal' }
+});
 
 export class ShardPlayPresenter {
   private readonly run: LegacyShardRun = createLegacyShardRun();
@@ -122,7 +116,10 @@ export class ShardPlayPresenter {
   private lastCaged: boolean | null = null;
   private noticeTop = 0;
   private viewHeight = 0;
+  private viewWidth = 0;
   private reducedMotion = false;
+  /** Switch tiles and wrap mouths of the live maze (cards keep them in view). */
+  private mechanicCells: LegacyPoint[] = [];
 
   constructor(scene: Phaser.Scene, options: ShardPlayPresenterOptions) {
     this.layer = new ShardSceneLayer(scene, { depth: options.depth, crisp: options.crisp });
@@ -147,6 +144,7 @@ export class ShardPlayPresenter {
   /** A new maze went live: place its shards (play only) and drop every moment of the last one. */
   install(maze: LegacyMazeSnapshot, options: LegacyShardInstallOptions, now?: () => number): void {
     this.run.install(maze, options, now);
+    this.mechanicCells = resolveTextCardMechanicCells(maze);
     this.layer.reset();
     this.hintRequested = false;
     this.hintPending = false;
@@ -215,6 +213,7 @@ export class ShardPlayPresenter {
   frame(input: ShardFrameInput): boolean {
     this.reducedMotion = input.reducedMotion;
     this.viewHeight = input.viewHeight;
+    this.viewWidth = input.viewWidth;
     // The notice is DOM over the canvas: it steps aside with the chip and the coach mark while a pause, the Guide or
     // the menu owns the screen, and comes back when play does.
     this.notices.setHidden(!input.hudVisible);
@@ -235,21 +234,30 @@ export class ShardPlayPresenter {
     if (hud !== null) {
       this.noticeTop = hud.top + hud.size + designTokens.spacingPx[1]!;
     }
+    // The coach mark first, so the card can keep clear of its pill too.
+    this.drawCoach(input);
     if (this.hintPending && hud !== null) {
       this.hintPending = false;
-      const shard = this.cellScreenY(input, this.run.shardX(0), this.run.shardY(0));
-      const star = this.cellScreenY(input, input.goal.x, input.goal.y);
-      const player = input.player ? this.cellScreenY(input, input.player.x, input.player.y) : null;
-      this.showNotice(SHARD_HINT_KEYS.first, resolveShardFirstNotice(this.run.count), [shard, star, player], () => {
+      const keepClear = [
+        this.cellRect(input, input.player ?? null),
+        this.cellRect(input, input.goal),
+        this.cellRect(input, { x: this.run.shardX(0), y: this.run.shardY(0) }),
+        this.coach.pillRect ?? null,
+        ...this.mechanicCells.map((cell) => this.cellRect(input, cell))
+      ];
+      this.showNotice(SHARD_HINT_KEYS.first, resolveShardFirstNotice(this.run.count), keepClear, () => {
         this.coachOn = false;
       });
     }
-    this.drawCoach(input);
     const visual = this.layer.goalVisual(this.run, input.nowMs, input.reducedMotion);
     if (visual !== null && visual.noticeDue && !this.unlockNoticeShown) {
       this.unlockNoticeShown = true;
-      const player = input.player ? this.cellScreenY(input, input.player.x, input.player.y) : null;
-      this.showNotice(SHARD_HINT_KEYS.unlocked, SHARD_UNLOCKED_NOTICE, [this.cellScreenY(input, input.goal.x, input.goal.y), player]);
+      const keepClear = [
+        this.cellRect(input, input.player ?? null),
+        this.cellRect(input, input.goal),
+        ...this.mechanicCells.map((cell) => this.cellRect(input, cell))
+      ];
+      this.showNotice(SHARD_HINT_KEYS.unlocked, SHARD_UNLOCKED_NOTICE, keepClear);
     }
     const caged = visual?.caged ?? false;
     const changed = this.lastCaged !== null && this.lastCaged !== caged;
@@ -281,7 +289,9 @@ export class ShardPlayPresenter {
       alpha: Math.min(1, layout.alpha),
       toScreen: input.toScreen,
       minTop: this.noticeTop,
-      viewWidth: input.viewWidth
+      viewWidth: input.viewWidth,
+      icon: 'shard',
+      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: layout.backingScale }
     });
   }
 
@@ -294,20 +304,37 @@ export class ShardPlayPresenter {
     return input.toScreen({ x, y });
   }
 
-  private cellScreenY(input: ShardFrameInput, cellX: number, cellY: number): number | null {
-    return this.cellScreen(input, cellX, cellY)?.y ?? null;
+  /** A cell's keep-clear rect on screen (null = off screen or no layout). */
+  private cellRect(input: ShardFrameInput, cell: LegacyPoint | null): TextCardRect | null {
+    if (cell === null) return null;
+    const centre = this.cellScreen(input, cell.x, cell.y);
+    const next = this.cellScreen(input, cell.x + 1, cell.y);
+    if (centre === null || next === null) return null;
+    return resolveTextCardCellRect(centre, Math.abs(next.x - centre.x));
   }
 
-  private showNotice(key: string, copy: ShardNoticeCopy, keepClear: readonly (number | null)[], onDismiss?: () => void): void {
-    const bottom = resolveShardNoticeEdge(keepClear, this.noticeTop, this.viewHeight) === 'bottom';
+  private showNotice(key: string, copy: ShardNoticeCopy, keepClear: readonly (TextCardRect | null)[], onDismiss?: () => void): void {
+    const rich = SHARD_CARD_RICH[key];
+    const cardWidth = resolveTextCardWidth(this.viewWidth);
+    const place = resolveTextCardPlacement({
+      viewWidth: this.viewWidth,
+      viewHeight: this.viewHeight,
+      topMin: this.noticeTop,
+      bottomInset: designTokens.spacingPx[3]!,
+      cardWidth,
+      cardHeight: estimateTextCardHeight({ cardWidth, bodyChars: copy.body.length, heading: rich !== undefined, action: copy.actionLabel !== undefined }),
+      keepClear
+    });
     this.notices.show(key, {
       title: copy.title,
       body: copy.body,
+      heading: rich?.heading,
+      icon: rich?.icon,
       tone: copy.tone,
       actionLabel: copy.actionLabel,
       autoDismissMs: copy.autoDismissMs,
-      topPx: this.noticeTop,
-      bottomPx: bottom ? designTokens.spacingPx[3] : undefined,
+      topPx: place.topPx,
+      bottomPx: place.bottomPx,
       reducedMotion: this.reducedMotion,
       onDismiss: onDismiss ? () => onDismiss() : undefined
     });

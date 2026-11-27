@@ -432,34 +432,158 @@
   touch-action: pan-y;
 }
 
+/*
+ * StatusBanner wears the neon edge text skin (pick B, 2026-11-27; numbers in src/ui/skin/neonTextSkin.ts, pinned by
+ * tests/render/neon-text-skin.test.ts): opaque void panel, accent rim + outer glow + inner wash, Oxanium kicker marker.
+ * The accent is the tone's colour unless the caller sets --mazer-neon-accent (the in-flow notice passes the colour of
+ * the thing the card is about).
+ */
 .mazer-status-banner {
+  --mazer-neon-accent: var(--mazer-token-color-semantic-info);
   align-items: center;
-  background: var(--mazer-token-color-bg-elevated, #10242b);
-  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-normal, #5d9f98);
-  border-radius: var(--mazer-token-radius-control, 8px);
-  color: var(--mazer-token-color-text-primary, #f1faf6);
+  background: var(--mazer-token-color-bg-canvas);
+  border: 0;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1.5px var(--mazer-neon-accent),
+    0 0 22px color-mix(in srgb, var(--mazer-neon-accent) 30%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--mazer-neon-accent) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--mazer-token-color-bg-canvas) 60%, transparent);
+  color: var(--mazer-token-color-text-primary);
+  column-gap: var(--mazer-token-spacing-12, 12px);
   display: grid;
-  gap: var(--mazer-token-spacing-8, 8px);
   grid-template-columns: auto minmax(0, 1fr) auto;
   min-height: var(--mazer-token-touch-target-min, 44px);
-  padding: var(--mazer-token-spacing-8, 8px) var(--mazer-token-spacing-12, 12px);
+  padding: var(--mazer-token-spacing-12, 12px);
+  position: relative;
+  row-gap: 2px;
 }
 
 .mazer-status-banner__marker {
-  border: var(--mazer-token-stroke-hairline, 1px) solid currentColor;
-  border-radius: 999px;
-  font: 700 0.7rem/1 var(--mazer-token-font-ui, sans-serif);
-  padding: var(--mazer-token-spacing-4, 4px) var(--mazer-token-spacing-8, 8px);
+  color: color-mix(in srgb, var(--mazer-neon-accent) 70%, var(--mazer-token-color-text-muted));
+  font: 600 0.75rem/1.1 "Oxanium", var(--mazer-token-font-ui);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.mazer-status-banner__message {
+  font: 400 0.875rem/1.36 var(--mazer-token-font-ui);
+}
+
+.mazer-status-banner__action.mazer-button {
+  background: transparent;
+  border: 1.5px solid var(--mazer-neon-accent);
+  border-radius: 10px;
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--mazer-neon-accent) 40%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--mazer-neon-accent) 25%, transparent);
+  color: var(--mazer-neon-accent);
+  font: 700 1rem/1 "Oxanium", var(--mazer-token-font-ui);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .mazer-status-banner--success {
-  border-color: var(--mazer-token-color-semantic-energy, #39f58a);
+  --mazer-neon-accent: var(--mazer-token-color-semantic-energy);
 }
 
 .mazer-status-banner--warning,
 .mazer-status-banner--error {
-  border-color: var(--mazer-token-color-semantic-danger, #ff405d);
+  --mazer-neon-accent: var(--mazer-token-color-semantic-danger);
+}
+
+/* Rich card: icon well + kicker + heading over the body sentence (the first-time card layout). */
+.mazer-status-banner--rich {
+  grid-template-areas:
+    "glyph kicker action"
+    "glyph heading action"
+    "body body body";
+}
+
+.mazer-status-banner--rich .mazer-status-banner__marker { align-self: end; grid-area: kicker; }
+.mazer-status-banner--rich .mazer-status-banner__action { grid-area: action; }
+
+.mazer-status-banner--rich .mazer-status-banner__message {
+  grid-area: body;
+  margin-top: var(--mazer-token-spacing-8, 8px);
+}
+
+.mazer-status-banner__heading {
+  align-self: start;
+  color: var(--mazer-neon-accent);
+  font: 700 1rem/1.1 "Oxanium", var(--mazer-token-font-ui);
+  grid-area: heading;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--mazer-neon-accent) 75%, transparent);
+  text-transform: uppercase;
+}
+
+.mazer-status-banner__glyph {
+  align-items: center;
+  align-self: center;
+  background: color-mix(in srgb, var(--mazer-neon-accent) 10%, var(--mazer-token-color-bg-canvas));
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1.5px var(--mazer-neon-accent),
+    0 0 14px color-mix(in srgb, var(--mazer-neon-accent) 55%, transparent);
+  display: inline-flex;
+  grid-area: glyph;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.mazer-status-banner__glyph canvas { display: block; }
+
+/*
+ * Live card (short-lived notices): the rim light runs round. The still rim gives way to a conic rim; browsers without
+ * @property keep a still gradient rim. Reduced motion (or the notice's --reduced) keeps it still.
+ */
+@property --mazer-neon-angle {
+  inherits: false;
+  initial-value: 0deg;
+  syntax: "<angle>";
+}
+
+.mazer-status-banner--live {
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--mazer-neon-accent) 30%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--mazer-neon-accent) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--mazer-token-color-bg-canvas) 60%, transparent);
+}
+
+.mazer-status-banner--live::before {
+  animation: mazer-neon-rim-spin 3600ms linear infinite;
+  background: conic-gradient(
+    from var(--mazer-neon-angle),
+    var(--mazer-neon-accent),
+    color-mix(in srgb, var(--mazer-neon-accent) 15%, transparent) 25%,
+    var(--mazer-neon-accent) 50%,
+    color-mix(in srgb, var(--mazer-neon-accent) 15%, transparent) 75%,
+    var(--mazer-neon-accent)
+  );
+  border-radius: inherit;
+  content: "";
+  inset: 0;
+  -webkit-mask: linear-gradient(black 0 0) content-box, linear-gradient(black 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(black 0 0) content-box exclude, linear-gradient(black 0 0);
+  padding: 1.5px;
+  pointer-events: none;
+  position: absolute;
+}
+
+@keyframes mazer-neon-rim-spin {
+  to { --mazer-neon-angle: 360deg; }
+}
+
+@keyframes mazer-neon-flicker {
+  0% { opacity: 0; }
+  20% { opacity: 0.9; }
+  35% { opacity: 0.2; }
+  55% { opacity: 1; }
+  70% { opacity: 0.55; }
+  100% { opacity: 1; }
 }
 
 .mazer-dialog-layer {
@@ -555,5 +679,9 @@
   .mazer-confirm-dialog {
     scroll-behavior: auto;
     transition: none;
+  }
+
+  .mazer-status-banner--live::before {
+    animation: none;
   }
 }
