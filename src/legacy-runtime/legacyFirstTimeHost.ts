@@ -772,7 +772,9 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       minTop: noticeTop,
       viewWidth: layout?.width ?? 0,
       icon: FIRST_TIME_CARD_ICON[draw.cardId],
-      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: view.boardTileLayer?.currentBake?.scale ?? 1 }
+      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: view.boardTileLayer?.currentBake?.scale ?? 1 },
+      // The pill never sits on the player (a Pulse Gate ring is always one cell from them).
+      avoid: view.player ? cellRect(view.player, TEXT_CARD_MARKER_HALO_OF_TILE) : null
     });
   };
 

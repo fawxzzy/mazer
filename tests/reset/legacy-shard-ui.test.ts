@@ -165,6 +165,23 @@ describe('coach mark (reusable)', () => {
     expect(clamped.left).toBe(COACH_MARK.edge);
   });
 
+  test('pill never covers the avoid box (the player) when the other side of the ring is clear', () => {
+    const base = { ringBelow: 20, width: 100, height: 24, minTop: 80, viewWidth: 390 };
+    // Player one cell above the ring (a Pulse Gate approached from above): the pill goes under the ring.
+    const playerAbove = { x: 180, y: 240, width: 40, height: 40 };
+    const under = resolveCoachMarkPill({ ...base, centre: { x: 200, y: 300 }, avoid: playerAbove });
+    expect(under.side).toBe('below');
+    expect(under.top).toBeGreaterThanOrEqual(300 + 20);
+    // Player below the ring: above is clear, unchanged.
+    expect(resolveCoachMarkPill({ ...base, centre: { x: 200, y: 300 }, avoid: { x: 180, y: 330, width: 40, height: 40 } }).side).toBe('above');
+    // No room above (header) and the player below: stays below (the header wins; nothing better exists).
+    expect(resolveCoachMarkPill({ ...base, centre: { x: 200, y: 100 }, avoid: { x: 180, y: 130, width: 40, height: 40 } }).side).toBe('below');
+    // Both sides covered: the default rule.
+    expect(resolveCoachMarkPill({ ...base, centre: { x: 200, y: 300 }, avoid: { x: 0, y: 0, width: 390, height: 844 } }).side).toBe('above');
+    // No avoid box: identical to before.
+    expect(resolveCoachMarkPill({ ...base, centre: { x: 200, y: 300 }, avoid: null })).toEqual(resolveCoachMarkPill({ ...base, centre: { x: 200, y: 300 } }));
+  });
+
   test('sizes come from the token scale', () => {
     const scale = designTokens.spacingPx as readonly number[];
     for (const value of [COACH_MARK.padX, COACH_MARK.padY, COACH_MARK.gap, COACH_MARK.edge, SHARD_HUD.clearMarginPx]) {

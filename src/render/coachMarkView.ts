@@ -45,6 +45,8 @@ export interface CoachMarkProps {
   /** Optional registry icon at the start of the pill (the thing the mark points at). */
   readonly icon?: MechanicIconId;
   readonly iconEnv?: MechanicIconEnv;
+  /** Optional screen box the pill must not cover when the other side of the ring is clear (the player). */
+  readonly avoid?: CoachMarkRect | null;
 }
 
 /** A screen rect (CSS px). */
@@ -70,9 +72,14 @@ export const resolveCoachMarkPulse = (timeMs: number, reducedMotion: boolean): {
   return { scale: 1 + (COACH_MARK.pulseScale * wave), alpha: 0.95 - (0.35 * wave) };
 };
 
+const rectsOverlap = (a: CoachMarkRect, b: CoachMarkRect): boolean => (
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+);
+
 /**
  * Where the pill goes: centred over the ring when there is room under the header, else under it;
- * clamped inside the view. Whole pixels.
+ * clamped inside the view. Whole pixels. With `avoid` (the player's box), a pill that would cover it goes to the
+ * other side of the ring when that side is clear (a Pulse Gate card rings the gate the player stands next to).
  */
 export const resolveCoachMarkPill = (input: {
   centre: CoachMarkPoint;
@@ -81,14 +88,23 @@ export const resolveCoachMarkPill = (input: {
   height: number;
   minTop: number;
   viewWidth: number;
+  avoid?: CoachMarkRect | null;
 }): { left: number; top: number; side: 'above' | 'below' } => {
   const k = COACH_MARK;
   const aboveTop = input.centre.y - input.ringBelow - k.gap - input.height;
-  const side: 'above' | 'below' = aboveTop >= input.minTop ? 'above' : 'below';
-  const top = side === 'above' ? aboveTop : input.centre.y + input.ringBelow + k.gap;
+  const belowTop = input.centre.y + input.ringBelow + k.gap;
   const half = input.width / 2;
   const cx = Math.min(input.viewWidth - half - k.edge, Math.max(half + k.edge, input.centre.x));
-  return { left: Math.round(cx - half), top: Math.round(top), side };
+  const left = Math.round(cx - half);
+  let side: 'above' | 'below' = aboveTop >= input.minTop ? 'above' : 'below';
+  const avoid = input.avoid ?? null;
+  if (avoid !== null) {
+    const covers = (top: number): boolean => rectsOverlap({ x: left, y: top, width: input.width, height: input.height }, avoid);
+    if (side === 'above' && covers(aboveTop) && !covers(belowTop)) side = 'below';
+    else if (side === 'below' && covers(belowTop) && aboveTop >= input.minTop && !covers(aboveTop)) side = 'above';
+  }
+  const top = side === 'above' ? aboveTop : belowTop;
+  return { left, top: Math.round(top), side };
 };
 
 const colorOf = (color: number): string => `#${color.toString(16).padStart(6, '0').toUpperCase()}`;
@@ -182,7 +198,8 @@ export class CoachMarkView {
       width,
       height,
       minTop: props.minTop,
-      viewWidth: props.viewWidth
+      viewWidth: props.viewWidth,
+      avoid: props.avoid ?? null
     });
     drawCoachMarkNeonPill(pill, place.left, place.top, width, height, props.accent, props.alpha);
     if (props.icon) {
