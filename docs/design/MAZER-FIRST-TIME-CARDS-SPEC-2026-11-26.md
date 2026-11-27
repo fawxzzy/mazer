@@ -130,7 +130,7 @@ Script: the scratchpad `cadence.mjs` (not committed). It copies the F1 hash and 
   - Switch reads "Later mazes hide a wrap behind a pale tile with a dashed ring. Walk onto it to open it." (`:199-200`).
   - Both rows show from level 1, before the player has met either.
   - Hazard rows show only when the layer is on AND the kind has been met (`:307-336`; `legacyHazardOnboarding.ts:179-190`).
-  - The pending rows are `first-run-coach` (an owner decision) and `auto-pause` (`legacyGuideContent.ts:347-363`).
+  - The pending rows were `first-run-coach` (an owner decision) and `auto-pause` (`legacyGuideContent.ts:347-363`). Slice 9 (2026-11-27) resolved `first-run-coach`; only `auto-pause` remains.
 - F25 [read] Copy mismatch: the Goal row says "Reach the spinning twin stars" (`legacyGuideContent.ts:115`); the level-1 hint says "Reach the star".
 - F26 [read] What the drift test pins (`tests/reset/legacy-guide-content-drift.test.ts`):
   - the row id order (`:72`) and the pending ids (`:122`);
