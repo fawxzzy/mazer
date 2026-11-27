@@ -1,0 +1,92 @@
+/*
+ * Shared styles for the dev-only options pages (shards, Help). Colours come only from the shared tokens (tokens.css,
+ * remapped by the dark neon theme) and from custom properties bootOptionsPage fills from src/render/palette.ts, so this
+ * file holds no colour literal. Fonts are the shipped ones: Space Grotesk for text, Oxanium for short uppercase labels.
+ *
+ * base.css locks html/body (overflow hidden, touch-action none, no selection) for the game canvas. These pages scroll,
+ * so the page class below undoes exactly that.
+ */
+html.oo-page, html.oo-page body {
+  background: var(--mazer-token-color-bg-canvas);
+  color: var(--mazer-token-color-text-primary);
+  height: auto;
+  max-height: none;
+  min-height: 100%;
+  overflow: auto;
+  overscroll-behavior: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+  user-select: text;
+  width: 100%;
+}
+html.oo-page body { margin: 0; }
+.oo-page *, .oo-page *::before, .oo-page *::after { box-sizing: border-box; }
+
+.oo-wrap { margin: 0 auto; max-width: 1040px; padding: 20px 14px 72px; font-family: var(--mazer-token-font-ui); display: grid; gap: 40px; }
+.oo-intro h1 { font-size: 1.4rem; line-height: 1.2; margin: 0 0 8px; }
+.oo-intro p { color: var(--mazer-token-color-text-muted); font-size: .95rem; line-height: 1.45; margin: 0 0 8px; max-width: 70ch; }
+.oo-intro a, .oo-nav a { color: var(--mazer-token-color-semantic-info); font-size: .9rem; }
+.oo-nav { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 4px; }
+.oo-section { display: grid; gap: 14px; scroll-margin-top: 12px; }
+.oo-section-head h2 { font-size: 1.2rem; margin: 0 0 4px; }
+.oo-section-head p { color: var(--mazer-token-color-text-muted); font-size: .92rem; line-height: 1.4; margin: 0; max-width: 70ch; }
+.oo-options { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); align-items: start; }
+.oo-option { background: var(--mazer-token-color-bg-shell); border: 1px solid var(--mazer-token-color-line-subtle); border-radius: var(--mazer-token-radius-panel); display: grid; gap: 8px; min-width: 0; padding: 12px; }
+.oo-option.is-pick { border-color: var(--mazer-token-color-brand-mint); }
+.oo-option h3 { font-size: 1.02rem; margin: 0; }
+.oo-blurb, .oo-why, .oo-needs { font-size: .86rem; line-height: 1.38; margin: 0; }
+.oo-blurb { color: var(--mazer-token-color-text-muted); }
+.oo-why { color: var(--mazer-token-color-text-primary); }
+.oo-needs { color: var(--mazer-token-color-text-muted); border-top: 1px solid var(--mazer-token-color-line-subtle); padding-top: 8px; }
+.oo-pick { background: var(--mazer-token-color-brand-mint); border-radius: var(--mazer-token-radius-round); color: var(--mazer-token-color-bg-canvas); font: 700 .68rem/1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .08em; padding: 4px 8px; text-transform: uppercase; vertical-align: middle; }
+.oo-kicker { color: var(--mazer-token-color-text-muted); font: 600 .72rem/1 "Oxanium", var(--mazer-token-font-ui); letter-spacing: .2em; margin: 0; text-transform: uppercase; }
+.oo-controls { align-items: end; background: var(--mazer-token-color-bg-shell); border: 1px solid var(--mazer-token-color-line-subtle); border-radius: var(--mazer-token-radius-panel); display: flex; flex-wrap: wrap; gap: 10px 16px; padding: 10px 12px; }
+.oo-facts { border-collapse: collapse; font-size: .85rem; }
+.oo-facts th, .oo-facts td { border-bottom: 1px solid var(--mazer-token-color-line-subtle); padding: 4px 10px 4px 0; text-align: left; }
+.oo-facts th { color: var(--mazer-token-color-text-muted); font-weight: 600; }
+
+/* Stage: stands in for the game behind the part under test. */
+.oo-stage {
+  align-items: center;
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--mazer-token-color-brand-mint) 18%, transparent), transparent 70%),
+    var(--mazer-token-color-bg-canvas);
+  border: 1px solid var(--mazer-token-color-line-subtle);
+  border-radius: var(--mazer-token-radius-sheet);
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  overflow: hidden;
+  padding: 14px 8px;
+  position: relative;
+}
+
+/* Starlit Bevel board: continuous floor ribbon, lit rim only where the floor meets a wall. */
+.oo-board { display: grid; grid-template-columns: repeat(var(--oo-cols), var(--oo-cell)); grid-template-rows: repeat(var(--oo-rows), var(--oo-cell)); position: relative; }
+.oo-c { display: block; position: relative; width: var(--oo-cell); height: var(--oo-cell); }
+.oo-c--wall { background: radial-gradient(circle, color-mix(in srgb, var(--oo-rim) 16%, transparent) 0 8%, transparent 10%); }
+.oo-c--floor { background: var(--oo-floor); }
+.oo-c--floor.is-n { border-top: 1px solid var(--oo-rim); box-shadow: inset 0 2px 0 var(--oo-hi); }
+.oo-c--floor.is-w { border-left: 1px solid var(--oo-rim); }
+.oo-c--floor.is-s { border-bottom: 1px solid var(--oo-rim); box-shadow: inset 0 -2px 0 var(--oo-shade); }
+.oo-c--floor.is-e { border-right: 1px solid var(--oo-rim); }
+.oo-c--floor.is-n.is-s { box-shadow: inset 0 2px 0 var(--oo-hi), inset 0 -2px 0 var(--oo-shade); }
+.oo-c--floor.is-n.is-w { border-top-left-radius: 34%; }
+.oo-c--floor.is-n.is-e { border-top-right-radius: 34%; }
+.oo-c--floor.is-s.is-w { border-bottom-left-radius: 34%; }
+.oo-c--floor.is-s.is-e { border-bottom-right-radius: 34%; }
+
+/* Markers shipped today. */
+.oo-c > b { display: block; inset: 14%; position: absolute; }
+.oo-start { animation: oo-spin 9s linear infinite; background: var(--oo-start); clip-path: polygon(50% 50%, 50% 8%, 82% 8%, 50% 50%, 92% 50%, 92% 82%, 50% 50%, 50% 92%, 18% 92%, 50% 50%, 8% 50%, 8% 18%); }
+.oo-end { animation: oo-spin var(--oo-star-spin) linear infinite; background: radial-gradient(circle, var(--oo-goal-core) 0 16%, var(--oo-goal) 62%); clip-path: var(--oo-star-clip); display: block; inset: 6%; position: absolute; }
+.oo-trail { animation: oo-twinkle 2.4s ease-in-out infinite; background: var(--oo-trail); clip-path: var(--oo-sparkle-clip); inset: 30% !important; }
+.oo-player { background: conic-gradient(from 0deg at 50% 50%, var(--mazer-token-color-text-primary) 0 25%, var(--oo-trail) 25% 50%, var(--oo-trail-glow) 50% 75%, color-mix(in srgb, var(--oo-trail) 70%, var(--mazer-token-color-bg-canvas)) 75% 100%); clip-path: var(--oo-kite-clip); inset: 0 !important; }
+@keyframes oo-spin { to { transform: rotate(360deg); } }
+@keyframes oo-twinkle { 0%, 100% { opacity: .55; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.05); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .oo-start, .oo-end, .oo-trail { animation: none; }
+}
+
+/* base.css sizes every canvas to the viewport for the game; icon canvases here are small and fixed. */
+.oo-page canvas.oo-icon { display: block; flex: none; height: var(--oo-icon-size) !important; max-height: none !important; max-width: none !important; width: var(--oo-icon-size) !important; }

@@ -1,0 +1,81 @@
+/*
+ * Endless shards options page. No colour literal: colours come from the shared tokens and from the custom properties
+ * bootOptionsPage fills from src/render/palette.ts (Starlit Bevel tile, red end star, green start, star dust, gate magenta).
+ * Shapes use the clip-path vars the same helper derives from the game's own star and kite proportions.
+ */
+.sh-demo { display: grid; gap: 8px; }
+.sh-pair { align-items: end; display: flex; gap: 14px; justify-content: center; }
+.sh-fig { display: grid; gap: 16px; justify-items: center; }
+.sh-step-status { color: var(--mazer-token-color-text-muted); font-size: .85rem; }
+
+/* ---------------------------------------------------------------- shards (every look) */
+.sh-wrap { display: grid; filter: drop-shadow(0 0 3px var(--sh-glow, transparent)); inset: 0; place-items: center; position: absolute; }
+.sh { display: block; inset: 16%; position: absolute; }
+.sh-inline { display: inline-block; height: 14px; inset: auto; position: static; width: 14px; }
+.sh-next { --sh-glow: var(--mazer-token-color-text-primary); animation: sh-breathe 1.6s ease-in-out infinite; }
+.sh-later { opacity: .6; }
+@keyframes sh-breathe { 0%, 100% { transform: scale(.9); } 50% { transform: scale(1.14); } }
+
+.sh-gem { background: linear-gradient(135deg, color-mix(in srgb, var(--mazer-token-color-semantic-reward) 45%, var(--mazer-token-color-text-primary)), var(--mazer-token-color-semantic-reward) 55%, color-mix(in srgb, var(--mazer-token-color-semantic-reward) 60%, var(--mazer-token-color-bg-canvas))); clip-path: var(--oo-diamond-clip); }
+.sh-hex { background: var(--mazer-token-color-semantic-info); clip-path: var(--oo-hex-clip); color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .72rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
+.sh-splinter { background: linear-gradient(160deg, var(--mazer-token-color-text-primary), var(--mazer-token-color-semantic-anomaly) 45%); clip-path: polygon(38% 0%, 74% 14%, 62% 100%, 26% 66%); transform: rotate(18deg); }
+.sh-prism { background: linear-gradient(180deg, var(--mazer-token-color-text-primary), var(--mazer-token-color-semantic-info) 40%, color-mix(in srgb, var(--mazer-token-color-semantic-info) 60%, var(--mazer-token-color-bg-canvas))); clip-path: polygon(50% 6%, 94% 90%, 6% 90%); }
+.sh-tile { background: var(--mazer-token-color-brand-mint); border-bottom: 3px solid color-mix(in srgb, var(--mazer-token-color-brand-mint) 50%, var(--mazer-token-color-bg-canvas)); border-radius: 28%; color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .72rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
+
+/* ---------------------------------------------------------------- phone frame and HUD counters */
+.sh-phone { background: var(--mazer-token-color-bg-canvas); border: 1px solid var(--mazer-token-color-line-subtle); border-radius: 18px; display: grid; min-height: 250px; overflow: hidden; padding: 56px 0 40px; place-items: center; position: relative; width: min(100%, 300px); }
+.sh-menu { position: absolute; right: 10px; top: 10px; }
+.sh-chip, .sh-tray, .sh-thread span, .sh-rail { align-items: center; background: color-mix(in srgb, var(--mazer-token-color-bg-panel) 92%, transparent); border: 1px solid var(--mazer-token-color-line-normal); border-radius: var(--mazer-token-radius-round); display: flex; font: 600 .8rem/1 "Oxanium", var(--mazer-token-font-ui); gap: 6px; padding: 5px 10px; position: absolute; }
+.sh-chip { right: 8px; top: 40px; }
+.sh-tray { bottom: 8px; left: 8px; }
+.sh-rail { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.sh-pip { border: 2px solid var(--mazer-token-color-semantic-reward); border-radius: 50%; display: block; height: 10px; width: 10px; }
+.sh-pip-collected { background: var(--mazer-token-color-semantic-reward); }
+.sh-pip-next { animation: sh-breathe 1.6s ease-in-out infinite; }
+.sh-pip-later { opacity: .45; }
+.sh-thread { left: 0; position: absolute; right: 0; top: 0; }
+.sh-thread i { background: var(--mazer-token-color-semantic-reward); display: block; height: 4px; transform: scaleX(var(--sh-fill)); transform-origin: left; }
+.sh-thread span { border-radius: 0 0 10px 10px; border-top: 0; left: 8px; padding: 3px 8px; top: 4px; }
+.sh-ring { background: conic-gradient(var(--oo-goal) calc(var(--sh-fill) * 360deg), var(--mazer-token-color-line-normal) 0); border-radius: 50%; inset: -44%; -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), var(--mazer-token-color-text-primary) calc(100% - 3px)); mask: radial-gradient(farthest-side, transparent calc(100% - 4px), var(--mazer-token-color-text-primary) calc(100% - 3px)); pointer-events: none; position: absolute; }
+
+/* ---------------------------------------------------------------- locked / unlocked end star */
+.oo-c[data-lock] { overflow: visible; }
+.oo-c[data-lock="locked"] .oo-end { animation: none; filter: saturate(.35) brightness(.75); }
+.end-A[data-lock="locked"]::after { border: 2px dashed var(--mazer-token-color-line-active); border-radius: 50%; content: ""; inset: -22%; pointer-events: none; position: absolute; }
+.end-B[data-lock="locked"] .oo-end { filter: none; }
+.end-B[data-lock="locked"] .oo-end::before { background: var(--oo-floor); clip-path: var(--oo-star-clip); content: ""; inset: 16%; position: absolute; }
+.end-C::before, .end-C::after { background: var(--oo-hi); border: 1px solid var(--oo-rim); bottom: 6%; content: ""; pointer-events: none; position: absolute; top: 6%; transition: transform .5s ease, opacity .5s ease; width: 44%; z-index: 2; }
+.end-C::before { left: 6%; }
+.end-C::after { right: 6%; }
+.end-C[data-lock="open"]::before { opacity: 0; transform: translateX(-130%); }
+.end-C[data-lock="open"]::after { opacity: 0; transform: translateX(130%); }
+.end-D[data-lock="locked"] .oo-end { filter: saturate(.4); opacity: .6; transform: scale(.72); }
+.end-D .oo-end { transition: transform .4s ease, opacity .4s ease, filter .4s ease; }
+.end-E::before, .end-E::after { background: var(--mazer-token-color-line-active); content: ""; height: 10%; left: -4%; pointer-events: none; position: absolute; right: -4%; transition: transform .5s ease, opacity .5s ease; z-index: 2; }
+.end-E::before { top: 34%; }
+.end-E::after { top: 56%; }
+.end-E[data-lock="open"]::before { opacity: 0; transform: translateX(120%); }
+.end-E[data-lock="open"]::after { opacity: 0; transform: translateX(-120%); }
+
+/* ---------------------------------------------------------------- unlock moment */
+.oo-c[data-moment="A"] .oo-end { animation: sh-wake .7s ease-out, oo-spin var(--oo-star-spin) .7s linear infinite; }
+@keyframes sh-wake { 0% { filter: saturate(.35) brightness(.75); transform: scale(1); } 35% { filter: brightness(2); transform: scale(1.5); } 100% { filter: none; transform: scale(1); } }
+.sh-spark { animation: sh-burst .6s ease-out forwards; background: var(--oo-trail); clip-path: var(--oo-sparkle-clip); height: 40%; left: 30%; position: absolute; top: 30%; width: 40%; }
+@keyframes sh-burst { to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
+.oo-c[data-moment="B"]::before { animation: sh-ripple .9s ease-out; border: 2px solid var(--oo-goal); border-radius: 50%; content: ""; inset: 0; pointer-events: none; position: absolute; }
+@keyframes sh-ripple { from { opacity: 1; transform: scale(.6); } to { opacity: 0; transform: scale(6); } }
+.sh-fly { animation: sh-gather .8s ease-in forwards; animation-delay: var(--delay); display: block; position: absolute; z-index: 3; }
+@keyframes sh-gather { to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
+.oo-c[data-moment="C"] .oo-end, .oo-c[data-moment="D"] .oo-end, .oo-c[data-moment="E"] .oo-end { animation: oo-spin var(--oo-star-spin) linear infinite; transition: filter .15s ease; }
+
+/* ---------------------------------------------------------------- first-time hint */
+.sh-hint-host { display: grid; gap: 8px; justify-items: center; position: relative; width: 100%; }
+.sh-hint-host .mazer-status-banner { width: 100%; }
+.sh-coach::before { animation: sh-breathe 1.6s ease-in-out infinite; border: 2px dotted var(--mazer-token-color-text-primary); border-radius: 50%; content: ""; inset: -14%; pointer-events: none; position: absolute; }
+.sh-coach-tag { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-round); font: 600 .72rem/1 "Oxanium", var(--mazer-token-font-ui); left: 50%; padding: 4px 8px; position: absolute; top: -26px; transform: translateX(-50%); white-space: nowrap; z-index: 3; }
+.sh-card { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-panel); display: grid; font-size: .9rem; gap: 8px; padding: 12px; width: 100%; }
+.sh-hint-host > .sh-card:not(.sh-guide) { bottom: 8%; left: 6%; position: absolute; width: 88%; z-index: 4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-next, .sh-pip-next, .sh-coach::before, .sh-spark, .sh-fly, .oo-c[data-moment] .oo-end, .oo-c[data-moment]::before { animation: none !important; }
+}
