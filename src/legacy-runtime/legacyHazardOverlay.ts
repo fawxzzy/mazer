@@ -23,7 +23,9 @@ import type { LegacyMazeSnapshot } from './legacyMaze';
 
 export type LegacyHazardOverlayResult = HazardOverlayResult;
 
-export type LegacyHazardOverlaySource = Pick<LegacyMazeSnapshot, 'grid' | 'start' | 'goal' | 'seed'>;
+// `bleedGates` (the maze's Switches) are read by the adapter: the wrap behind an unlit Switch is a wall for
+// every hazard this overlay places (first-time cards spec D8, slice 5).
+export type LegacyHazardOverlaySource = Pick<LegacyMazeSnapshot, 'grid' | 'start' | 'goal' | 'seed' | 'bleedGates'>;
 
 export interface LegacyHazardOverlayOptions {
   /** The resolved hazard layer switch. False returns null (the default build). */

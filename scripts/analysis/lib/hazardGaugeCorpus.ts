@@ -6,7 +6,7 @@
 // converts what the overlay shipped into plain coordinates, and re-measures everything with
 // lib/hazardGauges.ts, which shares no code with the allocator, the placement or the H2 verdict.
 import { resolveLegacyHazardOverlay } from '../../../src/legacy-runtime/legacyHazardOverlay';
-import { createLegacyMazeHazardGraph } from '../../../src/legacy-runtime/legacyHazardGraphAdapter';
+import { createLegacyMazeHazardGraph, maskLegacyBleedGatedCells } from '../../../src/legacy-runtime/legacyHazardGraphAdapter';
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../../../src/legacy-runtime/legacyGeometryBudget';
 import type { LegacyMazeSnapshot } from '../../../src/legacy-runtime/legacyMaze';
 import { measureFelt } from '../../../src/legacy-runtime/legacyMazeFeltDifficulty';
@@ -41,13 +41,16 @@ export interface HazardGaugeRow {
 
 const toPoint = (width: number, cell: number): GaugePoint => ({ x: cell % width, y: Math.floor(cell / width) });
 
-/** Plain-coordinate copy of what an overlay shipped (no hazard-module code beyond reading the result). */
-export const overlayToGaugeInput = (maze: Pick<LegacyMazeSnapshot, 'grid' | 'start' | 'goal'>, overlay: HazardOverlayResult | null) => {
+/**
+ * Plain-coordinate copy of what an overlay shipped (no hazard-module code beyond reading the result). The grid is
+ * the one the overlay placed on: each Switch-gated wrap's openings walled (first-time cards spec D8, slice 5).
+ */
+export const overlayToGaugeInput = (maze: Pick<LegacyMazeSnapshot, 'grid' | 'start' | 'goal' | 'bleedGates'>, overlay: HazardOverlayResult | null) => {
   const width = maze.grid[0]?.length ?? 0;
   const specs = overlay?.specs ?? [];
   return {
     input: {
-      grid: maze.grid,
+      grid: maskLegacyBleedGatedCells(maze.grid, maze.bleedGates),
       start: maze.start,
       goal: maze.goal,
       gates: specs.flatMap((spec) => (spec.kind === 'timedGate'

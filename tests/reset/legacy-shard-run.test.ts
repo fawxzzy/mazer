@@ -158,7 +158,7 @@ describe('legacy shard run on the shipped play board', () => {
       expect(result).toEqual({ status: 'placed', count: expected });
       expect(run.goalLocked).toBe(true);
       // The shards add a real detour on top of the maze's own route (the band is anchored there).
-      const read = createLegacyMazeHazardGraph({ ...maze, grid: maskLegacyBleedGatedCells(maze.grid, maze.bleedGates) });
+      const read = createLegacyMazeHazardGraph(maze);
       const direct = shardFloorDistances(read.graph, read.start)[read.goal]!;
       expect(run.describe().routeTicks! - direct).toBeGreaterThanOrEqual(SHARD_ROUTE_BASE);
     }
@@ -190,7 +190,8 @@ describe('legacy shard run on the shipped play board', () => {
     }
     // The shipped route is the one proved without the wrap; through the open wrap the same shards are shorter.
     const witnessTicks = (grid: boolean[][]): number | null => {
-      const read = createLegacyMazeHazardGraph({ ...maze, grid });
+      // `bleedGates: []` reads `grid` as given (the adapter would wall the wrap again otherwise).
+      const read = createLegacyMazeHazardGraph({ ...maze, grid, bleedGates: [] });
       const shards = unlit.cells.map((cell) => read.graph.cellId(cell.x, cell.y));
       const verdict = validateShardRoute(read.graph, installed.gates.liveGateSpecs(), { start: read.start, goal: read.goal, shards });
       return verdict.witness?.ticks ?? null;
