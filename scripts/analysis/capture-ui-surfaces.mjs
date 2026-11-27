@@ -52,7 +52,7 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Camera Follow',
   'Control Style',
   'Smart Steering',
-  'Reduce Motion',
+  'Reduce motion',
   'Haptics'
 ]);
 // MAZER-ACCT-043: Mazer keeps no account screen. The forced signed-out state is the failure fallback of the hand-off
@@ -1367,11 +1367,11 @@ export const evaluateAuthStatusAnatomy = (surface) => {
 // src/legacy-runtime/legacySettingsSheetPlan.ts; tests/reset/ui-surface-capture-script.test.mjs
 // asserts each one still exists in buildLegacySettingsSheetModel, so a renamed or
 // removed row fails a test instead of silently going stale here. The header
-// affordance (Close pill / `Back to Menu` row) is deliberately NOT listed: it is
+// affordance (Close pill / `Back to menu` row) is deliberately NOT listed: it is
 // owned by the sheet header and changes independently of the rows.
 // MAZER-UI-095/096: the `How to play` and Sound rows left the sheet for the Menu dropdown (legacyMenuRows.ts).
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'Reduce Motion',
+  'Reduce motion',
   'Haptics'
 ]);
 
@@ -1440,7 +1440,7 @@ const hasMenuRowButtons = (surface, rows) => rows.every((row) => (
   ))
 ));
 const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([
-  'Reduce Motion',
+  'Reduce motion',
   'Haptics'
 ]);
 
@@ -1527,9 +1527,9 @@ const clickVisualButton = async (page, label, timeoutMs) => {
 };
 
 // MAZER-UI-096: the Guide is a row of the main-menu dropdown, not of the Settings sheet. Leave Settings through its
-// Back to Menu row, then open the Guide through the real dropdown row (the same overlay hosts it).
+// Back to menu row, then open the Guide through the real dropdown row (the same overlay hosts it).
 const openGuideFromOptions = async (page, timeoutMs) => {
-  await clickVisualButton(page, 'Back to Menu', timeoutMs);
+  await clickVisualButton(page, 'Back to menu', timeoutMs);
   await waitForSurface(page, { expectedLabels: [], mode: 'menu', overlay: 'none', timeoutMs });
   const guidePoint = await revealMenuDropdownActionPoint(page, OPTIONS_GUIDE_OPEN_LABEL, { timeoutMs });
   if (!guidePoint) {
@@ -1560,9 +1560,9 @@ const closeGuideToOptions = async (page, timeoutMs) => {
 // Overlay-exit controls the Settings sheet header may expose, in preference
 // order: the sheet's own back affordance (`backChevron` diagnostics, the Close
 // pill today) and the labelled buttons the header can carry instead (a
-// `Back to Menu` primary row in the menu context). Resolving through the live
+// `Back to menu` primary row in the menu context). Resolving through the live
 // diagnostics keeps this proof independent of which one a given build ships.
-const OVERLAY_EXIT_BUTTON_LABELS = Object.freeze(['Back to Menu', 'Close']);
+const OVERLAY_EXIT_BUTTON_LABELS = Object.freeze(['Back to menu', 'Close']);
 
 export const resolveOverlayExitPoint = (visual) => {
   const bounds = visual?.overlayUi?.backChevron;

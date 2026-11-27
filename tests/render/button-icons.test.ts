@@ -17,6 +17,8 @@ import {
 } from '../../src/render/buttonIcons';
 import { HUD_ICON_CELL_PX, HUD_ICON_GLYPH_BOX } from '../../src/render/hudIconAtlas';
 import { MENU_DROPDOWN_FOREGROUND, drawMenuBurgerGlyph, type MenuBurgerGraphics } from '../../src/render/menuDropdownArt';
+import { LEGACY_GUIDE_ROWS } from '../../src/legacy-runtime/legacyGuideContent';
+import { drawGuidePauseGlyph } from '../../src/render/guidePauseGlyph';
 import { drawGuideSoundGlyph } from '../../src/render/guideSoundGlyph';
 import {
   CLOSED_LEGACY_MENU_DROPDOWN_STATE,
@@ -234,6 +236,17 @@ describe('Guide icons follow the icon set', () => {
     expect(calls.some((c) => c.name === 'fillPoints')).toBe(true);
     expect(calls.some((c) => c.name === 'arc')).toBe(false);
     expect(read('src/render/guideSoundGlyph.ts')).toContain("drawButtonIconGraphics(graphics, 'soundOn',");
+  });
+
+  test('the In a maze row draws the existing pause icon, so its badge differs from the Menu row burger', () => {
+    const { calls, graphics } = recordingGraphics();
+    drawGuidePauseGlyph(graphics, 20, 20, 10, 0xffffff);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(read('src/render/guidePauseGlyph.ts')).toContain("drawButtonIconGraphics(graphics, 'pause',");
+    const rows = LEGACY_GUIDE_ROWS;
+    expect(rows.find((r) => r.id === 'menu')!.icon.glyph).toBe('menu-burger');
+    expect(rows.find((r) => r.id === 'menu-play')!.icon.glyph).toBe('menu-pause');
+    expect(new Set(rows.map((r) => r.icon.glyph)).size).toBe(rows.length);
   });
 
   test('the Menu row passes the live toggle ink, so the guide and the button stay one draw', () => {

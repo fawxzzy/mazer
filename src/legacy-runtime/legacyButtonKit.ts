@@ -8,6 +8,13 @@ import { LEGACY_MIN_HIT_TARGET_PX } from './legacyHitTarget';
  * one surface per PR; `chromeViaKit` records which buttons already draw from it
  * (the MenuScene action-button factory resolves fill/stroke/text from LEGACY_BUTTON_CHROME below),
  * and the test pins that set so migrations must flip entries.
+ *
+ * Label casing rule (2026-11-26, UI consistency batch B): every button, row, tab and setting label is SENTENCE case,
+ * first word capitalised and the rest lowercase, unless a word is a proper name (Mazer) or a state value (On, Off,
+ * System). So `Back to menu` (the exit button on the sheets and mode select) and `Main menu` (the in-game dropdown row)
+ * are the same word for the same place, written the same way, like `Reset level`, `Reduce motion` and `Dark mode`.
+ * ALL CAPS is a display style (the TAP TO PLAY hint, the Oxanium kickers), never a label's stored text rule.
+ * tests/reset/ui-screens-consistency.test.ts pins the exported labels.
  */
 export type LegacyButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'icon';
 
@@ -23,8 +30,8 @@ export interface LegacyButtonVariantSpec {
 }
 
 export const LEGACY_BUTTON_KIT: Readonly<Record<LegacyButtonVariant, LegacyButtonVariantSpec>> = Object.freeze({
-  primary: { variant: 'primary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: true, bordered: false, use: 'The one main action on a surface, solid mint (Back to Menu, Got it, Retry, Sign in)' },
-  secondary: { variant: 'secondary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Other actions, dark with an outline (Next level, Back to Menu beside a Retry)' },
+  primary: { variant: 'primary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: true, bordered: false, use: 'The one main action on a surface, solid mint (Back to menu, Got it, Retry, Sign in)' },
+  secondary: { variant: 'secondary', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Other actions, dark with an outline (Next level, Back to menu beside a Retry)' },
   ghost: { variant: 'ghost', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Quiet text actions, no box (Jump to level rows, Skip, Not now)' },
   danger: { variant: 'danger', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: true, use: 'Destructive actions (Sign out, Reset progress)' },
   icon: { variant: 'icon', minWidthPx: LEGACY_MIN_HIT_TARGET_PX, minHeightPx: LEGACY_MIN_HIT_TARGET_PX, filled: false, bordered: false, use: 'Icon-only controls (Settings cog, close x)' }

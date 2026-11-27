@@ -49,7 +49,7 @@ export interface ModeSelectRailOptions {
    * this call the press began (0 for keys), so the caller's open guard can be measured from the press.
    */
   readonly onPlay: (index: number, pressAgeMs: number) => void;
-  /** Back to Menu (the button or Escape); `pressAgeMs` as for onPlay. */
+  /** Back to menu (the button or Escape); `pressAgeMs` as for onPlay. */
   readonly onBack: (pressAgeMs: number) => void;
   /** The centred entry changed. */
   readonly onSelect?: (index: number) => void;
@@ -117,7 +117,7 @@ export const createModeSelectRail = (options: ModeSelectRailOptions): ModeSelect
   const { signal } = controller;
 
   const root = make(doc, 'div', 'mms-stack');
-  const kicker = make(doc, 'p', 'mms-kicker', options.title);
+  const kicker = make(doc, 'p', 'mms-kicker mazer-sheet-title', options.title);
   kicker.id = 'mms-title';
   const rail = make(doc, 'div', 'mms-rail');
   rail.tabIndex = 0;

@@ -160,8 +160,8 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number, rowCount = 4
     legendTopOffset,
     rowHeight,
     rowCount,
-    rowFontSize: compact ? 11 : 12,
-    rowMinFontSize: compact ? 10 : 10,
+    rowFontSize: 12,
+    rowMinFontSize: 12,
     textWidthSafetyRatio: compact ? 0.9 : 0.92,
     titleFontSize,
     titleOffset,
@@ -236,16 +236,16 @@ export const resolveLegacyOverlayContentFlowLayout = ({
 };
 
 /**
- * Body copy never renders below this size (audit: no mobile body text under
- * 11 px). Toggle labels and the Guide legend both clamp to it.
+ * Body copy never renders below this size: the type scale's floor (`TYPE_BODY_FLOOR_PX`, 12 px; raised from 11 in the
+ * 2026-11-26 UI consistency batch C). Toggle labels and the Guide legend both clamp to it.
  */
-export const LEGACY_UI_MIN_BODY_FONT_SIZE = 11;
+export const LEGACY_UI_MIN_BODY_FONT_SIZE = 12;
 
 /**
  * Smallest legend-copy size. The Guide legend wraps onto a second line before
  * it is allowed to shrink below this, so it never reaches the old 8 px floor.
  */
-export const LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE = 10;
+export const LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE = 12;
 
 /**
  * Ordered label candidates for a toggle row, richest first. When the row has
@@ -288,7 +288,7 @@ export const resolveLegacyToggleRowLayout = (
       : Math.max(14, Math.min(compact ? 17 : 19, Math.round(height * 0.33))),
     rowPaddingX: Math.max(12, Math.min(compact ? 14 : 18, Math.round(width * 0.05))),
     showStateLabel,
-    stateFontSize: Math.max(10, Math.min(12, Math.round(height * 0.24))),
+    stateFontSize: Math.max(12, Math.min(12, Math.round(height * 0.24))),
     stateLaneWidth: showStateLabel
       ? compact
         ? Math.max(44, Math.min(58, Math.round(width * 0.17)))

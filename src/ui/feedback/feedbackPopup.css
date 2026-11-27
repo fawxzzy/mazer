@@ -44,7 +44,10 @@
   display: grid;
   font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
   gap: var(--mazer-token-spacing-16, 16px);
+  /* A short screen (a phone on its side) scrolls the card instead of clipping its title and buttons. */
+  max-height: 100%;
   max-width: 360px;
+  overflow-y: auto;
   padding: var(--mazer-token-spacing-24, 24px) var(--mazer-token-spacing-20, 20px) var(--mazer-token-spacing-20, 20px);
   width: 100%;
 }
@@ -60,10 +63,9 @@
   display: none !important;
 }
 
+/* The title look is the shared .mazer-sheet-title (primitives.css); this class only keeps the hook. */
 .mazer-feedback__title {
-  font: 700 1.3rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
-  letter-spacing: 0.01em;
-  margin: 0;
+  min-width: 0;
 }
 
 .mazer-feedback__rate {
@@ -145,7 +147,7 @@
 
 .mazer-feedback__note-label {
   color: var(--mazer-token-color-text-muted);
-  font: 500 0.85rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  font: 500 0.875rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
 }
 
 .mazer-feedback__textarea {
@@ -186,7 +188,7 @@
 
 .mazer-feedback__banner {
   border-color: var(--mazer-token-color-line-normal);
-  font: 400 0.9rem/1.3 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  font: 400 0.875rem/1.3 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
 }
 
 .mazer-feedback__banner.mazer-status-banner--success {
@@ -261,10 +263,6 @@
 .mazer-feedback--compact {
   gap: var(--mazer-token-spacing-12, 12px);
   padding: var(--mazer-token-spacing-16, 16px);
-}
-
-.mazer-feedback--compact .mazer-feedback__title {
-  font-size: 1.1rem;
 }
 
 .mazer-feedback--compact .mazer-feedback__rate {

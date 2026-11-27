@@ -5,12 +5,12 @@
  * canonical; the main-menu Settings sheet must have the same structure. This
  * module is that structure: one row vocabulary, one set of sizes, one layout
  * routine. The two contexts differ only in
- *   - the context actions       (pause: Resume above; menu: Back to Menu
+ *   - the context actions       (pause: Resume above; menu: Back to menu
  *                                above. MAZER-UI-100: no Account section;
  *                                Reset progress and Sign out live only on the
  *                                account page, reached from Menu > Profile),
  *   - the exit                  (pause: the primary Resume row; menu: the
- *                                primary Back to Menu row in the same slot).
+ *                                primary Back to menu row in the same slot).
  *                                Neither sheet draws a Close pill, an X or a
  *                                back arrow: the primary top row IS the exit.
  *   - which Settings rows show (MAZER-UI-095, below).
@@ -34,7 +34,7 @@
  * says what the row does and what happens on/off. It is a REQUIRED field of
  * `LegacySettingsSettingRowModel`, so a setting row cannot be added without one
  * (the type, `settingRow()` and the plan test all enforce it). Chrome rows (the
- * exits Resume / Back to Menu / Quit to Menu, disclosures, headings, the rotate
+ * exits Resume / Back to menu / Quit to Menu, disclosures, headings, the rotate
  * notice, the Level Preview jump rows) are not settings and carry none.
  *
  * Pure: no Phaser, no DOM, no storage, no network, no wiring. A later lane
@@ -276,7 +276,7 @@ const settingRow = (
  * describes (REDUCED_MOTION_SETTING_NOTE). Pinned by tests: non-empty, <= LEGACY_SETTINGS_DESCRIPTION_MAX_CHARS.
  */
 export const LEGACY_SETTINGS_DESCRIPTIONS = Object.freeze({
-  haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce Motion, and on iPhone.',
+  haptics: 'Buzzes on steps, wall bumps and wins. Silent with Reduce motion, and on iPhone.',
   resetProgress: 'Sets your level back to 1. Asks you to confirm first.',
   signOut: 'Signs this device out. Your progress stays on your account.'
 });
@@ -414,7 +414,7 @@ export const buildLegacySettingsSheetModel = (
         collapsedByDefault: false,
         collapsible: false,
         id: 'menu-top',
-        rows: [row('back-to-menu', 'action', 'Back to Menu', {
+        rows: [row('back-to-menu', 'action', 'Back to menu', {
           command: { type: 'CLOSE_OVERLAY' },
           emphasis: 'primary'
         })],
@@ -669,7 +669,7 @@ const resolveRowParts = (model: LegacySettingsRowModel, width: number, height: n
 
 /**
  * Flattened row list for a model. Pause: Resume, then the in-game Settings
- * rows (always open, MAZER-UI-095). Menu: Back to Menu (same slot
+ * rows (always open, MAZER-UI-095). Menu: Back to menu (same slot
  * and size as Resume), then the group rows (always open). A titled, non-
  * collapsible section still gets a heading row; none exists since MAZER-UI-100.
  */

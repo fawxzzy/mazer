@@ -158,6 +158,9 @@ import {
   type EdgeStation,
   type EdgeWrapFlash
 } from '../render/edgeMarkers';
+import type { LegacyControlHintDeviceFacts } from '../legacy-runtime/legacyControlHint';
+import { isLegacyDesktopPointerDevice, isLegacyPlayLabel, resolveLegacyDesktopPlayLabelCell, resolveLegacyPlayLabel } from '../legacy-runtime/legacyPlayLabel';
+import { drawGuidePauseGlyph } from '../render/guidePauseGlyph';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import { paintGuideGlossarySheet, resetGuideGlossarySelection } from '../legacy-runtime/legacyGuideGlossaryPainter';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
@@ -227,7 +230,6 @@ import {
 import { legacyTuning } from '../config/tuning';
 import {
   LEGACY_DEFAULTS,
-  MAIN_MENU_BUTTONS,
   copyLegacySettings,
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
@@ -1446,7 +1448,8 @@ export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagno
 const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
-const LEGACY_AUTH_UI_FONT_FAMILY = '"Segoe UI Variable", "Helvetica Neue", Arial, sans-serif';
+// The sign-in surface uses the same Space Grotesk stack as every other sheet (UI consistency batch C, 2026-11-26); it used to start with a Windows system face.
+const LEGACY_AUTH_UI_FONT_FAMILY = LEGACY_UI_FONT_FAMILY;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 // Higher than literally everything else, including overlays -- the boot-
 // time loading screen (while the auth gate's first snapshot is still
@@ -4863,7 +4866,7 @@ export class MenuScene extends Phaser.Scene {
     return this.setLegacyOverlayScrollOffset(this.overlayScrollOffset + (Math.sign(deltaY) * wheelStep));
   }
 
-  // Menu Settings and the Leaderboard have no Close pill: besides the primary Back to Menu row and
+  // Menu Settings and the Leaderboard have no Close pill: besides the primary Back to menu row and
   // Escape, a tap on the dimmed scrim outside the card closes them. Only the
   // un-covered scrim counts (nothing under the pointer, outside the card), and
   // never the Guide sub-view, which keeps its own Got it exit.
@@ -11652,7 +11655,8 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
-        const [startLabel] = MAIN_MENU_BUTTONS;
+        // Touch keeps TAP TO PLAY; a positively-desktop device reads PRESS TO PLAY (legacyPlayLabel.ts, batch D).
+        const startLabel = resolveLegacyPlayLabel(this.readLegacyPlayLabelDeviceFacts());
         const playAccessAllowed = this.hasLegacyPlayAccess();
         // A normal compact button (the same width the row-of-three action
         // geometry already computes), not a full-width bottom-dock bar --
@@ -11875,7 +11879,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayMovementSpeedSliderBounds = null;
 
     // No Close pill / X / back arrow: the primary top row (Resume in pause,
-    // Back to Menu in the menu) is the exit. In the menu a tap on the scrim
+    // Back to menu in the menu) is the exit. In the menu a tap on the scrim
     // outside the card also closes the sheet (handleOverlayScrimPointerDown).
     this.overlayScrimCloseBounds = context === 'menu'
       ? createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height)
@@ -12380,6 +12384,7 @@ export class MenuScene extends Phaser.Scene {
       case 'level-numeral': return playerPalette.playerCoreColor;
       case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
       case 'menu-burger': return MENU_DROPDOWN_ACCENT;
+      case 'menu-pause': return MENU_DROPDOWN_ACCENT;
       case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
       case 'hazard-gate':
       case 'hazard-sentry':
@@ -12403,10 +12408,32 @@ export class MenuScene extends Phaser.Scene {
     });
     this.guideOpenedFromMenu = false;
     // MAZER-UI-096: a Guide opened from the main menu's dropdown returns to the main menu, through the same back path
-    // the sheet's own Back to Menu uses. In a game it returns to the paused dropdown (playMenuView is still 'menu').
+    // the sheet's own Back to menu uses. In a game it returns to the paused dropdown (playMenuView is still 'menu').
     if (target === 'main-menu' && this.overlay === 'options') {
       this.handleBackAction();
     }
+  }
+
+  /** The device facts the front-door play label reads (the same ones the control hint uses). */
+  private readLegacyPlayLabelDeviceFacts(): LegacyControlHintDeviceFacts {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return {};
+    }
+    const media = (query: string): boolean => {
+      try {
+        return window.matchMedia(query).matches === true;
+      } catch {
+        return false;
+      }
+    };
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    return {
+      coarsePointer: media('(pointer: coarse)'),
+      finePointer: media('(pointer: fine)'),
+      hoverCapable: media('(hover: hover)'),
+      standalone: media('(display-mode: standalone)') || nav.standalone === true,
+      userAgent: nav.userAgent
+    };
   }
 
   private resolveLegacyGuideHasKeyboard(): boolean {
@@ -12519,6 +12546,10 @@ export class MenuScene extends Phaser.Scene {
       case 'menu-burger':
         // The header menu button's own three-line draw (src/render/menuDropdownArt.ts), closed.
         drawMenuBurgerGlyph(graphics, centerX, centerY, badgeRadius * 1.3, 0, MENU_DROPDOWN_FOREGROUND);
+        return;
+      case 'menu-pause':
+        // The in-maze row: the icon set's pause bars, so it does not repeat the burger the Menu row shows.
+        drawGuidePauseGlyph(graphics, centerX, centerY, badgeRadius * 0.9, MENU_DROPDOWN_FOREGROUND);
         return;
       case 'sound-speaker':
         drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);
@@ -12670,7 +12701,7 @@ export class MenuScene extends Phaser.Scene {
 
   // Leaderboard sheet (redesign 2026-11-06): the scene only paints the plan
   // built from the pure view-model (legacyLeaderboardView.ts) and layout
-  // (legacyLeaderboardOverlayPlan.ts). Same card, title, primary `Back to Menu`
+  // (legacyLeaderboardOverlayPlan.ts). Same card, title, primary `Back to menu`
   // exit, masked scroll body and rail as the Settings sheet; the top N rows
   // scroll, the You row stays pinned. Menu context only (not reachable from
   // pause). Static: no animation, so nothing to gate for reduced motion.
@@ -12855,7 +12886,7 @@ export class MenuScene extends Phaser.Scene {
       }
     );
     // Exit: no X, no back arrow. The primary top row (same row as Settings'
-    // Back to Menu), Escape (handleBackAction) and a tap on the scrim outside
+    // Back to menu), Escape (handleBackAction) and a tap on the scrim outside
     // the card (handleOverlayScrimPointerDown) all close the sheet.
     this.overlayScrimCloseBounds = createVisualRect(plan.card.left, plan.card.top, plan.card.width, plan.card.height);
     this.drawLegacySheetCard(plan.card);
@@ -13945,7 +13976,7 @@ export class MenuScene extends Phaser.Scene {
     // bordered cyber panel every other button keeps -- ties the primary menu
     // action into the title wordmark's crystal/glow language regardless of
     // which label is showing (signed-out vs signed-in).
-    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === MAIN_MENU_BUTTONS[0] || text === 'Login');
+    const isPrimaryFrontDoorButton = isMenuFrontDoor && (isLegacyPlayLabel(text) || text === 'Login');
     const frontDoorChrome = isMenuFrontDoor
       ? resolveLegacyMenuButtonChrome({
         width,
@@ -13956,7 +13987,7 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const baseAlpha = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA, 0.38) : 0.54;
     // MAZER-UI-094: TAP TO PLAY's breathing glow, added before `panel` so it draws under the word (hidden at alpha 0).
-    const playLabelGlowKey = isPrimaryFrontDoorButton && text === MAIN_MENU_BUTTONS[0] && isLegacyGlyphWordRenderable(text)
+    const playLabelGlowKey = isPrimaryFrontDoorButton && isLegacyPlayLabel(text) && isLegacyGlyphWordRenderable(text)
       ? ensureMenuPlayLabelGlowTexture(this.textures)
       : null;
     const playLabelGlow = playLabelGlowKey !== null ? this.add.image(0, 0, playLabelGlowKey).setAlpha(0) : null;
@@ -14038,7 +14069,11 @@ export class MenuScene extends Phaser.Scene {
       const glyphPaddingY = Math.max(6, Math.round(height * 0.14));
       const cellSizeFromWidth = Math.floor(Math.max(1, width - (glyphPaddingX * 2)) / Math.max(1, glyphColumns));
       const cellSizeFromHeight = Math.floor(Math.max(1, height - (glyphPaddingY * 2)) / 7);
-      const glyphCellSize = Math.max(2, Math.min(10, cellSizeFromWidth, cellSizeFromHeight));
+      const fittedGlyphCellSize = Math.max(2, Math.min(10, cellSizeFromWidth, cellSizeFromHeight));
+      // Desktop only: the 262 px button box fits just a 3 px cell, so the play label takes its cell from the viewport.
+      const glyphCellSize = isLegacyPlayLabel(text) && this.layout.width >= LEGACY_MENU_PLAY_LABEL_PHONE_MAX_WIDTH_PX && isLegacyDesktopPointerDevice(this.readLegacyPlayLabelDeviceFacts())
+        ? resolveLegacyDesktopPlayLabelCell({ fallbackCell: fittedGlyphCellSize, glyphColumns, viewportWidth: this.layout.width })
+        : fittedGlyphCellSize;
       // Drawn in local coordinates around (0,0) with `panel` itself
       // positioned at (x, y) -- setScale on the graphics object then scales
       // around its own (x, y) origin correctly for the blink/grow-shrink
@@ -15478,14 +15513,13 @@ export class MenuScene extends Phaser.Scene {
       this.closeLegacyGuideSheet();
       return;
     }
-    // MAZER-UI-095: the in-game Settings sheet steps back to the Menu dropdown; on the dropdown, back resumes.
+    // In a paused run, back (Esc, scrim, browser back) resumes from the dropdown AND from the Settings sheet, like the
+    // sheet's Resume button (UI consistency batch D). The Guide was handled above.
     if (
       this.overlay === 'pause'
-      && resolveLegacyPlayMenuBack({ guideOpen: false, view: this.playMenuView }) === 'show-menu'
+      && resolveLegacyPlayMenuBack({ guideOpen: false, view: this.playMenuView }) === 'resume'
     ) {
-      this.playMenuView = 'menu';
-      this.resetLegacyOverlayScrollState();
-      this.uiDirty = true;
+      this.closeOverlay();
       return;
     }
     if (this.overlay === 'confirm-progression-reset') {

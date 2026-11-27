@@ -1003,7 +1003,7 @@ describe('UI surface capture script contract', () => {
     // MAZER-UI-095: pause opens the in-game Menu dropdown; its rows are the play rows of the shared row model
     // (checked as dropdown buttons). The trimmed sheet's toggles are asserted after a real Settings click.
     expect([...source.match(/const PAUSE_MENU_EXPECTED_ROWS = Object\.freeze\(\[([^\]]*)\]\);/)[1].matchAll(/'([^']*)'/g)].map((entry) => entry[1])).toEqual(buildLegacyMenuRows('play', { soundEnabled: true }).map((row) => row.label));
-    expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Reduce Motion',\n  'Haptics'\n]);");
+    expect(source).toContain("const PAUSE_SETTINGS_EXPECTED_LABELS = Object.freeze([\n  'Reduce motion',\n  'Haptics'\n]);");
     expect(source).toContain('hasMenuRowButtons(surfaces.pause, PAUSE_MENU_EXPECTED_ROWS)');
     expect(source).toContain("!hasLabels(surfaces.pause, ['GUIDE'])");
     expect(source).toContain('hasLabels(surfaces.pauseBottom, PAUSE_SETTINGS_EXPECTED_LABELS)');
@@ -1207,14 +1207,14 @@ describe('overlay exit control resolution', () => {
 
   test('prefers the published back affordance', () => {
     expect(resolveOverlayExitPoint({
-      buttons: [{ bounds: rect(40, 600, 300, 48), text: 'Back to Menu' }],
+      buttons: [{ bounds: rect(40, 600, 300, 48), text: 'Back to menu' }],
       overlayUi: { backChevron: rect(300, 8, 76, 44) }
     })).toEqual({ x: 338, y: 30 });
   });
 
-  test('falls back to a labelled Back to Menu row, then a Close pill, when no back affordance is published', () => {
+  test('falls back to a labelled Back to menu row, then a Close pill, when no back affordance is published', () => {
     expect(resolveOverlayExitPoint({
-      buttons: [{ bounds: rect(300, 8, 76, 44), text: 'Close' }, { bounds: rect(40, 600, 300, 48), text: 'Back to Menu' }],
+      buttons: [{ bounds: rect(300, 8, 76, 44), text: 'Close' }, { bounds: rect(40, 600, 300, 48), text: 'Back to menu' }],
       overlayUi: { backChevron: null }
     })).toEqual({ x: 190, y: 624 });
     expect(resolveOverlayExitPoint({

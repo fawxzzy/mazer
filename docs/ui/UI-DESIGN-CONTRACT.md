@@ -61,31 +61,10 @@ the 3 current HUD icons:
 - One body font family for everything else, already token-backed
   (`designTokens.fonts.ui`, `"Space Grotesk, ui-sans-serif, system-ui"`
   per `docs/contracts/mazer-ui-rework-design-tokens.v1.json`).
-  **Correction, one real exception, not yet reconciled:** the Auth/Account
-  surface doesn't use it. `MenuScene.ts:980` defines a separate hardcoded
-  `LEGACY_AUTH_UI_FONT_FAMILY` (`'"Segoe UI Variable", "Helvetica Neue",
-  Arial, sans-serif'`), used across the auth fields, labels, and actions
-  (12 call sites, e.g. `MenuScene.ts:11730-12088`, `12375`) — a genuinely
-  different font stack from the token, not just a different name for the
-  same thing.
-
-  **Ownership correction (2026-08-30):** an earlier version of this note
-  assigned the resolution to "whoever migrates Auth under Wave 3B." That's
-  wrong — the constant and every one of its call sites live in
-  `MenuScene.ts`, which the decision registry assigns exclusively to Wave
-  3A, not Wave 3B (Wave 3B's exclusive paths are `legacyAuth.ts` and
-  `legacyPlayerMessage.ts` — auth behavior/messages/domain migration, not
-  Phaser presentation). The real ownership:
-  - **Wave 3A** owns any change to this existing Phaser Auth/Account font
-    constant or its `MenuScene.ts` call sites.
-  - **Wave 3B** owns auth behavior, messages, and auth-domain migration —
-    not Phaser presentation; it has no standing to decide this.
-  - **Wave 3C**, after Wave 4D under the board-first sequence, owns the
-    final DOM Auth/Account typography once that surface is actually
-    mounted.
-  - Until one of those waves acts, `LEGACY_AUTH_UI_FONT_FAMILY` is
-    documented here as a transitional legacy exception, not an open
-    decision assigned to any wave in particular.
+  **Resolved 2026-11-26 (UI consistency batch C):** the Auth/Account surface was the one exception (a separate
+  `LEGACY_AUTH_UI_FONT_FAMILY` starting at Segoe UI Variable). It is now an alias of `LEGACY_UI_FONT_FAMILY`, so the
+  sign-in surface draws in Space Grotesk like every other sheet. The old stack survives only as the unconsumed
+  `legacy.fonts.system` token (cited in `src/theme/tokens.css`); retiring that token is a follow-up for the token owner.
 
 ## Motion
 

@@ -8,14 +8,14 @@ card, a round rank chip and a top-right back chevron). Data and RPCs are unchang
 ## Design
 
 The Leaderboard is a sheet in the shared Settings language: the same near-black card (`drawLegacySheetCard`), card padding,
-title slot, 48 px primary `Back to Menu` row, masked scroll body and rail in the card padding, Space Grotesk
+title slot, 48 px primary `Back to menu` row, masked scroll body and rail in the card padding, Space Grotesk
 (`LEGACY_UI_FONT_FAMILY`) and theme colours (mint, cyan, start gold, goal red from `cyberArcadeMaterial`).
 `legacyLeaderboardOverlayPlan.ts` reuses `LEGACY_SETTINGS_SIZES`, so the two sheets cannot drift apart.
 
 ```
 Leaderboard                      title (shared createOverlayTitle)
-[ Back to Menu ]                 primary exit row, pinned (same row as Settings)
- RANK   PLAYER           LEVEL   column header, pinned
+[ Back to menu ]                 primary exit row, pinned (same row as Settings)
+ #      PLAYER           LEVEL   column header, pinned
  1      nova              259    top 3: themed accent bar + tint + bold (gold / cyan / mint), not medals
  2      qa-player [YOU]   255    own row in the list: mint tint + keyline + YOU tag
  3      kestrel           252
@@ -25,10 +25,10 @@ Leaderboard                      title (shared createOverlayTitle)
 ```
 
 - Top N = 50 in one request (`LEGACY_LEADERBOARD_TOP_N`, RPC cap is 100); no pager, no offset state.
-- Vocabulary: columns `RANK` (position, `#N`-style number), `PLAYER`, `LEVEL` (standing = level). The letter rank (E..S)
+- Vocabulary: columns `#` (position, a plain number), `PLAYER`, `LEVEL` (standing = level); empty state `No scores yet`; row labels `Position N` (2026-11-26: the word rank is gone from this sheet). The letter rank (E..S)
   still has no player surface (see `legacy-rank-vocabulary-guard.test.ts`); the unresolved "Rank vs Place" naming (audit G6) is
   an owner decision, the column follows the brief.
-- Exit: the primary `Back to Menu` row, Escape (`handleBackAction`) and a tap on the dimmed scrim outside the card
+- Exit: the primary `Back to menu` row, Escape (`handleBackAction`) and a tap on the dimmed scrim outside the card
   (`handleOverlayScrimPointerDown`, now for `options` and `leaderboard`). No X, no back arrow. Menu context only: the
   leaderboard is still not reachable from pause.
 - Static: no animation anywhere in the sheet (loading is a static skeleton plus a status line), so there is nothing to gate
@@ -40,7 +40,7 @@ Leaderboard                      title (shared createOverlayTitle)
 | --- | --- | --- |
 | loading | skeleton rows + `Loading the leaderboard…` in the header slot | none |
 | ready | the list, header and (when ranked) the You row | none |
-| empty | `No ranks yet` / `Clear a maze to put your name on the board.` | none |
+| empty | `No scores yet` / `Clear a maze to put your name on the board.` | none |
 | error (generic) | `Leaderboard unavailable` / `Something went wrong on our side. Try again in a moment.` | Retry |
 | error (network) | `Can’t reach the leaderboard` / `Check your connection and try again.` | Retry |
 | error (not set up) | `Leaderboard not ready` / `It isn’t available yet. Check back soon.` | Retry |

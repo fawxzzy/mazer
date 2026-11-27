@@ -232,7 +232,7 @@ const runViewport = async (browser, args, key, outDir, password) => {
     return waitFor(() => readYouRow(page), 30000, 'the Leaderboard "You" row');
   };
   const backToMenu = async () => {
-    await pressButton(page, mobile, 'Back to Menu');
+    await pressButton(page, mobile, 'Back to menu');
     await waitFor(async () => findButton(await readDiagnostics(page), 'Leaderboard'), 20000, 'the menu');
     await sleep(2500);
   };

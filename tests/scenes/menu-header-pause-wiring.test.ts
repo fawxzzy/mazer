@@ -140,13 +140,13 @@ describe('MenuScene wiring: pause card', () => {
     }
   });
 
-  test('the Options sheet is the same painter, with no Close pill, a Back to Menu exit row, a scrim-tap close and no profile icon', () => {
+  test('the Options sheet is the same painter, with no Close pill, a Back to menu exit row, a scrim-tap close and no profile icon', () => {
     const options = methodSource('private buildOptionsOverlay(): void');
     expect(options).not.toContain('createLegacyOverlayUsernameButton');
     expect(options).not.toContain('semanticAction');
     expect(options).toContain("this.buildLegacySettingsSheetOverlay('menu')");
     expect(sheet).not.toContain('plan.close');
-    // Back to Menu is painted by paintLegacySettingsItem like every other action row (its CLOSE_OVERLAY command runs
+    // Back to menu is painted by paintLegacySettingsItem like every other action row (its CLOSE_OVERLAY command runs
     // through the same handleBackAction as Escape); the scrim-close rect is the menu card only.
     expect(sheet).toContain("this.overlayScrimCloseBounds = context === 'menu'");
     const scrim = methodSource('private handleOverlayScrimPointerDown(pointer: Phaser.Input.Pointer, objectsUnderPointer: number): boolean');
@@ -156,7 +156,7 @@ describe('MenuScene wiring: pause card', () => {
     expect(scrim).toContain('this.handleBackAction();');
     expect(scene).toContain('this.handleOverlayScrimPointerDown(pointer, currentlyOver.length)');
     expect(buildLegacySettingsSheetPlan({ context: 'menu', height: 844, signedIn: true, width: 390 }).items[0]?.model)
-      .toMatchObject({ command: { type: 'CLOSE_OVERLAY' }, emphasis: 'primary', id: 'back-to-menu', label: 'Back to Menu' });
+      .toMatchObject({ command: { type: 'CLOSE_OVERLAY' }, emphasis: 'primary', id: 'back-to-menu', label: 'Back to menu' });
     expect(commands).toContain("case 'CLOSE_OVERLAY':\n        this.handleBackAction();");
   });
 });

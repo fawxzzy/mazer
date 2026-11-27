@@ -42,7 +42,7 @@ describe('mode-select flow contract (MAZER-MODE-002, look D)', () => {
     expect(body.indexOf("{ type: 'START_RUN' }")).toBeGreaterThan(body.indexOf('this.closeOverlay();'));
   });
 
-  test('Back to Menu uses the standard back action (the sheet routes through the overlay router, not its own state)', () => {
+  test('Back to menu uses the standard back action (the sheet routes through the overlay router, not its own state)', () => {
     expect(sheetRegion()).toContain('this.handleBackAction();');
     expect(read('src/legacy-runtime/legacyOverlayRouting.ts')).toContain("'mode-select'");
   });

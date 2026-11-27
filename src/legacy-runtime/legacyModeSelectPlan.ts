@@ -126,7 +126,7 @@ export const resolveLegacyModeSelectPlayAction = (
 );
 
 /** The selector's one exit row (also Escape): the standard back action. */
-export const LEGACY_MODE_SELECT_BACK_LABEL = 'Back to Menu';
+export const LEGACY_MODE_SELECT_BACK_LABEL = 'Back to menu';
 /** Small heading above the rail. */
 export const LEGACY_MODE_SELECT_TITLE = 'Choose a mode';
 

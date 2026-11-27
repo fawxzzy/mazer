@@ -2111,7 +2111,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(overlaySource).toContain('buildLegacyLeaderboardViewModel(this.resolveLegacyLeaderboardViewState())');
     expect(overlaySource).toContain('buildLegacyLeaderboardOverlayPlan(');
     expect(overlaySource).not.toContain('drawLegacyLeaderboardTitleGlyph');
-    // Same exit language as Settings: no chevron / X; the primary Back to Menu row, Escape (handleBackAction)
+    // Same exit language as Settings: no chevron / X; the primary Back to menu row, Escape (handleBackAction)
     // and the scrim tap close the sheet. Rows scroll under the shared mask and rail; the You row is painted outside it.
     expect(overlaySource).not.toContain('createOverlayBackChevronButton');
     expect(overlaySource).toContain('plan.exitLabel,');
@@ -2327,9 +2327,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).not.toContain('createOverlayBackChevronButton');
     // The settings/guide sheets have NO close control at all (Zac, 2026-11-06: no Close pill, X or back arrow):
-    // the primary Resume row (pause) / Back to Menu row (menu) is the exit and the Guide keeps its Got it footer.
+    // the primary Resume row (pause) / Back to menu row (menu) is the exit and the Guide keeps its Got it footer.
     // Resume still routes through the Wave 3A bridge first (bridge.dispatch(RESUME_RUN)) and falls back to the same
-    // real applyLegacyPauseCommand('resume'); Back to Menu is CLOSE_OVERLAY -> handleBackAction. The chevron stays
+    // real applyLegacyPauseCommand('resume'); Back to menu is CLOSE_OVERLAY -> handleBackAction. The chevron stays
     // for the account overlay only (deleted by MAZER-ACCT-043; the leaderboard joined the Settings language on 2026-11-06).
     expect(menuSceneSource).not.toContain('createOverlayClosePill');
     expect(menuSceneSource).not.toContain('plan.close');
