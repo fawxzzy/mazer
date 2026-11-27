@@ -10,8 +10,9 @@
  * - Flag on: per frame (the scene's postupdate event) it follows level changes, the auth scope, the pause/overlay
  *   state, the auto-dismiss clock (visible time only), and the coach mark lifetime (R4).
  * - Level Preview (`?previewLevel=N`): the session keeps its record in memory, so a preview run writes nothing.
- * - Placement: the card takes the screen edge away from the player, the coach target and the goal
- *   (`resolveFirstTimeCardPlacement`), so it never covers what the player needs to see.
+ * - Placement (`resolveLegacyFirstTimeCardSpot`): the card takes a screen edge that covers none of the player, the
+ *   coach target and the goal; when both edges cover one, it slides to the free band nearest an edge, so it never
+ *   covers what the player needs to see (Zac 2026-11-27).
  *
  * The card look (Zac 2026-11-27: E Two-line, skin B Neon edge) is the in-flow notice's own: this host passes the
  * heading and the mechanic icon id as extra props, which the rich-text skin renders once it lands; until then the
@@ -127,6 +128,51 @@ export const resolveLegacyFirstTimeCardEdge = (input: {
     keepVisibleYPx: points.filter((point) => point.y >= input.noticeTop && point.y <= input.viewHeight).map((point) => point.y - input.noticeTop)
   });
 };
+
+/** Where the card sits: at an edge (the notice's own top or bottom slot), or slid to a free band (`topPx`). */
+export type LegacyFirstTimeCardSpot =
+  | { readonly kind: 'edge'; readonly edge: 'top' | 'bottom' }
+  | { readonly kind: 'slid'; readonly topPx: number };
+
+/**
+ * Pure: where the card goes so it covers nothing it must not (Zac 2026-11-27: cards must not cover anything
+ * important). An edge that covers no point wins (`resolveLegacyFirstTimeCardEdge` picks between two free edges).
+ * When both edges cover a point, the card slides to the free band (no point within the cover margin) nearest an edge;
+ * only when no band on screen is free does it fall back to the edge that covers the least weight.
+ */
+export const resolveLegacyFirstTimeCardSpot = (input: {
+  readonly noticeTop: number;
+  readonly viewHeight: number;
+  readonly bottomInset: number;
+  readonly points: readonly LegacyFirstTimeKeepPoint[];
+  readonly bandPx?: number;
+}): LegacyFirstTimeCardSpot => {
+  const band = input.bandPx ?? FIRST_TIME_CARD_BAND_PX;
+  const points = input.points.filter((point) => Number.isFinite(point.y));
+  const margin = FIRST_TIME_CARD_COVER_MARGIN_PX;
+  const coveredAt = (top: number): boolean => points.some((point) => point.y >= top - margin && point.y <= top + band + margin);
+  const minTop = Math.ceil(input.noticeTop);
+  const maxTop = Math.floor(input.viewHeight - input.bottomInset - band);
+  if (!coveredAt(minTop) || !coveredAt(maxTop) || maxTop <= minTop) {
+    return { kind: 'edge', edge: resolveLegacyFirstTimeCardEdge(input) };
+  }
+  // The free bands touch a point's margin on one side: try just below and just above every point.
+  const candidates = points
+    .flatMap((point) => [Math.floor(point.y + margin) + 1, Math.ceil(point.y - margin - band) - 1])
+    .filter((top) => top > minTop && top < maxTop && !coveredAt(top));
+  if (candidates.length === 0) return { kind: 'edge', edge: resolveLegacyFirstTimeCardEdge(input) };
+  const fromEdge = (top: number): number => Math.min(top - minTop, maxTop - top);
+  const best = candidates.reduce((a, b) => (fromEdge(b) < fromEdge(a) || (fromEdge(b) === fromEdge(a) && b < a) ? b : a));
+  return { kind: 'slid', topPx: best };
+};
+
+/**
+ * Pure: the coach label to draw. A ring on a cell under the header (above noticeTop) keeps its ring but drops the
+ * label: the coach mark would put the pill below the ring, on the header controls (seen on a real L200 board, where
+ * "Open edge" sat on the menu button). The card already names the mechanic.
+ */
+export const resolveLegacyFirstTimeCoachLabel = (label: string, anchorScreenY: number | null, noticeTop: number): string =>
+  anchorScreenY !== null && anchorScreenY < noticeTop ? '' : label;
 
 /**
  * Pure: the border cell a just-lit Switch opened that the player will walk to: the nearer of its two by walking
@@ -292,7 +338,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       .map(([cell, weight]) => ({ y: cell ? input.cellScreenY(cell) : null, weight }))
       .filter((point): point is LegacyFirstTimeKeepPoint => point.y !== null);
     const bottomInset = designTokens.spacingPx[3]!;
-    const edge = resolveLegacyFirstTimeCardEdge({ noticeTop: input.noticeTop, viewHeight: input.viewHeight, bottomInset, points });
+    const spot = resolveLegacyFirstTimeCardSpot({ noticeTop: input.noticeTop, viewHeight: input.viewHeight, bottomInset, points });
     const props: LegacyFirstTimeNoticeProps = {
       title: notice.marker,
       heading: notice.heading,
@@ -300,8 +346,8 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       body: notice.body,
       tone: 'info',
       actionLabel: notice.actionLabel,
-      topPx: input.noticeTop,
-      bottomPx: edge === 'bottom' ? bottomInset : undefined,
+      topPx: spot.kind === 'slid' ? spot.topPx : input.noticeTop,
+      bottomPx: spot.kind === 'edge' && spot.edge === 'bottom' ? bottomInset : undefined,
       reducedMotion: input.reducedMotion,
       onDismiss: onNoticeDismiss
     };
@@ -327,10 +373,13 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
   const pollSwitches = (s: LegacyFirstTimeSession, input: LegacyFirstTimeFrameInput): void => {
     const lit = input.litSwitchKeys;
     if (lit === undefined) return;
-    const known = knownLitSwitches;
+    // A level first seen starts from "none lit": lit state is per attempt and in memory only (legacyBleedGateState), so
+    // anything lit at the first look was lit by the step that installed this host (the scene's first step), and that
+    // step counts. A new attempt darkens every Switch: the set shrinks, and relighting one is a fresh touch (seen
+    // cards stay seen).
+    const known = knownLitSwitches ?? new Set<string>();
     knownLitSwitches = new Set(lit);
-    // A new attempt darkens every Switch: the set shrinks, and relighting one is a fresh touch (seen cards stay seen).
-    if (known === null || !input.playing) return;
+    if (!input.playing) return;
     const fresh = [...lit].find((key) => !known.has(key));
     if (fresh === undefined) return;
     fire(s, ['switch-trigger'], input.nowMs, (target) => (
@@ -564,7 +613,7 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       anchor: { x: local.x, y: local.y },
       ringRadius: local.tile * SHARD_COACH_RING_OF_TILE,
       dotRadius: Math.max(SHARD_LOOK.cage.minDotRadiusCss, local.tile * SHARD_LOOK.cage.dotRadiusOfTile),
-      label: draw.label,
+      label: resolveLegacyFirstTimeCoachLabel(draw.label, cellScreen(draw.anchor)?.y ?? null, noticeTop),
       accent: COACH_ACCENT[draw.cardId] ?? phaserMaterialAliases['semantic.info'],
       nowMs: time,
       reducedMotion,

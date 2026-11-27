@@ -18,6 +18,8 @@ import {
   isLegacyFirstTimeWrapStep,
   noteLegacyFirstTimeStep,
   resolveLegacyFirstTimeCardEdge,
+  resolveLegacyFirstTimeCardSpot,
+  resolveLegacyFirstTimeCoachLabel,
   resolveLegacyFirstTimeSwitchAnchor,
   type LegacyFirstTimeFrameInput,
   type LegacyFirstTimeNoticeProps
@@ -166,6 +168,36 @@ describe('first-time host: card edge (never cover anything important)', () => {
     expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [] })).toBe('top');
     expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 300, weight: 3 }] })).toBe('bottom');
     expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 600, weight: 3 }] })).toBe('top');
+  });
+});
+
+describe('first-time host: card spot (slides off the goal when both edges are busy)', () => {
+  const frame = { noticeTop: 57, viewHeight: 844, bottomInset: 12 };
+  const clear = (top: number, ys: number[]) => ys.every((y) => y < top - 12 || y > top + 128 + 12);
+  it('a free edge keeps the edge rule', () => {
+    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points: [{ y: 814, weight: 3 }, { y: 30, weight: 2 }] })).toEqual({ kind: 'edge', edge: 'top' });
+    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points: [{ y: 120, weight: 3 }] })).toEqual({ kind: 'edge', edge: 'bottom' });
+  });
+  it('real L22 (chromium): player under the header, goal at 148 under a top card, ring at 814 under a bottom card -> slides', () => {
+    const points = [{ y: 22, weight: 3 }, { y: 814, weight: 2 }, { y: 148, weight: 1 }];
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, points });
+    expect(spot.kind).toBe('slid');
+    if (spot.kind !== 'slid') return;
+    expect(clear(spot.topPx, points.map((p) => p.y))).toBe(true);
+    expect(spot.topPx + 128).toBeLessThanOrEqual(844 - 12);
+    // The free band nearest an edge: just above the ring (31 px from the bottom slot), not below the goal (104 px).
+    expect(spot.topPx).toBe(673);
+  });
+  it('real L22-top (webkit): player at 823 under a bottom card, goal at 148 under a top card -> slides just above the player', () => {
+    const points = [{ y: 823, weight: 3 }, { y: 30, weight: 2 }, { y: 148, weight: 1 }];
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, points });
+    // 22 px from the bottom slot beats 104 px from the top one (just below the goal at 161).
+    expect(spot).toEqual({ kind: 'slid', topPx: 682 });
+    expect(clear(682, points.map((p) => p.y))).toBe(true);
+  });
+  it('no free band anywhere -> the edge that covers the least', () => {
+    const points = Array.from({ length: 12 }, (_, i) => ({ y: 60 + i * 66, weight: i === 0 ? 3 : 1 }));
+    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points })).toEqual({ kind: 'edge', edge: 'bottom' });
   });
 });
 
@@ -343,10 +375,15 @@ describe('first-time host: the Switch card', () => {
     expect(r.notices.shown[0]).toMatchObject({ heading: 'Switch', icon: 'switch' });
   });
 
-  it('a Switch already lit when the level is first seen, or relit after a reset, never re-fires once seen', () => {
+  it('fires when the first step of the scene lights a Switch (the host installs on that step; real L200 board)', () => {
     const r = rig({ liveCardIds: BOTH });
-    r.frame(lit('vertical:4'));
-    r.advance(16);
+    expect(r.frame(lit('vertical:4'))).toEqual({ cardId: 'mechanic.switch', anchor, label: 'Open edge' });
+    expect(r.notices.shown).toHaveLength(1);
+  });
+
+  it('nothing fires while not playing; a Switch relit after a reset never re-fires once seen', () => {
+    const r = rig({ liveCardIds: BOTH });
+    r.frame({ ...lit('vertical:4'), playing: false });
     r.frame(lit('vertical:4'));
     expect(r.notices.shown).toHaveLength(0);
     r.frame(lit());
@@ -366,6 +403,12 @@ describe('first-time host: the Switch card', () => {
     r.frame(lit('vertical:4'));
     r.frame(lit('vertical:4'));
     expect(r.notices.shown).toHaveLength(0);
+  });
+
+  it('a ring under the header keeps the ring but drops its label (the pill would land on the menu button)', () => {
+    expect(resolveLegacyFirstTimeCoachLabel('Open edge', 18, 57)).toBe('');
+    expect(resolveLegacyFirstTimeCoachLabel('Open edge', 57, 57)).toBe('Open edge');
+    expect(resolveLegacyFirstTimeCoachLabel('Open edge', null, 57)).toBe('Open edge');
   });
 
   it('anchors on the nearer opened border cell by walking distance, not straight-line distance', () => {
