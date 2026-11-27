@@ -9,7 +9,7 @@
  * (bigint-safe) and are never converted to JS numbers. Only type imports are
  * taken from legacyLeaderboard.ts so this module never pulls in the auth client.
  *
- * Content: RANK | PLAYER | LEVEL columns, the top N players (one request, no
+ * Content: # | PLAYER | LEVEL columns, the top N players (one request, no
  * pager), a pinned You row that is always visible once the player has a rank
  * (even when they are outside the loaded top N), top-3 emphasis by theme
  * colour. Raw error text is never shown: every failure maps to designed copy.
@@ -54,9 +54,9 @@ export const LEGACY_LEADERBOARD_TITLE = 'Leaderboard';
 export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   columnLevel: 'LEVEL',
   columnPlayer: 'PLAYER',
-  columnRank: 'RANK',
+  columnRank: '#',
   emptyBody: 'Clear a maze to put your name on the board.',
-  emptyHeading: 'No ranks yet',
+  emptyHeading: 'No scores yet',
   errorBody: 'Something went wrong on our side. Try again in a moment.',
   errorHeading: 'Leaderboard unavailable',
   exit: 'Back to menu',
@@ -166,7 +166,7 @@ const buildRow = (entry: LegacyLeaderboardEntry, usernameMaxChars: number): Lega
   const levelText = formatLegacyProgressionOrdinal(entry.playerLevel);
   const tier = resolveLegacyLeaderboardRankTier(entry.rank);
   return {
-    accessibilityLabel: `Rank ${rankText}, ${entry.username.trim()}, level ${levelText}${entry.isRequestingUser ? ', you' : ''}`,
+    accessibilityLabel: `Position ${rankText}, ${entry.username.trim()}, level ${levelText}${entry.isRequestingUser ? ', you' : ''}`,
     emphasized: tier !== 'standard',
     isOwn: entry.isRequestingUser,
     key: normalizeLegacyProgressionOrdinal(entry.rank),
@@ -208,7 +208,7 @@ const buildSelfRow = (
       return null;
     }
     return {
-      accessibilityLabel: 'You have no rank yet.',
+      accessibilityLabel: 'You have no position yet.',
       inList: false,
       levelText: LEGACY_LEADERBOARD_UNRANKED_TEXT,
       ranked: false,
@@ -220,7 +220,7 @@ const buildSelfRow = (
   const rankText = formatLegacyProgressionOrdinal(selfRank.rank);
   const levelText = formatLegacyProgressionOrdinal(selfRank.playerLevel);
   return {
-    accessibilityLabel: `You are rank ${rankText}, level ${levelText}.`,
+    accessibilityLabel: `You are at position ${rankText}, level ${levelText}.`,
     inList: loadedRankKeys.has(normalizeLegacyProgressionOrdinal(selfRank.rank)),
     levelText,
     ranked: true,

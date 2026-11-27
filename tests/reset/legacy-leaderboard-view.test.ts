@@ -49,11 +49,11 @@ describe('leaderboard view-model: request and vocabulary', () => {
     expect(LEGACY_LEADERBOARD_TOP_N).toBe(50);
   });
 
-  test('title, exit and columns use the sheet vocabulary: Leaderboard, Back to menu, RANK | PLAYER | LEVEL', () => {
+  test('title, exit and columns use the sheet vocabulary: Leaderboard, Back to menu, # | PLAYER | LEVEL', () => {
     const view = buildLegacyLeaderboardViewModel(state());
     expect(view.header.title).toBe('Leaderboard');
     expect(view.exit.label).toBe('Back to menu');
-    expect(view.columns).toEqual({ level: 'LEVEL', player: 'PLAYER', rank: 'RANK' });
+    expect(view.columns).toEqual({ level: 'LEVEL', player: 'PLAYER', rank: '#' });
     // No Skill wording on a player surface; the pager is gone.
     expect(JSON.stringify(LEGACY_LEADERBOARD_COPY)).not.toMatch(/skill|page|next|previous/i);
   });
@@ -85,7 +85,7 @@ describe('leaderboard view-model: rows', () => {
   test('the own row is flagged and described for assistive tech', () => {
     const view = buildLegacyLeaderboardViewModel(state({ entries: entries(5, 2) }));
     expect(view.rows.filter((row) => row.isOwn).map((row) => row.rankText)).toEqual(['2']);
-    expect(view.rows[1]!.accessibilityLabel).toBe('Rank 2, player2, level 499, you');
+    expect(view.rows[1]!.accessibilityLabel).toBe('Position 2, player2, level 499, you');
   });
 
   test('usernames are ellipsis-safe by code point and never split a surrogate pair', () => {
@@ -176,7 +176,7 @@ describe('leaderboard view-model: designed states (no raw error text)', () => {
   test('empty: heading, one line, no action', () => {
     const view = buildLegacyLeaderboardViewModel(state({ entries: [], selfUsername: '', status: 'empty' }));
     expect(view.phase).toBe('empty');
-    expect(view.state).toMatchObject({ action: null, heading: 'No ranks yet', kind: 'empty' });
+    expect(view.state).toMatchObject({ action: null, heading: 'No scores yet', kind: 'empty' });
   });
 
   test('every failure maps to designed copy with a Retry; the source string is never shown', () => {

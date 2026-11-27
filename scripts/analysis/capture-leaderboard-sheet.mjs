@@ -106,7 +106,7 @@ try {
         check(`${tag}: per-mode tab strip shows the Endless tab`, state.texts.includes('Endless'));
       }
       if (shape === 'top3' || shape === 'rank57') {
-        check(`${tag}: rank | player | level columns`, ['RANK', 'PLAYER', 'LEVEL'].every((label) => state.texts.includes(label)));
+        check(`${tag}: rank | player | level columns`, ['#', 'PLAYER', 'LEVEL'].every((label) => state.texts.includes(label)));
       }
       if (shape === 'rank57') {
         check(`${tag}: pinned self row shows rank 57 while the list is the top 50`, state.texts.includes('57'));

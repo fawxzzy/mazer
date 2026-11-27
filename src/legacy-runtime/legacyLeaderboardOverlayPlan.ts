@@ -8,7 +8,7 @@
  *   card (centred, shrinks to its content, never taller than the panel)
  *     title
  *     exit row            primary `Back to menu`, pinned (>= 48 px)
- *     column header       RANK | PLAYER | LEVEL, pinned
+ *     column header       # | PLAYER | LEVEL, pinned
  *     list viewport       the top N rows, the only part that scrolls
  *     You row             pinned under the list, always visible
  *   or, for a state (loading failure, empty, signed out, gate): the exit row
