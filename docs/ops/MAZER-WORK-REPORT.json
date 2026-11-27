@@ -3,25 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-26T05:47:29.000Z",
+    "registryUpdatedAt": "2026-11-27T01:04:07.000Z",
     "boardSync": {
-      "at": "2026-11-26T05:47:29.000Z",
-      "appliedEventCount": 555,
-      "lastEventId": "875e286bae15"
+      "at": "2026-11-27T01:04:07.000Z",
+      "appliedEventCount": 562,
+      "lastEventId": "c14f5bd601b0"
     }
   },
   "counters": {
-    "total": 333,
-    "open": 116,
+    "total": 340,
+    "open": 123,
     "completed": 193,
     "deferred": 24,
     "buckets": {
       "needs-you": 32,
-      "in-review": 66,
+      "in-review": 70,
       "blocked": 8,
       "ready": 1,
       "in-progress": 1,
-      "unclassified": 8,
+      "unclassified": 11,
       "deferred": 24,
       "completed": 193
     },
@@ -3240,6 +3240,38 @@
       "note": ""
     },
     {
+      "id": "MAZER-UI-103",
+      "title": "Batch A style cleanup: shared style values and type scale groundwork",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#721",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-104",
+      "title": "Remove the player rank display everywhere incl. the game mode selector",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#722",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-105",
+      "title": "Account recovery link opens the plain request form in any browser",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#723",
+      "note": ""
+    },
+    {
+      "id": "MAZER-UI-106",
+      "title": "UI polish B, C, D: sentence case copy, one sheet title, Esc resumes, leaderboard wording",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#724",
+      "note": ""
+    },
+    {
       "id": "MAZER-VIS-030",
       "title": "Edge diamonds fill on beam contact, drain on release: merged and live, phone check pending",
       "status": "review",
@@ -3731,6 +3763,13 @@
       "lane": null
     },
     {
+      "id": "MAZER-DOC-020",
+      "title": "Update the current-truth doc: player ranks removed in PR 722",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
       "id": "MAZER-ECON-004",
       "title": "Offer the saved skin designs as shop unlockables",
       "status": "planning",
@@ -3768,6 +3807,20 @@
     {
       "id": "MAZER-UI-036",
       "title": "Move remaining legacy font stacks to the shared type scale",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-UI-107",
+      "title": "Retire the unconsumed legacy system font style value",
+      "status": "planning",
+      "priority": "low",
+      "lane": null
+    },
+    {
+      "id": "MAZER-UI-108",
+      "title": "Remove retired progression badge scaffolding in MenuScene",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -5104,6 +5157,34 @@
     },
     "MAZER-PERF-017": {
       "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-104": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-105": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-106": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-103": {
+      "bucket": "in-review",
+      "sub": null
+    },
+    "MAZER-UI-107": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-UI-108": {
+      "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-DOC-020": {
+      "bucket": "unclassified",
       "sub": null
     }
   }

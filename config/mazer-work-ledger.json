@@ -5638,6 +5638,99 @@
       "verify": [],
       "lane": null,
       "filesHint": []
+    },
+    "MAZER-UI-104": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 722,
+            "mergedSha": "efed250e"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "62a17d8e"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-105": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 723,
+            "mergedSha": "60f0db69"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "62a17d8e"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-106": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 724,
+            "mergedSha": "62a17d8e"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "62a17d8e"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-103": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 721,
+            "mergedSha": "20471769"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "62a17d8e"
+      },
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-107": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-UI-108": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-DOC-020": {
+      "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
     }
   }
 }
