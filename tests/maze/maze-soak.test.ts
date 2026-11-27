@@ -97,6 +97,11 @@ const createPathMembership = (pathIndices: Uint32Array, tileCount: number): Uint
 test(
   'soak: repeated seeded generation and reset cycles hold invariants',
   async () => {
+    // Without a working collector every sample is a raw heap size and the band checks below fail confusingly: say so first.
+    expect(
+      typeof collector,
+      'maze-soak could not expose the garbage collector (no globalThis.gc and v8.setFlagsFromString failed); heap samples would be raw sizes'
+    ).toBe('function');
     const memorySamples: MemorySample[] = [];
     let state = {
       processCount: 7,
