@@ -6,9 +6,11 @@
  * (scripts/verify/run-test-verify.mjs) nor .github/workflows/verify.yml's
  * explicit vitest invocations glob every relevant directory automatically.
  * tests/reset/legacy-menu-backdrop.test.ts happens to sit under a directory
- * TEST_SPINE globs, so it silently runs locally -- but CI's own explicit
- * list never named it, so a green CI run was never actually proof this
- * suite passed. Kept as its own World-Identity-scoped module (not folded
+ * TEST_SPINE globs, so it silently runs locally -- but before PR #727 CI's
+ * own explicit list never named it, so a green CI run was never actually
+ * proof this suite passed. (Since #727 CI also globs the whole tests/reset
+ * folder, so that file is now reached there too; the render and
+ * architecture entries below still depend on this list.) Kept as its own World-Identity-scoped module (not folded
  * into NAVIGATION_CORE_REQUIRED_TESTS or TELEPORT_REQUIRED_TESTS) so this
  * coverage is never mislabeled as Navigation-Core- or Teleport-only work.
  *
@@ -27,8 +29,8 @@ export const WORLD_IDENTITY_REQUIRED_TESTS = [
 /**
  * The subset npm run verify's local runner still needs to add on top of its
  * own existing TEST_SPINE, which already globs tests/reset -- so that entry
- * would otherwise run twice in the same local invocation. CI has no such
- * glob, so it uses the full list unfiltered.
+ * would otherwise run twice in the same local invocation. CI's
+ * required-coverage step does not filter: it runs the full list unfiltered.
  */
 export const WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE = WORLD_IDENTITY_REQUIRED_TESTS.filter(
   (relativePath) => !relativePath.startsWith('tests/reset/')

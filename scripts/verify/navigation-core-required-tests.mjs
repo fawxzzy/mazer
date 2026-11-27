@@ -11,8 +11,13 @@
  * .github/workflows/verify.yml's explicit vitest invocation ever actually
  * ran these files -- confirmed by adding tests to tests/render/ repeatedly
  * across a long session and observing neither pipeline's own reported test
- * count ever change. This module is the single canonical list both the
- * local runner and CI import from, so they can't drift apart again.
+ * count ever change. (Since PR #727 CI globs the whole tests/reset folder and
+ * tests/core, cosmetics, tutorial, architecture, brand and legacy-runtime, so
+ * the tests/reset and tests/architecture entries below are now also reached
+ * there; tests/render and tests/analysis are still not globbed by CI, which
+ * lists a fixed set of tests/render files by name.) This module is the single
+ * canonical list both the local runner and CI import from, so they can't
+ * drift apart again.
  *
  * Every new tests/render/*.ts suite added for this wave must be added here
  * too, in the same change that adds the suite -- a rendering module without
@@ -21,7 +26,7 @@
  * first.
  */
 
-/** The full required set -- what CI (whose own explicit test list has no directory globbing) needs to run in its entirety. */
+/** The full required set -- what CI's dedicated required-coverage step runs in its entirety (the tests/reset and tests/architecture entries are also reached by CI's folder globs since #727). */
 export const NAVIGATION_CORE_REQUIRED_TESTS = [
   'tests/render/navigationCoreTrail.test.ts',
   'tests/render/navigationCoreTrailCanvas.test.ts',
@@ -37,17 +42,17 @@ export const NAVIGATION_CORE_REQUIRED_TESTS = [
   'tests/architecture/decision-registry-contract.test.ts',
   'tests/architecture/ui-state-model-contract.test.ts'
   // tests/scenes/menu-render-frame.test.ts is already required elsewhere
-  // (both npm run verify's own TEST_SPINE and CI's "Verify progression,
-  // RPC, leaderboard, and UI boundaries" step) -- deliberately not
+  // (both npm run verify's own TEST_SPINE and CI's "Verify menu scene and
+  // legacy-runtime UI boundaries" step) -- deliberately not
   // duplicated here.
 ];
 
 /**
  * The subset npm run verify's local runner still needs to add on top of
  * its own existing TEST_SPINE -- that spine already globs the whole
- * `tests/reset` directory, so re-listing the two tests/reset/* entries
- * above would just run them twice in the same local invocation. CI has no
- * such glob, so it uses the full list unfiltered.
+ * `tests/reset` directory, so re-listing the tests/reset/* entry
+ * above would just run them twice in the same local invocation. CI's
+ * required-coverage step does not filter: it runs the full list unfiltered.
  */
 export const NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE = NAVIGATION_CORE_REQUIRED_TESTS.filter(
   (relativePath) => !relativePath.startsWith('tests/reset/')
