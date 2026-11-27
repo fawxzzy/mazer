@@ -80,8 +80,6 @@ jobs:
           tests/render/endpointTilePixels.test.ts
           tests/render/endpointTileSkins.test.ts
           tests/render/startPinwheel.test.ts
-          tests/reset/start-arrow-direction.test.ts
-          tests/reset/trail-iridescence.test.ts
           tests/render/palette.test.ts
           tests/render/trailHeadPath.test.ts
           tests/render/pixelAlignment.test.ts
@@ -92,29 +90,20 @@ jobs:
           tests/render/starDustTrailVariants.test.ts
           tests/render/controller-halo-look.test.ts
           tests/render/menu-play-label-attention.test.ts
-          tests/reset/board-tile-layer.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
           tests/render/type-scale-ratchet.test.ts
           tests/mazeV2/adapters.test.ts
           --maxWorkers=1
 
-      - name: Verify progression, RPC, leaderboard, and UI boundaries
+      # The progression, RPC, leaderboard, message-inventory, work-report and feedback-launch
+      # tests/reset files that used to be listed here run in the "whole tests/reset folder" step below.
+      - name: Verify menu scene and legacy-runtime UI boundaries
         run: >-
           npx --no-install vitest run
-          tests/reset/legacy-progression.test.ts
-          tests/reset/legacy-player-progression-flow.test.ts
-          tests/reset/legacy-remote-progression.test.ts
-          tests/reset/legacy-remote-progression-proof-fixtures.test.ts
-          tests/reset/legacy-remote-ai-hydration.test.ts
-          tests/reset/legacy-endless-progression.test.ts
-          tests/reset/legacy-leaderboard.test.ts
           tests/scenes/menu-runtime-diagnostics.test.ts
           tests/scenes/menu-render-frame.test.ts
           tests/scenes/menu-intent-runtime.test.ts
-          tests/reset/legacy-player-message-inventory.test.ts
-          tests/reset/work-report.test.ts
           tests/legacy-runtime
-          tests/reset/legacy-feedback-launch.test.ts
           --maxWorkers=1
 
       # The "generated work report is current" check moved to the Owner export workflow (ci.yml): it is a function of the
@@ -147,6 +136,28 @@ jobs:
 
       - name: Verify Wave 0C measured-baseline required coverage
         run: node ./scripts/verify/run-measured-baseline-required-tests.mjs
+
+      # The whole tests/reset folder (the same directory `npm test` and `npm run verify` run), so a
+      # broken reset test can no longer merge green. Two named exclusions, both still covered:
+      # - legacy-unreal-source-fixture.test.ts calls process.chdir, which a worker thread cannot do;
+      #   it runs in its own process in the "PR 284" step above.
+      # - legacy-reset.test.ts runs in the second command, minus the four tests that read the
+      #   local-only mazer-legacy-unreal-restore fixture (not in this repo and not on a CI runner;
+      #   they fail with "Missing local mazer-legacy-unreal-restore fixture" here and run locally
+      #   under `npm test` with MAZER_LEGACY_UNREAL_RESTORE_ROOT set).
+      # Thread pool, as in scripts/verify/run-test-verify.mjs: long synchronous generation-ladder
+      # tests outlast the fork pool's RPC heartbeat ("Timeout calling onTaskUpdate").
+      - name: Verify the whole tests/reset folder
+        shell: bash
+        run: |
+          npx --no-install vitest run tests/reset \
+            --exclude tests/reset/legacy-unreal-source-fixture.test.ts \
+            --exclude tests/reset/legacy-reset.test.ts \
+            --pool=threads \
+            --maxWorkers=4
+          npx --no-install vitest run tests/reset/legacy-reset.test.ts \
+            --maxWorkers=1 \
+            -t '^(?!.*(resumes from the next tile selected during legacy backtracking|defers overlay rebuild travel until closing the options surface|routes pause commands through an explicit legacy pause lifecycle contract|routes menu-time overlay field commits through an explicit legacy flag contract))'
 
       - name: Build production bundle and PWA assets
         run: npm run build
