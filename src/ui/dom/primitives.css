@@ -434,7 +434,7 @@
 
 /*
  * StatusBanner wears the neon edge text skin (pick B, 2026-11-27; numbers in src/ui/skin/neonTextSkin.ts, pinned by
- * tests/ui/neon-text-skin.test.ts): opaque void panel, accent rim + outer glow + inner wash, Oxanium kicker marker.
+ * tests/render/neon-text-skin.test.ts): opaque void panel, accent rim + outer glow + inner wash, Oxanium kicker marker.
  * The accent is the tone's colour unless the caller sets --mazer-neon-accent (the in-flow notice passes the colour of
  * the thing the card is about).
  */
@@ -487,10 +487,7 @@
   --mazer-neon-accent: var(--mazer-token-color-semantic-energy);
 }
 
-.mazer-status-banner--warning {
-  --mazer-neon-accent: var(--mazer-token-color-semantic-reward);
-}
-
+.mazer-status-banner--warning,
 .mazer-status-banner--error {
   --mazer-neon-accent: var(--mazer-token-color-semantic-danger);
 }

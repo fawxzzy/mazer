@@ -664,6 +664,11 @@ export class BoardTileLayer {
     return this.softCellExtent;
   }
 
+  /** CSS-px tile size of the current bake (null before the first bake). Read by the text card placement. */
+  get tileSize(): number | null {
+    return this.layout?.tileSize ?? null;
+  }
+
   /** Layout-px origin the layer last snapped the board to (so markers line up with the bake). */
   get snappedOrigin(): { x: number; y: number } | null {
     const bake = this.cache.current;

@@ -7,6 +7,7 @@ import {
   resolveTextCardMechanicCells,
   resolveTextCardPlacement,
   resolveTextCardWidth,
+  TEXT_CARD_MARKER_HALO_OF_TILE,
   TEXT_CARD_MAX_WIDTH_PX,
   type TextCardBoardScene,
   type TextCardRect
@@ -144,11 +145,32 @@ describe('reading the live scene (the DOM cards that cannot be handed rects)', (
     // Canvas is drawn at 2x the scene width: every scene px is two page px, offset by the canvas box.
     const [player, goal, ...mechanics] = view.keepClear;
     const centre = (r: TextCardRect | null): { x: number; y: number } => ({ x: r!.x + (r!.width / 2), y: r!.y + (r!.height / 2) });
-    expect(player!.width - 8).toBeCloseTo(40);
+    // A 40 px cell (20 at 2x), the 4 px pad, and half a tile of halo each side (the marker glow draws past the cell).
+    expect(player!.width).toBeCloseTo(40 + 8 + (40 * TEXT_CARD_MARKER_HALO_OF_TILE * 2));
+    expect(goal!.width).toBeCloseTo(player!.width);
+    expect(mechanics[0]!.width).toBeCloseTo(48);
     expect(centre(goal).x - centre(player).x).toBeCloseTo(80);
     expect(centre(goal).y - centre(player).y).toBeCloseTo(80);
     expect(mechanics).toHaveLength(2);
     expect(view.hudBottom).toBe(7 + 80);
+  });
+
+  test('flag off (no hazard lab): the board tile layer alone gives the same rects', () => {
+    // Every player's play: `hazardGateLayout` is never recorded (or is the empty 0-tile record), only the board tile
+    // layer exists. The view must still come back, or the level-1 hint never moves off the end star.
+    const box = { left: 5, top: 7, width: 400 };
+    const withLab = resolveTextCardBoardView(scene(), box)!;
+    const tileLayer = { tileSize: 20, snappedOrigin: { x: 10, y: 50 } };
+    for (const flagOff of [
+      scene({ hazardGateLayout: undefined, boardTileLayer: tileLayer }),
+      scene({ hazardGateLayout: null, boardTileLayer: tileLayer }),
+      scene({ hazardGateLayout: { tileSize: 0, mazeLeft: 0, mazeTop: 0 }, boardTileLayer: tileLayer })
+    ]) {
+      const view = resolveTextCardBoardView(flagOff, box);
+      expect(view).not.toBeNull();
+      expect(view!.keepClear).toEqual(withLab.keepClear);
+      expect(view!.hudBottom).toBe(withLab.hudBottom);
+    }
   });
 
   test('no board in play = null (the caller keeps its default spot)', () => {
@@ -157,5 +179,7 @@ describe('reading the live scene (the DOM cards that cannot be handed rects)', (
     expect(resolveTextCardBoardView(scene({ mode: 'menu' }), box)).toBeNull();
     expect(resolveTextCardBoardView(scene({ maze: null }), box)).toBeNull();
     expect(resolveTextCardBoardView(scene({ hazardGateLayout: { tileSize: 0, mazeLeft: 0, mazeTop: 0 } }), box)).toBeNull();
+    // Before the first bake the tile layer has no size or origin yet.
+    expect(resolveTextCardBoardView(scene({ hazardGateLayout: null, boardTileLayer: { tileSize: null, snappedOrigin: null } }), box)).toBeNull();
   });
 });

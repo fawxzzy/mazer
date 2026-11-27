@@ -15,7 +15,12 @@
     - `tests/render/text-card-placement.test.ts`: rule + live-scene mapping
     - `tests/render/neon-text-skin.test.ts`: CSS and Phaser halves agree; control hint placement
     - updated: hazard onboarding, shard hint/ui, control hint, type-scale ratchet
-  - Real-board proof (`?lab=hazards&previewLevel=1|10|22|200`, chromium + webkit, 390x844@3 and 412x915@2.625; 16 captures): 0 card overlaps, 0 control-hint overlaps, no page errors. L200 used the real shard presenter.
+  - Real-board proof with the flag OFF (what every player gets: `?previewLevel=1|10|22|200`, no lab), chromium + webkit, 390x844@3 and 412x915@2.625, 16 captures: the view comes back in every run. The L1 hint ends above the end star's halo (390: 756 vs 761; 412: 811 vs 818). A card placed by the rule covers neither the player, the star, the hint nor any mechanic. No page errors.
+- Review fixes (HOLD at cdd331d3):
+  - P1: `resolveTextCardBoardView` took the tile size from `hazardGateLayout`, which exists only with `?lab=hazards`, so flag-off it returned null and the hint stayed on the star. It now reads `BoardTileLayer.tileSize` (new getter) and `snappedOrigin`; the lab layout is a fallback only. Test: a scene without hazards (fails on the old code). The player and end star keep-clear boxes now also grow by half a tile for the marker glow.
+  - P2: warning banners and notices are danger red again (the gold was not Zac's pick). Dead `border-color` overrides in `feedbackPopup.css` removed.
+  - P3: the control hint measures `game.canvas`, never the first `<canvas>` in the page (its own icon well holds one).
+- Failure Mode: a placement proof shot only under a lab flag proves nothing for flag-off play. Shoot proofs with the flags players actually have.
   - Menu captures in the real scene: sign-in return notice and online counter, both engines, both sizes.
 - Decision (delegated to the worker): the auth notice uses an opaque fill and a full-strength rim but no outer glow. A glow needs a MenuScene draw change, and MenuScene stays at 0 changed lines.
 - Status: source only, not merged, not deployed, nothing checked on a real phone.

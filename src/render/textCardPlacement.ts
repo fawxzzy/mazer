@@ -54,6 +54,8 @@ export interface TextCardPlacement {
 export const TEXT_CARD_SCAN_STEP_PX = 8;
 /** The card never runs wider than this (the in-flow notice's max width) and keeps this margin to the view sides. */
 export const TEXT_CARD_MAX_WIDTH_PX = 360;
+/** Extra keep-clear round the player and end star, as a share of a tile: their glow and pulse ring draw past the cell. */
+export const TEXT_CARD_MARKER_HALO_OF_TILE = 0.5;
 export const TEXT_CARD_SIDE_MARGIN_PX = 16;
 
 const overlaps = (a: TextCardRect, b: TextCardRect): boolean => (
@@ -163,8 +165,13 @@ export interface TextCardBoardScene {
   readonly mode?: string;
   readonly player?: LegacyPoint | null;
   readonly maze?: (Pick<LegacyMazeSnapshot, 'grid' | 'goal'> & Partial<Pick<LegacyMazeSnapshot, 'bleedGates'>>) | null;
+  /** Hazard lab only (`?lab=hazards`): a fallback for the tile size and origin, never required. */
   readonly hazardGateLayout?: { readonly tileSize: number; readonly mazeLeft: number; readonly mazeTop: number } | null;
-  readonly boardTileLayer?: { readonly snappedOrigin?: { readonly x: number; readonly y: number } | null } | null;
+  /** The board tile layer: tile size + snapped origin of the board as drawn (exists in every play, flag on or off). */
+  readonly boardTileLayer?: {
+    readonly tileSize?: number | null;
+    readonly snappedOrigin?: { readonly x: number; readonly y: number } | null;
+  } | null;
   readonly boardZoomContainer?: { getWorldTransformMatrix(): { transformPoint(x: number, y: number): { x: number; y: number } } } | null;
   resolveBoardTileBackingScale?(): number;
   readonly layout?: { readonly width: number; readonly lanes?: { readonly hud?: { readonly top: number; readonly height: number } | null } } | null;
@@ -186,27 +193,34 @@ export const resolveTextCardBoardView = (
   canvas: { readonly left: number; readonly top: number; readonly width: number }
 ): TextCardBoardView | null => {
   const maze = scene?.maze;
-  const layout = scene?.hazardGateLayout;
   const matrix = scene?.boardZoomContainer?.getWorldTransformMatrix?.();
   const viewWidth = scene?.layout?.width ?? 0;
-  if (!scene || scene.mode !== 'play' || !maze || !layout || !(layout.tileSize > 0) || !matrix || !(viewWidth > 0)) return null;
+  if (!scene || scene.mode !== 'play' || !maze || !matrix || !(viewWidth > 0)) return null;
+  // The board as drawn (board tile layer) first: it exists in every play. The hazard lab layout is only a fallback.
+  const lab = scene.hazardGateLayout;
+  const tileSize = scene.boardTileLayer?.tileSize ?? lab?.tileSize ?? 0;
+  const origin = scene.boardTileLayer?.snappedOrigin ?? (lab ? { x: lab.mazeLeft, y: lab.mazeTop } : null);
+  if (!(tileSize > 0) || origin === null) return null;
   const s = canvas.width / viewWidth;
-  const origin = scene.boardTileLayer?.snappedOrigin ?? { x: layout.mazeLeft, y: layout.mazeTop };
   const backing = scene.resolveBoardTileBackingScale?.() ?? 1;
   const toPage = (cell: LegacyPoint): { x: number; y: number } => {
-    const [x, y] = centerOfCell(cell, layout.tileSize, backing, origin.x, origin.y);
+    const [x, y] = centerOfCell(cell, tileSize, backing, origin.x, origin.y);
     const p = matrix.transformPoint(x, y);
     return { x: canvas.left + (p.x * s), y: canvas.top + (p.y * s) };
   };
-  const rect = (cell: LegacyPoint | null | undefined): TextCardRect | null => {
+  const rect = (cell: LegacyPoint | null | undefined, haloOfTile = 0): TextCardRect | null => {
     if (!cell) return null;
     const a = toPage(cell);
-    const b = toPage({ x: cell.x + 1, y: cell.y });
-    return resolveTextCardCellRect(a, Math.abs(b.x - a.x));
+    const cellPx = Math.abs(toPage({ x: cell.x + 1, y: cell.y }).x - a.x);
+    return resolveTextCardCellRect(a, cellPx, 4 + (cellPx * haloOfTile));
   };
   const hud = scene.layout?.lanes?.hud;
   return {
-    keepClear: [rect(scene.player), rect(maze.goal), ...resolveTextCardMechanicCells(maze).map(rect)],
+    keepClear: [
+      rect(scene.player, TEXT_CARD_MARKER_HALO_OF_TILE),
+      rect(maze.goal, TEXT_CARD_MARKER_HALO_OF_TILE),
+      ...resolveTextCardMechanicCells(maze).map((cell) => rect(cell))
+    ],
     hudBottom: canvas.top + ((hud ? hud.top + hud.height : 0) * s)
   };
 };

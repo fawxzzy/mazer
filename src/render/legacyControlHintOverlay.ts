@@ -101,6 +101,8 @@ interface SceneView {
 
 export interface LegacyControlHintHost {
   readonly scene: { getScene(key: string): unknown };
+  /** The game canvas (Phaser.Game#canvas); the line reads the board through its box. */
+  readonly canvas?: { getBoundingClientRect(): { left: number; top: number; width: number } } | null;
 }
 
 const readFacts = (scene: SceneView | null, acknowledged: boolean): LegacyControlHintFacts => {
@@ -180,9 +182,10 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
 
   /** Keeps the line off the player, the end star, Switches and wrap mouths (the text card rule, bottom first). */
   const place = (node: HTMLDivElement): void => {
-    if (typeof node.getBoundingClientRect !== 'function' || typeof doc.querySelector !== 'function') return;
-    const canvas = doc.querySelector('canvas');
-    const view = canvas ? resolveTextCardBoardView(scene() as TextCardBoardScene | null, canvas.getBoundingClientRect()) : null;
+    // The game's own canvas (never the first canvas in the page: the hint's icon well holds one too).
+    const canvas = game.canvas;
+    if (typeof node.getBoundingClientRect !== 'function' || typeof canvas?.getBoundingClientRect !== 'function') return;
+    const view = resolveTextCardBoardView(scene() as TextCardBoardScene | null, canvas.getBoundingClientRect());
     if (view === null) return;
     const box = node.getBoundingClientRect();
     if (anchorInset === null) {

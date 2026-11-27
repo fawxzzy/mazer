@@ -63,8 +63,11 @@ describe('kit StatusBanner wears the skin (DOM half)', () => {
     };
     expect(rule('.mazer-status-banner')).toContain(`--mazer-neon-accent: ${tokenVar(NEON_TEXT_TONE_ACCENT.info)};`);
     expect(rule('.mazer-status-banner--success')).toContain(`--mazer-neon-accent: ${tokenVar(NEON_TEXT_TONE_ACCENT.success)};`);
-    expect(rule('.mazer-status-banner--warning')).toContain(`--mazer-neon-accent: ${tokenVar(NEON_TEXT_TONE_ACCENT.warning)};`);
+    // Warning shares the error rule (one selector list), so both read danger red.
+    expect(rule('.mazer-status-banner--warning,\n.mazer-status-banner--error')).toContain(`--mazer-neon-accent: ${tokenVar(NEON_TEXT_TONE_ACCENT.warning)};`);
     expect(rule('.mazer-status-banner--error')).toContain(`--mazer-neon-accent: ${tokenVar(NEON_TEXT_TONE_ACCENT.error)};`);
+    // Warnings stay danger red, as before the skin (no design pick moved them to gold).
+    expect(NEON_TEXT_TONE_ACCENT.warning).toBe(designTokens.color['semantic.danger']);
   });
 
   test('hierarchy: Oxanium kicker, Oxanium heading in the accent with a glow, body on the UI face', () => {

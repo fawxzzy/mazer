@@ -51,7 +51,8 @@ export const NEON_TEXT_SKIN = Object.freeze({
 export const NEON_TEXT_TONE_ACCENT: Readonly<Record<NeonTextTone, string>> = Object.freeze({
   info: designTokens.color['semantic.info'],
   success: designTokens.color['semantic.energy'],
-  warning: designTokens.color['semantic.reward'],
+  // Warnings stay danger red, as before the skin (no design pick moved them).
+  warning: designTokens.color['semantic.danger'],
   error: designTokens.color['semantic.danger']
 });
 
