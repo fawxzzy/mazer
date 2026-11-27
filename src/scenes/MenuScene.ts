@@ -356,7 +356,7 @@ import {
   type LegacyPathVisualStyle
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
-import { noteLegacyFirstTimeStep } from '../legacy-runtime/legacyFirstTimeHost';
+import { noteLegacyFirstTimeStep, resolveLegacyFirstTimeOwnedHazardKinds } from '../legacy-runtime/legacyFirstTimeHost';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import {
   buildLegacyMenuRows,
@@ -11104,7 +11104,8 @@ export class MenuScene extends Phaser.Scene {
           // Level Preview has no history: read it as a player who reached the previewed level by the schedule (H8).
           return this.levelPreviewLevel === null ? storage : seedHazardPreviewStorage(storage, HAZARD_EXPOSURE_STORAGE_KEY, this.levelPreviewLevel);
         },
-        saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL
+        saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL,
+        registryOwnedKinds: resolveLegacyFirstTimeOwnedHazardKinds(this.hazardLab?.state.enabled === true)
       });
     }
     return this.hazardOnboarding;

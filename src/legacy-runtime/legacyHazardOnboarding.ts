@@ -115,12 +115,19 @@ export interface ResolveHazardLevelMomentsOptions {
   readonly record: HazardExposureRecord;
   readonly saturationLevel: number;
   readonly liveKinds?: readonly HazardUnitKind[];
+  /**
+   * Kinds whose first-time moment belongs to the first-time card registry (R5 of
+   * docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md; legacyFirstTimeHost.ts fires them on first touch). Their intro
+   * card is never returned, so it is neither shown nor marked in `introsShown`. Empty or absent = today's behaviour.
+   */
+  readonly registryOwnedKinds?: readonly HazardUnitKind[];
 }
 
 /**
  * What a level start shows. Show-once: a card only for a first encounter whose card was never shown,
  * a pip only for a tail step above the last pip shown. Flag off = nothing. Pure and allocation-light
- * (one allocator call), so the card model is ready in the same frame the level starts.
+ * (one allocator call), so the card model is ready in the same frame the level starts. A registry-owned kind's
+ * first encounter shows no intro card (and still no pip: the level is a first-encounter level either way).
  */
 export const resolveHazardLevelMoments = (options: ResolveHazardLevelMomentsOptions): HazardLevelMoments => {
   const level = toHazardScheduleLevel(options.level);
@@ -130,7 +137,10 @@ export const resolveHazardLevelMoments = (options: ResolveHazardLevelMomentsOpti
   const liveKinds = options.liveKinds ?? HAZARD_ONBOARDING_LIVE_KINDS;
   const allocation = allocateHazardUnitsForRecord(options.record, level, options.saturationLevel);
   const intro = allocation.firstEncounter;
-  const introCard = intro !== null && isLive(intro, liveKinds) && !options.record.introsShown.includes(intro)
+  const introCard = intro !== null
+    && isLive(intro, liveKinds)
+    && !options.record.introsShown.includes(intro)
+    && options.registryOwnedKinds?.includes(intro) !== true
     ? buildHazardIntroCard(intro)
     : null;
   let tierPip: HazardTierPipModel | null = null;
@@ -225,6 +235,8 @@ export interface HazardOnboardingOptions {
   readonly resolveStorage: () => HazardExposureStorage | null | undefined;
   readonly saturationLevel: number;
   readonly liveKinds?: readonly HazardUnitKind[];
+  /** See ResolveHazardLevelMomentsOptions.registryOwnedKinds (the scene passes them while first-time cards are on). */
+  readonly registryOwnedKinds?: readonly HazardUnitKind[];
 }
 
 export interface HazardOnboarding {
@@ -260,7 +272,8 @@ export const createHazardOnboarding = (options: HazardOnboardingOptions): Hazard
         level,
         record,
         saturationLevel: options.saturationLevel,
-        liveKinds
+        liveKinds,
+        registryOwnedKinds: options.registryOwnedKinds
       });
       const withheld = resolved.introCard !== null && startOptions?.withheldKinds?.includes(resolved.introCard.kind) === true;
       const moments = withheld ? { ...resolved, introCard: null } : resolved;

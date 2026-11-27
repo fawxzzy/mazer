@@ -113,6 +113,7 @@ export class ShardPlayPresenter {
   private hintPending = false;
   private coachOn = false;
   private unlockNoticeShown = false;
+  private noticesHeld = false;
   private lastCaged: boolean | null = null;
   private noticeTop = 0;
   private viewHeight = 0;
@@ -141,6 +142,19 @@ export class ShardPlayPresenter {
     return this.run.active;
   }
 
+  /**
+   * The cell of an untaken shard while the star is locked: `offset` 0 is the next one to take, 1 the one after it; null
+   * past the last shard or once the star is open. The first-time Shard card (legacyFirstTimeHost.ts) reads it before
+   * the step's arrival is noted, to tell a pickup and to ring the shard after it.
+   */
+  untakenShardCell(offset = 0): LegacyPoint | null {
+    const index = this.run.collected + offset;
+    if (!this.run.goalLocked || offset < 0 || index >= this.run.count) {
+      return null;
+    }
+    return { x: this.run.shardX(index), y: this.run.shardY(index) };
+  }
+
   /** A new maze went live: place its shards (play only) and drop every moment of the last one. */
   install(maze: LegacyMazeSnapshot, options: LegacyShardInstallOptions, now?: () => number): void {
     this.run.install(maze, options, now);
@@ -166,6 +180,21 @@ export class ShardPlayPresenter {
     this.unlockNoticeShown = false;
     this.lastCaged = null;
     this.notices.close();
+  }
+
+  /**
+   * While a first-time card is up or about to show (legacyFirstTimeHost.ts), the shard cards step aside so two text
+   * cards never stack: turning the hold on closes an open shard card, and the unlock card waits until the hold ends
+   * (the star stays open, so it still shows once).
+   */
+  holdNotices(held: boolean): void {
+    if (held === this.noticesHeld) {
+      return;
+    }
+    this.noticesHeld = held;
+    if (held) {
+      this.notices.close();
+    }
   }
 
   /** The level start met shards for the first time: show the notice and the coach mark (once; the record says so). */
@@ -236,7 +265,7 @@ export class ShardPlayPresenter {
     }
     // The coach mark first, so the card can keep clear of its pill too.
     this.drawCoach(input);
-    if (this.hintPending && hud !== null) {
+    if (this.hintPending && hud !== null && !this.noticesHeld) {
       this.hintPending = false;
       const keepClear = [
         this.cellRect(input, input.player ?? null),
@@ -250,7 +279,7 @@ export class ShardPlayPresenter {
       });
     }
     const visual = this.layer.goalVisual(this.run, input.nowMs, input.reducedMotion);
-    if (visual !== null && visual.noticeDue && !this.unlockNoticeShown) {
+    if (visual !== null && visual.noticeDue && !this.unlockNoticeShown && !this.noticesHeld) {
       this.unlockNoticeShown = true;
       const keepClear = [
         this.cellRect(input, input.player ?? null),

@@ -17,7 +17,7 @@
  * (`resolveFirstTimeCardPlacement`).
  *
  * Live cards: LEGACY_FIRST_TIME_LIVE_CARD_IDS. Slice 2 made the wrap card live (legacyFirstTimeHost.ts shows it), slice 3 the
- * Switch; each later slice adds its card id.
+ * Switch, slices 7 and 8 the Shard and Pulse Gate cards; each later slice adds its card id.
  */
 import type { TutorialToken } from '../tutorial/tutorialRegistry.ts';
 import {
@@ -243,10 +243,16 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
 ]);
 
 /**
- * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card, slice 3 the Switch.
- * Everything stays behind `?lab=firsttime` (build default off).
+ * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card, slice 3 the Switch,
+ * slices 7 and 8 the Shard (locked gate) and Pulse Gate cards. Those two can only be touched with `?lab=hazards` on as well
+ * (only then do shards and Pulse Gates exist). Everything stays behind `?lab=firsttime` (build default off).
  */
-export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze(['mechanic.wrap', 'mechanic.switch'] as FirstTimeCardId[]);
+export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze([
+  'mechanic.wrap',
+  'mechanic.switch',
+  'mechanic.locked-gate',
+  'mechanic.pulse-gate'
+] as FirstTimeCardId[]);
 
 export const resolveFirstTimeCard = (id: FirstTimeCardId): FirstTimeCard => LEGACY_FIRST_TIME_CARDS.find((card) => card.id === id)!;
 
