@@ -1,0 +1,132 @@
+### logged 2026-11-27T04:26Z (UTC); command: PGLITE_SANDBOX=<sandbox> node scratch-test/helptest.cjs <repoRoot>
+### pglite 0.5.13 sandbox=C:\ATLAS\tmp\pglite-sandbox-l11-20261119 helptest.cjs sha256=6347df89161da0455a9378735c7316f924f0f68602b80a4fc9a6c5ac33651349
+PGlite 0.5.13 (PostgreSQL 17 wasm), in-memory
+### tested_file=docs/ops/sql-proposals/mazer-help-requests-20261126/apply.sql sha256=5627dd766bda3c18ea6dc097794f81086d56a18452befa1f91f7bc5e56be9206
+### tested_file=docs/ops/sql-proposals/mazer-help-requests-20261126/rollback.sql sha256=9ded10bd3ba3ad419518332de6aa1f24ebeb968bc8dd6aa0ab9209c93bde5ed8
+### tested_file=docs/ops/sql-proposals/mazer-help-requests-20261126/ops/read-open-help-requests.sql sha256=c44d620eec299d3bb9e14996dd58bc5fdc6930004417694f9fdbabeebd124a45
+### tested_file=docs/ops/sql-proposals/mazer-help-requests-20261126/ops/close-help-request.sql sha256=d19c52c6e8f6fc504cea1bf1a2a62217b975654688282285723bf8467883019a
+PASS  preflight aborts when schema mazer is missing  [MAZER_HELP_PREIMAGE_MISSING_SCHEMA]
+PASS  preflight aborts when auth.users is missing  [MAZER_HELP_PREIMAGE_MISSING_AUTH_USERS]
+PASS  preflight aborts on a same-name function of any signature  [MAZER_HELP_PREIMAGE_FUNCTION_EXISTS]
+PASS  preflight aborts on a pre-existing mazer_help_requests table of any shape  [MAZER_HELP_PREIMAGE_TABLE_EXISTS]
+PASS  apply runs clean (as superuser postgres in pglite)
+PASS  apply changed the catalog
+PASS  anon and authenticated have no table or column privilege  [{"a_any":false,"u_any":false,"a_col":false,"u_col":false,"s_sel":true,"s_del":true,"s_ins":false,"s_upd_tbl":false,"s_upd_status":true,"s_upd_closed":true,"s_upd_msg":false,"s_upd_email":false,"pub":false,"anon_x":true,"auth_x":true,"rls":true,"forced":false,"pol":0,"secdef":true,"cfg":"{\"search_path=\\\"\\\"\",lock_timeout=3s}","fn_owner":"postgres","tbl_owner":"postgres","fk_action":"c","uid_nn":false,"args":"p_email text, p_message text, p_build_id text DEFAULT NULL::text, p_player_level integer DEFAULT NULL::integer, p_game_mode text DEFAULT NULL::text"}]
+PASS  service_role: select + delete, UPDATE only on status and closed_at, no insert
+PASS  function: public denied; anon AND authenticated allowed (guests and players)
+PASS  RLS on, not forced, zero policies
+PASS  function is SECURITY DEFINER with empty search_path and lock_timeout=3s  [{"search_path=\"\"",lock_timeout=3s}]
+PASS  FK is ON DELETE CASCADE, user_id NULLABLE, function and table share an owner  [["c",false,"postgres","postgres"]]
+PASS  the RPC has no user-id parameter (cannot file as someone else)  [p_email text, p_message text, p_build_id text DEFAULT NULL::text, p_player_level integer DEFAULT NULL::integer, p_game_mode text DEFAULT NULL::text]
+PASS  guest (anon) submit -> {"status":"saved"}  [{"status":"saved"}]
+PASS  guest row: user_id NULL, email trimmed with case kept, message trimmed with inner newline kept, context, status open  [{"id":"21886ffe-3634-4f1e-bbb6-f2e989881527","user_id":null,"contact_email":"Guest.Person@Example.com","message":"My progress vanished.\nLine two.","status":"open","closed_at":null,"build_id":"abc1234","player_level":63,"game_mode":"endless","created_at":"2026-11-27T04:24:01.360Z"}]
+PASS  signed-in submit -> saved
+PASS  signed-in row carries user_id from auth.uid()
+PASS  authenticated role with no auth.uid() is stored as a guest (user_id NULL), not refused
+PASS  email null -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "   " -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "ab" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "no-at-sign.com" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a@b" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a b@c.de" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a@@b.co" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a@b@c.co" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "@b.co" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a@." -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "a@b." -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "tab\tin@x.io" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "ctl\u0001x@x.io" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  email "xxxxxxxxxxxx...(255)" -> MAZER_HELP_BAD_EMAIL 22023, not echoed  [MAZER_HELP_BAD_EMAIL 22023]
+PASS  254-character email accepted (boundary)
+PASS  255-character email rejected
+PASS  padded email that is valid after trimming is accepted
+PASS  unicode email (IDN-style) accepted as typed
+PASS  rejected emails stored nothing (3 rows saved in this block)
+PASS  message null -> MAZER_HELP_MESSAGE_EMPTY 22023  [MAZER_HELP_MESSAGE_EMPTY]
+PASS  message "" -> MAZER_HELP_MESSAGE_EMPTY 22023  [MAZER_HELP_MESSAGE_EMPTY]
+PASS  message "   " -> MAZER_HELP_MESSAGE_EMPTY 22023  [MAZER_HELP_MESSAGE_EMPTY]
+PASS  message " \n\t\r " -> MAZER_HELP_MESSAGE_EMPTY 22023  [MAZER_HELP_MESSAGE_EMPTY]
+PASS  2000-character message accepted (boundary)
+PASS  2001-character message -> MAZER_HELP_MESSAGE_TOO_LONG 22001, text not echoed  [MAZER_HELP_MESSAGE_TOO_LONG 22001]
+PASS  2001 characters padded with whitespace still rejected
+PASS  2000 emoji accepted (cap counts characters, not bytes)
+PASS  a 1-character message is accepted
+PASS  markup is stored verbatim as plain text
+PASS  bad context still saves
+PASS  bad build id / level / mode -> NULL  [{"id":"9016dd7b-2682-4333-a068-e47f1ae457e2","user_id":null,"contact_email":"ctx@x.io","message":"ctx","status":"open","closed_at":null,"build_id":null,"player_level":null,"game_mode":null,"created_at":"2026-11-27T04:24:01.399Z"}]
+PASS  level above cap -> NULL; v1.2.3+sha build and daily_2 mode kept
+PASS  per user: first 3 saved, 4th and 5th rate_limited  [saved,saved,saved,rate_limited,rate_limited]
+PASS  per user: retry_after_seconds in (0, 3600]  [3600]
+PASS  rate-limited calls stored nothing (3 rows)
+PASS  another user is unaffected by user 2 budget
+PASS  per user: after the hour passes, user 2 can send again
+PASS  per user: 11th within 24h refused by the daily cap (hour budget empty), wait > 1h  [{"status":"rate_limited","retry_after_seconds":50340}]
+PASS  per email: 3 per hour counted case-insensitively across guests and players, 4th rate_limited  [saved,saved,saved,rate_limited]
+PASS  per email: a different address from the same guest still works
+PASS  per email: also binds a signed-in player with a fresh user budget
+PASS  per email: 11th within 24h refused by the daily cap, wait > 1h  [{"status":"rate_limited","retry_after_seconds":50340}]
+PASS  guest pool: the 20th guest message in the hour is saved (boundary)
+PASS  guest pool: the 21st guest message is rate_limited (fresh address)  [{"status":"rate_limited","retry_after_seconds":100}]
+PASS  guest pool full: a signed-in player can still send
+PASS  guest pool: refused guest stored nothing (20 guest rows)
+PASS  global: the 60th message in the hour is saved (boundary)
+PASS  global: the 61st is rate_limited for a fresh player AND a guest  [[{"status":"rate_limited","retry_after_seconds":60},{"status":"rate_limited","retry_after_seconds":60}]]
+PASS  global: refused calls stored nothing (60 rows in the hour)
+PASS  global: after rows age past the hour the budget frees up
+PASS  two limits used up: the retry is the LONGER wait (> 20h, <= 24h)  [{"status":"rate_limited","retry_after_seconds":82260}]
+PASS  invalid calls consume no budget (a valid call afterwards is saved)
+PASS  direct SELECT denied (authenticated)  [permission denied for table mazer_help_requests]
+PASS  direct INSERT, UPDATE, DELETE denied (authenticated)
+PASS  direct SELECT denied (anon)  [permission denied for table mazer_help_requests]
+PASS  direct INSERT, UPDATE, DELETE denied (anon)
+PASS  MUTANT (grant added by mistake): RLS still returns 0 rows to anon  [rows=0]
+PASS  MUTANT: RLS still blocks a direct insert  [new row violates row-level security policy for table "mazer_help_requests"]
+PASS  service_role sees both rows
+PASS  service_role can close a message (status + closed_at)
+PASS  service_role can NOT rewrite message or email
+PASS  service_role can NOT insert directly
+PASS  closing without closed_at is refused by the table (status/closed_at check)  [new row for relation "mazer_help_requests" violates check constraint "mazer_help_requests_closed_at_check"]
+PASS  table rejects an empty / padded message
+PASS  table rejects a 2001-character message
+PASS  table rejects a malformed or padded email
+PASS  table rejects NULL email and NULL message
+PASS  table rejects an unknown status and a closed row without closed_at
+PASS  table rejects an open row with closed_at
+PASS  table rejects a user id that is not in auth.users (FK)
+PASS  no call through the function ever reached a table CHECK (no row echo in errors)
+PASS  error messages are bare MAZER_HELP_* codes with no input in message or detail
+PASS  RPC works for guest and player when the owner is not superuser and has no BYPASSRLS (RLS not forced)  [ ]
+PASS  deleting an account deletes that account's messages, not other players' or guests'
+PASS  read file passes the read-only wrapper screen, one statement  [[]]
+PASS  close file is refused by the read-only screen (it is a write)
+PASS  read file: open rows oldest first, signed_in flag, username for players, open_total  [[["first, signed in",true,"player_one",2],["second, guest",false,null,2]]]
+PASS  close template has exactly one placeholder uuid
+PASS  close file: closes exactly that row and returns it
+PASS  close file: a second run changes nothing (0 rows back)
+PASS  read file after close: only the other row is open
+PASS  close template run unedited touches nothing
+PASS  re-apply aborts with PREIMAGE_FUNCTION_EXISTS and leaves the catalog unchanged  [MAZER_HELP_PREIMAGE_FUNCTION_EXISTS]
+PASS  rollback with data: function dropped (intake stopped), table KEPT with its row
+PASS  kept table is still unreadable by clients after rollback
+PASS  rollback with empty table: catalog equals the pre-apply catalog
+PASS  rollback twice in a row is harmless
+PASS  apply after rollback equals the first post-apply catalog
+PASS  and the function works again
+PASS  apply: lock_timeout=3s and statement_timeout=15s in force at the end of the transaction  [ok]
+PASS  apply: the timeouts are transaction-local (session back to default)
+PASS  rollback: lock_timeout=3s and statement_timeout=15s in force  [ok]
+PASS  both files set the timeouts BEFORE the first DDL statement
+PASS  MUTANT: granting EXECUTE to anon is missing (signed-in only by mistake) aborts the apply (POSTIMAGE_FUNCTION_ACL)  [MAZER_HELP_POSTIMAGE_FUNCTION_ACL]
+PASS  MUTANT: EXECUTE left to public aborts the apply (POSTIMAGE_FUNCTION_ACL)  [MAZER_HELP_POSTIMAGE_FUNCTION_ACL]
+PASS  MUTANT: a different FK action aborts the apply (POSTIMAGE_FOREIGN_KEY)  [MAZER_HELP_POSTIMAGE_FOREIGN_KEY]
+PASS  MUTANT: user_id NOT NULL aborts the apply (POSTIMAGE_FOREIGN_KEY)  [MAZER_HELP_POSTIMAGE_FOREIGN_KEY]
+PASS  MUTANT: a function without lock_timeout aborts the apply (POSTIMAGE_FUNCTION_SHAPE)  [MAZER_HELP_POSTIMAGE_FUNCTION_SHAPE]
+PASS  MUTANT: a SECURITY INVOKER function aborts the apply (POSTIMAGE_FUNCTION_SHAPE)  [MAZER_HELP_POSTIMAGE_FUNCTION_SHAPE]
+PASS  MUTANT: a client table grant aborts the apply (POSTIMAGE_CLIENT_TABLE_PRIVILEGE)  [MAZER_HELP_POSTIMAGE_CLIENT_TABLE_PRIVILEGE]
+PASS  MUTANT: service_role allowed to rewrite the message aborts the apply (POSTIMAGE_SERVICE_ROLE_PRIVILEGE)  [MAZER_HELP_POSTIMAGE_SERVICE_ROLE_PRIVILEGE]
+PASS  MUTANT: service_role allowed to insert aborts the apply (POSTIMAGE_SERVICE_ROLE_PRIVILEGE)  [MAZER_HELP_POSTIMAGE_SERVICE_ROLE_PRIVILEGE]
+PASS  MUTANT: RLS left off aborts the apply (POSTIMAGE_RLS_OFF)  [MAZER_HELP_POSTIMAGE_RLS_OFF]
+
+SUMMARY: 123 passed, 0 failed

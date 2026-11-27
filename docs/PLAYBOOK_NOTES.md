@@ -816,3 +816,12 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY: `recovery=1` tells the account portal an emailed reset link just landed. With no link and no session it said "That reset link expired. Send a new one." before any email was sent (player report 2026-11-24). The portal's recovery links now carry their own marker (FawxzzyWeb PR #237).
 - Tests: `tests/reset/legacy-account-portal.test.ts`, `install-gate`, `ui-state-model-contract` (100 pass); full `npm run test` 326 files / 4162 tests pass (one vitest onTaskUpdate RPC timeout under load, a known flake). The Guide has no password text, so no Guide change. Not checked on a real phone.
 - Status: Applied
+
+## 2026-11-26 Help messages SQL v1 (proposal files only, not applied)
+
+- WHAT: new `docs/ops/sql-proposals/mazer-help-requests-20261126/` (apply, rollback, README, hashes, live preimage + pack, pglite scratch test, PG17 harness run, owner read and close files). Separate table `mazer.mazer_help_requests` (reply email + message, open/closed, nullable `user_id` with cascade) and `mazer.mazer_submit_help_request_v1` (SECURITY DEFINER, `search_path=''`, `lock_timeout` 3s, executable by anon and authenticated). IP-free limits: 3/hour and 10/day per player and per address, 20/hour for all guests, 60/hour overall. Client not built.
+- WHY: Zac wants Help tab messages (PR #728 options, form C "Email first") stored somewhere specific; guests must be able to ask for help, and the email is PII that must not mix with the feedback ratings table.
+- Rule: a function that writes PII validates with the same rules as the table CHECKs before inserting, so a CHECK violation (whose DETAIL echoes the row) is unreachable; error messages are bare codes. A guest pool below the global cap keeps signed-in headroom.
+- Evidence: pglite 0.5.13, 123 checks, 0 failed (`scratch-test/run-pglite.txt`); PG 17.9 `scratch-pg.mjs pair` with the non-superuser runner and the rollback-with-rows script (`scratch-test/pg17/*.txt`); read-only live preimage 2026-11-27 04:17Z UTC.
+- Not checked: any database apply, real lock contention, independent review (not done), a real phone. FawxzzyWeb delete manifest follow-up listed in the README.
+- Status: Proposed

@@ -1,0 +1,17 @@
+# PostgreSQL 17.9 scratch (scripts/db-scratch/scratch-pg.mjs), run 2026-11-27T04:26Z, runner role postgres (non-superuser), auth.users owned by supabase_auth_admin, locale C
+# apply.sql sha256 5627dd766bda3c18ea6dc097794f81086d56a18452befa1f91f7bc5e56be9206
+# rollback.sql sha256 9ded10bd3ba3ad419518332de6aa1f24ebeb968bc8dd6aa0ab9209c93bde5ed8
+# ops/read-open-help-requests.sql sha256 c44d620eec299d3bb9e14996dd58bc5fdc6930004417694f9fdbabeebd124a45
+# ops/close-help-request.sql sha256 d19c52c6e8f6fc504cea1bf1a2a62217b975654688282285723bf8467883019a
+# scratch-test/pg17/app-stub.sql sha256 81c0c41be797c2b432bc0016d5810a842644cb59985ecb9dd19b51e25c3d9e9f
+# scratch-test/pg17/seed.sql sha256 ad5c16a25f0f699fb7da29f4a72cb1cf26f07c7eae331298981db25dbceb6868
+# scratch-test/pg17/check.sql sha256 9623742d770b471046ae0190715c73fd05327744dd46aa8deb8f50db6b1be545
+# scratch-test/pg17/rollback-with-rows.ps1 sha256 b956601132e3ab2aae316499cb09bfffec16f75adac68aa229500dd8885d4c66
+# command: node scripts/db-scratch/scratch-pg.mjs pair --dir <scratch> --apply apply.sql --rollback rollback.sql --seed seed.sql --check check.sql --reapply --schemas mazer
+
+PASS  apply file runs clean as the runner role (postgres)
+PASS  apply changed the catalog (not a no-op)
+PASS  check file passes after apply
+PASS  second apply either aborts by its own guard or changes nothing - refused by its guard
+PASS  rollback file runs clean as the runner role (postgres)
+PASS  catalog after rollback equals the catalog before apply

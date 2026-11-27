@@ -1,0 +1,68 @@
+# PostgreSQL 17.9 scratch (scripts/db-scratch/scratch-pg.mjs), run 2026-11-27T04:26Z, runner role postgres (non-superuser), auth.users owned by supabase_auth_admin, locale C
+# apply.sql sha256 5627dd766bda3c18ea6dc097794f81086d56a18452befa1f91f7bc5e56be9206
+# rollback.sql sha256 9ded10bd3ba3ad419518332de6aa1f24ebeb968bc8dd6aa0ab9209c93bde5ed8
+# ops/read-open-help-requests.sql sha256 c44d620eec299d3bb9e14996dd58bc5fdc6930004417694f9fdbabeebd124a45
+# ops/close-help-request.sql sha256 d19c52c6e8f6fc504cea1bf1a2a62217b975654688282285723bf8467883019a
+# scratch-test/pg17/app-stub.sql sha256 81c0c41be797c2b432bc0016d5810a842644cb59985ecb9dd19b51e25c3d9e9f
+# scratch-test/pg17/seed.sql sha256 ad5c16a25f0f699fb7da29f4a72cb1cf26f07c7eae331298981db25dbceb6868
+# scratch-test/pg17/check.sql sha256 9623742d770b471046ae0190715c73fd05327744dd46aa8deb8f50db6b1be545
+# scratch-test/pg17/rollback-with-rows.ps1 sha256 b956601132e3ab2aae316499cb09bfffec16f75adac68aa229500dd8885d4c66
+# command: scratch-test/pg17/rollback-with-rows.ps1 (apply, submit one row, owner read, rollback keeps table, close template, empty + rollback drops table)
+
+﻿DROP DATABASE
+NOTICE:  database "help_rows" does not exist, skipping
+CREATE DATABASE
+INSERT 0 2
+INSERT 0 1
+BEGIN
+SET
+SET
+DO
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+REVOKE
+GRANT
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+DO
+COMMIT
+              set_config              | mazer_submit_help_request_v1 
+--------------------------------------+------------------------------
+ 00000000-0000-0000-0000-0000000000b1 | {"status": "saved"}
+(1 row)
+
+--- owner read file (expect 1 open row, signed_in=t, username=player_b1, open_total=1)
+5ff45350-8379-4bad-ab04-89734857f265 | 2026-11-26 23:26:10.945395-05 | keep@x.io | keep me | t | player_b1 |  |  |  | 1
+--- rollback with one row present (expect NOTICE MAZER_HELP_ROLLBACK_KEPT_TABLE rows=1)
+BEGIN
+SET
+SET
+DROP FUNCTION
+DO
+COMMIT
+psql:C:/ATLAS/tmp/worktrees/help-sql-20261126/docs/ops/sql-proposals/mazer-help-requests-20261126/rollback.sql:35: NOTICE:  MAZER_HELP_ROLLBACK_KEPT_TABLE rows=1
+--- after rollback (expect table_rows=1, function_exists=f)
+table_rows=1|function_exists=false
+--- close template with the placeholder id (expect 0 rows), then with the real id (expect 1 row closed)
+UPDATE 0
+<id>|closed|<ts>
+UPDATE 1
+--- empty the kept table, rollback again (expect table dropped)
+DELETE 1
+BEGIN
+SET
+SET
+DROP FUNCTION
+DO
+COMMIT
+psql:C:/ATLAS/tmp/worktrees/help-sql-20261126/docs/ops/sql-proposals/mazer-help-requests-20261126/rollback.sql:17: NOTICE:  function mazer.mazer_submit_help_request_v1(text,text,text,pg_catalog.int4,text) does not exist, skipping
+table_exists=false
+DROP DATABASE
