@@ -5,7 +5,7 @@
  *
  * Flag off: the session is inert (store() null) and reads no scene storage; the flag itself is read once per scene.
  */
-import type { HazardUnitKind } from '../mazer-core/hazards';
+import type { HazardUnitKind } from './legacyHazardOnboarding';
 import type { TutorialStorage } from '../tutorial/tutorialAckStore';
 import { resolveLegacyAuthStorageScope } from './legacyAuth';
 import type { FirstTimeCardId } from './legacyFirstTimeCards';

@@ -35,6 +35,12 @@ import {
   type LegacyGuideHazardRowId
 } from './legacyGuideContent';
 
+/**
+ * The hazard kind type, re-exported so the first-time cards (slices 7 and 8) can name a kind without importing the
+ * hazard graph themselves (tests/core/hazards/source-boundary.test.ts keeps that list to the hazard lane's own files).
+ */
+export type { HazardUnitKind };
+
 /** Local storage key (auth-scoped by the scene like the game toggles). Never part of the account settings JSON. */
 export const HAZARD_EXPOSURE_STORAGE_KEY = 'mazer.hazard-exposure.v1';
 

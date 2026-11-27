@@ -19,7 +19,7 @@
  * the heading and the mechanic icon; the coach pill shows the same icon.
  */
 import type Phaser from 'phaser';
-import type { HazardUnitKind } from '../mazer-core/hazards';
+import type { HazardUnitKind } from './legacyHazardOnboarding';
 import { centerOfCell } from '../render/boardTileBake';
 import { DEFAULT_BOARD_TILE_STYLE } from '../render/boardTileStyle';
 import { CoachMarkView } from '../render/coachMarkView';
