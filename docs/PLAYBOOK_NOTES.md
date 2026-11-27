@@ -809,3 +809,10 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - Visible change: keyboard focus only. The mode-select card ring is 3px (was 2px) at a 2px offset (was 3px); the outer edge stays 5px out, so nothing new clips. Mouse and touch show no ring, as before.
 - Tests: `off-theme-color-ratchet` (baseline lowered), `design-tokens-sync`, `legacy-progression`, `legacy-player-message*`, `legacy-menu-dropdown`, architecture + render + ui + scenes folders. Not checked on a real phone.
 - Status: Applied
+
+## 2026-11-26 Forgot password opens the reset request form (no recovery=1)
+
+- WHAT: `buildMazerAccountPortalUrl` (`src/legacy-runtime/legacyAccountPortal.ts`) no longer adds `recovery=1`, so the in-game Forgot password link and the legacy recovery-path redirect (`src/boot/main.ts`) open `account.fawxzzy.com/reset-password?app=mazer` (plus the existing return/theme params). `tests/reset/legacy-account-portal.test.ts` pins the URL and asserts no `recovery` param.
+- WHY: `recovery=1` tells the account portal an emailed reset link just landed. With no link and no session it said "That reset link expired. Send a new one." before any email was sent (player report 2026-11-24). The portal's recovery links now carry their own marker (FawxzzyWeb PR #237).
+- Tests: `tests/reset/legacy-account-portal.test.ts`, `install-gate`, `ui-state-model-contract` (100 pass); full `npm run test` 326 files / 4162 tests pass (one vitest onTaskUpdate RPC timeout under load, a known flake). The Guide has no password text, so no Guide change. Not checked on a real phone.
+- Status: Applied

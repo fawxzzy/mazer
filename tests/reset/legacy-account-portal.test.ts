@@ -326,8 +326,10 @@ describe('Mazer shared account contract', () => {
       `${MAZER_ACCOUNT_PORTAL_ORIGIN}/account?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
     );
     expect(buildMazerAccountPortalUrl('reset-password')).toBe(
-      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/reset-password?recovery=1&app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
+      `${MAZER_ACCOUNT_PORTAL_ORIGIN}/reset-password?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
     );
+    // Forgot password opens the request form; `recovery=1` would read as an expired emailed link.
+    expect(new URL(buildMazerAccountPortalUrl('reset-password')).searchParams.has('recovery')).toBe(false);
     expect(buildMazerLegalUrl('privacy')).toBe(
       `${MAZER_ACCOUNT_PORTAL_ORIGIN}/privacy?app=mazer&returnTo=${encodeURIComponent(MAZER_CANONICAL_RETURN_URL)}`
     );
