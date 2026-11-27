@@ -3,11 +3,14 @@
  *
  * Mirrors navigation-core-required-tests.mjs's own reasoning exactly (see
  * that module's header): neither `npm run verify`'s curated TEST_SPINE
- * (scripts/verify/run-test-verify.mjs) nor .github/workflows/verify.yml's
- * explicit vitest invocations glob tests/render/ automatically (CI lists a
- * fixed set of tests/render files by name; it globs tests/reset since #727) --
- * a new tests/render file is silently never run unless it's listed in one of
- * these shared canonical lists. Kept as its own Teleport-scoped module (not
+ * (scripts/verify/run-test-verify.mjs) globs tests/render/, and before PR #727
+ * and the "whole tests/render folder" step of .github/workflows/verify.yml
+ * neither did CI (it listed a fixed set of tests/render files by name), so a
+ * new tests/render file was silently never run unless it was listed in one of
+ * these shared canonical lists. CI now globs tests/reset and tests/render, so
+ * these entries are also reached there; the list stays as the explicit
+ * required-coverage step, which fails loudly if a listed file goes missing
+ * (and the local runner still depends on it). Kept as its own Teleport-scoped module (not
  * folded into NAVIGATION_CORE_REQUIRED_TESTS) so Teleport coverage is never
  * mislabeled as Navigation-Core-only coverage.
  *

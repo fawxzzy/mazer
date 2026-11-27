@@ -50,7 +50,8 @@
             "tests/architecture/**",
             "tests/brand/**",
             "tests/legacy-runtime/**",
-            "tests/reset/**"
+            "tests/reset/**",
+            "tests/render/**"
           ]
         }
       ]

@@ -67,31 +67,12 @@ jobs:
           tests/brand
           --maxWorkers=1
 
-      # Listed by file rather than as the tests/render directory so an unrelated
-      # new render test cannot silently change what this step gates.
-      - name: Verify intro timeline, edge markers, tile bake, and lifecycle analyzer contracts
+      # The tests/render files that used to be listed here by name run in the "whole tests/render folder"
+      # step below; only the two non-render entries remain.
+      - name: Verify lifecycle analyzer and MazeV2 adapter contracts
         run: >-
           npx --no-install vitest run
-          tests/render/introTimeline.test.ts
-          tests/render/edgeMarkers.test.ts
-          tests/render/boardTileBake.test.ts
-          tests/render/boardTileStyle.test.ts
-          tests/render/starlitBevelBake.test.ts
-          tests/render/endpointTilePixels.test.ts
-          tests/render/endpointTileSkins.test.ts
-          tests/render/startPinwheel.test.ts
-          tests/render/palette.test.ts
-          tests/render/trailHeadPath.test.ts
-          tests/render/pixelAlignment.test.ts
-          tests/render/bleedGlow.test.ts
-          tests/render/backdropStars.test.ts
-          tests/render/trail-bloom-clip.test.ts
-          tests/render/starDustTrailCache.test.ts
-          tests/render/starDustTrailVariants.test.ts
-          tests/render/controller-halo-look.test.ts
-          tests/render/menu-play-label-attention.test.ts
           tests/visual/maze-lifecycle-analysis.test.mjs
-          tests/render/type-scale-ratchet.test.ts
           tests/mazeV2/adapters.test.ts
           --maxWorkers=1
 
@@ -158,6 +139,17 @@ jobs:
           npx --no-install vitest run tests/reset/legacy-reset.test.ts \
             --maxWorkers=1 \
             -t '^(?!.*(resumes from the next tile selected during legacy backtracking|defers overlay rebuild travel until closing the options surface|routes pause commands through an explicit legacy pause lifecycle contract|routes menu-time overlay field commits through an explicit legacy flag contract))'
+
+      # The whole tests/render folder, so a new render test is covered without being named and a broken one
+      # can no longer merge green. No named exclusions: all 90 files pass on a clean main under the thread
+      # pool, none calls process.chdir or reads a local-only fixture. Thread pool and 4 workers as in the
+      # tests/reset step above. The Wave 4D-A, 4D-B and 4E required-coverage steps still name some of these
+      # files; they run twice on purpose (those steps fail loudly if a listed file goes missing).
+      - name: Verify the whole tests/render folder
+        run: >-
+          npx --no-install vitest run tests/render
+          --pool=threads
+          --maxWorkers=4
 
       - name: Build production bundle and PWA assets
         run: npm run build

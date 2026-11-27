@@ -9,8 +9,10 @@
  * TEST_SPINE globs, so it silently runs locally -- but before PR #727 CI's
  * own explicit list never named it, so a green CI run was never actually
  * proof this suite passed. (Since #727 CI also globs the whole tests/reset
- * folder, so that file is now reached there too; the render and
- * architecture entries below still depend on this list.) Kept as its own World-Identity-scoped module (not folded
+ * folder, and its "whole tests/render folder" step globs tests/render, so the
+ * reset and render files are now reached there too; the architecture entry
+ * below is also globbed by CI's tests/architecture step. This list stays as the
+ * explicit required-coverage step and the local runner's source.) Kept as its own World-Identity-scoped module (not folded
  * into NAVIGATION_CORE_REQUIRED_TESTS or TELEPORT_REQUIRED_TESTS) so this
  * coverage is never mislabeled as Navigation-Core- or Teleport-only work.
  *
