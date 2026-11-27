@@ -15,7 +15,9 @@
  * tests/core, cosmetics, tutorial, architecture, brand and legacy-runtime, and
  * its "whole tests/render folder" step globs tests/render, so the tests/reset,
  * tests/architecture and tests/render entries below are now also reached
- * there; tests/analysis is still not globbed by CI.) This module is the single
+ * there; since the 2026-11-27 CI-leftovers change the same job also globs
+ * tests/analysis, so tests/analysis/rasterCompare.test.ts runs there, inside
+ * the required check.) This module is the single
  * canonical list both the local runner and CI import from, so they can't
  * drift apart again.
  *
@@ -32,10 +34,10 @@ export const NAVIGATION_CORE_REQUIRED_TESTS = [
   'tests/render/navigationCoreTrailCanvas.test.ts',
   'tests/render/navigationCorePlayerGlowCanvas.test.ts',
   'tests/render/navigationCoreGoalHaloCanvas.test.ts',
-  // tests/analysis/ is a specific-file list in TEST_SPINE, not a glob (see
-  // scripts/verify/run-test-verify.mjs) -- a new file there is exactly the
-  // same silent-gap class this whole module exists to close, so it's
-  // listed here rather than assumed to be picked up automatically.
+  // tests/analysis/ was once a specific-file list, not a glob, so this file
+  // was listed rather than assumed to be picked up. The folder is now run
+  // whole in the required job; the entry stays so check-test-coverage.mjs
+  // fails if that run ever moves out of the required check.
   'tests/analysis/rasterCompare.test.ts',
   'tests/architecture/boot-payload-budget.test.ts',
   'tests/reset/legacy-playable-graph.test.ts',

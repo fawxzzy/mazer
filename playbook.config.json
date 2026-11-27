@@ -51,7 +51,22 @@
             "tests/brand/**",
             "tests/legacy-runtime/**",
             "tests/reset/**",
-            "tests/render/**"
+            "tests/render/**",
+            "tests/ai/**",
+            "tests/analysis/**",
+            "tests/config/**",
+            "tests/future-runtime/**",
+            "tests/maze/**",
+            "tests/mazeV2/**",
+            "tests/projections/**",
+            "tests/proof-surfaces/**",
+            "tests/scenes/**",
+            "tests/settings/**",
+            "tests/telemetry/**",
+            "tests/theme/**",
+            "tests/topology-proof/**",
+            "tests/ui/**",
+            "tests/visual/**"
           ]
         }
       ]

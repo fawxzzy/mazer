@@ -91,17 +91,14 @@ jobs:
       # registry, ledger and event archive only, and this workflow is skipped for board-only pull requests, so a check here
       # turned main red after a board-only merge.
 
-      - name: Verify PR 284 maze output parity and search-work diagnostics
-        shell: bash
-        run: |
-          npx --no-install vitest run \
-            tests/reset/legacy-reset.test.ts \
-            tests/reset/legacy-topology-scale-audit.test.ts \
-            --maxWorkers=1 \
-            -t "PR #284"
-          npx --no-install vitest run \
-            tests/reset/legacy-unreal-source-fixture.test.ts \
-            --maxWorkers=1
+      # The PR #284 maze-parity tests in legacy-reset.test.ts and legacy-topology-scale-audit.test.ts used to be run here
+      # by name (-t "PR #284") and again in the whole tests/reset folder step below; the folder step runs them once.
+      # Only the process.chdir fixture, which a worker thread cannot run, still needs its own process.
+      - name: Verify the legacy Unreal source fixture contract (own process, it calls process.chdir)
+        run: >-
+          npx --no-install vitest run
+          tests/reset/legacy-unreal-source-fixture.test.ts
+          --maxWorkers=1
 
       - name: Verify Wave 4D-A Navigation Core v1 required coverage
         run: node ./scripts/verify/run-navigation-core-required-tests.mjs
@@ -121,7 +118,7 @@ jobs:
       # The whole tests/reset folder (the same directory `npm test` and `npm run verify` run), so a
       # broken reset test can no longer merge green. Two named exclusions, both still covered:
       # - legacy-unreal-source-fixture.test.ts calls process.chdir, which a worker thread cannot do;
-      #   it runs in its own process in the "PR 284" step above.
+      #   it runs in its own process in the "legacy Unreal source fixture" step above.
       # - legacy-reset.test.ts runs in the second command, minus the four tests that read the
       #   local-only mazer-legacy-unreal-restore fixture (not in this repo and not on a CI runner;
       #   they fail with "Missing local mazer-legacy-unreal-restore fixture" here and run locally
@@ -144,12 +141,51 @@ jobs:
       # can no longer merge green. No named exclusions: all 90 files pass on a clean main under the thread
       # pool, none calls process.chdir or reads a local-only fixture. Thread pool and 4 workers as in the
       # tests/reset step above. The Wave 4D-A, 4D-B and 4E required-coverage steps still name some of these
-      # files; they run twice on purpose (those steps fail loudly if a listed file goes missing).
+      # files; the runners now only assert that those files exist and sit inside a whole-folder run, so each file runs once.
       - name: Verify the whole tests/render folder
         run: >-
           npx --no-install vitest run tests/render
           --pool=threads
           --maxWorkers=4
+
+      # The 15 folders that no CI step ran before 2026-11-27 (tests/ai ... tests/visual), whole, so a new test there is
+      # covered without being named. They run in THIS job on purpose: "TypeScript, contracts, and build" is a required
+      # check, so a red test here blocks the merge (a separate job would not, unless the ruleset named it too). About
+      # 30 seconds of test time. Not run here:
+      # - the files named in the steps above (each runs once);
+      # - the files in config/ci-test-exclusions.json (needs browser / fails on main), enforced by check-test-coverage.mjs.
+      - name: Verify the remaining tests folders
+        run: >-
+          npx --no-install vitest run
+          tests/ai
+          tests/analysis
+          tests/config
+          tests/future-runtime
+          tests/maze
+          tests/mazeV2
+          tests/projections
+          tests/proof-surfaces
+          tests/scenes
+          tests/settings
+          tests/telemetry
+          tests/theme
+          tests/topology-proof
+          tests/ui
+          tests/visual
+          --exclude tests/visual/maze-lifecycle-analysis.test.mjs
+          --exclude tests/mazeV2/adapters.test.ts
+          --exclude tests/scenes/menu-runtime-diagnostics.test.ts
+          --exclude tests/scenes/menu-render-frame.test.ts
+          --exclude tests/scenes/menu-intent-runtime.test.ts
+          --exclude tests/analysis/live-auth-persistence-soak.test.mjs
+          --exclude tests/ui/dom-settings-primitives.test.ts
+          --exclude tests/maze/maze-soak.test.ts
+          --pool=threads
+          --maxWorkers=4
+
+      # Every test file is run once, or sits in config/ci-test-exclusions.json with a one-line reason. Static check, no test runs.
+      - name: Check every test file is run once or excluded
+        run: node ./scripts/verify/check-test-coverage.mjs
 
       - name: Build production bundle and PWA assets
         run: npm run build
