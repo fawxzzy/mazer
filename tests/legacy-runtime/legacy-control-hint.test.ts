@@ -147,6 +147,7 @@ describe('legacy control hint (MAZER-FLOW-001)', () => {
             const node = {
               id: '', textContent: '', style: {} as Record<string, string>,
               setAttribute: () => undefined,
+              append: () => undefined,
               remove: () => { const at = body.indexOf(node); if (at >= 0) body.splice(at, 1); }
             };
             return node;
