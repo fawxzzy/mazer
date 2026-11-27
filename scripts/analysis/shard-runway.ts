@@ -9,7 +9,8 @@
 //    each 50-level shard block, `--to`): the shipped maze per board, the H2 overlay on it, then `computeShardLayer`.
 //    A failed base is retried with the next seed (emulating the contract's reject-and-try-next-base loop); the bases
 //    needed must stay within GEOMETRY_BUDGET_BASE_CANDIDATES. The witness ticks of each shipped route must land in its
-//    band and rise strictly from one sampled level to the next on the same board.
+//    band, and the shard detour (witness ticks minus the maze's own static start -> star distance; the band is anchored
+//    there since 2026-11-27) must rise strictly from one sampled level to the next on the same board.
 // 3. Cost: the shard verdict (`validateShardRoute`, timed again on the shipped shards) median must be at most
 //    2x the H5 budget (2 x 40 ms). Placement (layer) time is reported, not gated.
 //
@@ -31,6 +32,7 @@ import {
   allocateHazardUnits,
   computeShardLayer,
   resolveShardRoutePlan,
+  shardFloorDistances,
   validateShardRoute
 } from '../../src/mazer-core/hazards';
 import { LADDER_BOARDS, generateLadderMaze, seedForIndex } from './lib/progressionLadderSampling';
@@ -52,6 +54,8 @@ export interface ShardRunwayRow {
   readonly basesTried: number;
   readonly status: 'placed' | 'failed';
   readonly routeTicks: number | null;
+  /** routeTicks minus the maze's own static start -> star distance. */
+  readonly detour: number | null;
   readonly tour: number | null;
   readonly inBand: boolean;
   readonly escapeSlack: number | null;
@@ -119,6 +123,7 @@ export const runShardRunwayLevel = (level: number, board: (typeof LADDER_BOARDS)
       basesTried: base + 1,
       status: 'placed',
       routeTicks: ticks,
+      detour: ticks === null ? null : ticks - shardFloorDistances(graph, start)[goal]!,
       tour: layer.tour,
       inBand: ticks !== null && layer.band !== null && ticks >= layer.band.min && ticks <= layer.band.max && ticks === layer.routeTicks,
       escapeSlack: layer.escapeSlack?.ratio ?? null,
@@ -135,6 +140,7 @@ export const runShardRunwayLevel = (level: number, board: (typeof LADDER_BOARDS)
     basesTried: GEOMETRY_BUDGET_BASE_CANDIDATES,
     status: 'failed',
     routeTicks: null,
+    detour: null,
     tour: null,
     inBand: false,
     escapeSlack: null,
@@ -172,12 +178,12 @@ const main = (): void => {
     for (const level of levels) {
       const row = runShardRunwayLevel(level, board, saturationLevel);
       rows.push(row);
-      console.log(`L${level} ${board.name}: k ${row.shards} target ${row.target} -> ${row.status} ticks ${String(row.routeTicks)} `
+      console.log(`L${level} ${board.name}: k ${row.shards} target ${row.target} -> ${row.status} ticks ${String(row.routeTicks)} detour ${String(row.detour)} `
         + `bases ${row.basesTried} slack ${String(row.escapeSlack)} verdict ${row.verdictMs?.toFixed(1) ?? '-'} ms layer ${row.layerMs.toFixed(0)} ms`);
       if (row.status !== 'placed') failures.push(`L${level} ${board.name}: no base out of ${GEOMETRY_BUDGET_BASE_CANDIDATES} placed shards`);
       else if (!row.inBand) failures.push(`L${level} ${board.name}: route ${String(row.routeTicks)} outside its band`);
-      if (previous?.routeTicks != null && row.routeTicks !== null && row.routeTicks <= previous.routeTicks) {
-        failures.push(`L${level} ${board.name}: route ${row.routeTicks} does not exceed L${previous.level} (${previous.routeTicks})`);
+      if (previous?.detour != null && row.detour !== null && row.detour <= previous.detour) {
+        failures.push(`L${level} ${board.name}: shard detour ${row.detour} does not exceed L${previous.level} (${previous.detour})`);
       }
       previous = row;
     }

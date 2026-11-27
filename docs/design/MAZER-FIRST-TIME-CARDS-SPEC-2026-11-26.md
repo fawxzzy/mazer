@@ -88,6 +88,7 @@ Script: the scratchpad `cadence.mjs` (not committed). It copies the F1 hash and 
 - U1 [UNKNOWN] Per-seed Switch placement success below L140 (no real-board run here; it needs a build and an install).
 - U2 [UNKNOWN] Per-seed wrap presence 10..139 beyond the F6 comment.
 - U3 [UNKNOWN] Whether shard placement succeeds on real boards at each level, and whether the strict target `160 + 2(L-288)` stays reachable as L grows (the shards lane owns it; a failed placement ships the level with no shards, `legacyShardRun.ts` header in the shards-ui worktree).
+  - Resolved 2026-11-27 [measured]: on the shipped play board the absolute target failed from L288 to about L500 (983 of 3764 sweep runs). The band is now anchored at the maze's own start -> star distance and play ships the nearest verified route on a miss, so every level L60-L1000 places (`docs/playbook-notes/2026-11-27-mazer-shard-placement-anchor.md`). The shard side of D8 (wrap behind an unlit Switch walled for placement and verdict) shipped with it via `maskLegacyBleedGatedCells`; the adapter-wide mask and the 81-level test (slice 5) are still open.
 
 ### 2.3 Existing "seen" and onboarding machinery
 

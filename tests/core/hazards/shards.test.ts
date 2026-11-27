@@ -11,6 +11,7 @@ import {
   SHARD_ROUTE_BAND,
   advanceShardProgress,
   allocateHazardUnits,
+  computeShardLayer,
   createHazardTimeline,
   createShardSolvableQuery,
   findShardInputProblem,
@@ -282,6 +283,42 @@ describe('placement', () => {
     expect(strict).toMatchObject({ placed: false, reason: 'band-missed' });
     const loose = placeShards(graph, { start, goal, count: 1, min: 10_000, max: 10_001, seed: 1, strict: false });
     expect(loose).toMatchObject({ placed: true, inBand: false });
+  });
+
+  test('the strict band is anchored at the maze start -> star distance (a detour target, any board size)', () => {
+    const plan = resolveShardRoutePlan(300, { saturationLevel: 288 });
+    const target = SHARD_ROUTE_BASE + (SHARD_ROUTE_STEP * 12);
+    expect(plan.target).toBe(target);
+    // A 59x131 play board's own route (~560 ticks) is far above the bare target: the band sits above it.
+    expect(resolveShardRouteBand(plan, 560)).toEqual({ min: 560 + target, max: 560 + target + SHARD_ROUTE_BAND });
+    const layer = computeShardLayer(graph, { start, goal, mazeSeed: 4242, level: 300, saturationLevel: 288, specs: [] });
+    expect(layer.band).toEqual({ min: base + target, max: base + target + SHARD_ROUTE_BAND });
+  });
+
+  test('a strict miss is failed by default; onStrictMiss nearest ships the nearest verified route', () => {
+    // L288 on a 31x31 maze: a 160-tick detour is more than its deepest branch adds, so no attempt can hit the band.
+    const options = { start, goal, mazeSeed: 4242, level: 288, saturationLevel: 288, specs: [] as HazardSpec[] };
+    const strict = computeShardLayer(graph, options);
+    expect(strict).toMatchObject({ status: 'failed', inBand: false, shards: [], routeTicks: null, digest: '' });
+    const nearest = computeShardLayer(graph, { ...options, onStrictMiss: 'nearest' });
+    expect(nearest).toMatchObject({ status: 'placed', inBand: false });
+    expect(nearest.shards).toHaveLength(1);
+    expect(nearest.verdict?.pass).toBe(true);
+    expect(nearest.routeTicks).toBe(nearest.verdict?.witness?.ticks);
+    expect(nearest.routeTicks!).toBeLessThan(nearest.band!.min);
+    expect(nearest.rejections[0]).toBe(strict.rejections[0]);
+    expect(computeShardLayer(graph, { ...options, onStrictMiss: 'nearest' })).toEqual(nearest);
+  });
+
+  test('a strict hit lands in the band whether or not the fallback is allowed', () => {
+    const big = createLegacyMaze(61, 61, 7, undefined, null);
+    const read = createLegacyMazeHazardGraph(big);
+    const options = { start: read.start, goal: read.goal, mazeSeed: 7, level: 288, saturationLevel: 288, specs: [] as HazardSpec[] };
+    const strict = computeShardLayer(read.graph, options);
+    expect(strict).toMatchObject({ status: 'placed', inBand: true });
+    expect(strict.routeTicks!).toBeGreaterThanOrEqual(strict.band!.min);
+    expect(strict.routeTicks!).toBeLessThanOrEqual(strict.band!.max);
+    expect(computeShardLayer(read.graph, { ...options, onStrictMiss: 'nearest' })).toEqual(strict);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   type HazardCellId,
   type HazardGraph
 } from '../mazer-core/hazards/graphContract';
+import { resolveLegacyBleedGateBorderCells, type LegacyBleedGate } from './legacyBleedGateState';
 import {
   resolveLegacyWalkableGridNeighbors,
   type LegacyMazeSnapshot,
@@ -27,6 +28,32 @@ export const hazardCellToLegacyPoint = (graph: HazardGraph, cell: HazardCellId):
   x: graph.cellX(cell),
   y: graph.cellY(cell)
 });
+
+/**
+ * The grid with the two openings of every bleed-gated wrap path walled (first-time cards spec D8 / K3): a wrap
+ * behind an unlit Switch counts as blocked, so a route proved on this grid never needs it. Reads the gates
+ * from the maze (`resolveLegacyBleedGateBorderCells`), never the runtime lit state, so the result is
+ * deterministic per maze. Returns `grid` itself when there are no gates; never mutates it.
+ */
+export const maskLegacyBleedGatedCells = (
+  grid: boolean[][],
+  bleedGates: readonly Pick<LegacyBleedGate, 'axis' | 'line'>[] | undefined
+): boolean[][] => {
+  if (!bleedGates || bleedGates.length === 0) {
+    return grid;
+  }
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const masked = grid.map((row) => [...row]);
+  for (const gate of bleedGates) {
+    for (const cell of resolveLegacyBleedGateBorderCells(gate, width, height)) {
+      if (masked[cell.y]?.[cell.x] === true) {
+        masked[cell.y]![cell.x] = false;
+      }
+    }
+  }
+  return masked;
+};
 
 /** Dimensions come from the grid itself (the production snapshot's own source of truth). */
 export const createLegacyMazeHazardGraph = (maze: LegacyHazardGraphSource): LegacyMazeHazardGraph => {

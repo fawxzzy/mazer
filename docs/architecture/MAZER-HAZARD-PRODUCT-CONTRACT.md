@@ -146,6 +146,14 @@ kind is met alone before it is mixed with the others.
 - **Decision: Shards are the forever axis.** From geometry saturation on (about L420 at scale 40), the strict per-level component is the
   **shard route target**: the witness ticks of the route start -> shard 1 -> ... -> shard k -> star.
   - The route target rises by at least one tick per level, enforced by the same reject-and-try-next-base loop as the felt window.
+  - **Amended 2026-11-27 (fact, shard placement lane):** the target is the shard **detour** on top of the maze's own static
+    start -> star distance `d`, band `[d + target, d + target + 1]`. The absolute band was calibrated on the ladder boards; on
+    the shipped rule-2 play board (59x131 phone, 117x65 desktop) `d` alone is 430-600 ticks, so every level from saturation until
+    about L500 failed and shipped without shards (sweep L60-L1000, 2 seeds x 2 boards: 983 of 3764 runs). Play has one base per
+    level (no reject-and-try-next-base loop), so a level whose base cannot hit the band ships the nearest route the verdict passes
+    (`onStrictMiss: 'nearest'`) instead of no shards. The per-level rise therefore holds for the target, not for every shipped
+    route: timed gates quantize the witness ticks (period 6), and one shard cannot add more than the maze's deepest branch
+    (the k = 1 block L288-L337 is the weakest). Evidence: `docs/playbook-notes/2026-11-27-mazer-shard-placement-anchor.md`.
   - k grows by one every 50 levels.
   - The solver state gains the next-shard index, which costs a small multiple of the state space.
 - Shards keep "the board always on screen" and need no camera. A route that revisits corridors exceeds the 2F-R felt limit on a fixed
@@ -251,4 +259,4 @@ The generation overlay is built as specified in the H2 row, behind the hazard la
 
 ## Update 2026-11-16, slice H8 (core only)
 
-The shard core is built and dormant (nothing outside `src/mazer-core/hazards` imports it; a test pins that): `shardSolvability.ts` (solver state = cell, tick mod P, invulnerable turns, next-shard index; the star is plain floor until every shard is collected; shards count only in order; witness, verifier, layered solvable query, last-shard route ticks) and `shards.ts` (`resolveShardRoutePlan`: count = the allocator's `shards`, strict route target from saturation `160 + 2 * (level - saturation)` ticks with band `[target, target + 1]`; deterministic `placeShards`; `computeShardLayer` = placement + shard verdict + escape slack, `failed` means try the next base). Saturation is a parameter (default `GEOMETRY_BUDGET_SATURATION_LEVEL`), so PROG-020 can move it. Rendering, pickup UI and wiring into generation are not part of this slice. Evidence: `docs/playbook-notes/2026-11-16-mazer-h8-shards-core.md`.
+The shard core is built and dormant (nothing outside `src/mazer-core/hazards` imports it; a test pins that): `shardSolvability.ts` (solver state = cell, tick mod P, invulnerable turns, next-shard index; the star is plain floor until every shard is collected; shards count only in order; witness, verifier, layered solvable query, last-shard route ticks) and `shards.ts` (`resolveShardRoutePlan`: count = the allocator's `shards`, strict route target from saturation `160 + 2 * (level - saturation)` ticks with band `[target, target + 1]` (since 2026-11-27 a detour target: band `[d + target, d + target + 1]` with `d` the maze's static start -> star distance, see section 2.6); deterministic `placeShards`; `computeShardLayer` = placement + shard verdict + escape slack, `failed` means try the next base). Saturation is a parameter (default `GEOMETRY_BUDGET_SATURATION_LEVEL`), so PROG-020 can move it. Rendering, pickup UI and wiring into generation are not part of this slice. Evidence: `docs/playbook-notes/2026-11-16-mazer-h8-shards-core.md`.

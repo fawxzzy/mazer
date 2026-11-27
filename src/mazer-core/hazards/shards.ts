@@ -8,10 +8,18 @@
  * Pieces:
  * - `resolveShardRoutePlan`: how many shards a level gets (the allocator's
  *   `shards`) and the route-target band. From saturation on the target is
- *   strict: `SHARD_ROUTE_BASE + SHARD_ROUTE_STEP * (level - saturation)` ticks,
- *   band `[target, target + SHARD_ROUTE_BAND]`. STEP 2 / BAND 1 keeps
- *   every realized route strictly above the previous level's (`R + 2 > R + 1`)
- *   even though a plain grid fixes the parity of a static tour.
+ *   strict: a shard DETOUR of `SHARD_ROUTE_BASE + SHARD_ROUTE_STEP * (level - saturation)`
+ *   ticks on top of the maze's own static start -> star distance `d`, band
+ *   `[d + target, d + target + SHARD_ROUTE_BAND]`. STEP 2 / BAND 1 keeps every
+ *   realized detour strictly above the previous level's (`R + 2 > R + 1`)
+ *   even though a plain grid fixes the parity of a static tour. From saturation
+ *   on a play seed builds the same maze at every level (same `d`), so on one
+ *   seed the realized route itself rises strictly too.
+ *   Why anchored (2026-11-27): the band used to be absolute (`[target, target + 1]`),
+ *   calibrated on the ~23x51 ladder boards. On the shipped rule-2 play board
+ *   (about 59x131 phone, 117x65 desktop) `d` alone is 430-600 ticks, so every
+ *   level until the absolute target passed `d` failed with
+ *   `route-too-long-for-target` and shipped without shards.
  * - `placeShards`: deterministic shard cells whose static tour
  *   start -> shard 1 -> ... -> shard k -> star lands in a band.
  * - `computeShardLayer`: placement + the shard verdict + the phone forgiveness
@@ -45,7 +53,7 @@ import {
 export const SHARD_LAYER_CONTRACT = 'mazer-shard-layer-v1' as const;
 /** Seed stream tag ("SHRD") mixed into the level's hazard seed. */
 export const SHARD_SEED_STREAM = 0x53485244;
-/** Route target (witness ticks) at the saturation level. Calibrated on the ladder boards (docs/playbook-notes H8 note). */
+/** Shard detour target at the saturation level: witness ticks beyond the maze's static start -> star distance. */
 export const SHARD_ROUTE_BASE = 160;
 /** Ticks added per level from saturation on (manifest `forever.minRiseTicksPerLevel` is 1; 2 survives grid parity). */
 export const SHARD_ROUTE_STEP = 2;
@@ -69,11 +77,11 @@ export interface ShardRoutePlan {
   readonly count: number;
   /** True from saturation on: the band is the strict per-level route target. */
   readonly strict: boolean;
-  /** Strict target in witness ticks, or null before saturation. */
+  /** Strict shard detour target in witness ticks (on top of the maze's start -> star distance), or null before saturation. */
   readonly target: number | null;
 }
 
-/** Strict route target for a level, or null before saturation. */
+/** Strict shard detour target for a level (ticks beyond the maze's start -> star distance), or null before saturation. */
 export const resolveShardRouteTarget = (level: number, saturationLevel: number): number | null => (
   level < saturationLevel ? null : SHARD_ROUTE_BASE + SHARD_ROUTE_STEP * (level - saturationLevel)
 );
@@ -88,16 +96,18 @@ export const resolveShardRoutePlan = (
 };
 
 /**
- * Band for the route in ticks. Strict levels: `[target, target + SHARD_ROUTE_BAND]`.
+ * Band for the route in ticks, anchored at `d`, the maze's static start -> star distance.
+ * Strict levels: `[d + target, d + target + SHARD_ROUTE_BAND]`: the shard detour is the
+ * per-level rung, so the band is reachable whatever the board size.
  * Before saturation the single shard is a modest detour: `[d + 2, d + max(4, ceil(d / 2))]`
- * with `d` the static start -> star distance (a preference, not a ladder rung).
+ * (a preference, not a ladder rung).
  */
 export const resolveShardRouteBand = (
   plan: ShardRoutePlan,
   startGoalDistance: number
 ): { readonly min: number; readonly max: number } => (
   plan.target !== null
-    ? { min: plan.target, max: plan.target + SHARD_ROUTE_BAND }
+    ? { min: startGoalDistance + plan.target, max: startGoalDistance + plan.target + SHARD_ROUTE_BAND }
     : { min: startGoalDistance + 2, max: startGoalDistance + Math.max(4, Math.ceil(startGoalDistance / 2)) }
 );
 
@@ -275,7 +285,10 @@ export const placeShards = (graph: HazardGraph, options: PlaceShardsOptions): Sh
 export type ShardLayerStatus =
   /** No shard on this level (before the Shard intro). */
   | 'none'
-  /** Shards placed; the verdict and the forgiveness gate passed; strict levels landed in the band. */
+  /**
+   * Shards placed; the verdict and the forgiveness gate passed. Strict levels landed in the band unless the
+   * caller asked for `onStrictMiss: 'nearest'` and no attempt hit it (`inBand` false).
+   */
   | 'placed'
   /** No attempt passed: try the next base (strict levels) or ship without shards (before saturation). */
   | 'failed';
@@ -301,6 +314,8 @@ export interface ShardLayerResult {
   readonly tour: number | null;
   /** Witness ticks of the shipped route (the felt route target). */
   readonly routeTicks: number | null;
+  /** True when the shipped witness ticks lie inside `band`; false when nothing shipped or a nearest-route fallback shipped. */
+  readonly inBand: boolean;
   readonly verdict: ShardRouteVerdict | null;
   readonly escapeSlack: ShardEscapeSlack | null;
   readonly attempts: number;
@@ -320,6 +335,14 @@ export interface ComputeShardLayerOptions {
   /** The H2 overlay's shipped specs (gates, Sentries). */
   readonly specs: readonly HazardSpec[];
   readonly maxProductStates?: number;
+  /**
+   * What a strict level does when no attempt lands in the band. `'fail'` (default): status `failed`, the
+   * caller's cue to reject the base and try the next one (the contract loop the runway uses). `'nearest'`:
+   * for a caller with only this base (play), the same attempts run, and when none lands in the band the
+   * attempt whose route closed nearest it ships (ties: earliest), still behind the full verdict and
+   * forgiveness gate (`inBand` false). No second pass: a miss costs what a `'fail'` miss costs plus its verdicts.
+   */
+  readonly onStrictMiss?: 'fail' | 'nearest';
 }
 
 const fnv1a = (text: string): string => {
@@ -342,7 +365,8 @@ export const resolveShardSeed = (mazeSeed: number, level: number): number => mix
  * Placement + verdict + forgiveness gate for one base maze. On strict levels the
  * witness ticks (waits included) must land in the band; when a witness
  * carries `w` waits, the next attempt aims the static tour `w` lower. Before
- * saturation the band only steers placement.
+ * saturation the band only steers placement. A strict miss is `failed` unless
+ * `onStrictMiss: 'nearest'` (see the option).
  */
 export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayerOptions): ShardLayerResult => {
   const { start, goal, level, specs } = options;
@@ -357,6 +381,7 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
     shards: [] as HazardCellId[],
     tour: null,
     routeTicks: null,
+    inBand: false,
     verdict: null,
     escapeSlack: null,
     digest: ''
@@ -376,9 +401,44 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
   const finalTicks = (prefix: readonly HazardCellId[]): Int32Array => (
     measureFinalShardTicks(graph, timeline, { start, goal, prefix, maxProductStates: options.maxProductStates })
   );
-  let expectedWaits = 0;
+  /** Verdict + forgiveness gate for one placement: the shipped result, or the reason it was rejected. */
+  const verify = (shards: readonly HazardCellId[], tour: number, requireBand: boolean): ShardLayerResult | ShardLayerReasonCode => {
+    const verdict = validateShardRoute(graph, specs, { start, goal, shards, maxProductStates: options.maxProductStates });
+    if (!verdict.pass || verdict.witness === null) {
+      return verdict.hazardsPresent.pass && !verdict.sentryFreeLegs ? 'sentry-on-leg' : 'verdict-failed';
+    }
+    const ticks = verdict.witness.ticks;
+    const inBand = ticks >= band.min && ticks <= band.max;
+    // Cannot happen when finalTicks is exact; kept as the guard the ladder relies on.
+    if (requireBand && !inBand) return 'witness-outside-band';
+    const slack = verdict.escapeSlack;
+    if (slack === null || slack.ratio === null || slack.ratio < HAZARD_FAIRNESS.escapeSlackRatioMin) return 'escape-slack-low';
+    if (slack.firstFragileIndex !== null && slack.firstFragileIndex < HAZARD_FAIRNESS.noFragileStepInFirstWitnessSteps) {
+      return 'fragile-early-step';
+    }
+    return {
+      ...empty,
+      status: 'placed',
+      band,
+      shards,
+      tour,
+      routeTicks: ticks,
+      inBand,
+      verdict,
+      escapeSlack: slack,
+      attempts: rejections.length + 1,
+      rejections: [...rejections],
+      digest: computeShardDigest({ level, seed, shards })
+    };
+  };
   // One shard: the prefix is empty, so every attempt sees the same candidates.
   const attempts = plan.count === 1 ? 1 : SHARD_LAYER_ATTEMPTS;
+  // 'nearest': placement closes every attempt on its nearest cell (strict false) and an out-of-band close is
+  // rejected here with the same code a strict placement would give, so the in-band search is unchanged and
+  // costs no second pass; the misses wait as fallback candidates.
+  const keepNearest = plan.strict && options.onStrictMiss === 'nearest';
+  const candidates: { readonly shards: readonly HazardCellId[]; readonly tour: number; readonly gap: number; readonly attempt: number }[] = [];
+  let expectedWaits = 0;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const placement = placeShards(graph, {
       start,
@@ -390,7 +450,7 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       specs,
       finalTicks,
       expectedWaits,
-      strict: plan.strict
+      strict: plan.strict && !keepNearest
     });
     if (!placement.placed) {
       rejections.push(placement.reason);
@@ -401,44 +461,24 @@ export const computeShardLayer = (graph: HazardGraph, options: ComputeShardLayer
       }
       continue;
     }
-    const verdict = validateShardRoute(graph, specs, {
-      start,
-      goal,
-      shards: placement.shards,
-      maxProductStates: options.maxProductStates
-    });
-    if (!verdict.pass || verdict.witness === null) {
-      rejections.push(verdict.hazardsPresent.pass && !verdict.sentryFreeLegs ? 'sentry-on-leg' : 'verdict-failed');
+    if (keepNearest && !placement.inBand) {
+      const tooLong = placement.route > band.max;
+      rejections.push(tooLong ? 'route-too-long-for-target' : 'band-missed');
+      if (tooLong) expectedWaits += Math.max(1, placement.route - band.max);
+      const gap = tooLong ? placement.route - band.max : band.min - placement.route;
+      candidates.push({ shards: placement.shards, tour: placement.tour, gap, attempt });
       continue;
     }
-    const ticks = verdict.witness.ticks;
-    if (plan.strict && (ticks < band.min || ticks > band.max)) {
-      // Cannot happen when finalTicks is exact; kept as the guard the ladder relies on.
-      rejections.push('witness-outside-band');
-      continue;
-    }
-    const slack = verdict.escapeSlack;
-    if (slack === null || slack.ratio === null || slack.ratio < HAZARD_FAIRNESS.escapeSlackRatioMin) {
-      rejections.push('escape-slack-low');
-      continue;
-    }
-    if (slack.firstFragileIndex !== null && slack.firstFragileIndex < HAZARD_FAIRNESS.noFragileStepInFirstWitnessSteps) {
-      rejections.push('fragile-early-step');
-      continue;
-    }
-    return {
-      ...empty,
-      status: 'placed',
-      band,
-      shards: placement.shards,
-      tour: placement.tour,
-      routeTicks: ticks,
-      verdict,
-      escapeSlack: slack,
-      attempts: attempt + 1,
-      rejections,
-      digest: computeShardDigest({ level, seed, shards: placement.shards })
-    };
+    const result = verify(placement.shards, placement.tour, plan.strict);
+    if (typeof result !== 'string') return result;
+    rejections.push(result);
+  }
+  // No attempt hit the band: ship the verified candidate nearest it (ties: earliest attempt).
+  candidates.sort((x, y) => x.gap - y.gap || x.attempt - y.attempt);
+  for (const candidate of candidates) {
+    const result = verify(candidate.shards, candidate.tour, false);
+    if (typeof result !== 'string') return result;
+    rejections.push(result);
   }
   return { ...empty, status: 'failed', band, attempts: rejections.length, rejections };
 };
