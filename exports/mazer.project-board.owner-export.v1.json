@@ -1,20 +1,20 @@
 {
   "contract_version": "atlas.project-board.owner-export.v1",
-  "export_id": "pbe_mazer_owner_registry_d8c7f569667a",
+  "export_id": "pbe_mazer_owner_registry_34b9744ea4a8",
   "project_id": "mazer",
   "board_id": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "adapter_id": "mazer-owner-registry-v1",
-  "source_revision": "sha256:d8c7f569667ae65e277b7874967d2155dda27abe82f81a65f134f221696d5a88",
-  "generated_at": "2026-11-26T05:47:29.000Z",
+  "source_revision": "sha256:34b9744ea4a88611d7f778bac595793f6a4685576a968e6031c7ba5bddd7b33d",
+  "generated_at": "2026-11-27T01:04:07.000Z",
   "sources": [
     {
       "source_id": "mazer-owner-work-registry",
       "kind": "manual-registry",
       "repository": "mazer",
       "path": "repos/mazer/config/mazer-owner-work-registry.json",
-      "revision": "sha256:9437701da4a59928edc78e0fd330be4e32cf96f5bce72bd0a0738b3af24e8a00",
-      "observed_at": "2026-11-26T05:47:29.000Z"
+      "revision": "sha256:fd6b2eda6cfbeabd170bd6ba8363ea30039d307434fddc861ecc507f91f55d0a",
+      "observed_at": "2026-11-27T01:04:07.000Z"
     },
     {
       "source_id": "mazer-current-truth",
@@ -22,7 +22,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/current-truth.md",
       "revision": "sha256:82a0a1b17b745ed0be10a92aa48f13ca3780519849e4d94e758a61c3cc90aee8",
-      "observed_at": "2026-11-26T05:47:29.000Z"
+      "observed_at": "2026-11-27T01:04:07.000Z"
     },
     {
       "source_id": "mazer-roadmap",
@@ -30,7 +30,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/roadmap.md",
       "revision": "sha256:f4e71d182b1d248952c728397cb2a8cfddd0e566d18979bb4c0bee72302dce6d",
-      "observed_at": "2026-11-26T05:47:29.000Z"
+      "observed_at": "2026-11-27T01:04:07.000Z"
     },
     {
       "source_id": "mazer-mobile-plan",
@@ -38,7 +38,7 @@
       "repository": "mazer",
       "path": "repos/mazer/docs/mobile-plan.md",
       "revision": "sha256:9d7c3cf366a2ee073deefdc8b9c4feb165e77c738eb4bb696ce6553620922b33",
-      "observed_at": "2026-11-26T05:47:29.000Z"
+      "observed_at": "2026-11-27T01:04:07.000Z"
     },
     {
       "source_id": "mazer-owner-export-adapter",
@@ -46,7 +46,7 @@
       "repository": "mazer",
       "path": "repos/mazer/scripts/export-project-board-owner.mjs",
       "revision": "sha256:429987f569c280a38c5fb0b638d09d505dfdeca440feadcfb27fe921f8c9324e",
-      "observed_at": "2026-11-26T05:47:29.000Z"
+      "observed_at": "2026-11-27T01:04:07.000Z"
     }
   ],
   "cards": [
@@ -3748,6 +3748,57 @@
           "The change is covered by a test or a verify script",
           "Checked in Chromium and WebKit phone emulation",
           "Nothing else in the menu or game changes"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-doc-020_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-DOC-020",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Update the current-truth doc: player ranks removed in PR 722",
+        "description": "The current-truth document still describes player ranks in two places. Record the removal made in PR 722 and keep leaderboard positions described.",
+        "card_type": "documentation",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:04:07.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOC-020",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-DOC-020",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:04:07.000Z"
+      },
+      "content": {
+        "summary": "The current-truth document still describes player ranks in two places. Record the removal made in PR 722 and keep leaderboard positions described.",
+        "objective": "The current-truth document still describes player ranks in two places. Record the removal made in PR 722 and keep leaderboard positions described.",
+        "acceptance_criteria": [
+          "Both rank passages state the removal and cite PR 722",
+          "Leaderboard positions are still described",
+          "Docs checks pass"
         ],
         "discoveries": [],
         "next_actions": [],
@@ -14053,6 +14104,312 @@
       }
     },
     {
+      "idempotency_key": "pbk_mazer_mazer-ui-103_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-103",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Batch A style cleanup: shared style values and type scale groundwork",
+        "description": "Batch A of the UI consistency polish moved scattered style values into the shared style definitions. Merged as PR 721 and live in build 62a17d8e. Checked only in headless browsers.",
+        "card_type": "technical-debt",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:04:07.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-103",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-103",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:04:07.000Z"
+      },
+      "content": {
+        "summary": "Batch A of the UI consistency polish moved scattered style values into the shared style definitions. Merged as PR 721 and live in build 62a17d8e. Checked only in headless browsers.",
+        "objective": "Batch A of the UI consistency polish moved scattered style values into the shared style definitions. Merged as PR 721 and live in build 62a17d8e. Checked only in headless browsers.",
+        "acceptance_criteria": [
+          "The cleanup is covered by a test or a repeatable check",
+          "Checked in Chromium and WebKit phone emulation",
+          "Checked on a real phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-104_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-104",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Remove the player rank display everywhere incl. the game mode selector",
+        "description": "The rank letter is gone from every screen including the game mode selector, which shows only the Level chip. Dead rank code removed; leaderboard positions kept. Merged as PR 722, live in build 62a17d8e.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:03:39.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-104",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-104",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:03:39.000Z"
+      },
+      "content": {
+        "summary": "The rank letter is gone from every screen including the game mode selector, which shows only the Level chip. Dead rank code removed; leaderboard positions kept. Merged as PR 722, live in build 62a17d8e.",
+        "objective": "The rank letter is gone from every screen including the game mode selector, which shows only the Level chip. Dead rank code removed; leaderboard positions kept. Merged as PR 722, live in build 62a17d8e.",
+        "acceptance_criteria": [
+          "Rank removal is covered by a test or a repeatable check",
+          "Checked in Chromium and WebKit phone emulation",
+          "Checked on a real phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-105_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-105",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Account recovery link opens the plain request form in any browser",
+        "description": "The sign-in screen recovery link no longer adds the recovery flag, part of the any-browser reset fix with the matching Web change and mail function update. Merged as PR 723, live in build 62a17d8e.",
+        "card_type": "bug",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:03:39.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-105",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-105",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:03:39.000Z"
+      },
+      "content": {
+        "summary": "The sign-in screen recovery link no longer adds the recovery flag, part of the any-browser reset fix with the matching Web change and mail function update. Merged as PR 723, live in build 62a17d8e.",
+        "objective": "The sign-in screen recovery link no longer adds the recovery flag, part of the any-browser reset fix with the matching Web change and mail function update. Merged as PR 723, live in build 62a17d8e.",
+        "acceptance_criteria": [
+          "The recovery link behaviour is covered by a test or a repeatable check",
+          "Checked in Chromium and WebKit phone emulation",
+          "Checked on a real phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-106_v1",
+      "record_kind": "project-work",
+      "record_status": "active",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-106",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "UI polish B, C, D: sentence case copy, one sheet title, Esc resumes, leaderboard wording",
+        "description": "Batch B sentence case copy, Back to menu, Reduce motion. Batch C one 28px mint sheet title, type scale snap, auth font. Batch D Guide pause icon, Esc from in-game Settings resumes, desktop hint PRESS TO PLAY. Leaderboard shows a # header, No scores yet and Position N. Merged as PR 724, live in build 62a17d8e.",
+        "card_type": "feature",
+        "lifecycle": "review",
+        "priority": "medium",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:03:39.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-106",
+        "extensions": {
+          "owner_status": "review",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-106",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:03:39.000Z"
+      },
+      "content": {
+        "summary": "Batch B sentence case copy, Back to menu, Reduce motion. Batch C one 28px mint sheet title, type scale snap, auth font. Batch D Guide pause icon, Esc from in-game Settings resumes, desktop hint PRESS TO PLAY. Leaderboard shows a # header, No scores yet and Position N. Merged as PR 724, live in build 62a17d8e.",
+        "objective": "Batch B sentence case copy, Back to menu, Reduce motion. Batch C one 28px mint sheet title, type scale snap, auth font. Batch D Guide pause icon, Esc from in-game Settings resumes, desktop hint PRESS TO PLAY. Leaderboard shows a # header, No scores yet and Position N. Merged as PR 724, live in build 62a17d8e.",
+        "acceptance_criteria": [
+          "The polish set is covered by a test or a repeatable check",
+          "Checked in Chromium and WebKit phone emulation",
+          "Checked on a real phone"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-107_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-107",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Retire the unconsumed legacy system font style value",
+        "description": "Batch A left one legacy system font style value that nothing reads. Remove it and keep the style tests green.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:04:07.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-107",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-107",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:04:07.000Z"
+      },
+      "content": {
+        "summary": "Batch A left one legacy system font style value that nothing reads. Remove it and keep the style tests green.",
+        "objective": "Batch A left one legacy system font style value that nothing reads. Remove it and keep the style tests green.",
+        "acceptance_criteria": [
+          "No code reads the value after removal",
+          "Style and type tests pass",
+          "Board and menu render unchanged in emulation"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
+      "idempotency_key": "pbk_mazer_mazer-ui-108_v1",
+      "record_kind": "project-work",
+      "record_status": "candidate",
+      "record": {
+        "contract_version": "atlas.card-record.v2",
+        "card_id": "MAZER-UI-108",
+        "project_id": "mazer",
+        "board_id": "discordos:project-feedback:mazer",
+        "title": "Remove retired progression badge scaffolding in MenuScene",
+        "description": "The rank removal left unused badge scaffolding in the menu scene. Delete it without changing behaviour; the menu scene is a hot file so keep the change small.",
+        "card_type": "technical-debt",
+        "lifecycle": "planning",
+        "priority": "low",
+        "owner": "mazer",
+        "dependencies": [],
+        "board_version": 1,
+        "updated_at": "2026-11-27T01:04:07.000Z",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-108",
+        "extensions": {
+          "owner_status": "planning",
+          "public_safe": true
+        }
+      },
+      "source": {
+        "source_id": "mazer-owner-work-registry",
+        "source_ref": "repos/mazer/config/mazer-owner-work-registry.json#MAZER-UI-108",
+        "source_status": "current",
+        "source_updated_at": "2026-11-27T01:04:07.000Z"
+      },
+      "content": {
+        "summary": "The rank removal left unused badge scaffolding in the menu scene. Delete it without changing behaviour; the menu scene is a hot file so keep the change small.",
+        "objective": "The rank removal left unused badge scaffolding in the menu scene. Delete it without changing behaviour; the menu scene is a hot file so keep the change small.",
+        "acceptance_criteria": [
+          "Unused badge scaffolding is gone from the menu scene",
+          "Menu render tests pass",
+          "Menu looks unchanged in emulation"
+        ],
+        "discoveries": [],
+        "next_actions": [],
+        "blockers": [],
+        "evidence": [
+          "repos/mazer/config/mazer-owner-work-registry.json"
+        ]
+      },
+      "relationships": {
+        "parent_card_id": null,
+        "duplicate_of": null,
+        "superseded_by": null
+      }
+    },
+    {
       "idempotency_key": "pbk_mazer_mazer-vis-001_v1",
       "record_kind": "project-work",
       "record_status": "active",
@@ -17398,9 +17755,9 @@
     }
   ],
   "extensions": {
-    "stable_identity_count": 333,
-    "exported_public_card_count": 333,
-    "exported_open_card_count": 116,
+    "stable_identity_count": 340,
+    "exported_public_card_count": 340,
+    "exported_open_card_count": 123,
     "exported_completed_card_count": 85,
     "exported_deferred_card_count": 24,
     "exported_archived_card_count": 108,

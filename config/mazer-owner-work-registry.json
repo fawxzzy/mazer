@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-26T05:47:29.000Z",
+  "updatedAt": "2026-11-27T01:04:07.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 333,
+    "stableIdentityCount": 340,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 116,
+    "openCardCount": 123,
     "completedCardCount": 85,
     "deferredCardCount": 24,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-26T05:47:29.000Z",
-      "appliedEventCount": 555,
-      "lastEventId": "875e286bae15"
+      "at": "2026-11-27T01:04:07.000Z",
+      "appliedEventCount": 562,
+      "lastEventId": "c14f5bd601b0"
     },
     "archivedCardCount": 108
   },
@@ -6045,6 +6045,125 @@
         "Per-phase frame cost table measured at level 300 with a long trail under phone emulation",
         "Top cost fixed with a zero-difference pixel check at several device scales",
         "Remaining costs listed with an options page required before any look-changing fix, and a real iPhone measurement requested"
+      ]
+    },
+    {
+      "id": "MAZER-UI-104",
+      "status": "review",
+      "updatedAt": "2026-11-27T01:03:39.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-104",
+      "title": "Remove the player rank display everywhere incl. the game mode selector",
+      "description": "The rank letter is gone from every screen including the game mode selector, which shows only the Level chip. Dead rank code removed; leaderboard positions kept. Merged as PR 722, live in build 62a17d8e.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Rank removal is covered by a test or a repeatable check",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-UI-105",
+      "status": "review",
+      "updatedAt": "2026-11-27T01:03:39.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-105",
+      "title": "Account recovery link opens the plain request form in any browser",
+      "description": "The sign-in screen recovery link no longer adds the recovery flag, part of the any-browser reset fix with the matching Web change and mail function update. Merged as PR 723, live in build 62a17d8e.",
+      "cardType": "bug",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The recovery link behaviour is covered by a test or a repeatable check",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-UI-106",
+      "status": "review",
+      "updatedAt": "2026-11-27T01:03:39.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-106",
+      "title": "UI polish B, C, D: sentence case copy, one sheet title, Esc resumes, leaderboard wording",
+      "description": "Batch B sentence case copy, Back to menu, Reduce motion. Batch C one 28px mint sheet title, type scale snap, auth font. Batch D Guide pause icon, Esc from in-game Settings resumes, desktop hint PRESS TO PLAY. Leaderboard shows a # header, No scores yet and Position N. Merged as PR 724, live in build 62a17d8e.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The polish set is covered by a test or a repeatable check",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-UI-103",
+      "status": "review",
+      "updatedAt": "2026-11-27T01:04:07.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-103",
+      "title": "Batch A style cleanup: shared style values and type scale groundwork",
+      "description": "Batch A of the UI consistency polish moved scattered style values into the shared style definitions. Merged as PR 721 and live in build 62a17d8e. Checked only in headless browsers.",
+      "cardType": "technical-debt",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "The cleanup is covered by a test or a repeatable check",
+        "Checked in Chromium and WebKit phone emulation",
+        "Checked on a real phone"
+      ]
+    },
+    {
+      "id": "MAZER-UI-107",
+      "status": "planning",
+      "updatedAt": "2026-11-27T01:04:07.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-107",
+      "title": "Retire the unconsumed legacy system font style value",
+      "description": "Batch A left one legacy system font style value that nothing reads. Remove it and keep the style tests green.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "No code reads the value after removal",
+        "Style and type tests pass",
+        "Board and menu render unchanged in emulation"
+      ]
+    },
+    {
+      "id": "MAZER-UI-108",
+      "status": "planning",
+      "updatedAt": "2026-11-27T01:04:07.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-UI-108",
+      "title": "Remove retired progression badge scaffolding in MenuScene",
+      "description": "The rank removal left unused badge scaffolding in the menu scene. Delete it without changing behaviour; the menu scene is a hot file so keep the change small.",
+      "cardType": "technical-debt",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Unused badge scaffolding is gone from the menu scene",
+        "Menu render tests pass",
+        "Menu looks unchanged in emulation"
+      ]
+    },
+    {
+      "id": "MAZER-DOC-020",
+      "status": "planning",
+      "updatedAt": "2026-11-27T01:04:07.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-DOC-020",
+      "title": "Update the current-truth doc: player ranks removed in PR 722",
+      "description": "The current-truth document still describes player ranks in two places. Record the removal made in PR 722 and keep leaderboard positions described.",
+      "cardType": "documentation",
+      "priority": "low",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Both rank passages state the removal and cite PR 722",
+        "Leaderboard positions are still described",
+        "Docs checks pass"
       ]
     }
   ]
