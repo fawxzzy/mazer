@@ -120,7 +120,8 @@ describe('guide structure', () => {
       expect(pending.reasonId).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
     }
     // The Start row left the pending list when Chip was wired (the start marker is on the board now).
-    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['first-run-coach', 'auto-pause']);
+    // The first-run coach left it with first-time cards slice 9 (the level-1 hint card and its "Reach these" goal coach).
+    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['auto-pause']);
   });
 });
 

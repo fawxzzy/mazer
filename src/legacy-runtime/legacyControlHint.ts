@@ -43,6 +43,17 @@ export const LEGACY_CONTROL_HINT_COPY_MOUSE = `${LEGACY_CONTROL_HINT_MOVE_MOUSE}
 export const LEGACY_CONTROL_HINT_COPY_KEYS = `${LEGACY_CONTROL_HINT_MOVE_KEYS}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
 export const LEGACY_CONTROL_HINT_COPY_NEUTRAL = `${LEGACY_CONTROL_HINT_MOVE_NEUTRAL}\n${LEGACY_CONTROL_HINT_GOAL_LINE}`;
 
+/**
+ * First-time cards slice 9 (spec section 8 item 1, `?lab=firsttime` only): the hint as a card names the goal the way
+ * the board draws it and the Guide Goal row says it ("twin stars"). The flag-off line above is unchanged until the flag
+ * ships for players; then the old line goes.
+ */
+export const LEGACY_CONTROL_HINT_CARD_GOAL_LINE = 'Reach the twin stars to clear the maze.';
+export const LEGACY_CONTROL_HINT_CARD_COPY_TOUCH = `${LEGACY_CONTROL_HINT_MOVE_TOUCH}\n${LEGACY_CONTROL_HINT_CARD_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_CARD_COPY_MOUSE = `${LEGACY_CONTROL_HINT_MOVE_MOUSE}\n${LEGACY_CONTROL_HINT_CARD_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_CARD_COPY_KEYS = `${LEGACY_CONTROL_HINT_MOVE_KEYS}\n${LEGACY_CONTROL_HINT_CARD_GOAL_LINE}`;
+export const LEGACY_CONTROL_HINT_CARD_COPY_NEUTRAL = `${LEGACY_CONTROL_HINT_MOVE_NEUTRAL}\n${LEGACY_CONTROL_HINT_CARD_GOAL_LINE}`;
+
 /** Auto-fade if the player never moves, so the line cannot linger. The hint is then considered seen. */
 export const LEGACY_CONTROL_HINT_MAX_VISIBLE_MS = 12000;
 export const LEGACY_CONTROL_HINT_FADE_MS = 400;
@@ -105,6 +116,16 @@ export const resolveLegacyControlHintCopy = (input: LegacyControlHintInput): str
     case 'mouse': return LEGACY_CONTROL_HINT_COPY_MOUSE;
     case 'neutral': return LEGACY_CONTROL_HINT_COPY_NEUTRAL;
     default: return LEGACY_CONTROL_HINT_COPY_TOUCH;
+  }
+};
+
+/** The card's body (flag on): the same move line, then the twin-stars goal line. */
+export const resolveLegacyControlHintCardCopy = (input: LegacyControlHintInput): string => {
+  switch (input) {
+    case 'keys': return LEGACY_CONTROL_HINT_CARD_COPY_KEYS;
+    case 'mouse': return LEGACY_CONTROL_HINT_CARD_COPY_MOUSE;
+    case 'neutral': return LEGACY_CONTROL_HINT_CARD_COPY_NEUTRAL;
+    default: return LEGACY_CONTROL_HINT_CARD_COPY_TOUCH;
   }
 };
 

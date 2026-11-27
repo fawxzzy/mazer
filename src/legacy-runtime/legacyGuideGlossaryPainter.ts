@@ -6,7 +6,12 @@
  * Nothing here is a mock: it paints through the scene's own pieces (card, title, kit buttons, `drawLegacyGuideIcon`,
  * the text helper, scroll rail) and the shared sheet plan. The scene is passed as an untyped host because those pieces
  * are private members of MenuScene (a Wave 5C file: new behaviour lives in new modules).
+ *
+ * First-time cards slice 4 (`?lab=firsttime` only, absent from the model otherwise): a small "New" pill on the tiles in
+ * `model.newRowIds`, and a row of ghost buttons at the foot of the body for `model.footActions` ("All tips", "Show tips
+ * again"); a tap runs the action in legacyFirstTimeGuideHost.ts (Phaser-free, safe to import here).
  */
+import { runLegacyFirstTimeGuideFootAction } from './legacyFirstTimeGuideHost';
 import type { LegacyGuideRow, LegacyGuideSheetModel } from './legacyGuideContent';
 import {
   LEGACY_GUIDE_SHEET_SIZES,
@@ -32,6 +37,13 @@ export const GUIDE_GLOSSARY_COLUMNS = 4;
 export const GUIDE_GLOSSARY_TILE_GAP = 8;
 export const GUIDE_GLOSSARY_TILE_HEIGHT = 76;
 const PANEL_PAD = 12;
+/**
+ * First-time cards: the "New" pill sits on a tile's top border at the right (a badge), clear of the icon below it, and
+ * the foot action row. Tiles are ~70 px wide on a phone, so a pill inside the tile would cover the icon.
+ */
+export const GUIDE_GLOSSARY_NEW_PILL = Object.freeze({ width: 34, height: 16, inset: 6, fontSize: 10 });
+export const GUIDE_GLOSSARY_FOOT_ACTION_HEIGHT = 40;
+export const GUIDE_GLOSSARY_FOOT_ACTION_GAP = 8;
 
 const S = LEGACY_GUIDE_SHEET_SIZES;
 const WHITE = (): string => toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
@@ -80,6 +92,21 @@ const buildItems = (host: Host, model: LegacyGuideSheetModel, width: number): It
           width: tileW
         });
         drawLegacyGuideRowIcon(host, row.icon, tileLeft + (tileW / 2), tileTop + 26, host.resolveLegacyGuideAccent(row.icon.glyph), g);
+        if (model.newRowIds?.has(row.id) === true) {
+          const pill = GUIDE_GLOSSARY_NEW_PILL;
+          const pillLeft = tileLeft + tileW - pill.width - pill.inset;
+          const pillTop = tileTop - (pill.height / 2);
+          g.fillStyle(cyberArcadeMaterial.substrate.field, 1);
+          g.fillRoundedRect(pillLeft, pillTop, pill.width, pill.height, pill.height / 2);
+          g.fillStyle(cyberArcadeMaterial.rail.mint, 0.18);
+          g.fillRoundedRect(pillLeft, pillTop, pill.width, pill.height, pill.height / 2);
+          g.lineStyle(1, cyberArcadeMaterial.rail.mint, 0.95);
+          g.strokeRoundedRect(pillLeft, pillTop, pill.width, pill.height, pill.height / 2);
+          // The helper wraps at width - 16: pass the pill width + 16 so the label never wraps.
+          mask(host.addLegacySheetWrappedText(model.newPillLabel ?? '', pillLeft, pillTop + (pill.height / 2), pill.width + 16, MINT_CSS(),
+            pill.fontSize, pill.fontSize, 1, { alpha: 1, bold: true })
+            .setOrigin(0.5, 0.5).setPosition(pillLeft + (pill.width / 2), pillTop + (pill.height / 2)).setAlign('center'));
+        }
         const centerX = tileLeft + (tileW / 2);
         const centerY = tileTop + GUIDE_GLOSSARY_TILE_HEIGHT - 14;
         mask(host.addLegacySheetWrappedText(row.heading, tileLeft, centerY, tileW + 8, selected ? MINT_CSS() : WHITE(), 14, 12, 1,
@@ -130,6 +157,23 @@ const buildItems = (host: Host, model: LegacyGuideSheetModel, width: number): It
       paint: (top, _g, mask) => {
         mask(host.addLegacySheetWrappedText(keyboardLine, (host.__guideLeft as number) - 8, top + (height / 2), width + 16, MUTED(),
           S.copyFontSize, S.copyFontSize, 3, { alpha: 0.92 }));
+      }
+    });
+  }
+  const footActions = model.footActions ?? [];
+  if (footActions.length > 0) {
+    items.push({
+      height: GUIDE_GLOSSARY_FOOT_ACTION_HEIGHT,
+      paint: (top) => {
+        const left = host.__guideLeft as number;
+        const buttonW = (width - (GUIDE_GLOSSARY_FOOT_ACTION_GAP * (footActions.length - 1))) / footActions.length;
+        footActions.forEach((action, index) => {
+          const centerX = left + (index * (buttonW + GUIDE_GLOSSARY_FOOT_ACTION_GAP)) + (buttonW / 2);
+          host.uiButtons.push(host.createLegacyAuthActionButton(
+            centerX, top + (GUIDE_GLOSSARY_FOOT_ACTION_HEIGHT / 2), buttonW, GUIDE_GLOSSARY_FOOT_ACTION_HEIGHT, action.label,
+            () => runLegacyFirstTimeGuideFootAction(host, action.id), 'ghost'
+          ));
+        });
       }
     });
   }

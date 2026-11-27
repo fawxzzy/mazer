@@ -163,6 +163,7 @@ import { isLegacyDesktopPointerDevice, isLegacyPlayLabel, resolveLegacyDesktopPl
 import { drawGuidePauseGlyph } from '../render/guidePauseGlyph';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import { paintGuideGlossarySheet, resetGuideGlossarySelection } from '../legacy-runtime/legacyGuideGlossaryPainter';
+import { noteLegacyFirstTimeGuideClosed, resolveLegacyFirstTimeGuideSheetOptions } from '../legacy-runtime/legacyFirstTimeGuideHost';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
 import { HazardMomentView } from '../render/hazardMomentRenderer';
 import { ShardPlayPresenter } from '../render/shardPlayPresenter';
@@ -12459,7 +12460,9 @@ export class MenuScene extends Phaser.Scene {
     const model = buildLegacyGuideSheetModel(context, {
       hasKeyboard: this.resolveLegacyGuideHasKeyboard(),
       // Slice H6: met + live hazard kinds while the layer is on; [] (the unchanged sheet) while off.
-      hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? []
+      hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? [],
+      // First-time cards slice 4 (?lab=firsttime): hide-until-met rows, "New" pills, foot actions; undefined while off.
+      firstTime: resolveLegacyFirstTimeGuideSheetOptions(this)
     });
     const card = paintGuideGlossarySheet(this, model);
     this.overlayGuideBounds = createVisualRect(card.left, card.top, card.width, card.height);
@@ -12495,6 +12498,7 @@ export class MenuScene extends Phaser.Scene {
     this.settingsGuideOpen = false;
     this.overlayGuideBounds = null;
     resetGuideGlossarySelection();
+    noteLegacyFirstTimeGuideClosed(this);
     this.resetLegacyOverlayScrollState();
     this.uiDirty = true;
     const target = resolveLegacyGuideCloseTarget({

@@ -16,6 +16,7 @@ import {
   FIRST_TIME_NOTICE_KEY,
   LEGACY_FIRST_TIME_SCENE_MEMBERS,
   createLegacyFirstTimeCardController,
+  isLegacyFirstTimeBackstep,
   isLegacyFirstTimeCardSeenByHazardRecord,
   isLegacyFirstTimeWrapStep,
   noteLegacyFirstTimeStep,
@@ -714,6 +715,117 @@ describe('first-time host: caps hold with the hazard cards (S1, S3)', () => {
     next.step({ x: 2, y: 7 }, { gates: fakeGates([{ x: 3, y: 7 }]) });
     next.show();
     expect(next.notices.shown.map((props) => props.heading)).toEqual(['Pulse Gate']);
+  });
+});
+
+describe('first-time host: the trail tip (slice 9)', () => {
+  it('a step straight back is a backstep; a turn, a second step on, or no previous step is not', () => {
+    const a = { x: 2, y: 5 };
+    const b = { x: 3, y: 5 };
+    expect(isLegacyFirstTimeBackstep({ from: a, to: b }, b, a)).toBe(true);
+    expect(isLegacyFirstTimeBackstep(null, b, a)).toBe(false);
+    expect(isLegacyFirstTimeBackstep({ from: a, to: b }, b, { x: 3, y: 6 })).toBe(false);
+    expect(isLegacyFirstTimeBackstep({ from: a, to: b }, b, { x: 4, y: 5 })).toBe(false);
+  });
+
+  it('fires on the first step back with the trail row heading, no ring, and "Got it"', () => {
+    const r = rig();
+    r.frame();
+    r.place({ x: 2, y: 7 });
+    r.step({ x: 3, y: 7 });
+    r.frame();
+    expect(r.notices.shown).toHaveLength(0);
+    r.step({ x: 2, y: 7 });
+    expect(r.frame()).toBeNull();
+    expect(r.notices.shown).toHaveLength(1);
+    expect(r.notices.shown[0]).toMatchObject({
+      title: 'New',
+      heading: LEGACY_GUIDE_ROWS.find((row) => row.id === 'trail')!.heading,
+      icon: 'trail',
+      body: 'Step back to wipe your trail.',
+      actionLabel: 'Got it'
+    });
+  });
+
+  it('a new level forgets the last step: the first step of a level is never a backstep', () => {
+    const r = rig();
+    r.frame();
+    r.place({ x: 2, y: 7 });
+    r.step({ x: 3, y: 7 });
+    r.newLevel();
+    r.frame();
+    r.step({ x: 2, y: 7 });
+    r.frame();
+    expect(r.notices.shown).toHaveLength(0);
+  });
+
+  it('shares the one-card-per-level cap: after the wrap card, a step back waits for the next level', () => {
+    const r = rig();
+    r.frame();
+    r.wrapLeft();
+    r.show();
+    r.notices.tap();
+    r.step({ x: 7, y: 7 });
+    r.step({ x: 8, y: 7 });
+    r.frame();
+    expect(r.notices.shown.map((props) => props.heading)).toEqual(['Wrap']);
+  });
+});
+
+describe('first-time host: the level-1 goal coach (slice 9)', () => {
+  it('after the hint is dismissed: a "Reach these" ring on the twin stars, no notice, seen once drawn', () => {
+    const storage = new SpyStorage();
+    const r = rig({ storage });
+    r.frame();
+    r.controller.queueTouch('control-hint-dismissed');
+    expect(r.frame()).toEqual({ cardId: 'level-1.goal', anchor: MAZE.goal, label: 'Reach these' });
+    expect(r.frame()).toEqual({ cardId: 'level-1.goal', anchor: MAZE.goal, label: 'Reach these' });
+    expect(r.notices.shown).toHaveLength(0);
+    expect(r.controller.describe().activeCardId).toBeNull();
+    // Seen: a later session does not offer it again.
+    const again = rig({ storage });
+    again.frame();
+    again.controller.queueTouch('control-hint-dismissed');
+    expect(again.frame()).toBeNull();
+  });
+
+  it('the ring stays for the card time plus the linger, then goes', () => {
+    const r = rig();
+    r.frame();
+    r.controller.queueTouch('control-hint-dismissed');
+    r.frame();
+    r.frame();
+    r.advance(FIRST_TIME_AUTO_DISMISS_MS + FIRST_TIME_COACH_LINGER_MS - 1);
+    expect(r.frame()).not.toBeNull();
+    r.advance(1);
+    expect(r.frame()).toBeNull();
+  });
+
+  it('waits while not playing, and does not count toward the per-level cap (the trail tip can still fire)', () => {
+    const r = rig();
+    r.frame();
+    r.controller.queueTouch('control-hint-dismissed');
+    expect(r.frame({ playing: false })).toBeNull();
+    expect(r.frame()).not.toBeNull();
+    r.frame();
+    r.place({ x: 2, y: 7 });
+    r.step({ x: 3, y: 7 });
+    r.step({ x: 2, y: 7 });
+    r.frame();
+    expect(r.notices.shown.map((props) => props.body)).toEqual(['Step back to wipe your trail.']);
+  });
+
+  it('no goal to point at: nothing is drawn and the coach is not marked seen', () => {
+    const storage = new SpyStorage();
+    const r = rig({ storage });
+    r.frame();
+    r.controller.queueTouch('control-hint-dismissed');
+    expect(r.frame({ goal: null })).toBeNull();
+    expect(r.frame({ goal: null })).toBeNull();
+    const again = rig({ storage });
+    again.frame();
+    again.controller.queueTouch('control-hint-dismissed');
+    expect(again.frame()).not.toBeNull();
   });
 });
 

@@ -79,7 +79,7 @@ export interface LegacyGuideRow {
 /** A guide row that must exist once its blocker lands. Never shown until then. */
 export interface LegacyGuidePendingRow {
   id: string;
-  blockedOn: 'first-run-coach' | 'guide-icon-construction';
+  blockedOn: 'guide-icon-construction';
   /** Kebab id; prose in the spec doc ("Guide icon reasons"). */
   reasonId: string;
 }
@@ -362,14 +362,10 @@ export const resolveLegacyGuideHazardRow = (kind: LegacyGuideHazardKind): Legacy
 /**
  * Rows deliberately NOT shown yet. Each names what must land first; the
  * drift test pins that none of them is in LEGACY_GUIDE_ROWS. (The Start row
- * left this list when Chip landed: the start marker is now on the board.)
+ * left this list when Chip landed: the start marker is now on the board. The level-1 first-run coach left it with
+ * first-time cards slice 9: the "Reach these" goal coach on the twin stars, behind ?lab=firsttime.)
  */
 export const LEGACY_GUIDE_PENDING_ROWS: readonly LegacyGuidePendingRow[] = Object.freeze([
-  {
-    blockedOn: 'first-run-coach',
-    id: 'first-run-coach',
-    reasonId: 'level1-coach-is-owner-decision'
-  },
   {
     // Gameplay pauses itself when the tab is hidden, the app is backgrounded or
     // the window loses focus, and only Resume continues it. The Pause card is
@@ -408,24 +404,67 @@ export interface LegacyGuideSheetModel {
   keyboardLine: string | null;
   /** Labelled footer button; closing returns to the Menu it was opened from. */
   closeLabel: typeof LEGACY_GUIDE_CLOSE_LABEL;
+  /** First-time cards only (`?lab=firsttime`): rows that carry the small "New" pill. Absent while the flag is off. */
+  newRowIds?: ReadonlySet<string>;
+  /** First-time cards only: the pill's label. */
+  newPillLabel?: string;
+  /** First-time cards only: the actions at the Guide foot ("All tips", "Show tips again"), in order. */
+  footActions?: readonly LegacyGuideFootAction[];
+}
+
+export type LegacyGuideFootActionId = 'all-tips' | 'show-tips-again';
+
+export interface LegacyGuideFootAction {
+  id: LegacyGuideFootActionId;
+  label: string;
+}
+
+/**
+ * First-time cards (spec D9 and section 8, Guide pick E): what the read module (legacyFirstTimeGuideHost.ts) hands the
+ * model while `?lab=firsttime` is on. Omitted = the flag is off and the model is exactly today's.
+ */
+export interface LegacyGuideFirstTimeSheetOptions {
+  /** Rows to leave out (the Wrap and Switch rows until met; empty under "All tips"). */
+  hiddenRowIds: ReadonlySet<string>;
+  newRowIds: ReadonlySet<string>;
+  newPillLabel: string;
+  footActions: readonly LegacyGuideFootAction[];
 }
 
 /**
  * Same rows for both contexts: only the sheet the Guide returns to differs (the caller's overlay stack).
  * `hazardKinds` (slice H6) appends the hazard rows for those kinds, in schedule order; empty or omitted
  * (the hazard layer off) returns LEGACY_GUIDE_ROWS itself, so the flag-off sheet is unchanged.
+ * `firstTime` (first-time cards slice 4, `?lab=firsttime` only) leaves out the hidden rows and adds the "New" pills and
+ * the foot actions; omitted, nothing about the model changes (same rows object, no extra keys).
  */
 export const buildLegacyGuideSheetModel = (
   context: LegacyGuideContext,
-  options: { hasKeyboard?: boolean; hazardKinds?: readonly LegacyGuideHazardKind[] } = {}
+  options: {
+    hasKeyboard?: boolean;
+    hazardKinds?: readonly LegacyGuideHazardKind[];
+    firstTime?: LegacyGuideFirstTimeSheetOptions;
+  } = {}
 ): LegacyGuideSheetModel => {
   const hazardKinds = options.hazardKinds ?? [];
   const hazardRows = LEGACY_GUIDE_HAZARD_ROWS.filter((row) => hazardKinds.includes(row.kind));
-  return {
+  const rows: readonly LegacyGuideRow[] = hazardRows.length === 0 ? LEGACY_GUIDE_ROWS : [...LEGACY_GUIDE_ROWS, ...hazardRows];
+  const model: LegacyGuideSheetModel = {
     closeLabel: LEGACY_GUIDE_CLOSE_LABEL,
     context,
     keyboardLine: options.hasKeyboard === true ? buildLegacyGuideKeyboardLine() : null,
-    rows: hazardRows.length === 0 ? LEGACY_GUIDE_ROWS : [...LEGACY_GUIDE_ROWS, ...hazardRows],
+    rows,
     title: LEGACY_GUIDE_TITLE
+  };
+  const firstTime = options.firstTime;
+  if (firstTime === undefined) return model;
+  const shown = firstTime.hiddenRowIds.size === 0 ? rows : rows.filter((row) => !firstTime.hiddenRowIds.has(row.id));
+  const shownIds = new Set<string>(shown.map((row) => row.id));
+  return {
+    ...model,
+    rows: shown,
+    newRowIds: new Set([...firstTime.newRowIds].filter((id) => shownIds.has(id))),
+    newPillLabel: firstTime.newPillLabel,
+    footActions: firstTime.footActions
   };
 };

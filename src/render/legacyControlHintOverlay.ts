@@ -8,6 +8,10 @@
  * (src/render/textCardPlacement.ts) with the bottom band first. The line stays on its bottom anchor while that covers
  * nothing; on level 1 the end star sits at the foot of the corridor, right where the anchor is, so the line steps up
  * above it (re-checked every poll while visible, so the board reveal and zoom are followed).
+ *
+ * First-time cards slice 9 (`?lab=firsttime` only): the hint is a card instead (legacyControlHintCard.ts: the in-flow
+ * notice, "Move", the twin-stars goal line, "Got it"), dismissed the same ways (Got it, the first move, 12 s), and its
+ * dismissal offers the "Reach these" goal coach (legacyFirstTimeHintSignal.ts). Flag off nothing here changes.
  */
 import { createTutorialAckStore, type TutorialAckStore, type TutorialStorage } from '../tutorial/tutorialAckStore.ts';
 import {
@@ -25,9 +29,12 @@ import {
   shouldShowLegacyControlHint,
   type LegacyControlHintFacts
 } from '../legacy-runtime/legacyControlHint.ts';
+import { resolveFirstTimeCardsEnabled } from '../legacy-runtime/legacyFirstTimeFlag.ts';
+import { emitLegacyFirstTimeControlHintDismissed } from '../legacy-runtime/legacyFirstTimeHintSignal.ts';
 import { createLegacyLevelPreviewStorage, isLegacyLevelPreviewRoute } from '../legacy-runtime/legacyLevelPreview.ts';
 import { isInsideFeedbackPopup } from '../ui/feedback/feedbackKeyIsolation.ts';
 import { NEON_TEXT_SKIN, neonRgba, resolveNeonPanelStyle } from '../ui/skin/neonTextSkin.ts';
+import { createLegacyControlHintCard, type LegacyControlHintCard } from './legacyControlHintCard.ts';
 import { paintMechanicIconCanvas, resolveMechanicIconAccentCss } from './mechanicIcons.ts';
 import {
   resolveTextCardBoardView,
@@ -126,6 +133,19 @@ const safeStorage = (win: Window): TutorialStorage | null => {
   }
 };
 
+/**
+ * First-time cards on (`?lab=firsttime`, remembered on the device)? Read once per install; any failure = off. On a Level
+ * Preview route only the query counts: the hint never touches device storage there (spec F15, slice 0).
+ */
+const readFirstTimeCardsOn = (win: Window): boolean => {
+  try {
+    const search = win.location?.search ?? '';
+    return resolveFirstTimeCardsEnabled({ search, storage: isLegacyLevelPreviewRoute(search) ? null : win.localStorage });
+  } catch {
+    return false;
+  }
+};
+
 export const installLegacyControlHint = (win: Window, game: LegacyControlHintHost): (() => void) => {
   const storage = safeStorage(win);
   // No storage means we cannot honour "one time", so show nothing rather than nag every load.
@@ -142,6 +162,9 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
   let lastInput: LegacyControlHintObservedInput | null = null;
   let anchorInset: number | null = null;
   let placedTop: number | null = null;
+  // Slice 9: the card replaces the pill only while the first-time cards flag is on.
+  const card: LegacyControlHintCard | null = readFirstTimeCardsOn(win) ? createLegacyControlHintCard({ onAction: () => hide(true) }) : null;
+  const showing = (): boolean => el !== null || card?.isOpen() === true;
 
   const media = (query: string): boolean => {
     try { return win.matchMedia?.(query).matches === true; } catch { return false; }
@@ -204,6 +227,11 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
     if (acknowledge && !done) {
       done = true;
       try { store.acknowledge(LEGACY_CONTROL_HINT_TOKEN); } catch { /* storage full: the in-memory flag still holds */ }
+      if (card !== null) emitLegacyFirstTimeControlHintDismissed(scene());
+    }
+    if (card !== null) {
+      card.close();
+      return;
     }
     const node = el;
     if (node === null) return;
@@ -217,7 +245,21 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
     win.setTimeout(() => node.remove(), fade);
   };
 
+  /** Slice 9: the card waits for a board to keep clear of (and for it to stop moving), then mounts once. */
+  const showCard = (hintCard: LegacyControlHintCard): void => {
+    const canvas = game.canvas;
+    if (typeof canvas?.getBoundingClientRect !== 'function') return;
+    const view = resolveTextCardBoardView(scene() as TextCardBoardScene | null, canvas.getBoundingClientRect());
+    if (view === null) return;
+    const page = { width: win.innerWidth, height: win.innerHeight };
+    if (hintCard.offer(view, resolveLegacyControlHintInput(readDevice()), page, reduced())) shownAt = win.performance.now();
+  };
+
   const show = (): void => {
+    if (card !== null) {
+      showCard(card);
+      return;
+    }
     const node = doc.createElement('div');
     node.id = LEGACY_CONTROL_HINT_ELEMENT_ID;
     node.setAttribute('aria-hidden', 'true');
@@ -243,14 +285,14 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
     // Capture phase runs before the feedback scrim can stop the event: a key typed into the note is not game input.
     if (isInsideFeedbackPopup(event.target)) return;
     if (event.isTrusted && event.key.length > 0 && event.key !== 'Unidentified') noteInput('keys');
-    if (el !== null && isLegacyControlHintMoveKey(event.key)) hide(true);
+    if (showing() && isLegacyControlHintMoveKey(event.key)) hide(true);
   };
   const onDown = (event: PointerEvent): void => {
     noteInput(classifyLegacyControlHintPointer(event.pointerType));
     dragStart = { x: event.clientX, y: event.clientY };
   };
   const onMove = (event: PointerEvent): void => {
-    if (el === null || dragStart === null) return;
+    if (!showing() || dragStart === null) return;
     if (isLegacyControlHintDrag(event.clientX - dragStart.x, event.clientY - dragStart.y)) hide(true);
   };
   const onUp = (): void => { dragStart = null; };
@@ -263,11 +305,11 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
 
   const timer = win.setInterval(() => {
     const wanted = shouldShowLegacyControlHint(readFacts(scene(), done));
-    if (wanted && el === null) {
+    if (wanted && !showing()) {
       show();
-    } else if (el !== null && !wanted) {
+    } else if (showing() && !wanted) {
       hide(false);
-    } else if (el !== null && win.performance.now() - shownAt >= LEGACY_CONTROL_HINT_MAX_VISIBLE_MS) {
+    } else if (showing() && win.performance.now() - shownAt >= LEGACY_CONTROL_HINT_MAX_VISIBLE_MS) {
       hide(true);
     } else if (el !== null) {
       place(el);
@@ -284,5 +326,6 @@ export const installLegacyControlHint = (win: Window, game: LegacyControlHintHos
     el?.remove();
     el = null;
     textEl = null;
+    card?.destroy();
   };
 };

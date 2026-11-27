@@ -142,8 +142,10 @@ describe('first-time card registry', () => {
     expect(resolveFirstTimeCard('level-1.controls').touches).toEqual([]);
   });
 
-  it('ships the wrap (slice 2), Switch (slice 3), Shard (slice 7) and Pulse Gate (slice 8) cards live; the Shard and Pulse Gate bodies are the Guide hazard rows', () => {
-    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual(['mechanic.wrap', 'mechanic.switch', 'mechanic.locked-gate', 'mechanic.pulse-gate']);
+  it('ships wrap (slice 2), Switch (slice 3), the trail tip and the level-1 goal coach (slice 9), Shard (slice 7) and Pulse Gate (slice 8) live; the Shard and Pulse Gate bodies are the Guide hazard rows', () => {
+    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual([
+      'mechanic.wrap', 'mechanic.switch', 'tip.trail', 'level-1.goal', 'mechanic.locked-gate', 'mechanic.pulse-gate'
+    ]);
     const shardCard = resolveFirstTimeCard('mechanic.locked-gate');
     expect(shardCard.notice).toMatchObject({ heading: 'Shard', body: resolveLegacyGuideHazardRow('shard').text, actionLabel: 'Got it' });
     expect(shardCard.coach).toMatchObject({ target: 'next-untaken-shard', label: 'Take this next' });
@@ -158,14 +160,15 @@ describe('first-time card registry', () => {
       .toBe('mechanic.pulse-gate');
   });
 
-  it('the Switch and wrap fire; every touch of a card that is not live yet fires nothing and marks nothing met', () => {
+  it('the Switch and wrap fire; a touch of a card that is not live fires nothing and marks nothing met', () => {
     const switchCard = resolveFirstTimeCard('mechanic.switch');
     expect(switchCard.notice).toMatchObject({ heading: 'Switch', body: LEGACY_GUIDE_ROWS.find((row) => row.id === 'bleed-gate')!.text });
     expect(LEGACY_GUIDE_ROWS.find((row) => row.id === 'bleed-gate')!.heading).toBe('Switch');
     expect(decideFirstTimeTouch(createFirstTimeCardsState(), { touches: ['switch-trigger'], nowMs: 0, isSeen: () => false }).fire?.id)
       .toBe('mechanic.switch');
     const others = decideFirstTimeTouch(createFirstTimeCardsState(), {
-      touches: ['trail-backstep', 'control-hint-dismissed'],
+      touches: ['shard-pickup', 'pulse-gate-adjacent'],
+      liveCardIds: ['mechanic.wrap', 'mechanic.switch'],
       nowMs: 0,
       isSeen: () => false
     });
