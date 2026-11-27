@@ -39,7 +39,8 @@ const REQUIRED_EXTRAS = Object.keys(RUNNER_FILES).flatMap((runner) => runnerExtr
 runVitest([
   ...FOLDER_RUNS,
   ...REQUIRED_EXTRAS,
-  ...[CWD_MUTATING_FIXTURE, ...EXCLUDED_FILES].flatMap((file) => ['--exclude', file]),
+  '--exclude', CWD_MUTATING_FIXTURE,
+  ...EXCLUDED_FILES.flatMap((file) => ['--exclude', file]),
   '--maxWorkers', '1',
   '--pool=threads',
   '--poolOptions.threads.singleThread'
