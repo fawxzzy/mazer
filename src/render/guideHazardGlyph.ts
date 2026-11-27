@@ -4,6 +4,7 @@
  * is the accent passed in by the scene (`resolveGuideHazardAccent`).
  */
 import { cyberArcadeMaterial } from './cyberArcadeMaterial';
+import { drawShardGem, SHARD_LOOK } from './shardLook';
 
 export type GuideHazardGlyph = 'hazard-gate' | 'hazard-sentry' | 'hazard-hunter' | 'hazard-shard';
 
@@ -74,22 +75,8 @@ export const drawGuideHazardGlyph = (
       return;
     }
     case 'hazard-shard': {
-      // A tall crystal.
-      graphics.fillStyle(color, 0.95);
-      graphics.fillPoints([
-        { x: centerX, y: centerY - 8 * unit },
-        { x: centerX + 4.5 * unit, y: centerY - 2 * unit },
-        { x: centerX + 2.5 * unit, y: centerY + 7 * unit },
-        { x: centerX - 2.5 * unit, y: centerY + 7 * unit },
-        { x: centerX - 4.5 * unit, y: centerY - 2 * unit }
-      ], true);
-      graphics.fillStyle(cyberArcadeMaterial.shine.core, 0.35);
-      graphics.fillPoints([
-        { x: centerX, y: centerY - 8 * unit },
-        { x: centerX + 1.5 * unit, y: centerY - 2 * unit },
-        { x: centerX, y: centerY + 7 * unit },
-        { x: centerX - 1.5 * unit, y: centerY - 2 * unit }
-      ], true);
+      // The board's sharp gem (shardLook.ts), so the Guide row and the intro card match what play shows.
+      drawShardGem(graphics, centerX, centerY, 8 * unit, 8 * unit * (SHARD_LOOK.gem.halfWidthOfTile / SHARD_LOOK.gem.halfHeightOfTile), 1, Math.max(1, unit));
       return;
     }
   }

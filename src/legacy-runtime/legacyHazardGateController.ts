@@ -253,6 +253,20 @@ export class LegacyHazardGateController {
     this.replayStartTick = startTick;
   }
 
+  /** The Pulse Gate specs live on this board (what play checks), for layers that must agree with them (H8 shards). */
+  liveGateSpecs(): readonly TimedGateSpec[] {
+    if (this.overlay === null || this.count === 0) {
+      return [];
+    }
+    const live: TimedGateSpec[] = [];
+    for (const spec of this.overlay.specs) {
+      if (spec.kind === 'timedGate' && live.length < this.count) {
+        live.push(spec as TimedGateSpec);
+      }
+    }
+    return live;
+  }
+
   gateX(index: number): number {
     return this.xs[index]!;
   }

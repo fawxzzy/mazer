@@ -42,7 +42,7 @@ export const HAZARD_EXPOSURE_STORAGE_KEY = 'mazer.hazard-exposure.v1';
  * Kinds drawn in play today. H3 wires the Pulse Gate; H4/H5/H8 append theirs. Order does not matter
  * (everything below re-sorts by the schedule).
  */
-export const HAZARD_ONBOARDING_LIVE_KINDS: readonly HazardUnitKind[] = Object.freeze(['pulseGate']);
+export const HAZARD_ONBOARDING_LIVE_KINDS: readonly HazardUnitKind[] = Object.freeze(['pulseGate', 'shard']);
 
 /** How long a card / pip stays up if the player does not move first (the first move dismisses the card). */
 export const HAZARD_INTRO_CARD_SHOW_MS = 4500;
