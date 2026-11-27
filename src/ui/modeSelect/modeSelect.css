@@ -183,6 +183,7 @@
 /* Short screens (a phone on its side): smaller cards, tighter spacing; the layer scrolls if it still does not fit. */
 @media (max-height: 560px) {
   .mazer-mode-select { --mms-item-w: min(30cqw, 190px); padding-top: max(10px, env(safe-area-inset-top, 0px)); padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .mms-kicker.mazer-sheet-title { font-size: 1.25rem; }
   .mms-stack { gap: 8px; }
   .mms-item { gap: 6px; padding: 12px 8px 10px; }
   .mms-actions { flex-direction: row; justify-content: center; }

@@ -44,7 +44,10 @@
   display: grid;
   font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
   gap: var(--mazer-token-spacing-16, 16px);
+  /* A short screen (a phone on its side) scrolls the card instead of clipping its title and buttons. */
+  max-height: 100%;
   max-width: 360px;
+  overflow-y: auto;
   padding: var(--mazer-token-spacing-24, 24px) var(--mazer-token-spacing-20, 20px) var(--mazer-token-spacing-20, 20px);
   width: 100%;
 }
