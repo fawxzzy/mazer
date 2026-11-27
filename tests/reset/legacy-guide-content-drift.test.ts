@@ -273,7 +273,7 @@ describe('guide copy only names things that exist', () => {
     expect(row('wrap').text).toMatch(/Edge stars fill as beams hit/);
   });
 
-  test('Wrap gate (MAZER-L10): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
+  test('Switch (MAZER-L10 bleed gate, first-time cards D1): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
     // "Later mazes": no gate before the first gate level, which sits after the first wrapped levels, and some
     // levels between it and the end of the wrap fade ask for one.
     expect(BLEED_GATE_FIRST_LEVEL).toBeGreaterThan(10);
@@ -296,7 +296,8 @@ describe('guide copy only names things that exist', () => {
     expect(resolveLegacyNavigationTarget(maze, { x: 0, y: 1 }, -1, 0)).toEqual({ x: 3, y: 1 });
     resetLegacyBleedGates(maze);
     expect(bleedGateRenderer.drawBleedGatePlan).toBeTypeOf('function');
-    expect(row('bleed-gate').text).toMatch(/dashed ring/);
+    expect(row('bleed-gate').heading).toBe('Switch');
+    expect(row('bleed-gate').text).toMatch(/^A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.$/);
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {

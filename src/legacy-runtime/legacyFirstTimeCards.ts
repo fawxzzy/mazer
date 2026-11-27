@@ -16,8 +16,8 @@
  * the host places the card on the screen edge away from the player and the coach target
  * (`resolveFirstTimeCardPlacement`).
  *
- * Live cards: LEGACY_FIRST_TIME_LIVE_CARD_IDS. Slice 2 made the wrap card live (legacyFirstTimeHost.ts shows it); each
- * later slice adds its card id.
+ * Live cards: LEGACY_FIRST_TIME_LIVE_CARD_IDS. Slice 2 made the wrap card live (legacyFirstTimeHost.ts shows it), slice 3 the
+ * Switch; each later slice adds its card id.
  */
 import type { TutorialToken } from '../tutorial/tutorialRegistry.ts';
 import {
@@ -134,9 +134,8 @@ const pulseGateRow = resolveLegacyGuideHazardRow('pulseGate');
 
 /**
  * The registry, in priority order. Copy is the spec's section 4 / 8 copy, unchanged. The locked-gate and Pulse Gate
- * bodies ARE the Guide hazard rows (read, not copied), and so is the wrap body (the Guide Wrap row took the card copy in
- * slice 2). The Switch body is the spec's new card copy; the Guide row takes it in slice 3 ("Wrap gate" becomes
- * "Switch", D1).
+ * bodies ARE the Guide hazard rows (read, not copied), and so are the wrap and Switch bodies (the Guide Wrap row took
+ * the card copy in slice 2, the Switch row in slice 3, where "Wrap gate" became "Switch", D1).
  */
 export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
   Object.freeze({
@@ -194,7 +193,7 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
     notice: Object.freeze({
       marker: MARKER,
       heading: 'Switch',
-      body: 'A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.',
+      body: guideRow('bleed-gate').text,
       actionLabel: ACTION
     }),
     coach: coach('opened-border-cell', 'Open edge'),
@@ -244,10 +243,10 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
 ]);
 
 /**
- * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card.
+ * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card, slice 3 the Switch.
  * Everything stays behind `?lab=firsttime` (build default off).
  */
-export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze(['mechanic.wrap'] as FirstTimeCardId[]);
+export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze(['mechanic.wrap', 'mechanic.switch'] as FirstTimeCardId[]);
 
 export const resolveFirstTimeCard = (id: FirstTimeCardId): FirstTimeCard => LEGACY_FIRST_TIME_CARDS.find((card) => card.id === id)!;
 

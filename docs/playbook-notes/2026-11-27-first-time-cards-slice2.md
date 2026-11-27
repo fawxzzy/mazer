@@ -1,14 +1,17 @@
-# 2026-11-27 - First-time cards slice 2: card host + the Wrap card (behind `?lab=firsttime`)
+# 2026-11-27 - First-time cards slices 2 and 3: card host, the Wrap card and the Switch card (behind `?lab=firsttime`)
 
 - WHAT changed:
   - New `src/legacy-runtime/legacyFirstTimeHost.ts`: a Phaser-free controller (steps to touch events, level/scope changes, pause hiding, a 4.5 s auto-dismiss that counts visible time only, the 800 ms move rule, coach-mark linger and anchor-reached) plus a thin scene binding. It shows the card through `legacyInFlowNoticeHost` (heading, body, "New" marker, mechanic icon id passed for the rich-text skin) and draws the dotted ring with `CoachMarkView` inside the board container. Flag off: one flag read, a WeakMap entry, nothing created or drawn.
   - `src/scenes/MenuScene.ts`: one call (`noteLegacyFirstTimeStep(this, previousPlayer, nextStep.player)`) after an accepted play step, plus its import.
   - `src/legacy-runtime/legacyFirstTimeCards.ts`: `mechanic.wrap` is live; the wrap body is read from the Guide Wrap row (R2); new coach target `wrapped-edge-cell` (dotted ring, no label).
   - `src/legacy-runtime/legacyGuideContent.ts`: the Wrap row now reads "Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit." (drift test + player-message inventory updated in the same change).
+  - Slice 3 (second commit): `mechanic.switch` is live. The host polls the lit Switches each frame and fires on a gate going from unlit to lit (never on the first look at a level, so a Switch already lit or relit after a reset does not count). The ring and its "Open edge" label go on the opened border cell nearer to the player by walking distance. The Guide `bleed-gate` heading "Wrap gate" becomes "Switch" (D1) and its text is the card body: "A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap." The drift test, player-message inventory, the options-guide label list and a sheet-plan comment follow.
+  - Card edge: the card takes the top or bottom band that covers the least, weighted player 3, ring 2, goal 1, and never counts a cell under the header as covered by a top card. Trade-off: with the player under the header and the ring low, a goal near the top can sit behind the card for up to 4.5 s.
   - Tests: new `tests/tutorial/first-time-host.test.ts`; `tests/tutorial/first-time-cards.test.ts` live-list and wrap coach pins.
 - WHY it changed:
   - First-time cards spec (docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md) slice 2, with Zac's picks of 2026-11-27 (card look E Two-line, skin B Neon edge, keep the dotted ring on the thing pointed at, never cover anything important).
 - Rule: scene glue that needs private MenuScene members reads them structurally and pins the member names with a source-scan test, so a rename fails a test instead of silently drawing nothing.
 - Pattern: the host owns the auto-dismiss clock (frames while visible) instead of the DOM timer, so a pause or the Guide never eats the card's on-screen time.
+- Decision: caps reset when the auth scope changes (a new session per scope). Shard notices keep their own notice host, so in the hazard lab a shard hint can stack with a card.
 - Decision: the wrap ring sits on the edge cell the player walked off (the cell they arrived on is under the player).
 - Status: source only, flag off by default, not deployed. Nothing checked on a real phone.

@@ -187,7 +187,8 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
   },
   {
     // MAZER-L10: the bleed gate (Gate D "Pulse ring"). MAZER-VIS-067: the icon is the board's own SLEEPING gate: the pale plate and the ink ring, still.
-    heading: 'Wrap gate',
+    // First-time cards (spec D1, slice 3): the tile is called "Switch" on screen; this row is also the Switch card's body.
+    heading: 'Switch',
     icon: {
       badge: 'circle',
       boardDraw: { module: 'src/render/bleedGateRenderer.ts', symbol: 'drawBleedGatePlan' },
@@ -198,7 +199,7 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'bleed-gate',
-    text: 'Later mazes hide a wrap behind a pale tile with a dashed ring. Walk onto it to open it.'
+    text: 'A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.'
   },
   {
     heading: 'Levels',
