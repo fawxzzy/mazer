@@ -31,12 +31,15 @@
 -- Rate limits (constants in the function body; change them only with a new function version). IP-free:
 --   per signed-in user : 3 per rolling hour, 10 per rolling 24 hours.
 --   per email address  : 3 per rolling hour, 10 per rolling 24 hours (lower-cased; guests and signed-in).
---   all guests together: 20 per rolling hour (rows with user_id NULL).
---   global             : 60 per rolling hour, everyone together.
+--   all guests together: 30 per rolling hour (rows with user_id NULL).
+--   global             : 90 per rolling hour, everyone together.
 --   The guest pool is smaller than the global cap, so a flood of guest messages can never take more than
---   20 of the 60 hourly slots: signed-in players always keep at least 40 per hour. When several limits are
---   used up the answer is the LONGEST wait, so one retry is enough. The counts and the insert run under one
---   transaction advisory lock, so two concurrent calls cannot both pass a count.
+--   30 of the 90 hourly slots: signed-in players always keep at least 60 per hour. When several limits are
+--   used up the answer is the LONGEST wait, so one retry is enough. A first count runs without any lock and
+--   answers rate_limited at once when a limit is already used up (a flood does not queue on the lock); a
+--   call that passes it takes one transaction advisory lock and counts again, and only that second count
+--   decides, so two concurrent calls cannot both pass.
+--   Known trade-off (README): 30 anonymous calls with invented addresses fill the guest pool for an hour.
 --
 -- Locks: the foreign key to auth.users takes SHARE ROW EXCLUSIVE on auth.users, which conflicts with the
 -- ROW EXCLUSIVE lock every writer of auth.users holds (sign-up, sign-in bookkeeping) and waits behind
@@ -156,8 +159,8 @@ declare
   c_user_day_limit constant integer := 10;
   c_email_hour_limit constant integer := 3;
   c_email_day_limit constant integer := 10;
-  c_guest_hour_limit constant integer := 20;
-  c_global_hour_limit constant integer := 60;
+  c_guest_hour_limit constant integer := 30;
+  c_global_hour_limit constant integer := 90;
   v_user_hour_count integer;
   v_user_hour_oldest timestamptz;
   v_user_day_count integer;
@@ -170,8 +173,8 @@ declare
   v_guest_hour_oldest timestamptz;
   v_global_hour_count integer;
   v_global_hour_oldest timestamptz;
-  v_limited boolean := false;
-  v_retry integer := 0;
+  v_limited boolean;
+  v_retry integer;
 begin
   -- Email: required, trimmed, same rules as the table CHECK. The value is never echoed.
   v_email := pg_catalog.btrim(p_email, E' \t\r\n');
@@ -199,62 +202,71 @@ begin
   v_level := case when p_player_level between 0 and 1000000 then p_player_level else null end;
   v_mode := case when p_game_mode ~ '^[a-z][a-z0-9_]{0,31}$' then p_game_mode else null end;
 
-  -- One lock for every submission: the counts are exact, and the volume is low (60 per hour at most).
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('mazer_help_requests', 0));
+  -- Pass 1 counts without a lock: when a limit is already used up it answers at once, so a flood is
+  -- refused without queueing on the lock. Pass 2 takes one transaction advisory lock for every submission
+  -- and counts again (a new snapshot, so it sees every message committed before the lock was granted);
+  -- only pass 2 decides, so the counts that let a message in are exact.
+  for v_pass in 1..2 loop
+    if v_pass = 2 then
+      perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('mazer_help_requests', 0));
+    end if;
+    v_limited := false;
+    v_retry := 0;
 
-  select
-    count(*) filter (where v_uid is not null and h.user_id = v_uid and h.created_at > pg_catalog.now() - interval '1 hour'),
-    min(h.created_at) filter (where v_uid is not null and h.user_id = v_uid and h.created_at > pg_catalog.now() - interval '1 hour'),
-    count(*) filter (where v_uid is not null and h.user_id = v_uid),
-    min(h.created_at) filter (where v_uid is not null and h.user_id = v_uid),
-    count(*) filter (where pg_catalog.lower(h.contact_email) = v_email_key and h.created_at > pg_catalog.now() - interval '1 hour'),
-    min(h.created_at) filter (where pg_catalog.lower(h.contact_email) = v_email_key and h.created_at > pg_catalog.now() - interval '1 hour'),
-    count(*) filter (where pg_catalog.lower(h.contact_email) = v_email_key),
-    min(h.created_at) filter (where pg_catalog.lower(h.contact_email) = v_email_key),
-    count(*) filter (where h.user_id is null and h.created_at > pg_catalog.now() - interval '1 hour'),
-    min(h.created_at) filter (where h.user_id is null and h.created_at > pg_catalog.now() - interval '1 hour'),
-    count(*) filter (where h.created_at > pg_catalog.now() - interval '1 hour'),
-    min(h.created_at) filter (where h.created_at > pg_catalog.now() - interval '1 hour')
-    into v_user_hour_count, v_user_hour_oldest, v_user_day_count, v_user_day_oldest,
-         v_email_hour_count, v_email_hour_oldest, v_email_day_count, v_email_day_oldest,
-         v_guest_hour_count, v_guest_hour_oldest, v_global_hour_count, v_global_hour_oldest
-  from mazer.mazer_help_requests h
-  where h.created_at > pg_catalog.now() - interval '24 hours';
+    select
+      count(*) filter (where v_uid is not null and h.user_id = v_uid and h.created_at > pg_catalog.now() - interval '1 hour'),
+      min(h.created_at) filter (where v_uid is not null and h.user_id = v_uid and h.created_at > pg_catalog.now() - interval '1 hour'),
+      count(*) filter (where v_uid is not null and h.user_id = v_uid),
+      min(h.created_at) filter (where v_uid is not null and h.user_id = v_uid),
+      count(*) filter (where pg_catalog.lower(h.contact_email) = v_email_key and h.created_at > pg_catalog.now() - interval '1 hour'),
+      min(h.created_at) filter (where pg_catalog.lower(h.contact_email) = v_email_key and h.created_at > pg_catalog.now() - interval '1 hour'),
+      count(*) filter (where pg_catalog.lower(h.contact_email) = v_email_key),
+      min(h.created_at) filter (where pg_catalog.lower(h.contact_email) = v_email_key),
+      count(*) filter (where h.user_id is null and h.created_at > pg_catalog.now() - interval '1 hour'),
+      min(h.created_at) filter (where h.user_id is null and h.created_at > pg_catalog.now() - interval '1 hour'),
+      count(*) filter (where h.created_at > pg_catalog.now() - interval '1 hour'),
+      min(h.created_at) filter (where h.created_at > pg_catalog.now() - interval '1 hour')
+      into v_user_hour_count, v_user_hour_oldest, v_user_day_count, v_user_day_oldest,
+           v_email_hour_count, v_email_hour_oldest, v_email_day_count, v_email_day_oldest,
+           v_guest_hour_count, v_guest_hour_oldest, v_global_hour_count, v_global_hour_oldest
+    from mazer.mazer_help_requests h
+    where h.created_at > pg_catalog.now() - interval '24 hours';
 
-  -- Over any limit: answer with the LONGEST wait among the limits that are used up.
-  if v_uid is not null and v_user_hour_count >= c_user_hour_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_user_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
-  end if;
-  if v_uid is not null and v_user_day_count >= c_user_day_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_user_day_oldest + interval '24 hours' - pg_catalog.now())))::integer);
-  end if;
-  if v_email_hour_count >= c_email_hour_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_email_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
-  end if;
-  if v_email_day_count >= c_email_day_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_email_day_oldest + interval '24 hours' - pg_catalog.now())))::integer);
-  end if;
-  if v_uid is null and v_guest_hour_count >= c_guest_hour_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_guest_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
-  end if;
-  if v_global_hour_count >= c_global_hour_limit then
-    v_limited := true;
-    v_retry := greatest(v_retry,
-      ceil(extract(epoch from (v_global_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
-  end if;
-  if v_limited then
-    return pg_catalog.jsonb_build_object('status', 'rate_limited', 'retry_after_seconds', greatest(1, v_retry));
-  end if;
+    -- Over any limit: answer with the LONGEST wait among the limits that are used up.
+    if v_uid is not null and v_user_hour_count >= c_user_hour_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_user_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
+    end if;
+    if v_uid is not null and v_user_day_count >= c_user_day_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_user_day_oldest + interval '24 hours' - pg_catalog.now())))::integer);
+    end if;
+    if v_email_hour_count >= c_email_hour_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_email_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
+    end if;
+    if v_email_day_count >= c_email_day_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_email_day_oldest + interval '24 hours' - pg_catalog.now())))::integer);
+    end if;
+    if v_uid is null and v_guest_hour_count >= c_guest_hour_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_guest_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
+    end if;
+    if v_global_hour_count >= c_global_hour_limit then
+      v_limited := true;
+      v_retry := greatest(v_retry,
+        ceil(extract(epoch from (v_global_hour_oldest + interval '1 hour' - pg_catalog.now())))::integer);
+    end if;
+    if v_limited then
+      return pg_catalog.jsonb_build_object('status', 'rate_limited', 'retry_after_seconds', greatest(1, v_retry));
+    end if;
+  end loop;
 
   insert into mazer.mazer_help_requests (user_id, contact_email, message, build_id, player_level, game_mode)
   values (v_uid, v_email, v_message, v_build, v_level, v_mode);
@@ -267,7 +279,7 @@ revoke all on function mazer.mazer_submit_help_request_v1(text, text, text, inte
 grant execute on function mazer.mazer_submit_help_request_v1(text, text, text, integer, text) to anon, authenticated;
 
 comment on function mazer.mazer_submit_help_request_v1(text, text, text, integer, text) is
-  'Saves one Help message (reply email + message) for a guest or the signed-in caller (user id from auth.uid() only). Errors: MAZER_HELP_BAD_EMAIL (22023), MAZER_HELP_MESSAGE_EMPTY (22023), MAZER_HELP_MESSAGE_TOO_LONG (22001). Returns {"status":"saved"} or {"status":"rate_limited","retry_after_seconds":n}. Limits: 3/hour and 10/24h per user and per email, 20/hour for all guests, 60/hour for everyone.';
+  'Saves one Help message (reply email + message) for a guest or the signed-in caller (user id from auth.uid() only). Errors: MAZER_HELP_BAD_EMAIL (22023), MAZER_HELP_MESSAGE_EMPTY (22023), MAZER_HELP_MESSAGE_TOO_LONG (22001). Returns {"status":"saved"} or {"status":"rate_limited","retry_after_seconds":n}. Limits: 3/hour and 10/24h per user and per email, 30/hour for all guests, 90/hour for everyone.';
 
 -- Post-image assertions: abort the whole transaction if the result is not what the proposal says.
 do $postimage$

@@ -20,6 +20,7 @@ const apply = rd(`${dir}/apply.sql`);
 const rollback = rd(`${dir}/rollback.sql`);
 const readFile = rd(`${dir}/ops/read-open-help-requests.sql`);
 const closeFile = rd(`${dir}/ops/close-help-request.sql`);
+const volumeFile = rd(`${dir}/ops/read-help-intake-last-hour.sql`);
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const pgliteVersion = JSON.parse(fs.readFileSync(path.join(sandbox, 'node_modules/@electric-sql/pglite/package.json'), 'utf8')).version;
 console.log(`PGlite ${pgliteVersion} (PostgreSQL 17 wasm), in-memory`);
@@ -27,6 +28,7 @@ console.log(`### tested_file=${dir}/apply.sql sha256=${sha(apply)}`);
 console.log(`### tested_file=${dir}/rollback.sql sha256=${sha(rollback)}`);
 console.log(`### tested_file=${dir}/ops/read-open-help-requests.sql sha256=${sha(readFile)}`);
 console.log(`### tested_file=${dir}/ops/close-help-request.sql sha256=${sha(closeFile)}`);
+console.log(`### tested_file=${dir}/ops/read-help-intake-last-hour.sql sha256=${sha(volumeFile)}`);
 
 const BASE = `
 create role anon; create role authenticated; create role service_role bypassrls;
@@ -234,8 +236,8 @@ const checkViolations = [];
   await as('authenticated', U(4));
   em.push(await rpc(['SAME@MAIL.IO', 'three (signed in)']));
   await as('anon', null);
-  em.push(await rpc([' same@mail.io ', 'four']));
-  check('per email: 3 per hour counted case-insensitively across guests and players, 4th rate_limited', em.slice(0, 3).every((o) => o.status === 'saved') && em[3].status === 'rate_limited', em.map((o) => o.status).join(','));
+  em.push(await rpc([' sAmE@mAiL.iO ', 'four (mixed case, padded)']));
+  check('per email: 3 per hour counted case-insensitively across guests and players, 4th (mixed case) rate_limited', em.slice(0, 3).every((o) => o.status === 'saved') && em[3].status === 'rate_limited', em.map((o) => o.status).join(','));
   check('per email: a different address from the same guest still works', (await rpc(['other@mail.io', 'five'])).status === 'saved');
   await as('authenticated', U(5));
   check('per email: also binds a signed-in player with a fresh user budget', (await rpc(['same@mail.io', 'six'])).status === 'rate_limited');
@@ -245,28 +247,28 @@ const checkViolations = [];
   await as('anon', null);
   const eday = await rpc(['Daily@X.io', 'eleventh']);
   check('per email: 11th within 24h refused by the daily cap, wait > 1h', eday.status === 'rate_limited' && eday.retry_after_seconds > 3600, JSON.stringify(eday));
-  // 8e. guest pool 20/hour: guests refused, signed-in players still served
+  // 8e. guest pool 30/hour: guests refused, signed-in players still served
   await wipe();
-  for (let i = 0; i < 19; i++) await db.exec(`insert into ${T} (contact_email, message, created_at) values ('g${i}@x.io', 'guest', now() - make_interval(secs => ${3500 - i * 60}))`);
+  for (let i = 0; i < 29; i++) await db.exec(`insert into ${T} (contact_email, message, created_at) values ('g${i}@x.io', 'guest', now() - make_interval(secs => ${3500 - i * 60}))`);
   await as('anon', null);
-  check('guest pool: the 20th guest message in the hour is saved (boundary)', (await rpc(['g19@x.io', 'twentieth'])).status === 'saved');
-  const g21 = await rpc(['g20@x.io', 'twenty-first']);
-  check('guest pool: the 21st guest message is rate_limited (fresh address)', g21.status === 'rate_limited' && g21.retry_after_seconds > 0 && g21.retry_after_seconds <= 3600, JSON.stringify(g21));
+  check('guest pool: the 30th guest message in the hour is saved (boundary)', (await rpc(['g29@x.io', 'thirtieth'])).status === 'saved');
+  const g31 = await rpc(['g30@x.io', 'thirty-first']);
+  check('guest pool: the 31st guest message is rate_limited (fresh address)', g31.status === 'rate_limited' && g31.retry_after_seconds > 0 && g31.retry_after_seconds <= 3600, JSON.stringify(g31));
   await as('authenticated', U(3));
   check('guest pool full: a signed-in player can still send', (await rpc(['player@x.io', 'player while guests are flooded'])).status === 'saved');
-  check('guest pool: refused guest stored nothing (20 guest rows)', (await count('user_id is null')) === 20);
-  // 8f. global 60/hour
+  check('guest pool: refused guest stored nothing (30 guest rows)', (await count('user_id is null')) === 30);
+  // 8f. global 90/hour (30 players x 3 each fill it without touching the per-user cap)
   await wipe();
   for (let i = 1; i <= 30; i++) await db.exec(`insert into auth.users (id) values ('${U(100 + i)}') on conflict do nothing`);
-  for (let i = 0; i < 59; i++) await db.exec(`insert into ${T} (user_id, contact_email, message, created_at) values ('${U(101 + (i % 30))}', 'glob${i}@x.io', 'x', now() - make_interval(secs => ${3540 - i * 30}))`);
+  for (let i = 0; i < 89; i++) await db.exec(`insert into ${T} (user_id, contact_email, message, created_at) values ('${U(101 + (i % 30))}', 'glob${i}@x.io', 'x', now() - make_interval(secs => ${3540 - i * 39}))`);
   await as('authenticated', U(3));
-  check('global: the 60th message in the hour is saved (boundary)', (await rpc(['g60@x.io', 'sixtieth'])).status === 'saved');
+  check('global: the 90th message in the hour is saved (boundary)', (await rpc(['g90@x.io', 'ninetieth'])).status === 'saved');
   await as('authenticated', U(4));
-  const p61 = await rpc(['g61@x.io', 'sixty-first']);
+  const p91 = await rpc(['g91@x.io', 'ninety-first']);
   await as('anon', null);
-  const a61 = await rpc(['g62@x.io', 'guest sixty-first']);
-  check('global: the 61st is rate_limited for a fresh player AND a guest', p61.status === 'rate_limited' && a61.status === 'rate_limited' && p61.retry_after_seconds <= 3600, JSON.stringify([p61, a61]));
-  check('global: refused calls stored nothing (60 rows in the hour)', (await count(`created_at > now() - interval '1 hour'`)) === 60);
+  const a91 = await rpc(['g92@x.io', 'guest ninety-first']);
+  check('global: the 91st is rate_limited for a fresh player AND a guest', p91.status === 'rate_limited' && a91.status === 'rate_limited' && p91.retry_after_seconds <= 3600, JSON.stringify([p91, a91]));
+  check('global: refused calls stored nothing (90 rows in the hour)', (await count(`created_at > now() - interval '1 hour'`)) === 90);
   await su(); await db.exec(`update ${T} set created_at = created_at - interval '2 hours' where id in (select id from ${T} order by created_at limit 2)`);
   await as('anon', null);
   check('global: after rows age past the hour the budget frees up', (await rpc(['g63@x.io', 'later'])).status === 'saved');
@@ -277,6 +279,48 @@ const checkViolations = [];
   await as('authenticated', U(2));
   const both = await rpc(['long@x.io', 'x']);
   check('two limits used up: the retry is the LONGER wait (> 20h, <= 24h)', both.status === 'rate_limited' && both.retry_after_seconds > 20 * 3600 && both.retry_after_seconds <= 24 * 3600, JSON.stringify(both));
+  // 8g'. long wait found FIRST: user day (checked 2nd, ~23 h left) then email hour (checked 3rd, ~10 min left).
+  // A plain assignment instead of greatest() would answer the later, SHORTER wait; the mutant below proves it.
+  const longFirstSetup = (q) => q(`insert into ${T} (user_id, contact_email, message, created_at) select '${U(2)}', 'ud' || i || '@x.io', 'old', now() - make_interval(mins => 61 + i) from generate_series(0, 9) i`)
+    .then(() => q(`insert into ${T} (contact_email, message, created_at) select 'short@x.io', 'old', now() - make_interval(mins => 50 - i) from generate_series(0, 2) i`));
+  await wipe();
+  await longFirstSetup((s) => db.exec(s));
+  await as('authenticated', U(2));
+  const longFirst = await rpc(['short@x.io', 'x']);
+  check('long wait checked first, short wait later: the retry is still the LONGER wait (> 20h)', longFirst.status === 'rate_limited' && longFirst.retry_after_seconds > 20 * 3600 && longFirst.retry_after_seconds <= 24 * 3600, JSON.stringify(longFirst));
+  {
+    const noGreatest = apply.replace(/v_retry := greatest\(v_retry,\n\s+(ceil\([^;]+\)::integer)\);/g, 'v_retry := $1;');
+    const m = new PGlite();
+    await m.exec(BASE);
+    await m.exec(`insert into auth.users (id) values ('${U(2)}')`);
+    await m.exec(noGreatest);
+    await longFirstSetup((s) => m.exec(s));
+    await m.query(`select set_config('request.jwt.claim.sub', $1, false)`, [U(2)]);
+    await m.exec('set role authenticated');
+    const mr = (await m.query(`select mazer.mazer_submit_help_request_v1('short@x.io', 'x') r`)).rows[0].r;
+    await m.close();
+    check('MUTANT: greatest() replaced by plain assignment answers the SHORT wait (the case above bites)', noGreatest !== apply && (noGreatest.match(/greatest\(v_retry/g) ?? []).length === 0 && mr.status === 'rate_limited' && mr.retry_after_seconds <= 3600, JSON.stringify(mr));
+  }
+  // 8g''. early count: a call refused by the first (unlocked) count never takes the advisory lock; a saved
+  // call does. Observed inside one transaction (an xact advisory lock is held until commit/rollback).
+  {
+    const advisoryHeld = async (args) => {
+      await db.exec('begin');
+      const r = (await db.query('select mazer.mazer_submit_help_request_v1($1::text, $2::text) r', args)).rows[0].r;
+      const n = Number((await db.query(`select count(*)::int c from pg_catalog.pg_locks where locktype = 'advisory' and pid = pg_catalog.pg_backend_pid()`)).rows[0].c);
+      await db.exec('rollback');
+      return { status: r.status, locks: n };
+    };
+    await wipe();
+    await as('anon', null);
+    const okCall = await advisoryHeld(['lockprobe@x.io', 'saved path']);
+    await su();
+    for (let i = 0; i < 3; i++) await db.exec(`insert into ${T} (contact_email, message) values ('lockprobe@x.io', 'old')`);
+    await as('anon', null);
+    const refused = await advisoryHeld(['lockprobe@x.io', 'refused path']);
+    check('early count: a saved call holds the advisory lock; a refused call answers without it', okCall.status === 'saved' && okCall.locks === 1 && refused.status === 'rate_limited' && refused.locks === 0, JSON.stringify([okCall, refused]));
+    await su();
+  }
   // 8h. limits are checked AFTER validation: a bad call never consumes budget nor takes the lock path
   await wipe();
   await as('anon', null);
@@ -336,6 +380,12 @@ const checkViolations = [];
   let bareCodes = true;
   for (const [e, m] of echoProbe) { const r = await tryRpc([e, m]); if (!/^MAZER_HELP_[A-Z_]+$/.test(r.err ?? '') || /leak/.test(`${r.err} ${r.detail}`)) bareCodes = false; }
   check('error messages are bare MAZER_HELP_* codes with no input in message or detail', bareCodes);
+  // A still-valid JWT of a DELETED account: auth.uid() names a user that no longer exists, so the insert hits
+  // the FK (23503). Its detail names the caller's OWN user id (from their token) and nothing they typed.
+  await wipe();
+  await as('authenticated', U(999));
+  const stale = await tryRpc(['stale-jwt@x.io', 'stale token message']);
+  check('deleted account with a still-valid JWT: 23503 whose detail holds only the caller\'s own user id, no email or message', stale.code === '23503' && stale.detail.includes(U(999)) && !/stale-jwt|stale token/.test(`${stale.err} ${stale.detail}`) && (await count()) === 0, JSON.stringify(stale));
 
   // ---- 13. non-superuser, non-BYPASSRLS owner (closer to production's runner)
   await su();
@@ -378,6 +428,18 @@ const checkViolations = [];
   check('read file after close: only the other row is open', readAfter.length === 1 && readAfter[0].message === 'second, guest' && Number(readAfter[0].open_total) === 1);
   const placeholderRun = (await db.query(closeFile)).rows;
   check('close template run unedited touches nothing', placeholderRun.length === 0 && (await count(`status='open'`)) === 1);
+  // intake-volume read: counts only, last hour, guests vs players
+  check('intake-volume file passes the read-only wrapper screen, one statement', screen.screenReadOnly(volumeFile).length === 0 && screen.countStatements(volumeFile) === 1, JSON.stringify(screen.screenReadOnly(volumeFile)));
+  check('intake-volume limits match the function constants (30 guests, 90 total)', /30 as guest_hour_limit/.test(volumeFile) && /90 as total_hour_limit/.test(volumeFile) && /c_guest_hour_limit constant integer := 30;/.test(apply) && /c_global_hour_limit constant integer := 90;/.test(apply));
+  await wipe();
+  for (let i = 0; i < 4; i++) await db.exec(`insert into ${T} (contact_email, message, created_at) values ('${i < 3 ? 'Flood' : 'other'}${i}@x.io', 'g', now() - interval '${10 + i} minutes')`);
+  await db.exec(`insert into ${T} (contact_email, message, created_at) values ('flood0@X.io', 'g', now() - interval '5 minutes')`);
+  await db.exec(`insert into ${T} (contact_email, message, created_at) values ('old@x.io', 'g', now() - interval '2 hours')`);
+  await db.exec(`insert into ${T} (user_id, contact_email, message) values ('${U(1)}', 'p@x.io', 'p')`);
+  const vol = (await db.query(volumeFile)).rows[0];
+  const volCols = Object.keys(vol).join(',');
+  check('intake-volume: 5 guests (4 distinct addresses, case-folded), 1 player, 6 total in the hour; older rows ignored', Number(vol.guest_last_hour) === 5 && Number(vol.distinct_guest_addresses) === 4 && Number(vol.signed_in_last_hour) === 1 && Number(vol.total_last_hour) === 6 && Number(vol.guest_hour_limit) === 30 && Number(vol.total_hour_limit) === 90 && vol.oldest_guest_in_window !== null, JSON.stringify(vol));
+  check('intake-volume returns no email or message column', !/email|message/.test(volCols.replace('distinct_guest_addresses', '')), volCols);
 
   // ---- 16. re-apply over a live install aborts and changes nothing
   await wipe();

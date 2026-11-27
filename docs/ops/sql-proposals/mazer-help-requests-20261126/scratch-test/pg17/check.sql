@@ -54,7 +54,7 @@ begin
   perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b2', false);
   r := mazer.mazer_submit_help_request_v1('GUEST@example.com', 'second');
   r := mazer.mazer_submit_help_request_v1('guest@EXAMPLE.com', 'third');
-  r := mazer.mazer_submit_help_request_v1('guest@example.com', 'fourth');
+  r := mazer.mazer_submit_help_request_v1(' gUeSt@ExAmPlE.cOm ', 'fourth (mixed case, padded)');
   if r->>'status' is distinct from 'rate_limited' then raise exception 'CHECK_FAILED per-email cap: %', r; end if;
 
   -- cascade: deleting the auth user deletes that player's messages, guests' stay

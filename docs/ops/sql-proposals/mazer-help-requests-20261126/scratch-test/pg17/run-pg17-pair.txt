@@ -1,12 +1,14 @@
-# PostgreSQL 17.9 scratch (scripts/db-scratch/scratch-pg.mjs), run 2026-11-27T04:26Z, runner role postgres (non-superuser), auth.users owned by supabase_auth_admin, locale C
-# apply.sql sha256 5627dd766bda3c18ea6dc097794f81086d56a18452befa1f91f7bc5e56be9206
+# PostgreSQL 17.9 scratch (scripts/db-scratch/scratch-pg.mjs), run 2026-11-27T05:04Z, runner role postgres (non-superuser), auth.users owned by supabase_auth_admin, locale C
+# apply.sql sha256 084b3dca683aea88525bef820c01b4cda79564f9d11312b5ed3976f01b4d50ea
 # rollback.sql sha256 9ded10bd3ba3ad419518332de6aa1f24ebeb968bc8dd6aa0ab9209c93bde5ed8
 # ops/read-open-help-requests.sql sha256 c44d620eec299d3bb9e14996dd58bc5fdc6930004417694f9fdbabeebd124a45
 # ops/close-help-request.sql sha256 d19c52c6e8f6fc504cea1bf1a2a62217b975654688282285723bf8467883019a
+# ops/read-help-intake-last-hour.sql sha256 448659552fd3fa9597bb503be69908b3ee0a06837f2e54dc7216315c5dce79ed
 # scratch-test/pg17/app-stub.sql sha256 81c0c41be797c2b432bc0016d5810a842644cb59985ecb9dd19b51e25c3d9e9f
 # scratch-test/pg17/seed.sql sha256 ad5c16a25f0f699fb7da29f4a72cb1cf26f07c7eae331298981db25dbceb6868
-# scratch-test/pg17/check.sql sha256 9623742d770b471046ae0190715c73fd05327744dd46aa8deb8f50db6b1be545
-# scratch-test/pg17/rollback-with-rows.ps1 sha256 b956601132e3ab2aae316499cb09bfffec16f75adac68aa229500dd8885d4c66
+# scratch-test/pg17/check.sql sha256 dd6b234b21171b7ef72d28f66afc0156b1512f32f466e04480a142fe594a3f28
+# scratch-test/pg17/rollback-with-rows.ps1 sha256 324f1fe3e00f5d9a5e616f51d9c772980a0c1f71e49869643b98fa9c0f150bc6
+# scratch-test/pg17/race-test.mjs sha256 7ba80bb145f0b2a8869419d8617ad2cb1f54c35476b2cdb073fb0db9f67632ed
 # command: node scripts/db-scratch/scratch-pg.mjs pair --dir <scratch> --apply apply.sql --rollback rollback.sql --seed seed.sql --check check.sql --reapply --schemas mazer
 
 PASS  apply file runs clean as the runner role (postgres)
