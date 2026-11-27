@@ -5,7 +5,8 @@
  *
  * Show-once rides the existing hazard exposure record: the shard's intro card IS the hint (`introsShown` marks it), so
  * it shows the first time the player meets shards and never again, and the Guide's Shard row appears from then on.
- * The level shards start at is never written here: it comes from the hazard schedule (HAZARD_INTRO_SCHEDULE).
+ * The level shards start at is never written here: it comes from the hazard schedule (HAZARD_INTRO_SCHEDULE entry plus
+ * the curve-A lock roll, manifest v2: the first lock level, 102).
  *
  * Level Preview (`?lab=hazards&level=N`) runs on in-memory storage with no history, so a preview at the shard level
  * would build as a brand-new player (stage 0: no shards). `seedHazardPreviewStorage` reads a never-written record as
@@ -15,6 +16,7 @@ import {
   HAZARD_EXPOSURE_KIND_ORDER,
   HAZARD_EXPOSURE_RECORD_VERSION,
   HAZARD_INTRO_SCHEDULE,
+  resolveHazardKindFirstLevel,
   resolveScheduledStage,
   toHazardScheduleLevel,
   type HazardExposureRecord,
@@ -25,9 +27,12 @@ import type { HazardExposureStorage } from './legacyHazardOnboarding';
 
 const SHARD_KIND: HazardUnitKind = 'shard';
 
-/** The first level shards can appear on, read from the hazard schedule (one place to change the cadence). */
+/**
+ * The first level shards appear on, read from the hazard schedule (one place to change the cadence): the first lock
+ * level at or after the shard entry (manifest v2: entry 100, first lock 102).
+ */
 export const resolveShardFirstLevel = (): number | null => (
-  HAZARD_INTRO_SCHEDULE.find((entry) => entry.unit === SHARD_KIND)?.level ?? null
+  HAZARD_INTRO_SCHEDULE.some((entry) => entry.unit === SHARD_KIND) ? resolveHazardKindFirstLevel(SHARD_KIND) : null
 );
 
 export const SHARD_HINT_KEYS = Object.freeze({ first: 'shard.first', unlocked: 'shard.unlocked' });
@@ -69,7 +74,10 @@ export const isShardIntroCard = (card: { readonly kind: HazardUnitKind } | null 
   card?.kind === SHARD_KIND
 );
 
-/** The record a player who reached `level` by the schedule would carry (every earlier kind met and introduced). */
+/**
+ * The record a player who reached `level` by the schedule would carry (every earlier kind met and introduced). The
+ * shard counts as met only once a lock level lies before `level` (`resolveScheduledStage` counts it from 102).
+ */
 export const resolveHazardPreviewSeedRecord = (level: unknown): HazardExposureRecord => {
   const at = toHazardScheduleLevel(level);
   const stage = resolveScheduledStage(Math.max(0, at - 1));

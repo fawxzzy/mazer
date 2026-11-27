@@ -4,7 +4,7 @@
  * src/render/shardSceneLayer.ts draws.
  *
  * Placement is the existing H8 core (`computeShardLayer` in src/mazer-core/hazards/shards.ts) over the
- * live maze graph with every bleed-gated wrap walled (`maskLegacyBleedGatedCells`, spec D8), fed the gate
+ * live maze graph with every bleed-gated wrap walled (the adapter masks it, `maskLegacyBleedGatedCells`, spec D8), fed the gate
  * specs that are live in play, so the shipped route is the one the solvability verdict proved and it
  * never needs a wrap behind an unlit Switch. Play has one base per level (no reject-and-try-next-base loop),
  * so a strict level whose base misses the route band ships the nearest route the verdict passes
@@ -17,7 +17,7 @@
  */
 import type { HazardGraph, HazardSpec } from '../mazer-core/hazards/graphContract';
 import { advanceShardProgress, computeShardLayer, isStarUnlocked, type ShardLayerStatus } from '../mazer-core/hazards/shards';
-import { createLegacyMazeHazardGraph, maskLegacyBleedGatedCells } from './legacyHazardGraphAdapter';
+import { createLegacyMazeHazardGraph } from './legacyHazardGraphAdapter';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
 /** Specs whose cells are all floor on the placement graph (a gate on a closed wrap opening cannot touch the route). */
@@ -119,8 +119,9 @@ export class LegacyShardRun {
     }
     const startedAt = now();
     try {
-      // Every gate starts unlit (new maze, Pause > Reset level), so the wrap behind it counts as blocked.
-      const { graph, start, goal } = createLegacyMazeHazardGraph({ ...maze, grid: maskLegacyBleedGatedCells(maze.grid, maze.bleedGates) });
+      // Every gate starts unlit (new maze, Pause > Reset level), so the wrap behind it counts as blocked: the
+      // adapter walls it for any maze that carries `bleedGates` (slice 5, adapter-wide).
+      const { graph, start, goal } = createLegacyMazeHazardGraph(maze);
       const result = computeShardLayer(graph, {
         start,
         goal,

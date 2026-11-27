@@ -5,6 +5,7 @@
 // the brute-force oracle in tests/core/hazards/oracle.ts (absolute-time layers,
 // its own gate and patrol formulas), and a plain BFS for chokepoints.
 import { describe, expect, test } from 'vitest';
+import { maskLegacyBleedGatedCells } from '../../src/legacy-runtime/legacyHazardGraphAdapter';
 import { resolveLegacyHazardOverlay } from '../../src/legacy-runtime/legacyHazardOverlay';
 import {
   resolveLegacyWalkableGridNeighbors,
@@ -39,8 +40,11 @@ const openings = (maze: Maze): number => {
 
 const pointOf = (maze: Maze, cell: number): LegacyPoint => ({ x: cell % maze.width, y: Math.floor(cell / maze.width) });
 const same = (a: LegacyPoint, b: LegacyPoint): boolean => a.x === b.x && a.y === b.y;
+// The grid every hazard is placed on: the openings of each Switch-gated wrap walled (first-time cards spec D8,
+// slice 5; every Switch unlit). Production movement on it is the movement the hazard graph must match.
+const playGrid = (maze: Maze): boolean[][] => maskLegacyBleedGatedCells(maze.grid as boolean[][], maze.bleedGates);
 const neighbours = (maze: Maze, point: LegacyPoint): LegacyPoint[] => (
-  resolveLegacyWalkableGridNeighbors(maze.grid as boolean[][], point)
+  resolveLegacyWalkableGridNeighbors(playGrid(maze), point)
 );
 
 const toOracle = (maze: Maze, specs: readonly HazardSpec[]): OracleHazards => ({
@@ -130,7 +134,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
             const cells = spec.kind === 'patrol' ? spec.route : [spec.cell];
             for (const cell of cells) {
               const point = pointOf(maze, cell);
-              expect(maze.grid[point.y]![point.x], `${label} walkable`).toBe(true);
+              expect(playGrid(maze)[point.y]![point.x], `${label} walkable`).toBe(true);
               expect(near.some((p) => same(p, point)), `${label} clear of start/goal`).toBe(false);
             }
             if (spec.kind === 'timedGate') {
@@ -147,7 +151,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
           const hazards = toOracle(maze, specs);
           const witness = overlay.verdict?.witness;
           if (!witness) throw new Error(`${label}: shipped placement without a witness`);
-          const direct = oracleSolve(maze.grid as boolean[][], maze.start, maze.goal, hazards);
+          const direct = oracleSolve(playGrid(maze), maze.start, maze.goal, hazards);
           expect(direct, label).toEqual({ solvable: true, ticks: witness.ticks });
 
           // Junction-rewind safety: from the nearest junction behind any witness step, with N = 4 (play)
@@ -162,7 +166,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
             }
             sample += 1;
             for (const turns of sample % 2 === 0 ? [2, 4] : [2]) {
-              const after = oracleSolve(maze.grid as boolean[][], pushback, maze.goal, hazards, { startTick: index, invulnerableTurns: turns });
+              const after = oracleSolve(playGrid(maze), pushback, maze.goal, hazards, { startTick: index, invulnerableTurns: turns });
               expect(after.solvable, `${label} rewind at step ${index} N=${turns}`).toBe(true);
               postContactChecks += 1;
             }
@@ -195,7 +199,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
           landing = null;
         }
         const ok = landing !== null
-          && oracleSolve(maze.grid as boolean[][], landing, maze.goal, hazards, { startTick: next }).solvable;
+          && oracleSolve(playGrid(maze), landing, maze.goal, hazards, { startTick: next }).solvable;
         if (ok) survivable += 1;
         else firstFragile ??= index;
       }
@@ -213,6 +217,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
     expect(fresh?.allocation).toMatchObject({ exposureStage: 0, allocationLevel: 10, firstEncounter: 'pulseGate', gates: 1, sentries: 0 });
     expect(fresh?.specs.length).toBeLessThanOrEqual(1);
     const scheduled = resolveLegacyHazardOverlay(maze, { enabled: true, level: 100 });
-    expect(scheduled?.allocation.exposureStage).toBe(4);
+    // Manifest v2: L100 has met three kinds (the shard is first met on its first lock level, 102).
+    expect(scheduled?.allocation.exposureStage).toBe(3);
   });
 });

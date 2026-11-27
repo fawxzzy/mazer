@@ -1,32 +1,41 @@
 /**
- * Hazard allocator on the signed schedule manifest v1 (slice H2). Pure: no
- * scene, no geometry, no randomness, no clock.
+ * Hazard allocator on the signed schedule manifest v2 (slice H2; v2 from first-time
+ * cards spec slice 6, D4). Pure: no scene, no geometry, no randomness, no clock.
  *
- * Source of truth: docs/contracts/mazer-hazard-schedule.v1.json and
- * docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md section 2.5. A test pins
- * every constant below to the manifest, so the two cannot drift.
+ * Source of truth: docs/contracts/mazer-hazard-schedule.v2.json and
+ * docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md section 2.5 (v2 amendment).
+ * A test pins every constant below to the manifest, so the two cannot drift.
+ * Manifest v1 stays in docs/contracts as signed history.
  *
  * `allocateHazardUnits(level)` answers how many units of each kind a level asks
  * for, before any maze is seen:
  *   - levels 1..9 carry nothing;
  *   - the intro schedule adds one kind at its level, alone and in its
- *     first-encounter shape: Pulse Gate 10, Sentry 20, Hunter 35, Shard 60;
+ *     first-encounter shape: Pulse Gate 10, Sentry 20, Hunter 35;
+ *   - shards (locked gates) enter at 100 behind the lock roll (curve A): a level
+ *     carries shards only when `isShardLockLevel(level)`, 30% at 100 rising to
+ *     100% at 283 and held. The first lock level is 102, and that is where the
+ *     shard is first met (`resolveHazardKindFirstLevel('shard')`);
  *   - the tail adds exactly one unit at levels 36, 51, 66, ... up to the geometry
  *     saturation level, picked by the convex-price tape of `loadout.ts` with the
  *     static blocker removed and the readability caps applied;
  *   - past saturation the allocation is frozen (the Shard route target is the
  *     forever axis, slice H8).
- * Hazards only ever add: the allocation for level L + 1 contains the one for L.
+ * Gates, enemies and tiers only ever add: the allocation for level L + 1 contains
+ * the one for L. Shards are the exception from v2: in 100..282 a level without a
+ * lock roll carries none; from 283 every level carries them and the count only grows.
  *
  * Exposure (contract 2.5): a player whose local `exposureStage` is below the
  * schedule meets the next skipped kind in its first-encounter shape, one kind per
- * level. A missing stage means a new player, whose stage equals the schedule.
+ * level. The shard, last in the schedule, is met on the first lock level at or
+ * after the player reaches stage 3 (it is placed with that level's own
+ * allocation). A missing stage means a new player, whose stage equals the schedule.
  */
 
 import { MAX_GATE_TIER, MAX_PATROL_TIER } from './loadout';
 
 export const HAZARD_SCHEDULE_MANIFEST_ID = 'mazer-hazard-schedule' as const;
-export const HAZARD_SCHEDULE_VERSION = 1;
+export const HAZARD_SCHEDULE_VERSION = 2;
 
 export type HazardUnitKind = 'pulseGate' | 'sentry' | 'hunter' | 'shard';
 
@@ -35,7 +44,8 @@ export const HAZARD_INTRO_SCHEDULE: readonly { readonly level: number; readonly 
   { level: 10, unit: 'pulseGate' },
   { level: 20, unit: 'sentry' },
   { level: 35, unit: 'hunter' },
-  { level: 60, unit: 'shard' }
+  // v2: the level the shard lock roll starts; the first lock level (102) is where shards are first met.
+  { level: 100, unit: 'shard' }
 ];
 
 export const HAZARD_SCHEDULE_FIRST_LEVEL = HAZARD_INTRO_SCHEDULE[0]!.level;
@@ -55,6 +65,58 @@ export const HAZARD_EXPOSURE_STAGE_MAX = HAZARD_INTRO_SCHEDULE.length;
 
 /** Manifest `forever.shardCountGrowsEveryLevels`: one more shard per this many levels past saturation (H8). */
 export const HAZARD_SHARD_GROWTH_LEVELS = 50;
+
+/**
+ * Curve A (first-time cards spec section 3, approved D4): the chance a level carries shards (locks its star). 0 below
+ * the shard entry level, 30% there, rising linearly to 100% at `HAZARD_SHARD_LOCK.fullFromLevel` and held.
+ */
+export const HAZARD_SHARD_LOCK = {
+  /** Salt of the level hash ("LOCK"), so the lock roll never correlates with the Switch roll (salt 0x6a09e667). */
+  salt: 0x4c4f434b,
+  chanceAtEntry: 0.3,
+  fullFromLevel: 283
+} as const;
+
+/** Integer hash (lowbias32) of the level with the lock salt: the same hash as the Switch cadence (F1). */
+const hashShardLockLevel = (level: number): number => {
+  let value = (Math.trunc(level) ^ HAZARD_SHARD_LOCK.salt) >>> 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846ca68b) >>> 0;
+  value ^= value >>> 16;
+  return value >>> 0;
+};
+
+const shardEntryLevel = (): number => HAZARD_INTRO_SCHEDULE.find((entry) => entry.unit === 'shard')!.level;
+
+/** Curve A: 0 below the shard entry level, then `0.3 + 0.7 * (L - entry) / (full - entry)`, 1 from `fullFromLevel`. */
+export const resolveShardLockChance = (level: number): number => {
+  const entry = shardEntryLevel();
+  if (!Number.isFinite(level) || level < entry) {
+    return 0;
+  }
+  if (level >= HAZARD_SHARD_LOCK.fullFromLevel) {
+    return 1;
+  }
+  const t = (Math.trunc(level) - entry) / (HAZARD_SHARD_LOCK.fullFromLevel - entry);
+  return HAZARD_SHARD_LOCK.chanceAtEntry + ((1 - HAZARD_SHARD_LOCK.chanceAtEntry) * t);
+};
+
+/** Whether `level` carries shards (a locked star). Keyed on the level only: same level, same answer, every board. */
+export const isShardLockLevel = (level: number): boolean => {
+  const chance = resolveShardLockChance(level);
+  return chance >= 1 || (chance > 0 && (hashShardLockLevel(level) / 0x100000000) < chance);
+};
+
+/** The first lock level at or after `from` (always found: every level from `fullFromLevel` locks). */
+export const resolveShardFirstLockLevel = (from: number = shardEntryLevel()): number => {
+  let level = Math.max(shardEntryLevel(), Number.isFinite(from) ? Math.trunc(from) : 0);
+  while (!isShardLockLevel(level)) {
+    level += 1;
+  }
+  return level;
+};
 
 /** Hunter speed divisor by tier (manifest: 3 at intro, never below 2). */
 export const HUNTER_SPEED_DIVISORS: readonly number[] = [3, 2];
@@ -119,9 +181,18 @@ export interface AllocateHazardUnitsOptions {
 
 export const HAZARD_SCHEDULE_MAX_LEVEL = 1_000_000;
 
-/** Number of intro entries at or below `level`. */
+/**
+ * The level a kind is first met on by a player on the schedule: its intro level, and for the shard the first lock
+ * level at or after its entry (v2: 102).
+ */
+export const resolveHazardKindFirstLevel = (unit: HazardUnitKind): number => {
+  const entry = HAZARD_INTRO_SCHEDULE.find((candidate) => candidate.unit === unit)!;
+  return unit === 'shard' ? resolveShardFirstLockLevel(entry.level) : entry.level;
+};
+
+/** Number of kinds a player on the schedule has met by `level` (each counted from its first level). */
 export const resolveScheduledStage = (level: number): number => (
-  HAZARD_INTRO_SCHEDULE.filter((entry) => entry.level <= level).length
+  HAZARD_INTRO_SCHEDULE.filter((entry) => resolveHazardKindFirstLevel(entry.unit) <= level).length
 );
 
 /** The stage actually used: never above the schedule, never below 0. */
@@ -205,8 +276,11 @@ export const allocateHazardUnits = (level: number, options: AllocateHazardUnitsO
   }
   const scheduledStage = resolveScheduledStage(level);
   const exposureStage = resolveEffectiveExposureStage(level, options.exposureStage);
-  // A player behind the schedule gets the intro level of the next skipped kind.
-  const allocationLevel = exposureStage < scheduledStage ? HAZARD_INTRO_SCHEDULE[exposureStage]!.level : level;
+  // A player behind the schedule gets the intro level of the next skipped kind. The shard (last kind) is placed with
+  // the level's own allocation instead, and only on a lock level: its first encounter is the first lock level at or
+  // after the player reaches it.
+  const skipped = exposureStage < scheduledStage ? HAZARD_INTRO_SCHEDULE[exposureStage]! : null;
+  const allocationLevel = skipped === null || skipped.unit === 'shard' ? level : skipped.level;
 
   const state: HazardTailState = { gates: 0, sentries: 0, hunters: 0, gateTier: 0, sentryTier: 0, hunterTier: 0 };
   if (allocationLevel >= introLevelOf('pulseGate')) state.gates = 1;
@@ -220,12 +294,21 @@ export const allocateHazardUnits = (level: number, options: AllocateHazardUnitsO
     tailUnits.push(unit);
   }
   let shards = 0;
-  if (allocationLevel >= introLevelOf('shard')) {
+  if (allocationLevel >= introLevelOf('shard') && isShardLockLevel(allocationLevel)) {
     shards = 1 + (allocationLevel >= saturationLevel
       ? Math.floor((allocationLevel - saturationLevel) / HAZARD_SHARD_GROWTH_LEVELS)
       : 0);
+    if (skipped?.unit === 'shard') {
+      // First-encounter shape (manifest: 1 shard, star locked), even past saturation.
+      shards = 1;
+    }
   }
-  const intro = HAZARD_INTRO_SCHEDULE.find((entry) => entry.level === allocationLevel);
+  let firstEncounter: HazardUnitKind | null;
+  if (skipped !== null) {
+    firstEncounter = skipped.unit === 'shard' ? (shards > 0 ? 'shard' : null) : skipped.unit;
+  } else {
+    firstEncounter = HAZARD_INTRO_SCHEDULE.find((entry) => resolveHazardKindFirstLevel(entry.unit) === allocationLevel)?.unit ?? null;
+  }
   return {
     manifestId: HAZARD_SCHEDULE_MANIFEST_ID,
     scheduleVersion: HAZARD_SCHEDULE_VERSION,
@@ -233,7 +316,7 @@ export const allocateHazardUnits = (level: number, options: AllocateHazardUnitsO
     scheduledStage,
     exposureStage,
     allocationLevel,
-    firstEncounter: intro === undefined ? null : intro.unit,
+    firstEncounter,
     gates: state.gates,
     sentries: state.sentries,
     hunters: state.hunters,

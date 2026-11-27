@@ -141,7 +141,8 @@ describe('level moments: intro cards and tier pips', () => {
   test('kinds that are not drawn yet get no card and no Guide row, but the stage still advances on schedule', () => {
     const storage = memoryStorage();
     const live = createHazardOnboarding({ enabled: true, resolveStorage: () => storage, saturationLevel: SATURATION, liveKinds: ['pulseGate'] })!;
-    for (let level = 1; level <= 61; level += 1) {
+    // Through the first shard lock level (102, manifest v2).
+    for (let level = 1; level <= 102; level += 1) {
       live.levelStart(level);
       live.levelCleared(level);
     }

@@ -123,6 +123,9 @@ kind is met alone before it is mixed with the others.
 | 60 | Shard | 1 shard; the star is locked until it is collected |
 | 36..sat | one unit every 15 levels | the existing convex-price tape (`loadout.ts`) under the caps above, blockers removed |
 
+  **Amended 2026-11-27 (manifest v2):** the Shard row above is history. Shards now enter at level 100 behind a per-level lock roll
+  (curve A) and are first met on level 102. See "Amendment 2026-11-27, manifest v2" at the end of this file.
+
   The draft's unlocks at 6/11/16 with spacing 5 are **rejected**. That pace spends the whole menu by about level 38 (the loadout doc's
   own ceiling) and stacks hazards onto the steepest part of the geometry ramp (L2-16). With unlocks at 10/20/35/60 the full cast appears
   within the first one or two sessions, where retention is decided. About 26 later units then spread over L36 to about L420, so something
@@ -260,3 +263,15 @@ The generation overlay is built as specified in the H2 row, behind the hazard la
 ## Update 2026-11-16, slice H8 (core only)
 
 The shard core is built and dormant (nothing outside `src/mazer-core/hazards` imports it; a test pins that): `shardSolvability.ts` (solver state = cell, tick mod P, invulnerable turns, next-shard index; the star is plain floor until every shard is collected; shards count only in order; witness, verifier, layered solvable query, last-shard route ticks) and `shards.ts` (`resolveShardRoutePlan`: count = the allocator's `shards`, strict route target from saturation `160 + 2 * (level - saturation)` ticks with band `[target, target + 1]` (since 2026-11-27 a detour target: band `[d + target, d + target + 1]` with `d` the maze's static start -> star distance, see section 2.6); deterministic `placeShards`; `computeShardLayer` = placement + shard verdict + escape slack, `failed` means try the next base). Saturation is a parameter (default `GEOMETRY_BUDGET_SATURATION_LEVEL`), so PROG-020 can move it. Rendering, pickup UI and wiring into generation are not part of this slice. Evidence: `docs/playbook-notes/2026-11-16-mazer-h8-shards-core.md`.
+
+## Amendment 2026-11-27, manifest v2 (locked gates from 100, curve A)
+
+- Signed by: Zac (owner), 2026-11-27, via chat, recorded as decision D4 in `docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md` section 0: "locked-gate chance 30% at L100 rising to 100% at L283 (curve A), plus hazard manifest v2 (the shard entry moves from 60 to 100, with the chance layer)". The hidden-path rule D8 (same section) was delegated and is recorded there.
+- Manifest: `docs/contracts/mazer-hazard-schedule.v2.json` (schema `mazer-hazard-schedule.v2.schema.json`) supersedes v1 for the allocator (`src/mazer-core/hazards/schedule.ts`, `HAZARD_SCHEDULE_VERSION` 2). The v1 files stay unchanged as the 2026-11-15 signed record.
+- What changes:
+  - The Shard intro entry moves from 60 to **100**. From 100 a level carries shards only when its lock roll says so: `lowbias32(level ^ 0x4c4f434b) / 2^32 < chance`, chance 0.3 at 100 rising linearly to 1 at **283**, held at 1 from there (`isShardLockLevel`). The roll is keyed on the level only, salted apart from the Switch roll. 105 of the 183 levels in 100..282 lock; the first are 102, 106, 108, 110, 115; the longest run without a lock after 100 is 6 levels.
+  - The shard is first met on the first lock level, **102** (`resolveHazardKindFirstLevel('shard')`, read by `resolveShardFirstLevel` for the first-time hint). The exposure stage counts the shard from there.
+  - Exposure catch-up: a player whose stage is 3 meets the shard on the first lock level at or after reaching it, as one shard (its first-encounter shape), with that level's own gates and enemies. Other skipped kinds keep the v1 rule (the intro level's allocation, one kind per level).
+  - "Hazards only ever add" no longer holds for shards in 100..282 (a level without a lock carries none). Gates, enemies and tiers still only add; from 283 every level carries shards and the count still grows by one every 50 levels past saturation.
+  - Hidden path (D8, slice 5): every hazard graph built through `createLegacyMazeHazardGraph` walls the two border openings of each Switch (`maskLegacyBleedGatedCells`), so shard placement, the route verdict and every other hazard read treat the wrap behind an unlit Switch as blocked. `tests/reset/legacy-shard-hidden-path-solvability.test.ts` proves it on the 81 levels in 100..282 that carry both a Switch and a lock.
+- Unchanged: hazards still ship only behind `?lab=hazards` (build default off). Nothing a player sees changes in the default build. The hazard seed mixes the schedule version, so hazard placements behind the lab switch differ from v1 on the same maze; the maze geometry does not.

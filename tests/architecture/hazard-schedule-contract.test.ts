@@ -133,3 +133,62 @@ describe('MAZER-HAZ-002 hazard schedule manifest v1 (slice H0)', () => {
     expect(manifest.status).toBe('signed-not-wired');
   });
 });
+
+describe('hazard schedule manifest v2 (first-time cards spec slice 6, D4)', () => {
+  const MANIFEST_V2 = 'docs/contracts/mazer-hazard-schedule.v2.json';
+  const SCHEMA_V2 = 'docs/contracts/mazer-hazard-schedule.v2.schema.json';
+  const SPEC = 'docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md';
+  const v1 = readJson(MANIFEST);
+  const v2 = readJson(MANIFEST_V2);
+  const schemaV2 = readJson(SCHEMA_V2);
+
+  test('the v2 manifest satisfies its schema, and the validator still rejects a broken one', () => {
+    expect(validate(schemaV2, v2)).toEqual([]);
+    const broken = JSON.parse(JSON.stringify(v2));
+    broken.shardLock.curve = 'B';
+    delete broken.shardLock.salt;
+    broken.version = 1;
+    expect(validate(schemaV2, broken).length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('v2 moves only the shard entry (60 -> 100) and adds the curve-A lock layer; v1 stays the signed record', () => {
+    expect(v2.supersedes).toBe(MANIFEST);
+    expect(v2.intro.map((entry: any) => [entry.level, entry.unit])).toEqual([
+      [10, 'pulseGate'],
+      [20, 'sentry'],
+      [35, 'hunter'],
+      [100, 'shard']
+    ]);
+    expect(v1.intro.map((entry: any) => entry.level)).toEqual([10, 20, 35, 60]);
+    expect(v2.shardLock).toMatchObject({
+      curve: 'A',
+      salt: '0x4c4f434b',
+      chanceBelowEntry: 0,
+      chanceAtEntry: 0.3,
+      fullFromLevel: 283,
+      firstLockLevel: 102,
+      lockLevelsBelowFull: 105
+    });
+    // Everything outside the shard entry, the lock layer, the exposure rule and the record is v1 unchanged.
+    for (const key of ['manifestId', 'flag', 'kinds', 'tail', 'caps', 'fairness', 'rejected']) {
+      expect(v2[key], key).toEqual(v1[key]);
+    }
+    expect(v2.intro.slice(0, 3)).toEqual(v1.intro.slice(0, 3));
+    expect({ ...v2.forever, shardsOnEveryLevelFrom: undefined }).toEqual({ ...v1.forever, shardsOnEveryLevelFrom: undefined });
+    expect(v2.forever.shardsOnEveryLevelFrom).toBe(v2.shardLock.fullFromLevel);
+    expect(v2.flag.buildDefaultEnabled).toBe(HAZARD_LAYER_BUILD_DEFAULT);
+  });
+
+  test('v2 is signed by the D4 decision and the product contract carries the amendment', () => {
+    const spec = read(SPEC);
+    expect(v2.contract.signedBy).toBe('Zac, 2026-11-27, via chat');
+    expect(spec).toContain(v2.contract.signedWords);
+    expect(spec).toContain('| D4 | Curve and schedule |');
+    expect(v2.shardLock.decision).toContain(SPEC);
+    const doc = read(PRODUCT_CONTRACT);
+    expect(doc).toContain('## Amendment 2026-11-27, manifest v2 (locked gates from 100, curve A)');
+    expect(doc).toContain(MANIFEST_V2);
+    expect(doc).toContain(v2.contract.signedWords);
+    expect(read(v2.contract.doc)).toBe(doc);
+  });
+});

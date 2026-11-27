@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mazer-hazard-schedule.v2",
+  "title": "Mazer hazard schedule manifest v2",
+  "description": "Structural schema only. Cross-field rules (intro levels strictly ascending, caps consistent, doc and graph contract signed, nothing wired) are enforced by tests/architecture/hazard-schedule-contract.test.ts (v2 block).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "manifestId", "version", "status", "supersedes", "contract", "flag", "clock", "contact", "kinds", "intro", "shardLock", "tail", "caps", "fairness", "exposure", "forever", "rejected"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "manifestId": { "const": "mazer-hazard-schedule" },
+    "version": { "const": 2 },
+    "status": { "const": "signed-not-wired" },
+    "supersedes": { "const": "docs/contracts/mazer-hazard-schedule.v1.json" },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doc", "graphContract", "signedBy", "signedWords"],
+      "properties": {
+        "doc": { "type": "string", "pattern": "^docs/.+\\.md$" },
+        "graphContract": { "type": "string", "pattern": "^docs/.+\\.md$" },
+        "signedBy": { "type": "string", "minLength": 1 },
+        "signedWords": { "type": "string", "minLength": 1 }
+      }
+    },
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buildDefaultEnabled", "labSwitch", "note"],
+      "properties": {
+        "buildDefaultEnabled": { "const": false },
+        "labSwitch": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tickSource", "startsOn", "stopsOn", "catchUp"],
+      "properties": {
+        "tickSource": { "const": "repeatIntervalMs" },
+        "startsOn": { "const": "first-input" },
+        "stopsOn": {
+          "type": "array",
+          "items": {
+            "enum": ["pause", "overlay", "visibilitychange", "blur"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "catchUp": { "const": false }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consequence", "rewindMs", "invulnerableTicksPlay", "invulnerableTicksValidator", "runtimeFallback", "gateCloseOnPlayer", "hunterBurnoutContacts", "penalty"],
+      "properties": {
+        "consequence": { "const": "rewind-to-last-trail-junction" },
+        "rewindMs": { "type": "integer", "minimum": 0 },
+        "invulnerableTicksPlay": { "type": "integer", "minimum": 0 },
+        "invulnerableTicksValidator": { "type": "integer", "minimum": 0 },
+        "runtimeFallback": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "gateCloseOnPlayer": { "const": "eject-one-cell-back-no-contact" },
+        "hunterBurnoutContacts": { "type": "integer", "minimum": 1 },
+        "penalty": { "const": "time-and-distance-only" }
+      }
+    },
+    "kinds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pulseGate", "sentry", "hunter", "shard"],
+      "properties": {
+        "pulseGate": { "type": "object" },
+        "sentry": { "type": "object" },
+        "hunter": { "type": "object" },
+        "shard": { "type": "object" }
+      }
+    },
+    "intro": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["level", "unit", "firstEncounter"],
+        "properties": {
+          "level": { "type": "integer", "minimum": 2 },
+          "unit": {
+            "enum": ["pulseGate", "sentry", "hunter", "shard"]
+          },
+          "firstEncounter": { "type": "object" }
+        }
+      }
+    },
+    "shardLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["curve", "decision", "roll", "salt", "chanceBelowEntry", "chanceAtEntry", "fullFromLevel", "chanceShape", "firstLockLevel", "lockLevelsBelowFull", "firstEncounterOn"],
+      "properties": {
+        "curve": { "const": "A" },
+        "decision": { "type": "string", "minLength": 1 },
+        "roll": { "type": "string", "minLength": 1 },
+        "salt": { "type": "string", "pattern": "^0x[0-9a-f]{8}$" },
+        "chanceBelowEntry": { "const": 0 },
+        "chanceAtEntry": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fullFromLevel": { "type": "integer", "minimum": 2 },
+        "chanceShape": { "type": "string", "minLength": 1 },
+        "firstLockLevel": { "type": "integer", "minimum": 2 },
+        "lockLevelsBelowFull": { "type": "integer", "minimum": 0 },
+        "firstEncounterOn": { "const": "first-lock-level-at-or-after-stage" }
+      }
+    },
+    "tail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromLevel", "untilLevel", "everyLevels", "unitsPerStep", "pricedBy", "blockersRemoved"],
+      "properties": {
+        "fromLevel": { "type": "integer", "minimum": 2 },
+        "untilLevel": { "const": "geometry-saturation" },
+        "everyLevels": { "type": "integer", "minimum": 1 },
+        "unitsPerStep": { "type": "integer", "minimum": 1 },
+        "pricedBy": { "type": "string" },
+        "blockersRemoved": { "const": true }
+      }
+    },
+    "caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gates", "sentries", "hunters", "enemiesTotal", "shards"],
+      "properties": {
+        "gates": { "type": "integer", "minimum": 0 },
+        "sentries": { "type": "integer", "minimum": 0 },
+        "hunters": { "type": "integer", "minimum": 0 },
+        "enemiesTotal": { "type": "integer", "minimum": 0 },
+        "shards": { "const": "tail-rule" }
+      }
+    },
+    "fairness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["escapeSlackRatioMin", "noFragileStepInFirstWitnessSteps", "unknownVerdictCountsAsFail", "neverShipUnsolvable"],
+      "properties": {
+        "escapeSlackRatioMin": { "type": "number", "minimum": 0, "maximum": 1 },
+        "noFragileStepInFirstWitnessSteps": { "type": "integer", "minimum": 0 },
+        "unknownVerdictCountsAsFail": { "const": true },
+        "neverShipUnsolvable": { "const": true }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stages", "rule", "newPlayerStageEqualsSchedule"],
+      "properties": {
+        "stages": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "integer" },
+            "max": { "type": "integer" }
+          }
+        },
+        "rule": { "type": "string" },
+        "newPlayerStageEqualsSchedule": { "const": true }
+      }
+    },
+    "forever": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["axis", "fromLevel", "minRiseTicksPerLevel", "shardCountGrowsEveryLevels", "shardsOnEveryLevelFrom"],
+      "properties": {
+        "axis": { "const": "shard-route-target" },
+        "fromLevel": { "const": "geometry-saturation" },
+        "minRiseTicksPerLevel": { "type": "integer", "minimum": 1 },
+        "shardCountGrowsEveryLevels": { "type": "integer", "minimum": 1 },
+        "shardsOnEveryLevelFrom": { "type": "integer", "minimum": 2 }
+      }
+    },
+    "rejected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["draftUnlockLevels", "staticBlocker", "items", "dormantKinds"],
+      "properties": {
+        "draftUnlockLevels": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "staticBlocker": { "type": "string" },
+        "items": { "type": "string" },
+        "dormantKinds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

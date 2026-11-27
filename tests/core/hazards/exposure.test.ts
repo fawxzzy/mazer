@@ -142,11 +142,12 @@ describe('hazard exposure record: migration and tampered saves', () => {
   });
 
   test('a progression reset never regresses: the stored stage and shown cards survive a lower level', () => {
-    const veteran = playThrough(createEmptyHazardExposureRecord(), 1, 70);
+    // Through the first shard lock level (102, manifest v2) so the veteran has met every kind.
+    const veteran = playThrough(createEmptyHazardExposureRecord(), 1, 102);
     const shown: HazardExposureRecord = { ...veteran, introsShown: [...HAZARD_EXPOSURE_KIND_ORDER] };
     // Back to level 1: the maze is plain (the read-time clamp), the record is untouched.
     expect(resolveHazardExposureStage(shown, 1)).toBe(0);
-    const replayed = playThrough(shown, 1, 70);
+    const replayed = playThrough(shown, 1, 102);
     expect(replayed.stage).toBe(4);
     expect(replayed.introsShown).toEqual(HAZARD_EXPOSURE_KIND_ORDER);
     expect(parseHazardExposureRecord(serializeHazardExposureRecord(replayed))).toEqual(replayed);
