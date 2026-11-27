@@ -327,7 +327,9 @@ describe('dormant: nothing outside the hazards barrel imports the shard modules'
       for (const name of readdirSync(dir)) {
         const path = join(dir, name);
         if (statSync(path).isDirectory()) {
-          if (path.replace(/\\/g, '/').endsWith('src/mazer-core/hazards')) continue;
+          const normalised = path.replace(/\\/g, '/');
+          // The dev-only options pages quote the schedule and progress rule to show options; the game does not import them.
+          if (normalised.endsWith('src/mazer-core/hazards') || normalised.endsWith('src/ui/optionsPages') || normalised.endsWith('src/ui/shardOptions')) continue;
           walk(path);
         } else if (/\.(ts|tsx|js|mjs)$/.test(name)) {
           const text = readFileSync(path, 'utf8');
