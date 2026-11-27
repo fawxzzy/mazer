@@ -5,3 +5,11 @@
 - Rule: fix a failing test's measurement, never its thresholds; a test that needs the browser runs after the install step in the required job, via the `run after browser install` category, not by dropping it from CI. A test that reads another repo's files stays excluded with that exact reason: a committed copy would freeze the "live contract" it claims to compare, which is not coverage.
 - Evidence: before, `npx vitest run tests/maze/maze-soak.test.ts` failed twice (finalHeapUsed 42265216 / 44450992, finalNearLowerBand=false) and passed with `NODE_OPTIONS=--expose-gc`; after, it passed 4 of 4 runs (default, threads with 4 workers). The two browser files: 18 and 38 tests passed locally. Negative controls on the new check: browser file also run in the folder step (fails: misplaced + run twice), browser step removed (fails: stale), browser step before the install step (fails: misplaced). CI log lines for the new step: see the PR body.
 - Status: in review. The two playbook tests remain excluded: `playbook-adoption-evidence` compares the Mazer export with `../playbook/exports/playbook.contract.example.v1.json`, `playbook-verification-report` validates against `../../schemas/atlas.playbook.verification.report.v1.json` (ATLAS root). Moving them needs the contract and schema published to a place CI can fetch, a separate decision.
+
+## Also in this change: four hardening notes from the #736 review (scripts/verify/check-test-coverage.mjs)
+
+1. Step splitting works on any list item at step indent (`- name:`, `- run:`, `- uses:`, `- id:`, `- if:`), so a bare `- run:` step is no longer merged into the previous step.
+2. A counted test step in job `verify` with `if:` or `continue-on-error` (step level, or job level `if:` / `continue-on-error`) is reported, and does not count as protection (`continue-on-error: false` is allowed). No existing step in verify.yml has either.
+3. A folder operand under a listed folder (for example `tests/reset/sub`) is treated as listed.
+4. The usage docstring names the folder-run-outside-job, required-file-outside-job, conditional-step and browser-order failures.
+New unit tests `tests/architecture/test-coverage-check.test.mjs` (9 cases, each negative case has a plain-step control); the real-workflow negative control (`continue-on-error: true` on the folder step) made the check fail and was reverted.
