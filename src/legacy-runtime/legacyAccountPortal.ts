@@ -420,11 +420,11 @@ export const advanceMazerSharedAuthMutationEpoch = (
   }
 };
 
+// 'reset-password' opens the portal's request form. It never carries `recovery=1`: that flag means
+// "an emailed link just landed here", so the portal said the link had expired before any email was
+// sent (player report 2026-11-24).
 export const buildMazerAccountPortalUrl = (route: MazerAccountPortalRoute): string => {
   const url = new URL(`/${route}`, MAZER_ACCOUNT_PORTAL_ORIGIN);
-  if (route === 'reset-password') {
-    url.searchParams.set('recovery', '1');
-  }
   url.searchParams.set('app', MAZER_ACCOUNT_APP);
   url.searchParams.set('returnTo', MAZER_CANONICAL_RETURN_URL);
   return url.toString();
