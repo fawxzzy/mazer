@@ -109,8 +109,8 @@ export const resolveLegacyProgressionResetStrategy = (
 
 /**
  * Account-scoped storage key bases cleared/rewritten by a reset. They are the
- * literal values of LEGACY_PROGRESSION_STORAGE_KEY, LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY
- * and MAZE_CYCLE_TELEMETRY_STORAGE_KEY (a test pins equality). Each is read as
+ * literal values of LEGACY_PROGRESSION_STORAGE_KEY, LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY,
+ * MAZE_CYCLE_TELEMETRY_STORAGE_KEY and FIRST_TIME_SEEN_STORAGE_KEY_BASE (a test pins equality). Each is read as
  * `<base>:<scope>` where scope is `user:<id>` or `guest`.
  *
  * NEVER in this list: mazer.game-toggles.v1 (device settings),
@@ -123,7 +123,10 @@ export const LEGACY_PROGRESSION_RESET_LOCAL_EFFECTS = Object.freeze([
   // Pending completions for the pre-reset levels must never replay into the freshly reset account.
   Object.freeze({ action: 'remove' as const, keyBase: 'mazer.remote-completion-outbox.v1' }),
   // Old run receipts would otherwise feed exact-gap recovery against the new baseline.
-  Object.freeze({ action: 'remove' as const, keyBase: 'mazer.cycle-telemetry.v1' })
+  Object.freeze({ action: 'remove' as const, keyBase: 'mazer.cycle-telemetry.v1' }),
+  // First-time cards spec D7: a reset clears this account's seen + met record, so the cards show again.
+  // FIRST_TIME_SEEN_STORAGE_KEY_BASE in legacyFirstTimeStore.ts (a test pins equality).
+  Object.freeze({ action: 'remove' as const, keyBase: 'mazer.firsttime.seen.v1' })
 ]);
 
 export interface LegacyResetStorage {

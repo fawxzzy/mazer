@@ -62,6 +62,12 @@ export interface TutorialAckStoreOptions {
   readonly accountId: string;
   /** ISO timestamp source; injected for determinism. Defaults to the wall clock. */
   readonly now?: () => string;
+  /**
+   * Optional full storage key, used verbatim instead of `mazer.tutorial.acks:<encoded accountId>`. For stores that
+   * share this JSON shape but live under their own key (the first-time cards record, `mazer.firsttime.seen.v1:<scope>`,
+   * which a progress reset clears without touching the level-1 device hint). Omitted = the default key, unchanged.
+   */
+  readonly storageKey?: string;
 }
 
 /** Account-scoped key. The id is URI-encoded so distinct accounts can never collide on a shared prefix. */
@@ -150,7 +156,11 @@ export const serializeTutorialAcks = (acks: Readonly<Record<string, StoredTutori
 export const createTutorialAckStore = (options: TutorialAckStoreOptions): TutorialAckStore => {
   const { storage, accountId } = options;
   const now = options.now ?? (() => new Date().toISOString());
-  const storageKey = buildTutorialAckStorageKey(accountId);
+  const defaultKey = buildTutorialAckStorageKey(accountId);
+  if (options.storageKey !== undefined && (typeof options.storageKey !== 'string' || options.storageKey.trim().length === 0)) {
+    throw new TypeError('storageKey, when given, must be a non-empty string.');
+  }
+  const storageKey = options.storageKey ?? defaultKey;
   const corruptBackupKey = `${storageKey}.corrupt`;
   // Acknowledgements that could not be persisted this session; merged over whatever storage holds.
   const overlay = new Map<string, StoredTutorialAck>();

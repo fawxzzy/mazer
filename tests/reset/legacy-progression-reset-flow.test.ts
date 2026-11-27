@@ -25,6 +25,9 @@ import {
 } from '../../src/legacy-runtime/legacyProgression';
 import { MAZE_CYCLE_TELEMETRY_STORAGE_KEY } from '../../src/legacy-runtime/mazeCycleTelemetry';
 import { LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY } from '../../src/legacy-runtime/legacyRemoteProgression';
+import { FIRST_TIME_SEEN_STORAGE_KEY_BASE, resolveFirstTimeSeenStorageKey } from '../../src/legacy-runtime/legacyFirstTimeStore';
+import { LEGACY_CONTROL_HINT_DEVICE_ID } from '../../src/legacy-runtime/legacyControlHint';
+import { buildTutorialAckStorageKey } from '../../src/tutorial/tutorialAckStore';
 
 const NOW = '2026-11-06T12:00:00.000Z';
 
@@ -100,7 +103,8 @@ describe('local effects plan', () => {
     expect(LEGACY_PROGRESSION_RESET_LOCAL_EFFECTS.map((e) => e.keyBase)).toEqual([
       LEGACY_PROGRESSION_STORAGE_KEY,
       LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY,
-      MAZE_CYCLE_TELEMETRY_STORAGE_KEY
+      MAZE_CYCLE_TELEMETRY_STORAGE_KEY,
+      FIRST_TIME_SEEN_STORAGE_KEY_BASE
     ]);
     for (const effect of LEGACY_PROGRESSION_RESET_LOCAL_EFFECTS) {
       expect(effect.keyBase).not.toMatch(/game-toggles|auth|account-sync|tutorial/);
@@ -135,6 +139,26 @@ describe('local effects plan', () => {
     });
     expect(read.tracks.player.level).toBe('1');
     expect(read).toEqual(result.state);
+  });
+
+  test('first-time cards (spec D7): a reset removes the seen record of this account only; the device control hint and other scopes stay', () => {
+    const deviceHintKey = buildTutorialAckStorageKey(LEGACY_CONTROL_HINT_DEVICE_ID);
+    expect(deviceHintKey).toBe('mazer.tutorial.acks:device');
+    const store = new Map<string, string>([
+      [resolveFirstTimeSeenStorageKey('user:abc'), '{"version":1,"acks":{}}'],
+      [resolveFirstTimeSeenStorageKey('user:other'), 'KEEP-OTHER'],
+      [resolveFirstTimeSeenStorageKey('guest'), 'KEEP-GUEST'],
+      [deviceHintKey, 'KEEP-DEVICE']
+    ]);
+    const storage = {
+      removeItem: (key: string) => { store.delete(key); },
+      setItem: (key: string, value: string) => { store.set(key, value); }
+    };
+    expect(applyLegacyProgressionResetLocalEffects(storage, (base) => `${base}:user:abc`, NOW).ok).toBe(true);
+    expect(store.has('mazer.firsttime.seen.v1:user:abc')).toBe(false);
+    expect(store.get(resolveFirstTimeSeenStorageKey('user:other'))).toBe('KEEP-OTHER');
+    expect(store.get(resolveFirstTimeSeenStorageKey('guest'))).toBe('KEEP-GUEST');
+    expect(store.get(deviceHintKey)).toBe('KEEP-DEVICE');
   });
 
   test('reports ok:false instead of throwing when storage fails', () => {
