@@ -182,7 +182,8 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
       status: 'shared-with-board'
     },
     id: 'wrap',
-    text: 'Some mazes wrap around open edges. Edge stars fill with your colour as beams hit.'
+    // First-time cards (spec R2): this row is also the wrap card's body, so it reads right just after a wrap.
+    text: 'Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit.'
   },
   {
     // MAZER-L10: the bleed gate (Gate D "Pulse ring"). MAZER-VIS-067: the icon is the board's own SLEEPING gate: the pale plate and the ink ring, still.

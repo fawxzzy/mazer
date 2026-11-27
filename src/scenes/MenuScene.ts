@@ -356,6 +356,7 @@ import {
   type LegacyPathVisualStyle
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
+import { noteLegacyFirstTimeStep } from '../legacy-runtime/legacyFirstTimeHost';
 import { resolveLegacyHeaderControlFrame } from '../legacy-runtime/legacyHeaderControl';
 import {
   buildLegacyMenuRows,
@@ -7834,6 +7835,7 @@ export class MenuScene extends Phaser.Scene {
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
+    noteLegacyFirstTimeStep(this, previousPlayer, nextStep.player);
     if (this.shards) {
       this.noteLegacyShardArrival(nextStep.player);
     }
