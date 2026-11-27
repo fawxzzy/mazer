@@ -48,9 +48,16 @@ export const FOLDER_RUNS = [
   'tests/legacy-runtime',
   'tests/reset',
   'tests/render',
-  // The leftover folders (the "remaining test folders" CI job): the same whole-folder rule.
+  // The leftover folders (the "Verify the remaining tests folders" step): the same whole-folder rule.
   ...LEFTOVER_FOLDERS
 ];
+
+/**
+ * The job whose result is a required check on main ("TypeScript, contracts, and build"). check-test-coverage.mjs fails when a
+ * whole-folder run or a required-coverage file runs anywhere else: a red step in a non-required job does not block a merge.
+ */
+export const REQUIRED_CHECK_WORKFLOW = 'verify.yml';
+export const REQUIRED_CHECK_JOB = 'verify';
 
 export const RUNNER_FILES = {
   'run-navigation-core-required-tests.mjs': ['Navigation Core', NAVIGATION_CORE_REQUIRED_TESTS],

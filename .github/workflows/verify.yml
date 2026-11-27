@@ -148,6 +148,41 @@ jobs:
           --pool=threads
           --maxWorkers=4
 
+      # The 15 folders that no CI step ran before 2026-11-27 (tests/ai ... tests/visual), whole, so a new test there is
+      # covered without being named. They run in THIS job on purpose: "TypeScript, contracts, and build" is a required
+      # check, so a red test here blocks the merge (a separate job would not, unless the ruleset named it too). About
+      # 30 seconds of test time. Not run here:
+      # - the files named in the steps above (each runs once);
+      # - the files in config/ci-test-exclusions.json (needs browser / fails on main), enforced by check-test-coverage.mjs.
+      - name: Verify the remaining tests folders
+        run: >-
+          npx --no-install vitest run
+          tests/ai
+          tests/analysis
+          tests/config
+          tests/future-runtime
+          tests/maze
+          tests/mazeV2
+          tests/projections
+          tests/proof-surfaces
+          tests/scenes
+          tests/settings
+          tests/telemetry
+          tests/theme
+          tests/topology-proof
+          tests/ui
+          tests/visual
+          --exclude tests/visual/maze-lifecycle-analysis.test.mjs
+          --exclude tests/mazeV2/adapters.test.ts
+          --exclude tests/scenes/menu-runtime-diagnostics.test.ts
+          --exclude tests/scenes/menu-render-frame.test.ts
+          --exclude tests/scenes/menu-intent-runtime.test.ts
+          --exclude tests/analysis/live-auth-persistence-soak.test.mjs
+          --exclude tests/ui/dom-settings-primitives.test.ts
+          --exclude tests/maze/maze-soak.test.ts
+          --pool=threads
+          --maxWorkers=4
+
       # Every test file is run once, or sits in config/ci-test-exclusions.json with a one-line reason. Static check, no test runs.
       - name: Check every test file is run once or excluded
         run: node ./scripts/verify/check-test-coverage.mjs
@@ -178,57 +213,6 @@ jobs:
 
       - name: Verify the menu online counter paints in its slot and the leaderboard/profile icons are swapped (390, 360, 1280)
         run: node ./scripts/analysis/verify-menu-online-counter.mjs --skip-build
-
-  # The folders that no CI step ran before 2026-11-27 (tests/ai ... tests/visual), as a separate parallel job so the main
-  # job does not grow past ~15 minutes. Whole folders, so a new test there is covered without being named. Not run here:
-  # - the files named in the main job's steps above (they run there, inside the required check, so each runs once);
-  # - the files in config/ci-test-exclusions.json (needs browser / fails on main), enforced by check-test-coverage.mjs.
-  remaining-test-folders:
-    name: Remaining test folders
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      - name: Verify the remaining tests folders
-        run: >-
-          npx --no-install vitest run
-          tests/ai
-          tests/analysis
-          tests/config
-          tests/future-runtime
-          tests/maze
-          tests/mazeV2
-          tests/projections
-          tests/proof-surfaces
-          tests/scenes
-          tests/settings
-          tests/telemetry
-          tests/theme
-          tests/topology-proof
-          tests/ui
-          tests/visual
-          --exclude tests/visual/maze-lifecycle-analysis.test.mjs
-          --exclude tests/mazeV2/adapters.test.ts
-          --exclude tests/scenes/menu-runtime-diagnostics.test.ts
-          --exclude tests/scenes/menu-render-frame.test.ts
-          --exclude tests/scenes/menu-intent-runtime.test.ts
-          --exclude tests/analysis/live-auth-persistence-soak.test.mjs
-          --exclude tests/ui/dom-settings-primitives.test.ts
-          --exclude tests/maze/maze-soak.test.ts
-          --pool=threads
-          --maxWorkers=4
 
   ai-navigation-acceptance:
     name: AI navigation acceptance shard ${{ matrix.shard }}
