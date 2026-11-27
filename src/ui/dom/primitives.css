@@ -506,6 +506,8 @@
 .mazer-status-banner--rich .mazer-status-banner__message {
   grid-area: body;
   margin-top: var(--mazer-token-spacing-8, 8px);
+  /* Two-line bodies (the level-1 hint card: move line, then goal line) break where the copy breaks. */
+  white-space: pre-line;
 }
 
 .mazer-status-banner__heading {

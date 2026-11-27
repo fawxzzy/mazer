@@ -22,7 +22,7 @@ import type Phaser from 'phaser';
 import { centerOfCell } from '../render/boardTileBake';
 import { DEFAULT_BOARD_TILE_STYLE } from '../render/boardTileStyle';
 import { CoachMarkView } from '../render/coachMarkView';
-import type { MechanicIconId } from '../render/mechanicIcons';
+import { MECHANIC_ICON_ACCENT, type MechanicIconId } from '../render/mechanicIcons';
 import { SHARD_LOOK } from '../render/shardLook';
 import {
   estimateTextCardHeight,
@@ -37,7 +37,6 @@ import { SHARD_COACH_RING_OF_TILE } from '../render/shardPlayPresenter';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 import type { TutorialStorage } from '../tutorial/tutorialAckStore';
 import type { InFlowNoticeDismissReason, InFlowNoticeProps } from '../ui/notice/inFlowNotice';
-import { resolveLegacyAuthStorageScope } from './legacyAuth';
 import {
   bleedGateKey,
   readLegacyBleedGateTriggeredKeys,
@@ -51,8 +50,13 @@ import {
   type FirstTimeCardId,
   type FirstTimeTouchKind
 } from './legacyFirstTimeCards';
-import { createLegacyFirstTimeSession, type LegacyFirstTimeSession } from './legacyFirstTimeSession';
-import { mergeLegacyFirstTimeGuestRecord } from './legacyFirstTimeStore';
+import {
+  forgetLegacyFirstTimeSceneSession,
+  resolveLegacyFirstTimeSceneScope,
+  resolveLegacyFirstTimeSceneSession
+} from './legacyFirstTimeSceneSession';
+import type { LegacyFirstTimeSession } from './legacyFirstTimeSession';
+import { setLegacyFirstTimeHintListener } from './legacyFirstTimeHintSignal';
 import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
 import { createLegacyInFlowNoticeHost, type LegacyInFlowNoticeHost } from './legacyInFlowNoticeHost';
 import type { LegacyPoint } from './legacyMaze';
@@ -65,7 +69,9 @@ export const FIRST_TIME_CARD_ICON: Readonly<Partial<Record<FirstTimeCardId, Mech
   'mechanic.wrap': 'wrap',
   'mechanic.switch': 'switch',
   'mechanic.locked-gate': 'locked-star',
-  'mechanic.pulse-gate': 'pulse-gate'
+  'mechanic.pulse-gate': 'pulse-gate',
+  'tip.trail': 'trail',
+  'level-1.goal': 'goal'
 });
 
 /** The notice props this host sends (the rich layout: heading + icon). */
@@ -176,6 +182,16 @@ const samePoint = (a: LegacyPoint | null | undefined, b: LegacyPoint | null | un
   a != null && b != null && a.x === b.x && a.y === b.y
 );
 
+/**
+ * Pure (slice 9, the trail tip): a step that undoes the step just before it on the same level, i.e. the player walked
+ * back onto the cell they came from, which wipes that bit of trail.
+ */
+export const isLegacyFirstTimeBackstep = (
+  previous: { readonly from: LegacyPoint; readonly to: LegacyPoint } | null,
+  from: LegacyPoint,
+  to: LegacyPoint
+): boolean => previous !== null && samePoint(previous.to, from) && samePoint(previous.from, to);
+
 /* ------------------------------------------------------------------ */
 /* Controller: no Phaser, no DOM (the scene binding below feeds it)    */
 /* ------------------------------------------------------------------ */
@@ -229,6 +245,11 @@ export interface LegacyFirstTimeCardController {
   step(from: LegacyPoint, to: LegacyPoint, level: object & Pick<LegacyFirstTimeMazeView, 'width' | 'height'>, nowMs: number): void;
   /** Once per frame. Returns the coach mark to draw, or null. */
   frame(input: LegacyFirstTimeFrameInput): LegacyFirstTimeCoachDraw | null;
+  /**
+   * A touch from outside the play loop (slice 9: the level-1 control hint card was dismissed). It is handled on the next
+   * frame, where the goal cell is known.
+   */
+  queueTouch(kind: FirstTimeTouchKind): void;
   describe(): { activeCardId: FirstTimeCardId | null; pendingCardId: FirstTimeCardId | null; coach: LegacyFirstTimeCoachDraw | null };
   destroy(): void;
 }
@@ -255,6 +276,9 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
   let destroyed = false;
   /** Switches already lit when last looked at; null = not looked at on this level yet (sync without firing). */
   let knownLitSwitches: Set<string> | null = null;
+  /** The last accepted step on this level (the trail tip's step-back test). */
+  let lastStep: { from: LegacyPoint; to: LegacyPoint } | null = null;
+  let queuedTouches: FirstTimeTouchKind[] = [];
 
   const closeNotice = (): void => {
     pending = null;
@@ -283,6 +307,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
     const previous = level;
     level = current;
     knownLitSwitches = null;
+    lastStep = null;
     if (previous === null) return;
     // A new level: a card still up ends as a level end (acked only if it was up 800 ms, S5); the coach goes too.
     ensureSession().startLevel(nowMs);
@@ -304,12 +329,22 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
     const { card, anchor } = pending;
     const notice = card.notice;
     pending = null;
-    if (notice === null) return;
+    if (notice === null) {
+      // A coach-only card (slice 9: the "Reach these" ring on the twin stars) has nothing to read or dismiss: it counts
+      // as seen once its ring is drawn, and the ring stays for the card time plus the linger (R4), or until reached.
+      // With nothing to point at (no goal known) it closes unseen, so a later level can still offer it.
+      session?.dismiss(anchor !== null ? 'action' : 'closed', input.nowMs);
+      if (anchor !== null && coach !== null && coach.cardId === card.id) {
+        coach.until = input.nowMs + FIRST_TIME_AUTO_DISMISS_MS + FIRST_TIME_COACH_LINGER_MS;
+      }
+      return;
+    }
+    // The coach on screen now (this card's, or a goal ring still lingering) stays clear too.
     const keepClear: (TextCardRect | null)[] = [
       input.player ? input.cellRect(input.player, TEXT_CARD_MARKER_HALO_OF_TILE) : null,
       input.goal ? input.cellRect(input.goal, TEXT_CARD_MARKER_HALO_OF_TILE) : null,
-      anchor ? input.cellRect(anchor) : null,
-      anchor ? input.coachPillRect ?? null : null,
+      coach !== null ? input.cellRect(coach.anchor) : null,
+      coach !== null ? input.coachPillRect ?? null : null,
       ...(input.mechanicCells ?? []).map((cell) => input.cellRect(cell))
     ];
     const spot = resolveLegacyFirstTimeCardSpot({
@@ -348,7 +383,10 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
     if (card === null) return;
     const anchor = card.coach === null ? null : resolveAnchor(card.coach.target);
     pending = { card, anchor };
-    coach = card.coach !== null && anchor !== null ? { cardId: card.id, anchor, label: card.coach.label, until: null, drawn: false } : null;
+    // A card without a ring (the trail tip) leaves a ring already on screen alone (the goal ring keeps lingering).
+    if (card.coach !== null) {
+      coach = anchor !== null ? { cardId: card.id, anchor, label: card.coach.label, until: null, drawn: false } : null;
+    }
   };
 
   /** A Switch went from unlit to lit since the last frame (lighting happens in the scene's frame, not on the step). */
@@ -384,9 +422,16 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
           lingerCoach(nowMs);
         }
       }
-      if (!isLegacyFirstTimeWrapStep(from, to, current)) return;
-      // The wrap card rings the open edge cell the player walked off.
-      fire(s, ['wrap-step'], nowMs, (target) => (target === 'wrapped-edge-cell' ? { x: from.x, y: from.y } : null));
+      const touches: FirstTimeTouchKind[] = [];
+      if (isLegacyFirstTimeWrapStep(from, to, current)) touches.push('wrap-step');
+      if (isLegacyFirstTimeBackstep(lastStep, from, to)) touches.push('trail-backstep');
+      lastStep = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } };
+      if (touches.length === 0) return;
+      // The wrap card rings the open edge cell the player walked off; the trail tip has no ring.
+      fire(s, touches, nowMs, (target) => (target === 'wrapped-edge-cell' ? { x: from.x, y: from.y } : null));
+    },
+    queueTouch: (kind) => {
+      if (!destroyed) queuedTouches.push(kind);
     },
     frame: (input) => {
       if (destroyed) return null;
@@ -395,6 +440,11 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       const s = ensureSession();
       syncLevel(input.level, input.nowMs);
       pollSwitches(s, input);
+      if (queuedTouches.length > 0 && input.playing && input.level !== null) {
+        const touches = queuedTouches;
+        queuedTouches = [];
+        fire(s, touches, input.nowMs, (target) => (target === 'goal-stars' ? input.goal : null));
+      }
       const visible = input.playing && input.visible;
       deps.notices.setHidden(!visible);
       // A card with a coach mark waits until the mark has been drawn once, so its label pill can be kept clear.
@@ -422,6 +472,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       destroyed = true;
       pending = null;
       coach = null;
+      queuedTouches = [];
       deps.notices.destroy();
     }
   };
@@ -473,25 +524,17 @@ const FIRST_TIME_COACH_DEPTH = 40;
 
 const COACH_ACCENT: Readonly<Partial<Record<FirstTimeCardId, number>>> = Object.freeze({
   'mechanic.wrap': phaserMaterialAliases['semantic.info'],
-  'mechanic.switch': phaserMaterialAliases['semantic.info']
+  'mechanic.switch': phaserMaterialAliases['semantic.info'],
+  // The goal ring takes the end star's own colour (the goal icon's accent), so it reads as "these stars".
+  'level-1.goal': MECHANIC_ICON_ACCENT.goal
 });
-
-const readWindowSearch = (): string => (typeof window === 'undefined' ? '' : window.location.search);
-const readDeviceStorage = (): TutorialStorage | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
 
 interface SceneHost {
   step(from: LegacyPoint, to: LegacyPoint): void;
+  queueTouch(kind: FirstTimeTouchKind): void;
 }
 
 const sceneHosts = new WeakMap<object, SceneHost | 'off'>();
-
 /** Board cell (0,0)-relative layout px -> the board container's local space, from the current tile bake. */
 const resolveCellLocal = (view: FirstTimeSceneView, cell: LegacyPoint): { x: number; y: number; tile: number } | null => {
   const bake = view.boardTileLayer?.currentBake ?? null;
@@ -506,34 +549,14 @@ const resolveCellLocal = (view: FirstTimeSceneView, cell: LegacyPoint): { x: num
 
 const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
   const view = scene as unknown as FirstTimeSceneView;
-  const resolveScope = (): string => resolveLegacyAuthStorageScope({ userId: view.authSnapshot?.userId ?? null });
-  const createSession = (scope: string): LegacyFirstTimeSession => {
-    const session = createLegacyFirstTimeSession({
-      search: readWindowSearch(),
-      deviceStorage: readDeviceStorage(),
-      resolveSceneStorage: () => view.resolveBrowserLocalStorage?.(),
-      scope
-    });
-    // P2: on sign-in the guest record merges into the account's (union, max revision). Never on a preview route.
-    if (session.enabled && !session.preview) {
-      const storage = view.resolveBrowserLocalStorage?.();
-      if (storage) mergeLegacyFirstTimeGuestRecord(storage, scope);
-    }
-    return session;
-  };
   // The flag is read once, here. Off: nothing else is created, read or drawn for this scene.
-  const probe = createSession(resolveScope());
-  if (!probe.enabled) return null;
+  if (!resolveLegacyFirstTimeSceneSession(scene).enabled) return null;
 
   const notices = createLegacyInFlowNoticeHost();
-  let firstSession: LegacyFirstTimeSession | null = probe;
   const controller = createLegacyFirstTimeCardController({
-    resolveScope,
-    createSession: (scope) => {
-      const reuse = firstSession;
-      firstSession = null;
-      return reuse ?? createSession(scope);
-    },
+    resolveScope: () => resolveLegacyFirstTimeSceneScope(scene),
+    // The scope the controller asks for is the scene's current one, so this is the shared session for it.
+    createSession: () => resolveLegacyFirstTimeSceneSession(scene),
     notices
   });
   const coachView = new CoachMarkView(scene, {
@@ -640,6 +663,7 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
     controller.destroy();
     coachView.destroy();
     sceneHosts.delete(scene);
+    forgetLegacyFirstTimeSceneSession(scene);
   });
 
   return {
@@ -647,8 +671,18 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       const maze = view.maze;
       if (!maze || view.mode !== 'play') return;
       controller.step(from, to, maze, scene.time.now);
-    }
+    },
+    queueTouch: (kind) => controller.queueTouch(kind)
   };
+};
+
+const resolveSceneHost = (scene: Phaser.Scene): SceneHost | null => {
+  const host = sceneHosts.get(scene);
+  if (host === 'off') return null;
+  if (host !== undefined) return host;
+  const installed = installSceneHost(scene);
+  sceneHosts.set(scene, installed ?? 'off');
+  return installed;
 };
 
 /**
@@ -656,13 +690,18 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
  * Flag off: one flag read on the first call, then a WeakMap lookup per step; nothing is drawn.
  */
 export const noteLegacyFirstTimeStep = (scene: Phaser.Scene, from: LegacyPoint, to: LegacyPoint): void => {
-  let host = sceneHosts.get(scene);
-  if (host === 'off') return;
-  if (host === undefined) {
-    const installed = installSceneHost(scene);
-    sceneHosts.set(scene, installed ?? 'off');
-    if (installed === null) return;
-    host = installed;
-  }
-  host.step(from, to);
+  resolveSceneHost(scene)?.step(from, to);
 };
+
+/**
+ * Slice 9: the level-1 control hint card went away (Got it, the first move, or its own timeout). The goal coach
+ * ("Reach these" on the twin stars) is offered on the next frame. Called by the DOM hint presenter
+ * (src/render/legacyControlHintOverlay.ts) through legacyFirstTimeHintSignal.ts, only while `?lab=firsttime` is on; flag
+ * off it installs nothing.
+ */
+export const noteLegacyFirstTimeControlHintDismissed = (scene: Phaser.Scene): void => {
+  resolveSceneHost(scene)?.queueTouch('control-hint-dismissed');
+};
+
+// The hint presenter signals through a dependency-free module (it must not load Phaser); this host answers it.
+setLegacyFirstTimeHintListener((scene) => noteLegacyFirstTimeControlHintDismissed(scene as Phaser.Scene));
