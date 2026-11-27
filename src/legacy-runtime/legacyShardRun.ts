@@ -4,18 +4,26 @@
  * src/render/shardSceneLayer.ts draws.
  *
  * Placement is the existing H8 core (`computeShardLayer` in src/mazer-core/hazards/shards.ts) over the
- * live maze graph, fed the gate specs that are live in play, so the shipped route is the one the
- * solvability verdict proved. Shards count only in order (`advanceShardProgress`); the star unlocks
- * when the last one is taken (`isStarUnlocked`).
+ * live maze graph with every bleed-gated wrap walled (`maskLegacyBleedGatedCells`, spec D8), fed the gate
+ * specs that are live in play, so the shipped route is the one the solvability verdict proved and it
+ * never needs a wrap behind an unlit Switch. Play has one base per level (no reject-and-try-next-base loop),
+ * so a strict level whose base misses the route band ships the nearest route the verdict passes
+ * (`onStrictMiss: 'nearest'`, `inBand` false) instead of no shards. Shards count only in order
+ * (`advanceShardProgress`); the star unlocks when the last one is taken (`isStarUnlocked`).
  *
  * Only built while the hazard layer is on (`?lab=hazards` or the build default); the scene keeps
  * `null` otherwise, so flag-off play never reaches this file. A placement that fails or throws ships
  * the level without shards (star unlocked), never a locked star the player cannot open.
  */
-import type { HazardSpec } from '../mazer-core/hazards/graphContract';
+import type { HazardGraph, HazardSpec } from '../mazer-core/hazards/graphContract';
 import { advanceShardProgress, computeShardLayer, isStarUnlocked, type ShardLayerStatus } from '../mazer-core/hazards/shards';
-import { createLegacyMazeHazardGraph } from './legacyHazardGraphAdapter';
+import { createLegacyMazeHazardGraph, maskLegacyBleedGatedCells } from './legacyHazardGraphAdapter';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
+
+/** Specs whose cells are all floor on the placement graph (a gate on a closed wrap opening cannot touch the route). */
+const specsOnGraph = (graph: HazardGraph, specs: readonly HazardSpec[]): readonly HazardSpec[] => (
+  specs.filter((spec) => (spec.kind === 'patrol' ? spec.route.every((cell) => graph.isWalkable(cell)) : graph.isWalkable(spec.cell)))
+);
 
 /** What a step onto a cell did: took the next shard, took the last one (star unlocks), or nothing. */
 export type LegacyShardArrival = 'collected' | 'unlocked' | null;
@@ -42,6 +50,8 @@ export interface LegacyShardDiagnostics {
   readonly cells: readonly LegacyPoint[];
   readonly digest: string;
   readonly routeTicks: number | null;
+  /** False when the shipped route missed the strict band (nearest-route fallback) or nothing shipped. */
+  readonly inBand: boolean;
   /** The placer's rejection codes when it did not place (diagnostics only). */
   readonly rejections: readonly string[];
   readonly computeMs: number;
@@ -55,6 +65,7 @@ export class LegacyShardRun {
   private status: ShardLayerStatus | 'off' = 'off';
   private digest = '';
   private routeTicks: number | null = null;
+  private inBand = false;
   private rejections: readonly string[] = [];
   private computeMs = 0;
 
@@ -96,6 +107,7 @@ export class LegacyShardRun {
     this.digest = '';
     this.rejections = [];
     this.routeTicks = null;
+    this.inBand = false;
     this.computeMs = 0;
     this.changes += 1;
   }
@@ -107,7 +119,8 @@ export class LegacyShardRun {
     }
     const startedAt = now();
     try {
-      const { graph, start, goal } = createLegacyMazeHazardGraph(maze);
+      // Every gate starts unlit (new maze, Pause > Reset level), so the wrap behind it counts as blocked.
+      const { graph, start, goal } = createLegacyMazeHazardGraph({ ...maze, grid: maskLegacyBleedGatedCells(maze.grid, maze.bleedGates) });
       const result = computeShardLayer(graph, {
         start,
         goal,
@@ -115,7 +128,8 @@ export class LegacyShardRun {
         level: options.level,
         saturationLevel: options.saturationLevel,
         exposureStage: options.exposureStage,
-        specs: options.specs
+        specs: specsOnGraph(graph, options.specs),
+        onStrictMiss: 'nearest'
       });
       this.width = graph.width;
       this.status = result.status;
@@ -124,6 +138,7 @@ export class LegacyShardRun {
         this.cells = [...result.shards];
         this.digest = result.digest;
         this.routeTicks = result.routeTicks;
+        this.inBand = result.inBand;
       }
     } catch {
       // Fail open: a level whose placement throws ships without shards rather than with a star it cannot open.
@@ -169,6 +184,7 @@ export class LegacyShardRun {
       digest: this.digest,
       rejections: this.rejections,
       routeTicks: this.routeTicks,
+      inBand: this.inBand,
       computeMs: Math.round(this.computeMs * 1000) / 1000
     };
   }

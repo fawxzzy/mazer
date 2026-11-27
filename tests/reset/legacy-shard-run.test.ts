@@ -1,10 +1,23 @@
 import { describe, expect, test } from 'vitest';
+import {
+  SHARD_SWEEP_VIEWPORTS,
+  createShippedPlayJobInput,
+  installShardsLikePlay,
+  shardSweepSeed
+} from '../../scripts/analysis/lib/shardPlacementSweep';
+import {
+  resetLegacyBleedGates,
+  resolveLegacyBleedGateBorderCells,
+  triggerLegacyBleedGate
+} from '../../src/legacy-runtime/legacyBleedGateState';
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { resolveLegacyHazardOverlay } from '../../src/legacy-runtime/legacyHazardOverlay';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import { runLegacyMazeGenerationJob } from '../../src/legacy-runtime/legacyMazeGenerationJob';
 import { createLegacyShardRun, type LegacyShardInstallOptions } from '../../src/legacy-runtime/legacyShardRun';
 import { resolveShardFirstLevel } from '../../src/legacy-runtime/legacyShardHint';
+import { createLegacyMazeHazardGraph, maskLegacyBleedGatedCells } from '../../src/legacy-runtime/legacyHazardGraphAdapter';
+import { SHARD_ROUTE_BASE, allocateHazardUnits, shardFloorDistances, validateShardRoute } from '../../src/mazer-core/hazards';
 import { createLadderJobInput, PHONE_ASPECT } from './legacy-hazard-gate-fixture';
 
 /*
@@ -125,6 +138,73 @@ describe('legacy shard run (H8 UI v1)', () => {
     expect(run.collected).toBe(0);
     expect(run.version).toBeGreaterThan(before);
     run.clear();
-    expect(run.describe()).toMatchObject({ status: 'off', count: 0, cells: [], rejections: [], digest: '' });
+    expect(run.describe()).toMatchObject({ status: 'off', count: 0, cells: [], rejections: [], digest: '', inBand: false });
+  });
+});
+
+/*
+ * The board a player really gets (rule-2 play board, scale 88 from L250: 59x131 phone, 117x65 desktop), built
+ * and installed the way MenuScene does (scripts/analysis/lib/shardPlacementSweep.ts). Before 2026-11-27 every
+ * one of these levels shipped without shards: the absolute route target sat below the maze's own route.
+ */
+describe('legacy shard run on the shipped play board', () => {
+  test('levels past saturation place every scheduled shard (L340 phone, L400 desktop)', () => {
+    for (const [level, boardIndex] of [[340, 0], [400, 1]] as const) {
+      const viewport = SHARD_SWEEP_VIEWPORTS[boardIndex]!;
+      const maze = runLegacyMazeGenerationJob(createShippedPlayJobInput(level, viewport, shardSweepSeed(level, boardIndex, 0)));
+      const { result, run } = installShardsLikePlay(maze, level);
+      const expected = allocateHazardUnits(level, { saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL }).shards;
+      expect(expected).toBeGreaterThan(1);
+      expect(result).toEqual({ status: 'placed', count: expected });
+      expect(run.goalLocked).toBe(true);
+      // The shards add a real detour on top of the maze's own route (the band is anchored there).
+      const read = createLegacyMazeHazardGraph({ ...maze, grid: maskLegacyBleedGatedCells(maze.grid, maze.bleedGates) });
+      const direct = shardFloorDistances(read.graph, read.start)[read.goal]!;
+      expect(run.describe().routeTicks! - direct).toBeGreaterThanOrEqual(SHARD_ROUTE_BASE);
+    }
+  });
+
+  test('a bleed-gated wrap counts as blocked: shards never need it, and lighting the gate changes nothing', () => {
+    const level = 200;
+    const maze = runLegacyMazeGenerationJob(createShippedPlayJobInput(level, SHARD_SWEEP_VIEWPORTS[0]!, shardSweepSeed(level, 0, 0)));
+    const gates = maze.bleedGates ?? [];
+    expect(gates.length).toBeGreaterThan(0);
+    const width = maze.grid[0]!.length;
+    const height = maze.grid.length;
+    const openings = gates.flatMap((gate) => resolveLegacyBleedGateBorderCells(gate, width, height));
+    expect(openings.some((cell) => maze.grid[cell.y]![cell.x] === true)).toBe(true);
+
+    const before = JSON.stringify(maze.grid);
+    const placementGrid = maskLegacyBleedGatedCells(maze.grid, maze.bleedGates);
+    expect(JSON.stringify(maze.grid)).toBe(before);
+    for (const cell of openings) expect(placementGrid[cell.y]![cell.x]).toBe(false);
+    expect(placementGrid.flat().filter(Boolean).length)
+      .toBe(maze.grid.flat().filter(Boolean).length - openings.filter((cell) => maze.grid[cell.y]![cell.x]).length);
+    expect(maskLegacyBleedGatedCells(maze.grid, [])).toBe(maze.grid);
+
+    const installed = installShardsLikePlay(maze, level);
+    const unlit = installed.run.describe();
+    expect(unlit.status).toBe('placed');
+    for (const cell of unlit.cells) {
+      expect(openings.some((opening) => opening.x === cell.x && opening.y === cell.y)).toBe(false);
+    }
+    // The shipped route is the one proved without the wrap; through the open wrap the same shards are shorter.
+    const witnessTicks = (grid: boolean[][]): number | null => {
+      const read = createLegacyMazeHazardGraph({ ...maze, grid });
+      const shards = unlit.cells.map((cell) => read.graph.cellId(cell.x, cell.y));
+      const verdict = validateShardRoute(read.graph, installed.gates.liveGateSpecs(), { start: read.start, goal: read.goal, shards });
+      return verdict.witness?.ticks ?? null;
+    };
+    expect(witnessTicks(placementGrid)).toBe(unlit.routeTicks);
+    expect(witnessTicks(maze.grid)!).toBeLessThan(unlit.routeTicks!);
+    for (const gate of gates) triggerLegacyBleedGate(maze, gate, 0);
+    try {
+      const lit = installShardsLikePlay(maze, level).run.describe();
+      expect(lit.cells).toEqual(unlit.cells);
+      expect(lit.digest).toBe(unlit.digest);
+      expect(lit.routeTicks).toBe(unlit.routeTicks);
+    } finally {
+      resetLegacyBleedGates(maze);
+    }
   });
 });
