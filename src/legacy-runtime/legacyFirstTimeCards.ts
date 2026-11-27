@@ -17,14 +17,14 @@
  * (`resolveFirstTimeCardPlacement`).
  *
  * Live cards: LEGACY_FIRST_TIME_LIVE_CARD_IDS. Slice 2 made the wrap card live (legacyFirstTimeHost.ts shows it), slice 3 the
- * Switch; each later slice adds its card id.
+ * Switch, slice 9 the trail tip and the level-1 goal coach; each later slice adds its card id.
  */
 import type { TutorialToken } from '../tutorial/tutorialRegistry.ts';
 import {
-  LEGACY_CONTROL_HINT_COPY_KEYS,
-  LEGACY_CONTROL_HINT_COPY_MOUSE,
-  LEGACY_CONTROL_HINT_COPY_NEUTRAL,
-  LEGACY_CONTROL_HINT_COPY_TOUCH,
+  LEGACY_CONTROL_HINT_CARD_COPY_KEYS,
+  LEGACY_CONTROL_HINT_CARD_COPY_MOUSE,
+  LEGACY_CONTROL_HINT_CARD_COPY_NEUTRAL,
+  LEGACY_CONTROL_HINT_CARD_COPY_TOUCH,
   LEGACY_CONTROL_HINT_TOKEN,
   type LegacyControlHintInput
 } from './legacyControlHint';
@@ -139,7 +139,8 @@ const pulseGateRow = resolveLegacyGuideHazardRow('pulseGate');
  */
 export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
   Object.freeze({
-    // Existing level-1 control hint, kept as is (per device, own presenter); listed so the card look applies to it.
+    // Level-1 control hint (per device, own presenter: src/render/legacyControlHintOverlay.ts). Flag on (slice 9) it is a
+    // card with this copy (the twin-stars goal line); flag off it stays the unchanged pill.
     id: 'level-1.controls',
     token: LEGACY_CONTROL_HINT_TOKEN,
     priority: 0,
@@ -149,13 +150,13 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
     notice: Object.freeze({
       marker: MARKER,
       heading: guideRow('move').heading,
-      body: LEGACY_CONTROL_HINT_COPY_NEUTRAL,
+      body: LEGACY_CONTROL_HINT_CARD_COPY_NEUTRAL,
       actionLabel: ACTION,
       bodyByInput: Object.freeze({
-        touch: LEGACY_CONTROL_HINT_COPY_TOUCH,
-        mouse: LEGACY_CONTROL_HINT_COPY_MOUSE,
-        keys: LEGACY_CONTROL_HINT_COPY_KEYS,
-        neutral: LEGACY_CONTROL_HINT_COPY_NEUTRAL
+        touch: LEGACY_CONTROL_HINT_CARD_COPY_TOUCH,
+        mouse: LEGACY_CONTROL_HINT_CARD_COPY_MOUSE,
+        keys: LEGACY_CONTROL_HINT_CARD_COPY_KEYS,
+        neutral: LEGACY_CONTROL_HINT_CARD_COPY_NEUTRAL
       })
     }),
     coach: null,
@@ -243,10 +244,13 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
 ]);
 
 /**
- * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card, slice 3 the Switch.
+ * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card, slice 3 the Switch,
+ * slice 9 the trail tip and the level-1 goal coach.
  * Everything stays behind `?lab=firsttime` (build default off).
  */
-export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze(['mechanic.wrap', 'mechanic.switch'] as FirstTimeCardId[]);
+export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze([
+  'mechanic.wrap', 'mechanic.switch', 'tip.trail', 'level-1.goal'
+] as FirstTimeCardId[]);
 
 export const resolveFirstTimeCard = (id: FirstTimeCardId): FirstTimeCard => LEGACY_FIRST_TIME_CARDS.find((card) => card.id === id)!;
 

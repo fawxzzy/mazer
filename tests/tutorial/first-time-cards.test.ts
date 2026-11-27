@@ -142,15 +142,15 @@ describe('first-time card registry', () => {
     expect(resolveFirstTimeCard('level-1.controls').touches).toEqual([]);
   });
 
-  it('ships only the wrap (slice 2) and Switch (slice 3) cards live: every other touch fires nothing and marks nothing met', () => {
-    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual(['mechanic.wrap', 'mechanic.switch']);
+  it('ships wrap (slice 2), Switch (slice 3), the trail tip and the level-1 goal coach (slice 9) live: every other touch fires nothing and marks nothing met', () => {
+    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual(['mechanic.wrap', 'mechanic.switch', 'tip.trail', 'level-1.goal']);
     const switchCard = resolveFirstTimeCard('mechanic.switch');
     expect(switchCard.notice).toMatchObject({ heading: 'Switch', body: LEGACY_GUIDE_ROWS.find((row) => row.id === 'bleed-gate')!.text });
     expect(LEGACY_GUIDE_ROWS.find((row) => row.id === 'bleed-gate')!.heading).toBe('Switch');
     expect(decideFirstTimeTouch(createFirstTimeCardsState(), { touches: ['switch-trigger'], nowMs: 0, isSeen: () => false }).fire?.id)
       .toBe('mechanic.switch');
     const others = decideFirstTimeTouch(createFirstTimeCardsState(), {
-      touches: ['shard-pickup', 'pulse-gate-adjacent', 'trail-backstep', 'control-hint-dismissed'],
+      touches: ['shard-pickup', 'pulse-gate-adjacent'],
       nowMs: 0,
       isSeen: () => false
     });
