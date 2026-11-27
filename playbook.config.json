@@ -25,6 +25,34 @@
           "whenChanged": ["src/**", "scripts/**", "tests/**"],
           "mustTouch": ["docs/PLAYBOOK_NOTES.md", "docs/playbook-notes/**"]
         }
+      ],
+      "generatedFilesInSync": [
+        {
+          "inputs": [
+            "config/mazer-owner-work-registry.json",
+            "docs/current-truth.md",
+            "docs/roadmap.md",
+            "docs/mobile-plan.md",
+            "scripts/export-project-board-owner.mjs"
+          ],
+          "outputs": ["exports/mazer.project-board.owner-export.v1.json"],
+          "regenerate": "npm run project-board:owner-export"
+        }
+      ],
+      "requireTestRegistration": [
+        {
+          "tests": ["tests/**/*.test.ts", "tests/**/*.test.mjs"],
+          "registries": [".github/workflows", "scripts/verify", "package.json"],
+          "covered": [
+            "tests/core/**",
+            "tests/cosmetics/**",
+            "tests/tutorial/**",
+            "tests/architecture/**",
+            "tests/brand/**",
+            "tests/legacy-runtime/**",
+            "tests/reset/**"
+          ]
+        }
       ]
     }
   }
