@@ -119,7 +119,9 @@ describe('first-time card registry', () => {
 
     const wrap = resolveFirstTimeCard('mechanic.wrap');
     expect(wrap.notice).toMatchObject({ heading: 'Wrap', body: 'Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit.' });
-    expect(wrap.coach).toBeNull();
+    // Slice 2: the body IS the Guide Wrap row (R2), and the ring stays on the edge walked off (Zac 2026-11-27), no label.
+    expect(wrap.notice!.body).toBe(LEGACY_GUIDE_ROWS.find((row) => row.id === 'wrap')!.text);
+    expect(wrap.coach).toEqual({ target: 'wrapped-edge-cell', label: '', ring: 'dotted' });
 
     expect(resolveFirstTimeCard('tip.trail').notice).toMatchObject({ heading: LEGACY_GUIDE_ROWS.find((row) => row.id === 'trail')!.heading, body: 'Step back to wipe your trail.' });
     expect(resolveFirstTimeCard('tip.trail').coach).toBeNull();
@@ -140,15 +142,17 @@ describe('first-time card registry', () => {
     expect(resolveFirstTimeCard('level-1.controls').touches).toEqual([]);
   });
 
-  it('ships no live card in slice 1: a flag-on build fires nothing', () => {
-    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual([]);
-    const result = decideFirstTimeTouch(createFirstTimeCardsState(), {
-      touches: ['wrap-step', 'switch-trigger', 'shard-pickup', 'pulse-gate-adjacent', 'trail-backstep', 'control-hint-dismissed'],
+  it('ships only the slice-2 wrap card live: every other touch fires nothing and marks nothing met', () => {
+    expect(LEGACY_FIRST_TIME_LIVE_CARD_IDS).toEqual(['mechanic.wrap']);
+    const others = decideFirstTimeTouch(createFirstTimeCardsState(), {
+      touches: ['switch-trigger', 'shard-pickup', 'pulse-gate-adjacent', 'trail-backstep', 'control-hint-dismissed'],
       nowMs: 0,
       isSeen: () => false
     });
-    expect(result.fire).toBeNull();
-    expect(result.met).toEqual([]);
+    expect(others.fire).toBeNull();
+    expect(others.met).toEqual([]);
+    const wrap = decideFirstTimeTouch(createFirstTimeCardsState(), { touches: ['wrap-step'], nowMs: 0, isSeen: () => false });
+    expect(wrap.fire?.id).toBe('mechanic.wrap');
   });
 });
 

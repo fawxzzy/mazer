@@ -268,8 +268,9 @@ describe('guide copy only names things that exist', () => {
     expect(tutorial.expectedEdgeWraps).toEqual({ horizontal: 0, vertical: 0 });
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
-    expect(row('wrap').text).toMatch(/^Some mazes wrap /);
-    expect(row('wrap').text).toMatch(/Edge stars fill with your colour as beams hit/);
+    // First-time cards (spec section 7): the row is the wrap card's body, so it describes the step just taken.
+    expect(row('wrap').text).toMatch(/^Open edges wrap: walk off one to come back on the far side\./);
+    expect(row('wrap').text).toMatch(/Edge stars fill as beams hit/);
   });
 
   test('Wrap gate (MAZER-L10): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
@@ -299,7 +300,7 @@ describe('guide copy only names things that exist', () => {
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {
-    // "Some mazes wrap" is a claim about the ladder: wrap corridors from level 10, a seeded
+    // The Wrap row is only true if mazes really have open edges: wrap corridors from level 10, a seeded
     // share of every level while they fade out, none once the fade is over.
     const seeds = Array.from({ length: 200 }, (_, index) => 1337 + (index * 104729));
     const rungs = (level: number) => seeds.map((seed) => resolveGeometryBudgetWrapRungs(level, seed));

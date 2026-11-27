@@ -11,12 +11,13 @@
  *   at least 800 ms after it showed. Anything shorter, or the app closing, leaves the card unacked: it comes back.
  *
  * Card look (Zac 2026-11-27): a two-line card, heading + body, with a small "New" marker and a "Got it" action, plus
- * an optional dotted-ring coach mark on a board target. The host (a later slice) feeds this copy into the reusable
- * in-flow notice and coach mark; those components hold no card text. Cards must not cover anything important: the
- * host places the card on the screen edge away from the player and the coach target
+ * an optional dotted-ring coach mark on a board target. The host (legacyFirstTimeHost.ts) feeds this copy into the
+ * reusable in-flow notice and coach mark; those components hold no card text. Cards must not cover anything important:
+ * the host places the card on the screen edge away from the player and the coach target
  * (`resolveFirstTimeCardPlacement`).
  *
- * Nothing is live yet: LEGACY_FIRST_TIME_LIVE_CARD_IDS is empty in slice 1, and each later slice adds its card id.
+ * Live cards: LEGACY_FIRST_TIME_LIVE_CARD_IDS. Slice 2 made the wrap card live (legacyFirstTimeHost.ts shows it); each
+ * later slice adds its card id.
  */
 import type { TutorialToken } from '../tutorial/tutorialRegistry.ts';
 import {
@@ -53,6 +54,8 @@ export type FirstTimeCoachTarget =
   | 'next-untaken-shard'
   | 'touched-pulse-gate'
   | 'opened-border-cell'
+  /** The open edge cell the player just walked off (the wrap card, Zac 2026-11-27: keep the dotted ring). */
+  | 'wrapped-edge-cell'
   | 'goal-stars';
 
 /** Who owns the seen record: the account-scoped first-time record, or the existing per-device tutorial acks. */
@@ -131,8 +134,9 @@ const pulseGateRow = resolveLegacyGuideHazardRow('pulseGate');
 
 /**
  * The registry, in priority order. Copy is the spec's section 4 / 8 copy, unchanged. The locked-gate and Pulse Gate
- * bodies ARE the Guide hazard rows (read, not copied). The wrap and Switch bodies are the spec's new card copy; the
- * Guide rows take the same text in slices 2 and 3 (and "Wrap gate" becomes "Switch", D1).
+ * bodies ARE the Guide hazard rows (read, not copied), and so is the wrap body (the Guide Wrap row took the card copy in
+ * slice 2). The Switch body is the spec's new card copy; the Guide row takes it in slice 3 ("Wrap gate" becomes
+ * "Switch", D1).
  */
 export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
   Object.freeze({
@@ -206,10 +210,11 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
     notice: Object.freeze({
       marker: MARKER,
       heading: guideRow('wrap').heading,
-      body: 'Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit.',
+      body: guideRow('wrap').text,
       actionLabel: ACTION
     }),
-    coach: null,
+    // No label: the card alone explains it (options page, open question kept as is); the ring marks the edge used.
+    coach: coach('wrapped-edge-cell', ''),
     guideRowId: 'wrap'
   }),
   Object.freeze({
@@ -239,10 +244,10 @@ export const LEGACY_FIRST_TIME_CARDS: readonly FirstTimeCard[] = Object.freeze([
 ]);
 
 /**
- * Card ids the scene may fire. Empty in slice 1 (foundation only): each card slice adds its id here, so a flag-on
- * build of slice 1 still fires and draws nothing.
+ * Card ids the scene may fire (legacyFirstTimeHost.ts). Each card slice adds its id here: slice 2 the wrap card.
+ * Everything stays behind `?lab=firsttime` (build default off).
  */
-export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze([] as FirstTimeCardId[]);
+export const LEGACY_FIRST_TIME_LIVE_CARD_IDS: readonly FirstTimeCardId[] = Object.freeze(['mechanic.wrap'] as FirstTimeCardId[]);
 
 export const resolveFirstTimeCard = (id: FirstTimeCardId): FirstTimeCard => LEGACY_FIRST_TIME_CARDS.find((card) => card.id === id)!;
 
