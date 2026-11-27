@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   LEGACY_CONTROL_HINT_COPY_KEYS,
@@ -16,6 +16,7 @@ import {
   resolveLegacyControlHintFadeMs,
   shouldShowLegacyControlHint
 } from '../../src/legacy-runtime/legacyControlHint.ts';
+import { LEGACY_CONTROL_HINT_ELEMENT_ID, installLegacyControlHint } from '../../src/render/legacyControlHintOverlay.ts';
 import { createTutorialAckStore } from '../../src/tutorial/tutorialAckStore.ts';
 import { validateTutorialRegistry } from '../../src/tutorial/tutorialRegistry.ts';
 
@@ -121,5 +122,101 @@ describe('legacy control hint (MAZER-FLOW-001)', () => {
     store.acknowledge(LEGACY_CONTROL_HINT_TOKEN);
     const again = createTutorialAckStore({ storage, accountId: LEGACY_CONTROL_HINT_DEVICE_ID });
     expect(again.isAcknowledged(LEGACY_CONTROL_HINT_TOKEN)).toBe(true);
+  });
+
+  describe('Level Preview is a no-write sandbox for the hint (first-time spec F15, slice 0)', () => {
+    const DEVICE_KEY = 'mazer.tutorial.acks:device';
+
+    /** Minimal window: spy device storage, a body that records appended nodes, a manual poll tick, key dispatch. */
+    const fakeWindow = (search: string, seeded: Record<string, string> = {}) => {
+      const stored = new Map(Object.entries(seeded));
+      const localStorage = {
+        getItem: vi.fn((key: string) => stored.get(key) ?? null),
+        setItem: vi.fn((key: string, value: string) => { stored.set(key, value); }),
+        removeItem: vi.fn((key: string) => { stored.delete(key); })
+      };
+      const body: { id: string; remove: () => void }[] = [];
+      const listeners = new Map<string, (event: unknown) => void>();
+      let tick: () => void = () => undefined;
+      const win = {
+        location: { search },
+        localStorage,
+        document: {
+          body: { append: (node: { id: string; remove: () => void }) => { body.push(node); } },
+          createElement: () => {
+            const node = {
+              id: '', textContent: '', style: {} as Record<string, string>,
+              setAttribute: () => undefined,
+              remove: () => { const at = body.indexOf(node); if (at >= 0) body.splice(at, 1); }
+            };
+            return node;
+          }
+        },
+        navigator: { maxTouchPoints: 0, userAgent: 'test' },
+        matchMedia: () => ({ matches: false }),
+        performance: { now: () => 0 },
+        requestAnimationFrame: (fn: () => void) => { fn(); return 1; },
+        setInterval: (fn: () => void) => { tick = fn; return 1; },
+        clearInterval: () => undefined,
+        setTimeout: (fn: () => void) => { fn(); return 1; },
+        addEventListener: (type: string, fn: (event: unknown) => void) => { listeners.set(type, fn); },
+        removeEventListener: (type: string) => { listeners.delete(type); }
+      };
+      const scene = { mode: 'play', overlay: 'none', progressionState: { tracks: { player: { level: '1' } } } };
+      const dispose = installLegacyControlHint(win as never, { scene: { getScene: () => scene } });
+      return {
+        localStorage,
+        stored,
+        dispose,
+        tick: () => tick(),
+        hint: () => body.find((node) => node.id === LEGACY_CONTROL_HINT_ELEMENT_ID),
+        move: () => listeners.get('keydown')?.({ key: 'ArrowUp', isTrusted: true, target: null })
+      };
+    };
+
+    const deviceCalls = (storage: ReturnType<typeof fakeWindow>['localStorage']) => (
+      storage.getItem.mock.calls.length + storage.setItem.mock.calls.length + storage.removeItem.mock.calls.length
+    );
+
+    for (const search of ['?previewLevel=1', '?runtimeDiagnostics=1&previewLevel=1', '?lab=hazards&level=1']) {
+      it(`${search}: shows the hint, hides it on the first move, and never touches device storage`, () => {
+        const page = fakeWindow(search);
+        page.tick();
+        expect(page.hint()).toBeDefined();
+        page.move();
+        expect(page.hint()).toBeUndefined();
+        page.tick();
+        expect(page.hint()).toBeUndefined();
+        expect(deviceCalls(page.localStorage)).toBe(0);
+        expect(page.stored.size).toBe(0);
+        page.dispose();
+      });
+    }
+
+    it('preview ignores an ack already on the device (it reads nothing), so the hint still shows', () => {
+      const page = fakeWindow('?previewLevel=1', { [DEVICE_KEY]: 'not read in preview' });
+      page.tick();
+      expect(page.hint()).toBeDefined();
+      expect(deviceCalls(page.localStorage)).toBe(0);
+      page.dispose();
+    });
+
+    for (const search of ['', '?runtimeDiagnostics=1', '?previewLevel=0', '?level=1']) {
+      it(`normal play (${search || 'no query'}) is unchanged: reads the device ack and writes it on the first move`, () => {
+        const page = fakeWindow(search);
+        expect(page.localStorage.getItem).toHaveBeenCalledWith(DEVICE_KEY);
+        page.tick();
+        expect(page.hint()).toBeDefined();
+        page.move();
+        expect(page.hint()).toBeUndefined();
+        expect(page.localStorage.setItem).toHaveBeenCalledWith(DEVICE_KEY, expect.stringContaining(LEGACY_CONTROL_HINT_TOKEN.id));
+        page.dispose();
+        // One time per device: the next load on the same device storage shows nothing.
+        const again = fakeWindow(search, Object.fromEntries(page.stored));
+        again.tick();
+        expect(again.hint()).toBeUndefined();
+        again.dispose();
+      });
+    }
   });
 });

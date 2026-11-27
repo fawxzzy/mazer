@@ -38,6 +38,7 @@ Preview never reads or writes the real account. Mechanisms (all in `legacyLevelP
 2. Session: preview runs as the existing runtime-diagnostics auth fixture identity, which the remote layer, leaderboard and sync code already treat as ineligible. `initializeLegacyAuth` takes the fixture branch before any auth client or subscription exists. So `mazer_complete_level`, `mazer_initialize_progression`, `mazer_reset_progression`, settings sync, completion outbox and leaderboard calls cannot fire.
 3. Boot: `bootstrapLegacyRemoteAccountStateForRoute` returns null on a preview route (no account bootstrap, no completion replay), and the install gate is skipped (`levelPreviewRequested`), so there is no sign-in and no install screen in the way.
 4. Endless checkpoints: nothing in `src/` imports the endless checkpoint store, and nothing in preview writes one.
+5. Level-1 control hint: it is installed at boot, before the scene exists, so it cannot use the scene's sandbox. On a preview route (`isLegacyLevelPreviewRoute`, which includes the hazard lab level jump) `installLegacyControlHint` uses its own in-memory `createLegacyLevelPreviewStorage()`: the hint shows at L1 as for a new device, and its "seen" mark (`mazer.tutorial.acks:device`) never reads or writes the real device. Fixed 2026-11-27 (first-time spec F15, slice 0); tested in `tests/legacy-runtime/legacy-control-hint.test.ts`.
 
 Not covered by design: Settings toggles changed during preview live only in the sandbox (a preview session starts from default settings, not the device's saved ones).
 
