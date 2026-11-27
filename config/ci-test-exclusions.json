@@ -1,0 +1,22 @@
+{
+  "_comment": "Test files under tests/ that no CI step runs, each with a one-line reason. Checked by scripts/verify/check-test-coverage.mjs (CI step 'Check every test file is run once or excluded'); the same files are skipped by `npm test` so local and CI run the same set. Categories: needs browser, needs network, needs live auth, long soak, local fixture, fails on main.",
+  "files": {
+    "tests/analysis/live-auth-persistence-soak.test.mjs": { "category": "needs browser", "reason": "launches Playwright Chromium against a loopback server; the browser is only installed later in the Verify job" },
+    "tests/ui/dom-settings-primitives.test.ts": { "category": "needs browser", "reason": "launches Playwright Chromium to measure real layout; the browser is only installed later in the Verify job" },
+    "tests/maze/maze-soak.test.ts": { "category": "fails on main", "reason": "fails on main: AssertionError: expected false to be true (tests/maze/maze-soak.test.ts:181, heap-band check; also a soak, run by npm run test:soak)" },
+    "tests/playbook-adoption-evidence.test.mjs": { "category": "fails on main", "reason": "fails on main: ENOENT reading playbook/exports/playbook.contract.example.v1.json (reads a sibling local Playbook checkout)" },
+    "tests/playbook-verification-report.test.mjs": { "category": "fails on main", "reason": "fails on main: ENOENT reading schemas/atlas.playbook.verification.report.v1.json (reads a local ATLAS schemas folder)" }
+  },
+  "tests": {
+    "tests/reset/legacy-reset.test.ts": {
+      "category": "local fixture",
+      "reason": "read the local-only mazer-legacy-unreal-restore C++ source tree (21 MB of legacy project source, not committed); skipped by name in the CI tests/reset step, run locally under npm test",
+      "names": [
+        "resumes from the next tile selected during legacy backtracking",
+        "defers overlay rebuild travel until closing the options surface",
+        "routes pause commands through an explicit legacy pause lifecycle contract",
+        "routes menu-time overlay field commits through an explicit legacy flag contract"
+      ]
+    }
+  }
+}

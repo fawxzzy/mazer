@@ -1,40 +1,18 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './navigation-core-required-tests.mjs';
-import { TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './teleport-required-tests.mjs';
-import { WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './world-identity-required-tests.mjs';
-import { SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './shared-account-oauth-required-tests.mjs';
-import { MEASURED_BASELINE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE } from './measured-baseline-required-tests.mjs';
+import { FOLDER_RUNS, RUNNER_FILES, runnerExtraFiles } from './required-tests-lib.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(SCRIPT_PATH, '..', '..', '..');
 const CWD_MUTATING_FIXTURE = 'tests/reset/legacy-unreal-source-fixture.test.ts';
-const TEST_SPINE = [
-  'tests/reset',
-  'tests/core',
-  'tests/cosmetics',
-  'tests/tutorial',
-  'tests/architecture',
-  // Integration 2: pure render modules and the lifecycle analyzer. Listed by
-  // file on purpose: tests/render/palette.test.ts fails on a clean main
-  // (resolveAmbientThemeProfile is not a function), so the directory glob
-  // must not be added until that baseline is repaired.
-  'tests/render/introTimeline.test.ts',
-  'tests/render/edgeMarkers.test.ts',
-  'tests/render/boardTileBake.test.ts',
-  'tests/render/boardTileStyle.test.ts',
-  'tests/reset/board-tile-layer.test.ts',
-  'tests/visual/maze-lifecycle-analysis.test.mjs',
-  'tests/ai/demo-walker.test.ts',
-  'tests/ai/demo-walker-known-frontier.test.ts',
-  'tests/ai/demo-walker-rank-ladder.test.ts',
-  'tests/ai/demo-walker-recovery-diagnostics.test.ts',
-  'tests/analysis/ai-navigation-acceptance.test.ts',
-  'tests/scenes/menu-render-frame.test.ts',
-  'tests/analysis/maze-cycle-telemetry-report.test.mjs',
-  'tests/analysis/ai-run-corpus-audit.test.mjs'
-];
+
+// The same set CI runs: whole folders (FOLDER_RUNS in required-tests-lib.mjs, checked against .github/workflows/verify.yml by
+// scripts/verify/check-test-coverage.mjs), minus the files in config/ci-test-exclusions.json. No file is named one by one.
+const EXCLUDED_FILES = Object.keys(
+  JSON.parse(readFileSync(resolve(REPO_ROOT, 'config', 'ci-test-exclusions.json'), 'utf8')).files
+);
 
 const runVitest = (args) => {
   if (process.platform === 'win32') {
@@ -51,37 +29,17 @@ const runVitest = (args) => {
   });
 };
 
+// Required-coverage lists (navigation-core, teleport, ...): every listed file must exist and be inside a whole-folder run.
+// Any listed file outside FOLDER_RUNS is added here, so it is never silently dropped.
+const REQUIRED_EXTRAS = Object.keys(RUNNER_FILES).flatMap((runner) => runnerExtraFiles(runner));
+
 // The deterministic room-corpus cases intentionally run longer than Vitest's
 // fork-worker RPC heartbeat. They are pure and safe in one worker thread. The
 // one fixture that deliberately calls process.chdir must stay in a fork.
 runVitest([
-  ...TEST_SPINE,
-  // Wave 4D-A's Navigation Core v1 required coverage (tests/render,
-  // tests/architecture) that TEST_SPINE above never actually included --
-  // see navigation-core-required-tests.mjs's own header for why this list
-  // exists and is shared with CI. Filtered to skip tests/reset/* entries,
-  // which TEST_SPINE's own 'tests/reset' glob above already runs.
-  ...NAVIGATION_CORE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
-  // Wave 4D-B's Teleport System v1 required coverage -- same silent-gap
-  // class as the Navigation Core list just above; see
-  // teleport-required-tests.mjs's own header.
-  ...TELEPORT_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
-  // Wave 4E's World Identity required coverage -- same silent-gap class;
-  // see world-identity-required-tests.mjs's own header.
-  ...WORLD_IDENTITY_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
-  // Wave 5C's shared-account OAuth consumer required coverage -- same
-  // silent-gap class; see shared-account-oauth-required-tests.mjs's own
-  // header. Currently empty after the tests/reset/* filter (its one entry
-  // is already covered by TEST_SPINE's glob above) -- kept here anyway so a
-  // future non-tests/reset/* addition to this wave's list is covered
-  // automatically instead of silently missed again.
-  ...SHARED_ACCOUNT_OAUTH_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
-  // Wave 0C's measured-baseline required coverage -- same silent-gap class;
-  // see measured-baseline-required-tests.mjs's own header. Also currently
-  // empty after the tests/reset/* filter, kept for the same future-proofing
-  // reason as the Wave 5C list above.
-  ...MEASURED_BASELINE_REQUIRED_TESTS_NOT_COVERED_BY_LOCAL_SPINE,
-  '--exclude', CWD_MUTATING_FIXTURE,
+  ...FOLDER_RUNS,
+  ...REQUIRED_EXTRAS,
+  ...[CWD_MUTATING_FIXTURE, ...EXCLUDED_FILES].flatMap((file) => ['--exclude', file]),
   '--maxWorkers', '1',
   '--pool=threads',
   '--poolOptions.threads.singleThread'
