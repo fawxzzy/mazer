@@ -331,7 +331,7 @@ export const LEGACY_GUIDE_HAZARD_ROWS: readonly LegacyGuideHazardRow[] = Object.
     icon: hazardGlyphIcon('hazard-shard', 'hazard-shard-glyph-guide-local-until-board-layer'),
     id: 'hazard-shard',
     kind: 'shard',
-    text: 'Collect the shard first. The star stays locked until you do.'
+    text: 'Take the shards in order. The star stays locked until you do.'
   }
 ]);
 

@@ -135,6 +135,15 @@ export class LegacyShardRun {
     return { status: this.status, count: this.cells.length };
   }
 
+  /** A new attempt at the same maze (pause > Reset level): every shard goes back and the star locks again. */
+  restart(): void {
+    if (this.next === 0) {
+      return;
+    }
+    this.next = 0;
+    this.changes += 1;
+  }
+
   /** Call after the player lands on `point`. Only the next shard in order can be taken. */
   noteArrival(point: LegacyPoint): LegacyShardArrival {
     if (!this.goalLocked) {

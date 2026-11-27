@@ -41,6 +41,8 @@ export interface InFlowNoticeHandle {
   readonly element: HTMLElement;
   close(reason?: InFlowNoticeDismissReason): void;
   isOpen(): boolean;
+  /** Hides or shows the notice without closing it (hidden = not seen, not read out, no taps; timers keep running). */
+  setHidden(hidden: boolean): void;
 }
 
 export const IN_FLOW_NOTICE_HOST_CLASS = 'mazer-inflow-notice-host';
@@ -82,16 +84,36 @@ export const mountInFlowNotice = (props: InFlowNoticeProps, ownerDocument: Docum
   }, ownerDocument);
   banner.dataset.mazerComponent = 'InFlowNotice';
   const marker = banner.querySelector('.mazer-status-banner__marker');
-  if (marker && props.title) marker.textContent = props.title;
+  const message = banner.querySelector('.mazer-status-banner__message');
+  const markerText = props.title || (marker?.textContent ?? '');
+  // A live region announces changes, not the text it was inserted with: insert it empty, fill it once it is in the page.
+  if (marker) marker.textContent = '';
+  if (message) message.textContent = '';
+  const fill = (): void => {
+    if (marker) marker.textContent = markerText;
+    if (message) message.textContent = props.body;
+  };
 
   host.append(banner);
   ownerDocument.body.append(host);
   const view = ownerDocument.defaultView;
-  // Next frame, so the open transition runs from the closed state.
-  if (view?.requestAnimationFrame) view.requestAnimationFrame(() => { if (open) banner.classList.add('mazer-inflow-notice--open'); });
-  else banner.classList.add('mazer-inflow-notice--open');
+  // Next frame, so the open transition runs from the closed state and the region already exists when it is filled.
+  if (view?.requestAnimationFrame) {
+    view.requestAnimationFrame(() => {
+      if (!open) return;
+      fill();
+      banner.classList.add('mazer-inflow-notice--open');
+    });
+  } else {
+    fill();
+    banner.classList.add('mazer-inflow-notice--open');
+  }
   if (props.autoDismissMs !== undefined && props.autoDismissMs > 0) {
     timer = setTimeout(() => close('timeout'), props.autoDismissMs);
   }
-  return { element: banner, close, isOpen: () => open };
+  const setHidden = (hidden: boolean): void => {
+    // visibility (not display or [hidden]): the host's flex layout stays put and the banner leaves the a11y tree.
+    host.style.visibility = hidden ? 'hidden' : '';
+  };
+  return { element: banner, close, isOpen: () => open, setHidden };
 };

@@ -15,6 +15,8 @@ export interface LegacyInFlowNoticeHost {
   /** Closes the open notice; with a key, only if it is that one. */
   close(key?: string): void;
   isOpen(key?: string): boolean;
+  /** Hides the open notice (and any shown while hidden) without closing it, e.g. while a pause or the Guide is up. */
+  setHidden(hidden: boolean): void;
   destroy(): void;
 }
 
@@ -24,6 +26,7 @@ export const createLegacyInFlowNoticeHost = (deps: LegacyInFlowNoticeHostDeps = 
   let pendingKey: string | null = null;
   let token = 0;
   let destroyed = false;
+  let hidden = false;
 
   const close = (key?: string): void => {
     if (key !== undefined && pendingKey === key) {
@@ -57,6 +60,7 @@ export const createLegacyInFlowNoticeHost = (deps: LegacyInFlowNoticeHostDeps = 
           }
         });
         current = { key, handle };
+        if (hidden) handle.setHidden(true);
       }).catch(() => {
         // A chunk that fails to load drops the notice; the game never depends on it.
         if (mine === token) pendingKey = null;
@@ -64,6 +68,11 @@ export const createLegacyInFlowNoticeHost = (deps: LegacyInFlowNoticeHostDeps = 
     },
     close,
     isOpen: (key) => (current !== null && (key === undefined || current.key === key)) || (pendingKey !== null && (key === undefined || pendingKey === key)),
+    setHidden: (next) => {
+      if (next === hidden) return;
+      hidden = next;
+      current?.handle.setHidden(next);
+    },
     destroy: () => {
       destroyed = true;
       token += 1;

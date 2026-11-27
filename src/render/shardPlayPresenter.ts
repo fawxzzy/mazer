@@ -156,6 +156,20 @@ export class ShardPlayPresenter {
     this.notices.close();
   }
 
+  /**
+   * Pause > Reset level: a new attempt at the same maze. Every shard goes back, the star locks again, and the hint,
+   * the coach mark and the unlock notice close (the first-time hint does not come back: it was already shown).
+   */
+  restartAttempt(): void {
+    this.run.restart();
+    this.layer.reset();
+    this.hintPending = false;
+    this.coachOn = false;
+    this.unlockNoticeShown = false;
+    this.lastCaged = null;
+    this.notices.close();
+  }
+
   /** The level start met shards for the first time: show the notice and the coach mark (once; the record says so). */
   requestFirstHint(): void {
     this.hintRequested = true;
@@ -201,6 +215,9 @@ export class ShardPlayPresenter {
   frame(input: ShardFrameInput): boolean {
     this.reducedMotion = input.reducedMotion;
     this.viewHeight = input.viewHeight;
+    // The notice is DOM over the canvas: it steps aside with the chip and the coach mark while a pause, the Guide or
+    // the menu owns the screen, and comes back when play does.
+    this.notices.setHidden(!input.hudVisible);
     if (!this.run.active || input.goal === null) {
       this.layer.drawBoard(null, input.layout, { x: 0, y: 0 }, input.nowMs, input.reducedMotion);
       this.layer.drawHud(null, null, input.nowMs, input.reducedMotion, false);

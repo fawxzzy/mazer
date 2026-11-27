@@ -7742,7 +7742,8 @@ export class MenuScene extends Phaser.Scene {
         sizeScale: this.layout.headerIconScale,
         width: this.layout.width
       },
-      hudVisible: this.mode === 'play' && this.overlay === 'none',
+      // The open menu dropdown counts too: the DOM notice would otherwise sit over it.
+      hudVisible: this.mode === 'play' && this.overlay === 'none' && !this.menuDropdown.isOpen(),
       toScreen: (p) => {
         const out = matrix.transformPoint(p.x, p.y);
         return { x: out.x, y: out.y };
@@ -11131,7 +11132,10 @@ export class MenuScene extends Phaser.Scene {
     // Built once per scene while the layer is on (never while off), so a card costs only its model and two setText calls.
     const view = this.resolveHazardMomentView();
     const startedAt = performance.now();
-    const moments = onboarding.levelStart(this.progressionState.tracks.player.level);
+    // H8: no placed shards (failed placement or none this level) = the shard hint is not shown, so it is not spent.
+    const moments = onboarding.levelStart(this.progressionState.tracks.player.level, {
+      withheldKinds: this.shards?.active === true ? [] : ['shard']
+    });
     // H8: the shard's first-time moment is the in-flow notice plus the coach mark, not the card.
     if (isShardIntroCard(moments.introCard)) {
       this.shards?.requestFirstHint();
@@ -14763,6 +14767,8 @@ export class MenuScene extends Phaser.Scene {
     if (result.nextPlayer !== null) {
       // MAZER-L10: a new attempt: every bleed gate goes dark and its path hides again.
       resetLegacyBleedGates(this.maze);
+      // H8: the shards go back too, the star locks again, and the shard notice and coach mark close.
+      this.shards?.restartAttempt();
       this.boardPathDirty = true;
       this.player = result.nextPlayer;
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);

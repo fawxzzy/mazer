@@ -40,7 +40,10 @@ export interface ShardNoticeCopy {
   readonly tone: 'info' | 'success';
 }
 
-/** First-time notice: what to do, in the Guide's words. */
+/**
+ * First-time notice: what to do, in the Guide's words (the Shard row in legacyGuideContent.ts says "Take the shards in
+ * order. The star stays locked until you do."; this names the count, and one shard needs no order).
+ */
 export const resolveShardFirstNotice = (count: number): ShardNoticeCopy => ({
   title: 'New',
   body: count > 1

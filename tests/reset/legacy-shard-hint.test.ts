@@ -67,13 +67,15 @@ describe('shard hint', () => {
 
 describe('in-flow notice host (reusable)', () => {
   const fakeMount = () => {
-    const mounted: { props: InFlowNoticeProps; closed: InFlowNoticeDismissReason | null }[] = [];
+    type Entry = { props: InFlowNoticeProps; closed: InFlowNoticeDismissReason | null; hidden: boolean };
+    const mounted: Entry[] = [];
     const mountInFlowNotice = (props: InFlowNoticeProps): InFlowNoticeHandle => {
-      const entry: { props: InFlowNoticeProps; closed: InFlowNoticeDismissReason | null } = { props, closed: null };
+      const entry: Entry = { props, closed: null, hidden: false };
       mounted.push(entry);
       return {
         element: {} as HTMLElement,
         isOpen: () => entry.closed === null,
+        setHidden: (hidden: boolean) => { entry.hidden = hidden; },
         close: (reason?: InFlowNoticeDismissReason) => {
           if (entry.closed !== null) return;
           entry.closed = reason ?? 'closed';
@@ -140,10 +142,107 @@ describe('in-flow notice host (reusable)', () => {
     expect(host.isOpen('a')).toBe(false);
   });
 
+  test('setHidden hides the open notice, and one shown while hidden mounts hidden', async () => {
+    const { mounted, loadMount } = fakeMount();
+    const host = createLegacyInFlowNoticeHost({ loadMount });
+    host.show('a', props('A'));
+    await flush();
+    host.setHidden(true);
+    expect(mounted[0]!.hidden).toBe(true);
+    expect(host.isOpen('a')).toBe(true);
+    host.show('b', props('B'));
+    await flush();
+    expect(mounted[1]!.hidden).toBe(true);
+    host.setHidden(false);
+    expect(mounted[1]!.hidden).toBe(false);
+  });
+
   test('a chunk that fails to load drops the notice', async () => {
     const host = createLegacyInFlowNoticeHost({ loadMount: () => Promise.reject(new Error('offline')) });
     host.show('a', props('A'));
     await flush();
     expect(host.isOpen()).toBe(false);
+  });
+});
+
+describe('in-flow notice DOM (reusable)', () => {
+  /** Just enough of a DOM for mountInFlowNotice (no jsdom in this repo). */
+  class FakeElement {
+    className = '';
+    textContent = '';
+    style: Record<string, string> = {};
+    dataset: Record<string, string> = {};
+    children: FakeElement[] = [];
+    parent: FakeElement | null = null;
+    private attrs = new Map<string, string>();
+    classList = {
+      add: (name: string) => { if (!this.className.split(' ').includes(name)) this.className = `${this.className} ${name}`.trim(); },
+      remove: (name: string) => { this.className = this.className.split(' ').filter((c) => c !== name).join(' '); },
+      contains: (name: string) => this.className.split(' ').includes(name)
+    };
+    setAttribute(name: string, value: string): void { this.attrs.set(name, value); }
+    getAttribute(name: string): string | null { return this.attrs.get(name) ?? null; }
+    append(...nodes: FakeElement[]): void { for (const node of nodes) { node.parent = this; this.children.push(node); } }
+    remove(): void { if (this.parent) this.parent.children = this.parent.children.filter((c) => c !== this); this.parent = null; }
+    querySelector(selector: string): FakeElement | null {
+      const name = selector.slice(1);
+      for (const child of this.children) {
+        if (child.className.split(' ').includes(name)) return child;
+        const deeper = child.querySelector(selector);
+        if (deeper) return deeper;
+      }
+      return null;
+    }
+  }
+  const fakeDocument = (withFrames: boolean) => {
+    const frames: (() => void)[] = [];
+    const body = new FakeElement();
+    const view = withFrames ? { requestAnimationFrame: (cb: () => void) => { frames.push(cb); return frames.length; }, setTimeout } : null;
+    const doc = { body, defaultView: view, createElement: () => new FakeElement() };
+    return { doc: doc as unknown as Document, body, frames };
+  };
+
+  test('the live region is in the page empty first, then filled, so a screen reader announces it', async () => {
+    const { mountInFlowNotice } = await import('../../src/ui/notice/inFlowNotice');
+    const { doc, body, frames } = fakeDocument(true);
+    const handle = mountInFlowNotice({ title: 'New', body: 'Hello there', topPx: 40, reducedMotion: true }, doc);
+    const banner = handle.element as unknown as FakeElement;
+    expect(body.children).toHaveLength(1);
+    expect(banner.getAttribute('role')).toBe('status');
+    expect(banner.getAttribute('aria-live')).toBe('polite');
+    expect(banner.querySelector('.mazer-status-banner__message')!.textContent).toBe('');
+    expect(banner.querySelector('.mazer-status-banner__marker')!.textContent).toBe('');
+    frames.forEach((frame) => frame());
+    expect(banner.querySelector('.mazer-status-banner__message')!.textContent).toBe('Hello there');
+    expect(banner.querySelector('.mazer-status-banner__marker')!.textContent).toBe('New');
+    expect(banner.classList.contains('mazer-inflow-notice--open')).toBe(true);
+    handle.close();
+  });
+
+  test('without frames it fills at once; setHidden hides it without closing it', async () => {
+    const { mountInFlowNotice } = await import('../../src/ui/notice/inFlowNotice');
+    const { doc, body } = fakeDocument(false);
+    const handle = mountInFlowNotice({ body: 'Hi', topPx: 0, reducedMotion: true }, doc);
+    const host = body.children[0]!;
+    expect((handle.element as unknown as FakeElement).querySelector('.mazer-status-banner__message')!.textContent).toBe('Hi');
+    expect((handle.element as unknown as FakeElement).querySelector('.mazer-status-banner__marker')!.textContent).toBe('Info');
+    handle.setHidden(true);
+    expect(host.style.visibility).toBe('hidden');
+    expect(handle.isOpen()).toBe(true);
+    handle.setHidden(false);
+    expect(host.style.visibility).toBe('');
+    handle.close();
+    expect(body.children).toHaveLength(0);
+  });
+});
+
+describe('Guide and hint say the same thing', () => {
+  test('the Guide Shard row is the hint in general form (order, then the locked star)', async () => {
+    const { resolveLegacyGuideHazardRow } = await import('../../src/legacy-runtime/legacyGuideContent');
+    const guide = resolveLegacyGuideHazardRow('shard').text;
+    expect(guide).toBe('Take the shards in order. The star stays locked until you do.');
+    expect(resolveShardFirstNotice(3).body).toBe(guide.replace('the shards', 'the 3 shards'));
+    const lockSentence = guide.slice(guide.indexOf('The star'));
+    expect(resolveShardFirstNotice(1).body.endsWith(lockSentence)).toBe(true);
   });
 });

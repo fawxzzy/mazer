@@ -228,8 +228,12 @@ export interface HazardOnboardingOptions {
 }
 
 export interface HazardOnboarding {
-  /** Resolves and marks the level-start moments (writes the record only when something shows). */
-  levelStart(level: unknown): HazardLevelMoments;
+  /**
+   * Resolves and marks the level-start moments (writes the record only when something shows). An intro whose kind is
+   * in `withheldKinds` is neither shown nor marked (e.g. the shard hint on a level whose shards did not place), so it
+   * still shows the first time that kind really appears.
+   */
+  levelStart(level: unknown, options?: { readonly withheldKinds?: readonly HazardUnitKind[] }): HazardLevelMoments;
   /** Advances the stage on a first-encounter clear; never lowers it. */
   levelCleared(level: unknown): void;
   /** The stage to build `level` with (for the overlay's `exposureStage`). */
@@ -249,15 +253,17 @@ export const createHazardOnboarding = (options: HazardOnboardingOptions): Hazard
     writeHazardExposureRecord(options.resolveStorage(), next);
   };
   return {
-    levelStart(level) {
+    levelStart(level, startOptions) {
       const record = read();
-      const moments = resolveHazardLevelMoments({
+      const resolved = resolveHazardLevelMoments({
         enabled: true,
         level,
         record,
         saturationLevel: options.saturationLevel,
         liveKinds
       });
+      const withheld = resolved.introCard !== null && startOptions?.withheldKinds?.includes(resolved.introCard.kind) === true;
+      const moments = withheld ? { ...resolved, introCard: null } : resolved;
       const next = markHazardMomentsShown(record, moments);
       if (next !== record) {
         write(next);
