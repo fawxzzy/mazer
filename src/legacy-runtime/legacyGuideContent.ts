@@ -34,6 +34,7 @@ export type LegacyGuideGlyph =
   | 'level-numeral'
   | 'online-count'
   | 'menu-burger'
+  | 'menu-pause'
   | 'sound-speaker'
   | 'hazard-gate'
   | 'hazard-sentry'
@@ -244,12 +245,12 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
     heading: 'In a maze',
     icon: {
       badge: 'circle',
-      boardDraw: { module: 'src/render/menuDropdownArt.ts', symbol: 'drawMenuBurgerGlyph' },
+      boardDraw: null,
       chipDraw: null,
-      glyph: 'menu-burger',
+      glyph: 'menu-pause',
       lane: null,
-      reasonId: 'menu-legend-calls-header-burger-draw',
-      status: 'shared-with-board'
+      reasonId: 'in-maze-pause-icon-guide-local-no-board-counterpart',
+      status: 'guide-local'
     },
     id: 'menu-play',
     text: 'The same menu pauses the run. Reset level restarts the maze, Main menu leaves it.'

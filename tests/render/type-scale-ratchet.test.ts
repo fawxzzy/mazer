@@ -50,6 +50,27 @@ const collectSizes = (): Map<number, string[]> => {
   return found;
 };
 
+/** One rem is 16 px (no html font-size override in src/styles/base.css). */
+const REM_PX = 16;
+
+/**
+ * Font sizes written in rem inside the DOM layers (src/ui/**\/*.css), as `file -> px`. The px patterns above never see
+ * these, which is how the rating popup and the mode select drifted off the scale (UI audit 2026-11-26).
+ */
+const collectCssRemSizes = (): Map<string, Set<number>> => {
+  const found = new Map<string, Set<number>>();
+  for (const { file, text } of sources) {
+    if (!file.startsWith('src/ui/') || !file.endsWith('.css')) {
+      continue;
+    }
+    for (const match of text.matchAll(/font(?:-size)?:\s*(?:\d{3}\s+)?(\d*\.?\d+)rem/g)) {
+      const px = Math.round(Number(match[1]) * REM_PX * 100) / 100;
+      found.set(file, new Set([...(found.get(file) ?? []), px]));
+    }
+  }
+  return found;
+};
+
 const collectStacks = (): Map<string, string[]> => {
   const found = new Map<string, string[]>();
   const patterns = [/[A-Za-z_]*[Ff]ontFamily\s*=\s*'([^']+)'/g, /fontFamily:\s*'([^']+)'/g, /font-family:\s*([^;}\n]+)[;}\n]/g, /--mazer-token-font-[a-z-]+:\s*([^;]+);/g];
@@ -67,9 +88,7 @@ const collectStacks = (): Map<string, string[]> => {
       }
     }
   }
-  // Stacks declared once as constants and referenced by name.
-  add(readFileSync(join(root, 'src/scenes/MenuScene.ts'), 'utf8').match(/LEGACY_AUTH_UI_FONT_FAMILY = '([^']+)'/)?.[1] ?? '', 'src/scenes/MenuScene.ts');
-  found.delete('');
+  // MenuScene's stacks come from the shared token (LEGACY_UI_FONT_FAMILY, and the sign-in surface's alias of it): no literal.
   return found;
 };
 
@@ -82,9 +101,19 @@ const collectStacks = (): Map<string, string[]> => {
  */
 const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 13, 15, 18] as const;
 
+/**
+ * rem font sizes (as px) in src/ui/**\/*.css that are still off the scale, per file. Same shrink-only rule: a migrated
+ * entry must be deleted, a new off-scale rem size fails. feedbackPopup.css and modeSelect.css are on the scale
+ * (UI consistency batch C). primitives.css holds the kit's own sizes (field labels, helper text, the slider value) that
+ * only unmounted kit parts and the options pages use today; gameModeOptions.css is the mode-select proposal page.
+ */
+const LEGACY_OFF_SCALE_REM_PX: Readonly<Record<string, readonly number[]>> = {
+  'src/ui/dom/primitives.css': [11.2, 12.48, 12.8, 13.6, 14.4, 15.2],
+  'src/ui/gameModeOptions/gameModeOptions.css': [11.2, 12.48, 13.12, 13.6, 14.4, 15.2, 17.6, 21.6, 24, 83.2]
+};
+
 /** Font stacks still in shipped source besides the two scale faces. Same shrink-only rule. */
 const LEGACY_FONT_STACKS = [
-  'Segoe UI Variable, Helvetica Neue, Arial, sans-serif',
   'IBM Plex Mono, ui-monospace, monospace'
 ] as const;
 
@@ -139,6 +168,26 @@ describe('type scale source ratchet (shipped src + index.html)', () => {
     }
   });
 
+  test('rem font sizes in the DOM layers are on the scale, or on the shrink-only per-file legacy list', () => {
+    const scale = new Set<number>(TYPE_SCALE_SIZES_PX);
+    const offScale: Record<string, number[]> = {};
+    for (const [file, sizes] of collectCssRemSizes()) {
+      const off = [...sizes].filter((px) => !scale.has(px)).sort((a, b) => a - b);
+      if (off.length > 0) {
+        offScale[file] = off;
+      }
+    }
+    const expected = Object.fromEntries(Object.entries(LEGACY_OFF_SCALE_REM_PX).map(([file, sizes]) => [file, [...sizes].sort((a, b) => a - b)]));
+    expect(offScale).toEqual(expected);
+  });
+
+  test('the rating popup and the mode select hold no off-scale font size at all', () => {
+    const sizes = collectCssRemSizes();
+    for (const file of ['src/ui/feedback/feedbackPopup.css', 'src/ui/modeSelect/modeSelect.css']) {
+      expect([...(sizes.get(file) ?? [])].filter((px) => !TYPE_SCALE_SIZES_PX.includes(px)), file).toEqual([]);
+    }
+  });
+
   test('font stacks: Space Grotesk body face, optional Oxanium display face, plus the shrink-only legacy list', () => {
     const stacks = [...collectStacks().keys()];
     const allowed = new Set<string>([
@@ -155,6 +204,12 @@ describe('type scale source ratchet (shipped src + index.html)', () => {
     expect(stacks.filter((stack) => !allowed.has(stack))).toEqual([]);
     const present = new Set(stacks);
     expect(LEGACY_FONT_STACKS.filter((stack) => !present.has(stack))).toEqual([]);
+  });
+
+  test('the sign-in surface uses the shared Space Grotesk stack, not a system stack of its own', () => {
+    const menuScene = readFileSync(join(root, 'src/scenes/MenuScene.ts'), 'utf8');
+    expect(menuScene).toMatch(/const LEGACY_AUTH_UI_FONT_FAMILY = LEGACY_UI_FONT_FAMILY;/);
+    expect(menuScene).not.toContain('Segoe UI Variable');
   });
 
   test('Oxanium is declared in exactly one place and is the only added face', () => {

@@ -8,7 +8,7 @@ import {
 
 // MAZER-UI-017 acceptance pin: every non-populated leaderboard state is designed
 // (heading + one line, or a status line), offers a clear way forward (its own
-// action, or the always-present Back to Menu exit), and never shows raw error text.
+// action, or the always-present Back to menu exit), and never shows raw error text.
 
 const base: LegacyLeaderboardViewState = {
   entries: [],
@@ -41,7 +41,7 @@ describe('leaderboard non-populated states (MAZER-UI-017)', () => {
     if (kind !== 'profile-loading') {
       expect(view.state?.heading?.length).toBeGreaterThan(0);
     }
-    expect(view.exit.label).toBe('Back to Menu');
+    expect(view.exit.label).toBe('Back to menu');
     // Failures and gates carry their own action; empty and transient states rely on the exit.
     // The username gate points to Profile in words only (MAZER-ACCT-047).
     if (!['empty', 'profile-loading', 'needs-username'].includes(kind)) {

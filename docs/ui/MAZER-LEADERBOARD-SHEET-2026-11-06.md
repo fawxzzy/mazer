@@ -8,13 +8,13 @@ card, a round rank chip and a top-right back chevron). Data and RPCs are unchang
 ## Design
 
 The Leaderboard is a sheet in the shared Settings language: the same near-black card (`drawLegacySheetCard`), card padding,
-title slot, 48 px primary `Back to Menu` row, masked scroll body and rail in the card padding, Space Grotesk
+title slot, 48 px primary `Back to menu` row, masked scroll body and rail in the card padding, Space Grotesk
 (`LEGACY_UI_FONT_FAMILY`) and theme colours (mint, cyan, start gold, goal red from `cyberArcadeMaterial`).
 `legacyLeaderboardOverlayPlan.ts` reuses `LEGACY_SETTINGS_SIZES`, so the two sheets cannot drift apart.
 
 ```
 Leaderboard                      title (shared createOverlayTitle)
-[ Back to Menu ]                 primary exit row, pinned (same row as Settings)
+[ Back to menu ]                 primary exit row, pinned (same row as Settings)
  RANK   PLAYER           LEVEL   column header, pinned
  1      nova              259    top 3: themed accent bar + tint + bold (gold / cyan / mint), not medals
  2      qa-player [YOU]   255    own row in the list: mint tint + keyline + YOU tag
@@ -28,7 +28,7 @@ Leaderboard                      title (shared createOverlayTitle)
 - Vocabulary: columns `RANK` (position, `#N`-style number), `PLAYER`, `LEVEL` (standing = level). The letter rank (E..S)
   still has no player surface (see `legacy-rank-vocabulary-guard.test.ts`); the unresolved "Rank vs Place" naming (audit G6) is
   an owner decision, the column follows the brief.
-- Exit: the primary `Back to Menu` row, Escape (`handleBackAction`) and a tap on the dimmed scrim outside the card
+- Exit: the primary `Back to menu` row, Escape (`handleBackAction`) and a tap on the dimmed scrim outside the card
   (`handleOverlayScrimPointerDown`, now for `options` and `leaderboard`). No X, no back arrow. Menu context only: the
   leaderboard is still not reachable from pause.
 - Static: no animation anywhere in the sheet (loading is a static skeleton plus a status line), so there is nothing to gate

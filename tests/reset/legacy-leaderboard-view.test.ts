@@ -49,10 +49,10 @@ describe('leaderboard view-model: request and vocabulary', () => {
     expect(LEGACY_LEADERBOARD_TOP_N).toBe(50);
   });
 
-  test('title, exit and columns use the sheet vocabulary: Leaderboard, Back to Menu, RANK | PLAYER | LEVEL', () => {
+  test('title, exit and columns use the sheet vocabulary: Leaderboard, Back to menu, RANK | PLAYER | LEVEL', () => {
     const view = buildLegacyLeaderboardViewModel(state());
     expect(view.header.title).toBe('Leaderboard');
-    expect(view.exit.label).toBe('Back to Menu');
+    expect(view.exit.label).toBe('Back to menu');
     expect(view.columns).toEqual({ level: 'LEVEL', player: 'PLAYER', rank: 'RANK' });
     // No Skill wording on a player surface; the pager is gone.
     expect(JSON.stringify(LEGACY_LEADERBOARD_COPY)).not.toMatch(/skill|page|next|previous/i);

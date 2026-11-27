@@ -16,6 +16,7 @@ import {
   resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY
 } from '../../src/legacy-runtime/legacyUiStandards';
+import { TYPE_BODY_FLOOR_PX } from '../../src/render/typeScale';
 
 describe('legacy UI standards', () => {
   test('fills the safe phone viewport instead of preserving the hidden play HUD lane', () => {
@@ -80,8 +81,8 @@ describe('legacy UI standards', () => {
     expect(compact.cardHeight).toBe(178);
     expect(compact.collapsedHeight).toBe(40);
     expect(compact.rowCount).toBe(4);
-    expect(compact.rowFontSize).toBe(11);
-    expect(compact.rowMinFontSize).toBe(10);
+    expect(compact.rowFontSize).toBe(12);
+    expect(compact.rowMinFontSize).toBe(12);
     expect(compact.horizontalMargin).toBe(48);
     expect(compact.textWidthSafetyRatio).toBe(0.9);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
@@ -167,8 +168,8 @@ describe('320 px clipping guards (Wave 5C)', () => {
   });
 
   test('body and legend copy never shrink below the minimum readable sizes', () => {
-    expect(LEGACY_UI_MIN_BODY_FONT_SIZE).toBe(11);
-    expect(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE).toBe(10);
+    expect(LEGACY_UI_MIN_BODY_FONT_SIZE).toBe(TYPE_BODY_FLOOR_PX);
+    expect(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE).toBe(TYPE_BODY_FLOOR_PX);
     for (const width of [304, 344, 374]) {
       const guide = resolveLegacyOptionsGuideLayout(width, 5);
       expect(guide.rowMinFontSize).toBeGreaterThanOrEqual(LEGACY_OPTIONS_GUIDE_MIN_COPY_FONT_SIZE);

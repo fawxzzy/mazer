@@ -179,7 +179,7 @@
   ],
   "legacy/fonts/system": [
    {
-    "file": "src/scenes/MenuScene.ts",
+    "file": "src/theme/tokens.css",
     "pattern": "\"Segoe UI Variable\", \"Helvetica Neue\", Arial, sans-serif"
    }
   ],

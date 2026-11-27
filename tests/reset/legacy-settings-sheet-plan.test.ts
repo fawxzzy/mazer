@@ -111,10 +111,10 @@ describe('settings sheet model', () => {
     const pauseFirst = buildLegacySettingsSheetModel('pause').sections[0]!.rows[0]!;
     expect([pauseFirst.id, pauseFirst.label, pauseFirst.command]).toEqual(['resume', 'Resume', { type: 'RESUME_RUN' }]);
     const menuFirst = buildLegacySettingsSheetModel('menu').sections[0]!.rows[0]!;
-    expect([menuFirst.id, menuFirst.label, menuFirst.command]).toEqual(['back-to-menu', 'Back to Menu', { type: 'CLOSE_OVERLAY' }]);
+    expect([menuFirst.id, menuFirst.label, menuFirst.command]).toEqual(['back-to-menu', 'Back to menu', { type: 'CLOSE_OVERLAY' }]);
   });
 
-  test('Back to Menu takes the same slot, size and emphasis as Resume', () => {
+  test('Back to menu takes the same slot, size and emphasis as Resume', () => {
     const viewport = { height: 844, width: 390 };
     const menuTop = plan('menu', viewport).items[0]!;
     const pauseTop = plan('pause', viewport).items[0]!;
@@ -131,7 +131,7 @@ describe('settings sheet model', () => {
   test('toggle state words are separate from labels and keep today\'s copy', () => {
     const toggles = LEGACY_SETTINGS_GROUP_ROWS.filter((r) => r.kind === 'toggle');
     expect(toggles.map((r) => [r.label, r.onLabel, r.offLabel])).toEqual([
-      ['Reduce Motion', 'On', 'System'],
+      ['Reduce motion', 'On', 'System'],
       ['Haptics', 'On', 'Off'],
       ['Floating anchor', 'On', 'Off'],
       ['Dark mode', 'On', 'Off']
@@ -289,7 +289,7 @@ describe('settings sheet plan specifics', () => {
     expect(p.scrollable).toBe(false);
   });
 
-  test('menu is always open: Back to Menu, then the three settings (MAZER-UI-100: no Account section)', () => {
+  test('menu is always open: Back to menu, then the three settings (MAZER-UI-100: no Account section)', () => {
     const p = plan('menu', { height: 844, width: 390 });
     expect(p.settingsExpanded).toBe(true);
     expect(p.items.map((i) => i.model.id)).toEqual(['back-to-menu', 'reduce-motion', 'haptics', 'floating-anchor', 'dark-mode']);

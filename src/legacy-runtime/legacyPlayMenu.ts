@@ -95,17 +95,22 @@ export const resolveLegacyPlayMenuOpenView = (reason: LegacyPlayMenuOpenReason):
   reason === 'rotate' ? 'settings' : 'menu'
 );
 
-export type LegacyPlayMenuBackAction = 'close-guide' | 'show-menu' | 'resume';
+export type LegacyPlayMenuBackAction = 'close-guide' | 'resume';
 
-/** Esc / browser back while paused: the Guide closes first, then the Settings sheet steps back to the dropdown. */
+/**
+ * Esc / browser back while paused: the Guide closes first; after that Esc resumes the run from the dropdown AND from the
+ * Settings sheet, matching the sheet's own Resume button (UI consistency batch D, 2026-11-26; it used to step back to
+ * the dropdown first, so Esc and the visible Resume button disagreed).
+ */
 export const resolveLegacyPlayMenuBack = (input: {
   readonly view: LegacyPlayMenuView;
   readonly guideOpen: boolean;
 }): LegacyPlayMenuBackAction => {
+  // `view` is kept in the input so a future view that needs its own back step stays one switch here.
   if (input.guideOpen) {
     return 'close-guide';
   }
-  return input.view === 'settings' ? 'show-menu' : 'resume';
+  return 'resume';
 };
 
 /**

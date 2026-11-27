@@ -86,7 +86,7 @@ export const createFeedbackPopup = (
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-labelledby', `${prefix}-title`);
 
-  const title = el(doc, 'h2', 'mazer-feedback__title', FEEDBACK_COPY.title);
+  const title = el(doc, 'h2', 'mazer-feedback__title mazer-sheet-title', FEEDBACK_COPY.title);
   title.id = `${prefix}-title`;
 
   const stars = el(doc, 'div', 'mazer-feedback__stars');

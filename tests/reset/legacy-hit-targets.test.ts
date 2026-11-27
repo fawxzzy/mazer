@@ -148,7 +148,7 @@ describe('legacy hit targets (Wave 5C)', () => {
     }
     expect(undersized).toEqual([]);
     // The header menu button and its rows, play pause / the in-game Menu (the 2026-11-06 UI audit's under-44 px controls) plus
-    // every interactive row of the shared Settings sheet (Back to Menu / Resume are the exits; no Close pill) and the Guide sheet (Got it).
+    // every interactive row of the shared Settings sheet (Back to menu / Resume are the exits; no Close pill) and the Guide sheet (Got it).
     expect([...names].sort()).toEqual([
       'guide-got-it',
       'menu-dropdown-guide',

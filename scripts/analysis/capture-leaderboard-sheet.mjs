@@ -8,7 +8,7 @@
  * see src/legacy-runtime/legacyLeaderboardFixture.ts) at 390x844, 1280x720 and
  * 320x568, opens the sheet with real clicks on the header Menu toggle and then its Leaderboard row,
  * screenshots each state and asserts: no console errors, every interactive control
- * is >= 44 px, the exit is the primary `Back to Menu` row, Escape closes the sheet,
+ * is >= 44 px, the exit is the primary `Back to menu` row, Escape closes the sheet,
  * and a tap on the scrim outside the card closes it.
  *
  * Usage: node scripts/analysis/capture-leaderboard-sheet.mjs --base http://127.0.0.1:4261/ --out <dir>
@@ -99,7 +99,7 @@ try {
       const tag = `${viewportKey} ${shape}`;
       await page.screenshot({ path: resolve(outDir, `leaderboard-${shape}-${viewportKey}.png`) });
       check(`${tag}: leaderboard overlay is open`, state.overlay === 'leaderboard', `overlay=${state.overlay}`);
-      check(`${tag}: exit is the primary Back to Menu row (no X / arrow)`, state.buttons.some((button) => button.text === 'Back to Menu'));
+      check(`${tag}: exit is the primary Back to menu row (no X / arrow)`, state.buttons.some((button) => button.text === 'Back to menu'));
       const small = state.buttons.filter((button) => button.bounds && (button.bounds.height < 44 || button.bounds.width < 44));
       check(`${tag}: every interactive control is >= 44 px`, small.length === 0, small.map((button) => button.text).join(','));
       if (!['signed-out'].includes(shape)) {

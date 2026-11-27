@@ -74,7 +74,7 @@ describe('mode-select items (MAZER-MODE-002, look D)', () => {
     }
     expect(resolveLegacyModeSelectPlayAction(undefined).disabled).toBe(true);
     expect(LEGACY_MODE_SELECT_COMING_SOON_LABEL).toBe('Coming soon');
-    expect(LEGACY_MODE_SELECT_BACK_LABEL).toBe('Back to Menu');
+    expect(LEGACY_MODE_SELECT_BACK_LABEL).toBe('Back to menu');
     expect(LEGACY_MODE_SELECT_TITLE).toBe('Choose a mode');
   });
 });

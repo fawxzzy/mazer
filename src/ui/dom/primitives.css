@@ -505,6 +505,20 @@
   margin: 0;
 }
 
+/*
+ * The ONE title for a DOM sheet (rating popup, mode select; 2026-11-26 UI consistency batch C). It matches the title the
+ * canvas sheets draw (Settings, Guide, Leaderboard: createOverlayTitle in MenuScene): Space Grotesk, regular weight,
+ * brand mint. The size is the scale's `title` step (28 px) where the canvas uses 24 / 28 / 34 by width.
+ */
+.mazer-sheet-title {
+  color: var(--mazer-token-color-brand-mint);
+  font: 400 1.75rem/1.2 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  letter-spacing: 0;
+  margin: 0;
+  text-align: center;
+  text-transform: none;
+}
+
 .mazer-confirm-dialog__actions {
   display: flex;
   flex-wrap: wrap;

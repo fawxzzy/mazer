@@ -417,8 +417,8 @@ describe('guide icons are tied to the draw functions the board uses', () => {
 
   test('Chip wiring closed every chip-wiring todo: goal, start, you, trail, wrap, bleed-gate, levels, online and menu share a board draw; move and sound are guide-local', () => {
     const byStatus = (status: string): string[] => LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === status).map((r) => r.id);
-    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play']);
-    expect(byStatus('guide-local')).toEqual(['move', 'sound']);
+    expect(byStatus('shared-with-board')).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
+    expect(byStatus('guide-local')).toEqual(['move', 'menu-play', 'sound']);
     expect(byStatus('todo-wiring')).toEqual([]);
     expect(LEGACY_GUIDE_ROWS.filter((r) => r.icon.lane === 'chip-wiring').map((r) => r.id)).toEqual([]);
   });
@@ -435,7 +435,7 @@ describe('the scene paints exactly what the guide data declares', () => {
     const icon = method('\n  drawLegacyGuideIcon(');
     const drawn = [...icon.matchAll(/case '([a-z-]+)':/g)].map((m) => m[1]).sort();
     // Slice H6: the hazard rows (shown only while the hazard layer is on) are drawn by the same method.
-    // menu and menu-play share the burger glyph, so the declared set is deduplicated.
+    // Every row has its own glyph (the Menu and In a maze rows no longer share the burger); the set is deduplicated anyway.
     const declared = [...new Set([...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph))].sort();
     expect(drawn).toEqual(declared);
   });
@@ -443,7 +443,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('icons declared shared-with-board call the board draw function itself, not a copy', () => {
     const icon = method('\n  drawLegacyGuideIcon(');
     const shared = LEGACY_GUIDE_ROWS.filter((r) => r.icon.status === 'shared-with-board');
-    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play']);
+    expect(shared.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu']);
     // goal and start: one helper that paints a chip tile and then calls drawBoardMarkers itself.
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'goal',");
     expect(icon).toContain("this.drawLegacyGuideBoardMarker(graphics, 'start',");

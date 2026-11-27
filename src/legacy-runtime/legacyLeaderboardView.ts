@@ -2,7 +2,7 @@
  * Pure view-model for the Leaderboard sheet (redesign 2026-11-06).
  *
  * The Leaderboard is a sheet in the same language as Settings and the Guide:
- * one card, the shared title, the primary `Back to Menu` row as the exit (no X,
+ * one card, the shared title, the primary `Back to menu` row as the exit (no X,
  * no back arrow), a masked scrolling body with the shared rail, and designed
  * states. This module maps the scene's leaderboard state to a render-ready
  * model. No Phaser, no network, no DOM. Ranks and levels are DECIMAL STRINGS
@@ -59,7 +59,7 @@ export const LEGACY_LEADERBOARD_COPY = Object.freeze({
   emptyHeading: 'No ranks yet',
   errorBody: 'Something went wrong on our side. Try again in a moment.',
   errorHeading: 'Leaderboard unavailable',
-  exit: 'Back to Menu',
+  exit: 'Back to menu',
   loading: 'Loading the leaderboard…',
   needsUsernameBody: 'Choose it on the account site: open the menu and tap Profile.',
   needsUsernameHeading: 'Choose a username',
@@ -296,7 +296,7 @@ export interface LegacyLeaderboardViewModel {
   overlayId: typeof LEGACY_LEADERBOARD_OVERLAY_ID;
   phase: LegacyLeaderboardPhase;
   header: { title: string };
-  /** The exit row: the primary `Back to Menu` (same row as Settings). */
+  /** The exit row: the primary `Back to menu` (same row as Settings). */
   exit: { label: string };
   /** Column captions, only while rows are shown (the loading state shows a status line in the same slot). */
   columns: { level: string; player: string; rank: string } | null;

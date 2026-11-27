@@ -93,7 +93,7 @@ export const resolveTrailColourTimeMs = (colourClockMs: number, plan: TrailMotio
 export const REDUCED_MOTION_BLEED_GLOW_PROGRESS = 0.5;
 
 /** Settings copy: says exactly what the switch stops, and that colours keep moving. Pinned by tests. */
-export const REDUCED_MOTION_SETTING_LABEL = 'Reduce Motion';
+export const REDUCED_MOTION_SETTING_LABEL = 'Reduce motion';
 export const REDUCED_MOTION_SETTING_ON_LABEL = 'On';
 export const REDUCED_MOTION_SETTING_OFF_LABEL = 'System';
 export const REDUCED_MOTION_SETTING_NOTE =

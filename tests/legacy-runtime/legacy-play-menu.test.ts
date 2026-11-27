@@ -220,14 +220,29 @@ describe('MAZER-UI-095 in-game Menu rows (legacyPlayMenu.ts)', () => {
     expect(shouldLegacyPlayMenuStayOpen('main-menu', at({ quitState: armed }))).toBe(false);
   });
 
-  test('back steps Guide -> Settings sheet -> dropdown -> resume; only a rotate opens straight on the sheet', () => {
+  test('back closes the Guide first, then resumes from the dropdown and from the Settings sheet; only a rotate opens straight on the sheet', () => {
     expect(resolveLegacyPlayMenuBack({ guideOpen: true, view: 'menu' })).toBe('close-guide');
     expect(resolveLegacyPlayMenuBack({ guideOpen: true, view: 'settings' })).toBe('close-guide');
-    expect(resolveLegacyPlayMenuBack({ guideOpen: false, view: 'settings' })).toBe('show-menu');
+    expect(resolveLegacyPlayMenuBack({ guideOpen: false, view: 'settings' })).toBe('resume');
     expect(resolveLegacyPlayMenuBack({ guideOpen: false, view: 'menu' })).toBe('resume');
     expect(resolveLegacyPlayMenuOpenView('menu')).toBe('menu');
     expect(resolveLegacyPlayMenuOpenView('page-leave')).toBe('menu');
     expect(resolveLegacyPlayMenuOpenView('rotate')).toBe('settings');
+  });
+
+  test('Esc / scrim / browser back in a paused run closes the pause overlay, which also disarms Reset level and Main menu', () => {
+    const scene = read('src/scenes/MenuScene.ts');
+    const back = scene.slice(scene.indexOf('  private handleBackAction(): void {'));
+    const resume = back.indexOf("resolveLegacyPlayMenuBack({ guideOpen: false, view: this.playMenuView }) === 'resume'");
+    expect(resume).toBeGreaterThan(0);
+    // The Guide closes first (an Esc on the Guide never resumes), and no branch steps Settings back to the dropdown.
+    expect(back.indexOf('this.closeLegacyGuideSheet();')).toBeLessThan(resume);
+    expect(back).not.toContain("this.playMenuView = 'menu'");
+    expect(back.slice(resume, resume + 220)).toContain('this.closeOverlay();');
+    // closeOverlay drops both armed two-tap states, so one Esc on an armed dropdown resumes cleanly (never a stuck "Tap again").
+    const close = scene.slice(scene.indexOf('  private closeOverlay(): void {'));
+    expect(close.slice(0, 200)).toContain('this.quitConfirmState = IDLE_LEGACY_QUIT_CONFIRM_STATE;');
+    expect(close.slice(0, 260)).toContain('this.playResetConfirmState = IDLE_LEGACY_PLAY_RESET_CONFIRM_STATE;');
   });
 
   test('the Settings sheet the Settings row opens no longer has Guide, Sound or Main menu', () => {

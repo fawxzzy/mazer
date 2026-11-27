@@ -48,7 +48,7 @@ describe('mode-select layer controller (MAZER-MODE-002 look D)', () => {
     expect(layer.isMounted()).toBe(true);
     const options = mounts[0]!.options;
     expect(options.title).toBe('Choose a mode');
-    expect(options.backLabel).toBe('Back to Menu');
+    expect(options.backLabel).toBe('Back to menu');
     expect(options.comingSoonLabel).toBe('Coming soon');
     expect(options.items.map((item) => item.id)).toEqual(['endless', 'hazards', 'sprint', 'daily']);
     expect(options.resolvePlay(options.items[0])).toEqual({ disabled: false, label: 'Play Endless' });
