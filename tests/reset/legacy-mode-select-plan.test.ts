@@ -15,7 +15,7 @@ import {
   resolveLegacyModeSelectPlayAction
 } from '../../src/legacy-runtime/legacyModeSelectPlan';
 
-const progress = { level: 37, rank: 'C' };
+const progress = { level: 37 };
 const ART_CELLS = new Set(['S', 'E', 't', '.', '#', 'g', 'x']);
 
 describe('mode-select items (MAZER-MODE-002, look D)', () => {
@@ -31,10 +31,10 @@ describe('mode-select items (MAZER-MODE-002, look D)', () => {
     }
   });
 
-  it('shows Endless with the player level and rank it was given, and nothing else playable', () => {
+  it('shows Endless with the player level it was given (and no rank), and nothing else playable', () => {
     const items = buildLegacyModeSelectItems(progress);
     expect(items[0]).toMatchObject({ id: 'endless', label: 'Endless', playable: true, tagline: 'Every level harder than the last' });
-    expect(items[0]!.stats).toEqual([{ label: 'Level', value: '37' }, { label: 'Rank', value: 'C' }]);
+    expect(items[0]!.stats).toEqual([{ label: 'Level', value: '37' }]);
     expect(items.filter((item) => item.playable).map((item) => item.id)).toEqual(['endless']);
   });
 
@@ -80,7 +80,7 @@ describe('mode-select items (MAZER-MODE-002, look D)', () => {
 });
 
 describe('mode-select input guard and keyboard choice (MAZER-MODE-002 review)', () => {
-  const items = buildLegacyModeSelectItems({ level: 1, rank: 'E' });
+  const items = buildLegacyModeSelectItems({ level: 1 });
 
   it('the guard window is one pinned constant of 250 ms', () => {
     expect(LEGACY_MODE_SELECT_INPUT_GUARD_MS).toBe(250);

@@ -1,7 +1,7 @@
 /**
  * Sample modes for the game-mode selector options page (dev/proposal only). Endless is the one real registered mode
  * (src/legacy-runtime/legacyGameModes.ts); Hazards is the reserved slot; Sprint and Daily are PLACEHOLDER names so the
- * scroll has something to scroll to. Level and rank are labelled sample data on the page.
+ * scroll has something to scroll to. The level is labelled sample data on the page.
  */
 export type ModeArtCell = 'S' | 'E' | 't' | '.' | '#' | 'g' | 'x';
 
@@ -21,7 +21,7 @@ export const GAME_MODE_SAMPLES: readonly GameModeSample[] = Object.freeze([
     label: 'Endless',
     tagline: 'Every level harder than the last',
     playable: true,
-    stats: [{ label: 'Level', value: '37' }, { label: 'Rank', value: 'C' }],
+    stats: [{ label: 'Level', value: '37' }],
     art: ['Sttttt#', '#####t#', 'Ettttt#', '#.#####', '#......']
   },
   {

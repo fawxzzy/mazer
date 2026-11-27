@@ -67,7 +67,6 @@ describe('legacy menu layout', () => {
     // sits inline between the header icons -- no separate title lane at all.
     expect(layout.lanes.title).toBeNull();
     expectTitlePlacedSafely(layout);
-    expect(layout.lanes.rank).toBeNull();
     // The dock button sits near the bottom edge, not tucked immediately
     // under the board -- that reclaimed space went to the board instead.
     expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
@@ -344,7 +343,6 @@ describe('legacy menu layout', () => {
   test('reclaims the old status-card lane for the single menu action', () => {
     const layout = resolveLegacyMenuLayout(360, 720, 50, 49, 49, 'menu');
 
-    expect(layout.lanes.rank).toBeNull();
     expect(layout.lanes.actions?.top).toBeLessThanOrEqual(
       layout.buttonY - (layout.buttonHeight / 2)
     );
@@ -595,7 +593,6 @@ describe('legacy menu layout', () => {
 
       expect(restored).toEqual(first);
       expectTitlePlacedSafely(first);
-      expect(first.lanes.rank).toBeNull();
       // The board is full-bleed now, so it no longer guarantees stopping
       // short of the dock button's action lane -- see expectTitlePlacedSafely's
       // comment above.

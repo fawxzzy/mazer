@@ -16,7 +16,7 @@ Adopted 2026-11-14 on the decision record pick 1. Source of truth in code:
 | control | 16 px | 600 | display, uppercase | Button and tab labels, toggle names |
 | heading | 20 px | 600 | display, uppercase | Panel and sheet headings |
 | title | 28 px | 700 | display, uppercase | Screen titles |
-| display | 40 px | 700 | display, uppercase | Run result and rank figures |
+| display | 40 px | 700 | display, uppercase | Run result figures |
 
 ## Rules
 - Floor: body copy never renders below 12 px, including at 320 px wide. Narrow widths wrap or shorten the copy, they do not shrink it.

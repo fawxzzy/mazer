@@ -70,7 +70,7 @@ intro.className = 'gm-intro';
 const h1 = document.createElement('h1');
 h1.textContent = 'Game mode selector: pick a direction';
 const p = document.createElement('p');
-p.textContent = 'Each selector is live. Swipe or drag the row sideways, tap a mode to centre it, or use the arrow keys. Endless is the only playable mode; Hazards is the reserved slot; Sprint and Daily are placeholder names so the row has length. Level 37 and Rank C are sample numbers. Nothing here ships in the game.';
+p.textContent = 'Each selector is live. Swipe or drag the row sideways, tap a mode to centre it, or use the arrow keys. Endless is the only playable mode; Hazards is the reserved slot; Sprint and Daily are placeholder names so the row has length. Level 37 is a sample number. Nothing here ships in the game.';
 const themeLink = document.createElement('a');
 themeLink.href = `?theme=${dark ? 'default' : 'dark'}${only ? `&only=${only}` : ''}`;
 themeLink.textContent = `Theme: ${dark ? 'dark neon' : 'default mint'}. Switch to ${dark ? 'default mint' : 'dark neon'}.`;

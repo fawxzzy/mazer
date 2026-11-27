@@ -78,7 +78,7 @@ export interface LegacyGuideRow {
 /** A guide row that must exist once its blocker lands. Never shown until then. */
 export interface LegacyGuidePendingRow {
   id: string;
-  blockedOn: 'rank-surface' | 'first-run-coach' | 'guide-icon-construction';
+  blockedOn: 'first-run-coach' | 'guide-icon-construction';
   /** Kebab id; prose in the spec doc ("Guide icon reasons"). */
   reasonId: string;
 }
@@ -344,11 +344,6 @@ export const resolveLegacyGuideHazardRow = (kind: LegacyGuideHazardKind): Legacy
  * left this list when Chip landed: the start marker is now on the board.)
  */
 export const LEGACY_GUIDE_PENDING_ROWS: readonly LegacyGuidePendingRow[] = Object.freeze([
-  {
-    blockedOn: 'rank-surface',
-    id: 'ranks',
-    reasonId: 'rank-letters-not-visible-anywhere'
-  },
   {
     blockedOn: 'first-run-coach',
     id: 'first-run-coach',

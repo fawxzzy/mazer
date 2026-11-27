@@ -25,7 +25,7 @@ const fakeMount = () => {
 
 const showOptions = (overrides: Partial<LegacyModeSelectLayerShowOptions> = {}): LegacyModeSelectLayerShowOptions => ({
   initialIndex: 0,
-  items: buildLegacyModeSelectItems({ level: 3, rank: 'E' }),
+  items: buildLegacyModeSelectItems({ level: 3 }),
   onBack: vi.fn(),
   onPlay: vi.fn(),
   onSelect: vi.fn(),

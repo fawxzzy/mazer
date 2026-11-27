@@ -119,7 +119,7 @@ describe('guide structure', () => {
       expect(pending.reasonId).toMatch(/^[a-z0-9]+(-[a-z0-9]+){2,}$/);
     }
     // The Start row left the pending list when Chip was wired (the start marker is on the board now).
-    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['ranks', 'first-run-coach', 'auto-pause']);
+    expect(LEGACY_GUIDE_PENDING_ROWS.map((p) => p.id)).toEqual(['first-run-coach', 'auto-pause']);
   });
 });
 
@@ -331,7 +331,7 @@ describe('guide copy only names things that exist', () => {
     expect(plans(60).some((plan) => plan.shortcuts > 0)).toBe(true);
     expect(plans(198).some((plan) => legacyLoopPlanSize(plan) > 0)).toBe(true);
     expect(plans(198).some((plan) => legacyLoopPlanSize(plan) === 0)).toBe(true);
-    // Ranks are visible only as the rank-up caption; the board still draws no level or rank badge.
+    // No rank is shown anywhere (the rank-up caption is gone too); the board draws no level or rank badge.
     expect(MENU_SCENE).toMatch(/private drawLegacyProgressionBadge\(\): VisualRect \| null \{\s*this\.clearLegacyPlayerProgressionBadge\(\);\s*this\.clearLegacyMenuAiProgressionBadge\(\);\s*return null;\s*\}/);
   });
 });
