@@ -6,7 +6,7 @@
 .sh-demo { display: grid; gap: 8px; }
 .sh-pair { align-items: end; display: flex; gap: 14px; justify-content: center; }
 .sh-fig { display: grid; gap: 16px; justify-items: center; }
-.sh-step-status { color: var(--mazer-token-color-text-muted); font-size: .85rem; }
+.sh-step-status { color: var(--mazer-token-color-text-muted); font-size: .875rem; }
 
 /* ---------------------------------------------------------------- shards (every look) */
 .sh-wrap { display: grid; filter: drop-shadow(0 0 3px var(--sh-glow, transparent)); inset: 0; place-items: center; position: absolute; }
@@ -17,15 +17,15 @@
 @keyframes sh-breathe { 0%, 100% { transform: scale(.9); } 50% { transform: scale(1.14); } }
 
 .sh-gem { background: linear-gradient(135deg, color-mix(in srgb, var(--mazer-token-color-semantic-reward) 45%, var(--mazer-token-color-text-primary)), var(--mazer-token-color-semantic-reward) 55%, color-mix(in srgb, var(--mazer-token-color-semantic-reward) 60%, var(--mazer-token-color-bg-canvas))); clip-path: var(--oo-diamond-clip); }
-.sh-hex { background: var(--mazer-token-color-semantic-info); clip-path: var(--oo-hex-clip); color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .72rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
+.sh-hex { background: var(--mazer-token-color-semantic-info); clip-path: var(--oo-hex-clip); color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .75rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
 .sh-splinter { background: linear-gradient(160deg, var(--mazer-token-color-text-primary), var(--mazer-token-color-semantic-anomaly) 45%); clip-path: polygon(38% 0%, 74% 14%, 62% 100%, 26% 66%); transform: rotate(18deg); }
 .sh-prism { background: linear-gradient(180deg, var(--mazer-token-color-text-primary), var(--mazer-token-color-semantic-info) 40%, color-mix(in srgb, var(--mazer-token-color-semantic-info) 60%, var(--mazer-token-color-bg-canvas))); clip-path: polygon(50% 6%, 94% 90%, 6% 90%); }
-.sh-tile { background: var(--mazer-token-color-brand-mint); border-bottom: 3px solid color-mix(in srgb, var(--mazer-token-color-brand-mint) 50%, var(--mazer-token-color-bg-canvas)); border-radius: 28%; color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .72rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
+.sh-tile { background: var(--mazer-token-color-brand-mint); border-bottom: 3px solid color-mix(in srgb, var(--mazer-token-color-brand-mint) 50%, var(--mazer-token-color-bg-canvas)); border-radius: 28%; color: var(--mazer-token-color-bg-canvas); display: grid; font: 700 .75rem/1 "Oxanium", var(--mazer-token-font-ui); place-items: center; }
 
 /* ---------------------------------------------------------------- phone frame and HUD counters */
 .sh-phone { background: var(--mazer-token-color-bg-canvas); border: 1px solid var(--mazer-token-color-line-subtle); border-radius: 18px; display: grid; min-height: 250px; overflow: hidden; padding: 56px 0 40px; place-items: center; position: relative; width: min(100%, 300px); }
 .sh-menu { position: absolute; right: 10px; top: 10px; }
-.sh-chip, .sh-tray, .sh-thread span, .sh-rail { align-items: center; background: color-mix(in srgb, var(--mazer-token-color-bg-panel) 92%, transparent); border: 1px solid var(--mazer-token-color-line-normal); border-radius: var(--mazer-token-radius-round); display: flex; font: 600 .8rem/1 "Oxanium", var(--mazer-token-font-ui); gap: 6px; padding: 5px 10px; position: absolute; }
+.sh-chip, .sh-tray, .sh-thread span, .sh-rail { align-items: center; background: color-mix(in srgb, var(--mazer-token-color-bg-panel) 92%, transparent); border: 1px solid var(--mazer-token-color-line-normal); border-radius: var(--mazer-token-radius-round); display: flex; font: 600 .875rem/1 "Oxanium", var(--mazer-token-font-ui); gap: 6px; padding: 5px 10px; position: absolute; }
 .sh-chip { right: 8px; top: 40px; }
 .sh-tray { bottom: 8px; left: 8px; }
 .sh-rail { bottom: 8px; left: 50%; transform: translateX(-50%); }
@@ -72,8 +72,8 @@
 .sh-hint-host { display: grid; gap: 8px; justify-items: center; position: relative; width: 100%; }
 .sh-hint-host .mazer-status-banner { width: 100%; }
 .sh-coach::before { animation: sh-breathe 1.6s ease-in-out infinite; border: 2px dotted var(--mazer-token-color-text-primary); border-radius: 50%; content: ""; inset: -14%; pointer-events: none; position: absolute; }
-.sh-coach-tag { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-round); font: 600 .72rem/1 "Oxanium", var(--mazer-token-font-ui); left: 50%; padding: 4px 8px; position: absolute; top: -26px; transform: translateX(-50%); white-space: nowrap; z-index: 3; }
-.sh-card { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-panel); display: grid; font-size: .9rem; gap: 8px; padding: 12px; width: 100%; }
+.sh-coach-tag { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-round); font: 600 .75rem/1 "Oxanium", var(--mazer-token-font-ui); left: 50%; padding: 4px 8px; position: absolute; top: -26px; transform: translateX(-50%); white-space: nowrap; z-index: 3; }
+.sh-card { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-panel); display: grid; font-size: .875rem; gap: 8px; padding: 12px; width: 100%; }
 .sh-hint-host > .sh-card:not(.sh-guide) { bottom: 8%; left: 6%; position: absolute; width: 88%; z-index: 4; }
 
 @media (prefers-reduced-motion: reduce) {
