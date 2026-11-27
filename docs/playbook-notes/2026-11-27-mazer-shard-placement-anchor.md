@@ -1,0 +1,33 @@
+# 2026-11-27 - Shard placement: detour band, nearest fallback in play, bleed wrap walled
+
+- WHAT changed:
+  - `src/mazer-core/hazards/shards.ts`: the strict shard target is now a **detour**. The band is `[d + target, d + target + 1]`, where `d` is the maze's static start -> star distance (`resolveShardRouteBand(plan, d)`).
+  - New option `computeShardLayer(..., { onStrictMiss: 'nearest' })`, and `ShardLayerResult.inBand`.
+  - `src/legacy-runtime/legacyShardRun.ts` (play) places on the maze with every bleed-gated wrap opening walled. It uses `maskLegacyBleedGatedCells` (new, in `legacyHazardGraphAdapter.ts`), reads the gates from the maze and never the lit state, and passes `onStrictMiss: 'nearest'`. `describe()` reports `inBand`.
+  - New sweep `scripts/analysis/shard-placement-sweep.ts` with lib `scripts/analysis/lib/shardPlacementSweep.ts`. It builds the real shipped play board (rule-2, scale 88: 59x131 phone, 117x65 desktop) per level the way MenuScene does and installs shards the way play does.
+  - `scripts/analysis/shard-runway.ts` now checks that the detour rises per level, not the raw ticks.
+- WHY it changed:
+  - Shards failed to place, so levels shipped with none, at L288-L502 continuously and at scattered levels up to L1000 (seen at L340/345/400 in the shards UI v1 note).
+  - The absolute target `160 + 2 * (L - 288)` was calibrated on the small ladder boards. On the shipped board the maze's own route `d` is 430-600 ticks, so the band sat below any reachable route until about L500 (`route-too-long-for-target`).
+  - Past that point a 2-tick band often missed anyway. Timed gates (period 6) quantize the witness ticks, and play has no reject-and-try-next-base loop (one base per level).
+  - Placement also used the open bleed wrap, against spec D8 (a wrap behind an unlit Switch counts as blocked). Before this change, closing it changed placement at L200 phone on 4 of 4 seeds.
+- How 'nearest' works: the same attempts run once. An attempt whose route closes outside the band is rejected with the code strict placement gives and kept as a candidate. When no attempt hits the band, the candidate nearest the band that passes the full verdict and forgiveness gate ships (ties go to the earliest attempt). There is no second pass.
+- Rule: a route target meant to grow with the level must be a detour on top of the maze's own route, or it silently stops working on any board larger than the one it was tuned on. A caller with one base must not turn a band miss into "no content": ship the nearest verified route and report it (`inBand: false`).
+- Evidence:
+  - Sweep `npx vite-node --script scripts/analysis/shard-placement-sweep.ts -- --to=1000 --seeds=2 --workers=4`: L60-L1000, phone and desktop, 2 seeds each, 3764 runs.
+  - Before: 2781 placed, 983 failed on 367 levels (L288-L502 continuous, then scattered up to L1000). Last rejections: `route-too-long-for-target` x915, `band-missed` x68. Install median 44 ms, p95 214, worst 406.
+  - After: 3764 placed, 0 failed (PASS). Of the 2852 strict runs (L288+), 2253 landed in the route band and 599 shipped the nearest verified route. Every level before saturation placed, as before. Install median 37 ms, p95 244, worst 385 (desktop, 4 workers).
+  - A first version that reran the attempts as a second pass placed the same runs but cost a worst of 1050 ms under concurrent load, so the fallback was made one-pass.
+  - Tests:
+    - `tests/core/hazards/shards.test.ts`: the band is anchored; a strict miss is `failed` by default and placed with `inBand: false` under 'nearest', verdict passing and deterministic; an in-band hit is identical under both options.
+    - `tests/reset/legacy-shard-run.test.ts`: L340 phone and L400 desktop on the shipped board place every scheduled shard with a detour of at least `SHARD_ROUTE_BASE`. At L200 the bleed openings are walled for placement without mutating the maze, no shard sits on them, the witness proved on the walled grid equals the shipped route ticks (the open wrap would be shorter), and lighting the gates changes nothing.
+    - Removing the anchor fails 3 tests; removing the wrap closure fails the L200 test.
+  - Ladder runway assert (`shard-runway.ts -- --assert`, 24 bases, default 'fail'): 145 of 150 sampled level/board runs land in band; 5 strict misses (L289/L337 desktop, L291/L337/L437 phone).
+    - On the absolute band the same sample placed every level, but only because the ladder `d` is small. Its detours did not rise per level (10 drops in L288-L450), so the old pass was not measuring the rise.
+    - The misses are k = 1 levels (one shard cannot add the full detour on that maze) plus one quantization miss. Play covers them with the nearest fallback.
+- Status: source only, behind `?lab=hazards`. Generation cadence, `HAZARD_INTRO_SCHEDULE` and maze generation are untouched. Placement stays deterministic per seed.
+- NOT checked:
+  - No real phone, so install time on a phone is unmeasured (desktop numbers above).
+  - No browser run.
+  - The per-level rise now holds for the target, not for every shipped route: nearest-fallback levels can sit below the rung, most often in the k = 1 block L288-L337. That is a product call for Zac (accept, or add a second base in play).
+  - The adapter-wide bleed mask for every hazard and the 81-level hidden-path test (spec slice 5) are still open.
