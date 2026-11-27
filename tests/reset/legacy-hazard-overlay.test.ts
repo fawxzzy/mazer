@@ -217,6 +217,7 @@ describe('hazard generation overlay (slice H2) on shipped ladder mazes', () => {
     expect(fresh?.allocation).toMatchObject({ exposureStage: 0, allocationLevel: 10, firstEncounter: 'pulseGate', gates: 1, sentries: 0 });
     expect(fresh?.specs.length).toBeLessThanOrEqual(1);
     const scheduled = resolveLegacyHazardOverlay(maze, { enabled: true, level: 100 });
-    expect(scheduled?.allocation.exposureStage).toBe(4);
+    // Manifest v2: L100 has met three kinds (the shard is first met on its first lock level, 102).
+    expect(scheduled?.allocation.exposureStage).toBe(3);
   });
 });

@@ -332,8 +332,10 @@ describe('tail route-target schedule', () => {
         expect(plan.target === null).toBe(level < saturationLevel);
       }
     }
-    expect(resolveShardRoutePlan(60, { saturationLevel: 288 }).count).toBe(1);
-    expect(resolveShardRoutePlan(59, { saturationLevel: 288 }).count).toBe(0);
+    // Manifest v2: shards from the first lock level (102); 100 and 101 roll no lock, nor does 103.
+    expect(resolveShardRoutePlan(102, { saturationLevel: 288 }).count).toBe(1);
+    expect(resolveShardRoutePlan(101, { saturationLevel: 288 }).count).toBe(0);
+    expect(resolveShardRoutePlan(103, { saturationLevel: 288 }).count).toBe(0);
   });
 
   test('strict per-level rise with disjoint bands from saturation to L2000', () => {

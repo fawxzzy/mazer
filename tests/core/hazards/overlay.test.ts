@@ -256,7 +256,7 @@ describe('computeHazardOverlay on a small maze', () => {
   });
 
   test('hunters and shards are allocated but deferred to their slices', () => {
-    const result = run(60);
+    const result = run(102);
     expect(result.deferred).toEqual([
       { unit: 'hunter', count: result.allocation.hunters, slice: 'H5' },
       { unit: 'shard', count: 1, slice: 'H8' }

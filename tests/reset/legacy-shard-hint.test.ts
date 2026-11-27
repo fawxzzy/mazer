@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { HAZARD_EXPOSURE_KIND_ORDER, HAZARD_INTRO_SCHEDULE } from '../../src/mazer-core/hazards';
+import { HAZARD_EXPOSURE_KIND_ORDER, HAZARD_INTRO_SCHEDULE, isShardLockLevel, resolveHazardKindFirstLevel } from '../../src/mazer-core/hazards';
 import { createLegacyInFlowNoticeHost } from '../../src/legacy-runtime/legacyInFlowNoticeHost';
 import {
   isShardIntroCard,
@@ -22,7 +22,11 @@ describe('shard hint', () => {
   test('the first shard level comes from the intro schedule', () => {
     const scheduled = HAZARD_INTRO_SCHEDULE.find((entry) => entry.unit === 'shard');
     expect(scheduled).toBeDefined();
-    expect(resolveShardFirstLevel()).toBe(scheduled!.level);
+    // Manifest v2: the entry level (100) starts the lock roll; shards are first met on the first lock level.
+    expect(resolveShardFirstLevel()).toBe(resolveHazardKindFirstLevel('shard'));
+    expect(resolveShardFirstLevel()).toBe(102);
+    expect(resolveShardFirstLevel()!).toBeGreaterThanOrEqual(scheduled!.level);
+    expect(isShardLockLevel(resolveShardFirstLevel()!)).toBe(true);
   });
 
   test('copy names one shard or N shards; the unlock notice dismisses itself', () => {

@@ -1,0 +1,21 @@
+# 2026-11-27 - Hidden-path mask adapter-wide + hazard manifest v2 (first-time cards spec slices 5 and 6)
+
+- WHAT changed:
+  - Slice 5 (D8 / K3): `createLegacyMazeHazardGraph` (`src/legacy-runtime/legacyHazardGraphAdapter.ts`) now builds every hazard graph from `maskLegacyBleedGatedCells(maze.grid, maze.bleedGates)`, so the two border openings of each Switch are walls for every hazard read (overlay, Pulse Gates, sentries, shards, analysis scripts), not only shard placement (PR #735). `findHazardGraphLegacyMismatches` compares against the same masked grid. Passing `bleedGates: []` reads the open grid on purpose (witness comparisons).
+  - New `tests/reset/legacy-shard-hidden-path-solvability.test.ts`: the 81 levels in 100..282 that carry both a Switch and a lock (K3 steps 1-6), one pinned ladder seed per level, plus a hand-built negative control that fails when the mask is removed.
+  - Slice 6 (D4): manifest v2 (`docs/contracts/mazer-hazard-schedule.v2.json` + schema; v1 kept as the signed record). `schedule.ts`: `HAZARD_SCHEDULE_VERSION` 2, shard entry 60 -> 100, lock roll `isShardLockLevel` (lowbias32, salt `0x4c4f434b`, curve A: 30% at 100, linear to 100% at 283, held), `resolveHazardKindFirstLevel('shard')` = 102 (first lock), `resolveScheduledStage` counts the shard from there. `resolveShardFirstLevel` (`legacyShardHint.ts`) follows it. The shard placement sweep skips levels without a lock.
+  - Product contract: "Amendment 2026-11-27, manifest v2" at the end of `docs/architecture/MAZER-HAZARD-PRODUCT-CONTRACT.md`, plus a pointer under the 2.5 table.
+- WHY it changed:
+  - Spec D8: a shard level must be solvable without lighting its Switch; with the mask only in shard placement, the gate and sentry placement and the route verdicts could still lean on the hidden wrap.
+  - Spec D4: Zac approved locked gates from 100 with curve A and a manifest v2 (shard entry 60 -> 100).
+- Rule: a decision that "X counts as blocked" belongs in the one adapter every consumer builds its graph through, not in one consumer; a test should prove it on every level the clash can occur on, plus a negative control that fails when the rule is removed.
+- Rule: a chance layer on a signed schedule needs its own salt (here `0x4c4f434b`, never the Switch salt) and a golden of the levels it picks, so a hash or curve change shows up as a diff of named levels.
+- Decisions (delegated, recorded here and in the PR):
+  - Exposure catch-up for the shard: a stage-3 player meets it on the first lock level at or after reaching it, as one shard (its first-encounter shape), with that level's own gates and enemies. Other skipped kinds keep the v1 rule.
+  - "Hazards only ever add" now holds for gates, enemies and tiers; shards in 100..282 follow the lock roll. From 283 every level locks and the count only grows.
+  - `HAZARD_SCHEDULE_VERSION` 2 feeds the hazard seed, so hazard placements behind `?lab=hazards` differ from v1 on the same maze. Maze geometry is unchanged.
+- Evidence:
+  - Lock golden: 105 lock levels in 100..282, band counts 6/6/30/32/31 (spec table), first 102, 106, 108, 110, 115, longest dry run 6; production roll equals an independent copy on L1..400; lock levels x Switch-placeable = the 81-level constant.
+  - Hidden-path test: 81 pinned boards each carry a Switch, mismatches empty, goal reachable on the masked grid, shards placed off the openings and `validateShardRoute` passes on the masked graph.
+- Status: source only, behind `?lab=hazards` (build default off). Nothing a player sees changes in the default build.
+- NOT checked: no real phone; no full shard placement sweep rerun on the shipped boards after v2 (the v2 change only removes shard levels below 283).

@@ -10,7 +10,7 @@ import {
 } from '../../src/legacy-runtime/legacyHazardGraphAdapter';
 import { resolveLegacyWalkableGridNeighbors, type LegacyMazeSnapshot, type LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
 import { runLegacyMazeGenerationJob } from '../../src/legacy-runtime/legacyMazeGenerationJob';
-import { allocateHazardUnits, validateShardRoute, type HazardGraph, type HazardSpec } from '../../src/mazer-core/hazards';
+import { allocateHazardUnits, isShardLockLevel, validateShardRoute, type HazardGraph, type HazardSpec } from '../../src/mazer-core/hazards';
 import { createLadderJobInput, PHONE_ASPECT } from './legacy-hazard-gate-fixture';
 
 /*
@@ -125,6 +125,17 @@ describe('hidden-path solvability (first-time cards spec D8 / K3, slice 5)', () 
     // From 283 no level can carry a Switch, so the clash ends there.
     for (let level = 283; level <= GEOMETRY_BUDGET_SATURATION_LEVEL; level += 1) expect(isSwitchPlaceable(level), `L${level}`).toBe(false);
     expect(Object.keys(PINNED_SEEDS).map(Number)).toEqual([...SWITCH_AND_LOCK_LEVELS]);
+  });
+
+  test('slice 6: the production lock roll (manifest v2) is curve A, and its lock levels x Switch-placeable are the 81', () => {
+    const fromProduction: number[] = [];
+    for (let level = 1; level <= 400; level += 1) {
+      expect(isShardLockLevel(level), `L${level}`).toBe(curveALock(level));
+      // The allocator follows the roll: shards exactly on lock levels.
+      expect(allocateHazardUnits(level, { saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL }).shards > 0, `L${level} shards`).toBe(isShardLockLevel(level));
+      if (level <= 282 && isShardLockLevel(level) && isSwitchPlaceable(level)) fromProduction.push(level);
+    }
+    expect(fromProduction).toEqual([...SWITCH_AND_LOCK_LEVELS]);
   });
 
   test('steps 2-5: every pinned board carries a Switch, places its shards off the hidden path and is solvable without it', () => {

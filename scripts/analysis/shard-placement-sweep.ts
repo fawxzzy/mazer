@@ -1,4 +1,4 @@
-// Shard placement sweep: every level from the Shard intro to `--to`, on the board a player really gets
+// Shard placement sweep: every lock level (manifest v2, `isShardLockLevel`) from the first one to `--to`, on the board a player really gets
 // (lib/shardPlacementSweep.ts mirrors MenuScene's play-start job and its hazard install), lists the levels
 // whose shards do not place (`failed`: the run then ships without shards, so the level loses its objective).
 //
@@ -13,6 +13,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GEOMETRY_BUDGET_SATURATION_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
+import { isShardLockLevel } from '../../src/mazer-core/hazards';
 import {
   SHARD_SWEEP_VIEWPORTS,
   shardSweepFirstLevel,
@@ -76,7 +77,8 @@ const main = async (): Promise<void> => {
   const out = arg('out', '');
   const quiet = process.argv.includes('--quiet');
   const levels: number[] = [];
-  for (let level = from; level <= to; level += 1) levels.push(level);
+  // A level without a lock roll carries no shards by design, so it is not a placement failure: skip it.
+  for (let level = from; level <= to; level += 1) if (isShardLockLevel(level)) levels.push(level);
 
   let rows: ShardSweepRow[];
   if (part !== '') {
