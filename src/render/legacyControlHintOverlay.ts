@@ -19,6 +19,7 @@ import {
   shouldShowLegacyControlHint,
   type LegacyControlHintFacts
 } from '../legacy-runtime/legacyControlHint.ts';
+import { createLegacyLevelPreviewStorage, isLegacyLevelPreviewRoute } from '../legacy-runtime/legacyLevelPreview.ts';
 import { isInsideFeedbackPopup } from '../ui/feedback/feedbackKeyIsolation.ts';
 
 export const LEGACY_CONTROL_HINT_ELEMENT_ID = 'mazer-control-hint';
@@ -47,6 +48,9 @@ const readFacts = (scene: SceneView | null, acknowledged: boolean): LegacyContro
 
 const safeStorage = (win: Window): TutorialStorage | null => {
   try {
+    // Level Preview (`?previewLevel=N`) is a no-write sandbox: the hint still shows, but its "seen" mark lives in
+    // memory for this page only and never reaches the device key (spec F15 / slice 0).
+    if (isLegacyLevelPreviewRoute(win.location?.search)) return createLegacyLevelPreviewStorage();
     return win.localStorage;
   } catch {
     return null;
