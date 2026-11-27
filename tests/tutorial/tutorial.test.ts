@@ -131,6 +131,20 @@ describe('tutorial acknowledgement store', () => {
     expect(createTutorialAckStore({ storage, accountId: 'alice' }).snapshot()).toEqual({});
   });
 
+  it('keeps the default key when no storageKey is given, and uses an override verbatim when one is', () => {
+    const storage = new MemoryStorage();
+    const plain = createTutorialAckStore({ storage, accountId: 'device' });
+    expect(plain.storageKey).toBe('mazer.tutorial.acks:device');
+    const own = createTutorialAckStore({ storage, accountId: 'user:abc', storageKey: 'mazer.firsttime.seen.v1:user:abc' });
+    expect(own.storageKey).toBe('mazer.firsttime.seen.v1:user:abc');
+    own.acknowledge(welcome);
+    expect(storage.setCalls).toEqual(['mazer.firsttime.seen.v1:user:abc']);
+    expect(plain.isAcknowledged(welcome)).toBe(false);
+    own.clear();
+    expect(storage.data.size).toBe(0);
+    expect(() => createTutorialAckStore({ storage, accountId: 'x', storageKey: '  ' })).toThrow(TypeError);
+  });
+
   it('never suppresses repeatable tokens but counts acknowledgements', () => {
     const store = createTutorialAckStore({ storage: new MemoryStorage(), accountId: 'acct-1', now: clock() });
     expect(store.acknowledge(tip).changed).toBe(true);
