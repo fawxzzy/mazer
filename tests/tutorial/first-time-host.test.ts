@@ -17,7 +17,6 @@ import {
   createLegacyFirstTimeCardController,
   isLegacyFirstTimeWrapStep,
   noteLegacyFirstTimeStep,
-  resolveLegacyFirstTimeCardEdge,
   resolveLegacyFirstTimeCardSpot,
   resolveLegacyFirstTimeCoachLabel,
   resolveLegacyFirstTimeSwitchAnchor,
@@ -28,6 +27,12 @@ import { createLegacyFirstTimeSession } from '../../src/legacy-runtime/legacyFir
 import type { LegacyInFlowNoticeHost } from '../../src/legacy-runtime/legacyInFlowNoticeHost';
 import { LEGACY_GUIDE_ROWS } from '../../src/legacy-runtime/legacyGuideContent';
 import type { TutorialStorage } from '../../src/tutorial/index.ts';
+import {
+  estimateTextCardHeight,
+  resolveTextCardCellRect,
+  resolveTextCardWidth,
+  TEXT_CARD_MARKER_HALO_OF_TILE
+} from '../../src/render/textCardPlacement';
 import type { InFlowNoticeProps } from '../../src/ui/notice/inFlowNotice';
 
 class SpyStorage implements TutorialStorage {
@@ -106,10 +111,11 @@ const rig = (options: { search?: string; storage?: SpyStorage; liveCardIds?: rea
     visible: true,
     reducedMotion: false,
     noticeTop: 80,
+    viewWidth: 390,
     viewHeight: 844,
     player,
     goal: MAZE.goal,
-    cellScreenY: (cell) => 120 + cell.y * 40,
+    cellRect: (cell, halo = 0) => resolveTextCardCellRect({ x: 15 + (cell.x * 40), y: 120 + (cell.y * 40) }, 40, 4 + (40 * halo)),
     ...over
   });
   return {
@@ -122,6 +128,11 @@ const rig = (options: { search?: string; storage?: SpyStorage; liveCardIds?: rea
     at: () => now,
     advance: (ms: number) => { now += ms; },
     frame: (over: Partial<LegacyFirstTimeFrameInput> = {}) => controller.frame(frameInput(over)),
+    /** Two frames: the first draws the coach ring, the second shows the card (a card with a ring waits for its pill). */
+    show: (over: Partial<LegacyFirstTimeFrameInput> = {}) => {
+      const first = controller.frame(frameInput(over));
+      return controller.frame(frameInput(over)) ?? first;
+    },
     step: (to: { x: number; y: number }) => {
       const from = player;
       player = to;
@@ -151,64 +162,57 @@ describe('first-time host: wrap step detection', () => {
   });
 });
 
-describe('first-time host: card edge (never cover anything important)', () => {
-  const frame = { noticeTop: 80, viewHeight: 844, bottomInset: 16 };
-  it('real L10 wrap (up off row 0): player at the bottom, ring and goal under the header -> top', () => {
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 814, weight: 3 }, { y: 30, weight: 2 }, { y: 54, weight: 1 }] })).toBe('top');
+describe('first-time host: card spot (the shared text card rule; never cover anything important)', () => {
+  const frame = { viewWidth: 390, viewHeight: 844, noticeTop: 57, bottomInset: 12, bodyChars: 60, action: true };
+  const cell = (y: number, halo = 0) => resolveTextCardCellRect({ x: 195, y }, 40, 4 + (40 * halo));
+  const card = (topPx: number) => {
+    const width = resolveTextCardWidth(390);
+    const height = estimateTextCardHeight({ cardWidth: width, bodyChars: 60, heading: true, action: true });
+    return { x: (390 - width) / 2, y: topPx, width, height };
+  };
+  const overlaps = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number } | null) => (
+    b !== null && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+  );
+  it('nothing in the way: the top band, right under the HUD', () => {
+    expect(resolveLegacyFirstTimeCardSpot({ ...frame, keepClear: [] })).toEqual({ topPx: 57, bottomPx: undefined, covers: -1 });
   });
-  it('real L22 wrap (down off the last row): player under the header, ring and goal low -> top', () => {
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 22, weight: 3 }, { y: 800, weight: 2 }, { y: 780, weight: 1 }] })).toBe('top');
+  it('the player right under the HUD: the bottom band, anchored from the bottom', () => {
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, keepClear: [cell(120, TEXT_CARD_MARKER_HALO_OF_TILE)] });
+    expect(spot.bottomPx).toBe(12);
+    expect(spot.covers).toBe(-1);
   });
-  it('player right under the header -> bottom; both bands busy -> the one covering the player loses', () => {
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 120, weight: 3 }] })).toBe('bottom');
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 120, weight: 3 }, { y: 790, weight: 1 }] })).toBe('bottom');
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 790, weight: 3 }, { y: 120, weight: 2 }] })).toBe('top');
+  it('real L22: player under the header, goal under the top band, ring under the bottom band -> a band in between, clear of all', () => {
+    const keepClear = [cell(22, TEXT_CARD_MARKER_HALO_OF_TILE), cell(148, TEXT_CARD_MARKER_HALO_OF_TILE), cell(814)];
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, keepClear });
+    expect(spot.covers).toBe(-1);
+    expect(spot.bottomPx).toBeUndefined();
+    expect(spot.topPx).toBeGreaterThanOrEqual(57);
+    expect(keepClear.some((rect) => overlaps(card(spot.topPx), rect))).toBe(false);
   });
-  it('nothing in either band: the spec rule (farther edge, ties to the top)', () => {
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [] })).toBe('top');
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 300, weight: 3 }] })).toBe('bottom');
-    expect(resolveLegacyFirstTimeCardEdge({ ...frame, points: [{ y: 600, weight: 3 }] })).toBe('top');
+  it('keeps clear of the coach label pill too', () => {
+    const pill = { x: 150, y: 57, width: 90, height: 24 };
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, keepClear: [null, null, null, pill] });
+    expect(overlaps(card(spot.topPx), pill)).toBe(false);
   });
-});
-
-describe('first-time host: card spot (slides off the goal when both edges are busy)', () => {
-  const frame = { noticeTop: 57, viewHeight: 844, bottomInset: 12 };
-  const clear = (top: number, ys: number[]) => ys.every((y) => y < top - 12 || y > top + 128 + 12);
-  it('a free edge keeps the edge rule', () => {
-    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points: [{ y: 814, weight: 3 }, { y: 30, weight: 2 }] })).toEqual({ kind: 'edge', edge: 'top' });
-    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points: [{ y: 120, weight: 3 }] })).toEqual({ kind: 'edge', edge: 'bottom' });
-  });
-  it('real L22 (chromium): player under the header, goal at 148 under a top card, ring at 814 under a bottom card -> slides', () => {
-    const points = [{ y: 22, weight: 3 }, { y: 814, weight: 2 }, { y: 148, weight: 1 }];
-    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, points });
-    expect(spot.kind).toBe('slid');
-    if (spot.kind !== 'slid') return;
-    expect(clear(spot.topPx, points.map((p) => p.y))).toBe(true);
-    expect(spot.topPx + 128).toBeLessThanOrEqual(844 - 12);
-    // The free band nearest an edge: just above the ring (31 px from the bottom slot), not below the goal (104 px).
-    expect(spot.topPx).toBe(673);
-  });
-  it('real L22-top (webkit): player at 823 under a bottom card, goal at 148 under a top card -> slides just above the player', () => {
-    const points = [{ y: 823, weight: 3 }, { y: 30, weight: 2 }, { y: 148, weight: 1 }];
-    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, points });
-    // 22 px from the bottom slot beats 104 px from the top one (just below the goal at 161).
-    expect(spot).toEqual({ kind: 'slid', topPx: 682 });
-    expect(clear(682, points.map((p) => p.y))).toBe(true);
-  });
-  it('no free band anywhere -> the edge that covers the least', () => {
-    const points = Array.from({ length: 12 }, (_, i) => ({ y: 60 + i * 66, weight: i === 0 ? 3 : 1 }));
-    expect(resolveLegacyFirstTimeCardSpot({ ...frame, points })).toEqual({ kind: 'edge', edge: 'bottom' });
+  it('no clear spot anywhere: covers the least important thing (the player and goal stay visible)', () => {
+    const keepClear = [cell(100, TEXT_CARD_MARKER_HALO_OF_TILE), ...Array.from({ length: 30 }, (_, i) => cell(60 + (i * 28)))];
+    const spot = resolveLegacyFirstTimeCardSpot({ ...frame, keepClear });
+    expect(spot.covers).toBeGreaterThan(0);
+    expect(overlaps(card(spot.topPx), keepClear[0]!)).toBe(false);
   });
 });
 
 describe('first-time host: the wrap card', () => {
-  it('shows the wrap card on the frame after the first wrap, with the Guide row copy, and rings the edge walked off', () => {
+  it('rings the edge walked off on the frame after the first wrap, then shows the wrap card with the Guide row copy', () => {
     const r = rig();
     r.frame();
     r.place({ x: 0, y: 7 });
     r.wrapLeft();
     expect(r.notices.shown).toHaveLength(0);
     const coach = r.frame();
+    // The ring draws first; the card waits one frame so it can keep clear of the ring's label pill.
+    expect(r.notices.shown).toHaveLength(0);
+    r.frame();
     expect(r.notices.shown).toHaveLength(1);
     const props = r.notices.shown[0]!;
     expect(props).toMatchObject({
@@ -217,9 +221,11 @@ describe('first-time host: the wrap card', () => {
       icon: 'wrap',
       body: LEGACY_GUIDE_ROWS.find((row) => row.id === 'wrap')!.text,
       tone: 'info',
-      actionLabel: 'Got it',
-      topPx: 80
+      actionLabel: 'Got it'
     });
+    // The goal (row 0) sits under the top band, so the card takes the bottom band, clear of the goal, player and ring.
+    expect(props.bottomPx).toBeGreaterThan(0);
+    expect(props.topPx).toBeGreaterThan(120 + 24);
     // The host owns the timer (visible time only); the DOM auto-dismiss stays off.
     expect(props.autoDismissMs).toBeUndefined();
     expect(coach).toEqual({ cardId: 'mechanic.wrap', anchor: { x: 0, y: 7 }, label: '' });
@@ -230,24 +236,24 @@ describe('first-time host: the wrap card', () => {
     const r = rig({ storage });
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.notices.tap();
     r.place({ x: 0, y: 7 });
     r.advance(100);
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.newLevel();
     r.advance(100);
     r.frame();
     r.place({ x: 0, y: 7 });
     r.wrapLeft();
-    r.frame();
+    r.show();
     expect(r.notices.shown).toHaveLength(1);
     // A fresh scene on the same device reads the same record.
     const again = rig({ storage });
     again.frame();
     again.wrapLeft();
-    again.frame();
+    again.show();
     expect(again.notices.shown).toHaveLength(0);
   });
 
@@ -257,14 +263,14 @@ describe('first-time host: the wrap card', () => {
     low.frame();
     low.place({ x: 0, y: 12 });
     low.wrapLeft(12);
-    low.frame({ goal: null });
+    low.show({ goal: null });
     expect(low.notices.shown[0]!.bottomPx).toBeUndefined();
     // Player and ring high (row 1), goal row 0: the card moves to the bottom edge.
     const high = rig();
     high.frame();
     high.place({ x: 0, y: 1 });
     high.wrapLeft(1);
-    high.frame();
+    high.show();
     expect(high.notices.shown[0]!.bottomPx).toBeGreaterThan(0);
   });
 
@@ -272,7 +278,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.advance(FIRST_TIME_MIN_SHOWN_MS - 100);
     r.step({ x: 8, y: 6 });
     expect(r.notices.isOpen()).toBe(true);
@@ -288,7 +294,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.advance(FIRST_TIME_MIN_SHOWN_MS + 1);
     r.step({ x: 0, y: 7 });
     expect(r.frame()).toBeNull();
@@ -298,7 +304,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     for (let i = 0; i < 10; i += 1) {
       r.advance(1000);
       r.frame({ visible: false });
@@ -321,7 +327,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.notices.tap();
     expect(r.controller.describe().activeCardId).toBeNull();
     expect(r.frame()).not.toBeNull();
@@ -331,7 +337,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.newLevel();
     r.advance(16);
     expect(r.frame()).toBeNull();
@@ -344,7 +350,7 @@ describe('first-time host: the wrap card', () => {
     r.wrapLeft();
     r.frame({ visible: false });
     expect(r.notices.shown).toHaveLength(0);
-    r.frame();
+    r.show();
     expect(r.notices.shown).toHaveLength(1);
   });
 
@@ -352,7 +358,7 @@ describe('first-time host: the wrap card', () => {
     const r = rig();
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     r.setScope('user:abc');
     r.frame();
     expect(r.notices.isOpen()).toBe(false);
@@ -369,8 +375,10 @@ describe('first-time host: the Switch card', () => {
     const r = rig({ liveCardIds: BOTH });
     r.frame(lit());
     r.advance(16);
-    // Lighting happens in the scene's frame: the card shows on that same frame.
+    // Lighting happens in the scene's frame: the ring draws on that same frame, the card on the next.
     expect(r.frame(lit('vertical:4'))).toEqual({ cardId: 'mechanic.switch', anchor, label: 'Open edge' });
+    expect(r.notices.shown).toHaveLength(0);
+    r.frame(lit('vertical:4'));
     expect(r.notices.shown).toHaveLength(1);
     expect(r.notices.shown[0]).toMatchObject({ heading: 'Switch', icon: 'switch' });
   });
@@ -378,6 +386,7 @@ describe('first-time host: the Switch card', () => {
   it('fires when the first step of the scene lights a Switch (the host installs on that step; real L200 board)', () => {
     const r = rig({ liveCardIds: BOTH });
     expect(r.frame(lit('vertical:4'))).toEqual({ cardId: 'mechanic.switch', anchor, label: 'Open edge' });
+    r.frame(lit('vertical:4'));
     expect(r.notices.shown).toHaveLength(1);
   });
 
@@ -445,7 +454,7 @@ describe('first-time host: flag and preview', () => {
     const r = rig({ search: '?lab=firsttime&previewLevel=22', storage });
     r.frame();
     r.wrapLeft();
-    r.frame();
+    r.show();
     expect(r.notices.shown).toHaveLength(1);
     r.notices.tap();
     expect(storage.writes()).toEqual([]);

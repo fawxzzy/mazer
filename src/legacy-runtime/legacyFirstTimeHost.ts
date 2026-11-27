@@ -10,18 +10,29 @@
  * - Flag on: per frame (the scene's postupdate event) it follows level changes, the auth scope, the pause/overlay
  *   state, the auto-dismiss clock (visible time only), and the coach mark lifetime (R4).
  * - Level Preview (`?previewLevel=N`): the session keeps its record in memory, so a preview run writes nothing.
- * - Placement (`resolveLegacyFirstTimeCardSpot`): the card takes a screen edge that covers none of the player, the
- *   coach target and the goal; when both edges cover one, it slides to the free band nearest an edge, so it never
- *   covers what the player needs to see (Zac 2026-11-27).
+ * - Placement: the shared text card rule (src/render/textCardPlacement.ts, the same one the shard cards use). The card
+ *   sits under the HUD, never covers the player, the end star, the coach ring or its label pill, and keeps the wraps
+ *   and Switches visible where it can (Zac 2026-11-27: cards must not cover anything important). A card with a coach
+ *   mark waits one frame so the pill is drawn and can be kept clear.
  *
- * The card look (Zac 2026-11-27: E Two-line, skin B Neon edge) is the in-flow notice's own: this host passes the
- * heading and the mechanic icon id as extra props, which the rich-text skin renders once it lands; until then the
- * notice shows the "New" marker and the body.
+ * The card look (Zac 2026-11-27: E Two-line, skin B Neon edge) is the in-flow notice's rich layout: this host passes
+ * the heading and the mechanic icon; the coach pill shows the same icon.
  */
 import type Phaser from 'phaser';
 import { centerOfCell } from '../render/boardTileBake';
+import { DEFAULT_BOARD_TILE_STYLE } from '../render/boardTileStyle';
 import { CoachMarkView } from '../render/coachMarkView';
+import type { MechanicIconId } from '../render/mechanicIcons';
 import { SHARD_LOOK } from '../render/shardLook';
+import {
+  estimateTextCardHeight,
+  resolveTextCardCellRect,
+  resolveTextCardMechanicCells,
+  resolveTextCardPlacement,
+  resolveTextCardWidth,
+  TEXT_CARD_MARKER_HALO_OF_TILE,
+  type TextCardRect
+} from '../render/textCardPlacement';
 import { SHARD_COACH_RING_OF_TILE } from '../render/shardPlayPresenter';
 import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 import type { TutorialStorage } from '../tutorial/tutorialAckStore';
@@ -36,7 +47,6 @@ import {
 import {
   FIRST_TIME_AUTO_DISMISS_MS,
   FIRST_TIME_COACH_LINGER_MS,
-  resolveFirstTimeCardPlacement,
   type FirstTimeCard,
   type FirstTimeCardId,
   type FirstTimeTouchKind
@@ -50,19 +60,16 @@ import type { LegacyPoint } from './legacyMaze';
 /** The notice host key: one first-time card on screen at a time (S2). */
 export const FIRST_TIME_NOTICE_KEY = 'firsttime.card';
 
-/** Mechanic icon ids for the rich-text skin's icon registry (passed through; unknown to the notice on main). */
-export const FIRST_TIME_CARD_ICON: Readonly<Partial<Record<FirstTimeCardId, 'wrap' | 'switch' | 'shard' | 'pulse-gate'>>> = Object.freeze({
+/** The mechanic icon (src/render/mechanicIcons.ts) each card shows in its icon well and on its coach pill. */
+export const FIRST_TIME_CARD_ICON: Readonly<Partial<Record<FirstTimeCardId, MechanicIconId>>> = Object.freeze({
   'mechanic.wrap': 'wrap',
   'mechanic.switch': 'switch',
-  'mechanic.locked-gate': 'shard',
+  'mechanic.locked-gate': 'locked-star',
   'mechanic.pulse-gate': 'pulse-gate'
 });
 
-/** The notice props this host sends: the shipped props plus the two-line heading and the mechanic icon. */
-export type LegacyFirstTimeNoticeProps = InFlowNoticeProps & {
-  readonly heading?: string;
-  readonly icon?: 'wrap' | 'switch' | 'shard' | 'pulse-gate';
-};
+/** The notice props this host sends (the rich layout: heading + icon). */
+export type LegacyFirstTimeNoticeProps = InFlowNoticeProps;
 
 /** The board facts the host reads (a structural slice of LegacyMazeSnapshot). */
 export interface LegacyFirstTimeMazeView {
@@ -85,85 +92,40 @@ export const isLegacyFirstTimeWrapStep = (
   return (dy === 0 && dx > 1 && maze.width >= 3) || (dx === 0 && dy > 1 && maze.height >= 3);
 };
 
-/**
- * A generous height for the two-line card (heading + body + "Got it"), so the cover test errs on the safe side; the
- * shipped notice measured 94 CSS px at 390 wide, and the rich-text skin adds a heading line.
- */
-export const FIRST_TIME_CARD_BAND_PX = 128;
-/** A point closer than this to a card band counts as covered (about a ring radius on a phone board). */
-const FIRST_TIME_CARD_COVER_MARGIN_PX = 12;
-
-export interface LegacyFirstTimeKeepPoint {
-  /** Screen y (CSS px). */
-  readonly y: number;
-  /** How bad covering it is: player > coach target > goal. */
-  readonly weight: number;
+/** Where the card sits (the shared text card rule's answer): `bottomPx` set = anchored at the bottom band. */
+export interface LegacyFirstTimeCardSpot {
+  readonly topPx: number;
+  readonly bottomPx?: number;
+  /** Index into keepClear of the most important thing the card covers (-1 = covers nothing). */
+  readonly covers: number;
 }
 
 /**
- * Pure: which edge the card takes so it covers the least (Zac 2026-11-27: cards must not cover anything important).
- * The top card spans [noticeTop, noticeTop + band], the bottom card [viewHeight - bottomInset - band, viewHeight -
- * bottomInset]. The edge that covers less weight wins; when both cover the same, the spec rule
- * (`resolveFirstTimeCardPlacement`, farther from the points) decides, counting only points the card could ever cover:
- * a cell under the header (above noticeTop) is never under the card.
- */
-export const resolveLegacyFirstTimeCardEdge = (input: {
-  readonly noticeTop: number;
-  readonly viewHeight: number;
-  readonly bottomInset: number;
-  readonly points: readonly LegacyFirstTimeKeepPoint[];
-  readonly bandPx?: number;
-}): 'top' | 'bottom' => {
-  const band = input.bandPx ?? FIRST_TIME_CARD_BAND_PX;
-  const points = input.points.filter((point) => Number.isFinite(point.y));
-  const covered = (from: number, to: number): number => points
-    .filter((point) => point.y >= from - FIRST_TIME_CARD_COVER_MARGIN_PX && point.y <= to + FIRST_TIME_CARD_COVER_MARGIN_PX)
-    .reduce((sum, point) => sum + point.weight, 0);
-  const bottomEdge = input.viewHeight - input.bottomInset;
-  const top = covered(input.noticeTop, input.noticeTop + band);
-  const bottom = covered(bottomEdge - band, bottomEdge);
-  if (top !== bottom) return bottom < top ? 'bottom' : 'top';
-  return resolveFirstTimeCardPlacement({
-    viewportHeightPx: input.viewHeight - input.noticeTop,
-    keepVisibleYPx: points.filter((point) => point.y >= input.noticeTop && point.y <= input.viewHeight).map((point) => point.y - input.noticeTop)
-  });
-};
-
-/** Where the card sits: at an edge (the notice's own top or bottom slot), or slid to a free band (`topPx`). */
-export type LegacyFirstTimeCardSpot =
-  | { readonly kind: 'edge'; readonly edge: 'top' | 'bottom' }
-  | { readonly kind: 'slid'; readonly topPx: number };
-
-/**
- * Pure: where the card goes so it covers nothing it must not (Zac 2026-11-27: cards must not cover anything
- * important). An edge that covers no point wins (`resolveLegacyFirstTimeCardEdge` picks between two free edges).
- * When both edges cover a point, the card slides to the free band (no point within the cover margin) nearest an edge;
- * only when no band on screen is free does it fall back to the edge that covers the least weight.
+ * Pure: where the card goes (Zac 2026-11-27: cards must not cover anything important), by the shared text card rule
+ * (src/render/textCardPlacement.ts): under the HUD, the top band, then the bottom band, then every scan step; the
+ * first spot that covers nothing wins, else the one whose most important covered thing matters least. `keepClear`
+ * is most important first: player, end star, coach target, coach pill, then the wraps and Switches.
  */
 export const resolveLegacyFirstTimeCardSpot = (input: {
-  readonly noticeTop: number;
+  readonly viewWidth: number;
   readonly viewHeight: number;
+  readonly noticeTop: number;
   readonly bottomInset: number;
-  readonly points: readonly LegacyFirstTimeKeepPoint[];
-  readonly bandPx?: number;
+  readonly bodyChars: number;
+  readonly action: boolean;
+  readonly keepClear: readonly (TextCardRect | null)[];
 }): LegacyFirstTimeCardSpot => {
-  const band = input.bandPx ?? FIRST_TIME_CARD_BAND_PX;
-  const points = input.points.filter((point) => Number.isFinite(point.y));
-  const margin = FIRST_TIME_CARD_COVER_MARGIN_PX;
-  const coveredAt = (top: number): boolean => points.some((point) => point.y >= top - margin && point.y <= top + band + margin);
-  const minTop = Math.ceil(input.noticeTop);
-  const maxTop = Math.floor(input.viewHeight - input.bottomInset - band);
-  if (!coveredAt(minTop) || !coveredAt(maxTop) || maxTop <= minTop) {
-    return { kind: 'edge', edge: resolveLegacyFirstTimeCardEdge(input) };
-  }
-  // The free bands touch a point's margin on one side: try just below and just above every point.
-  const candidates = points
-    .flatMap((point) => [Math.floor(point.y + margin) + 1, Math.ceil(point.y - margin - band) - 1])
-    .filter((top) => top > minTop && top < maxTop && !coveredAt(top));
-  if (candidates.length === 0) return { kind: 'edge', edge: resolveLegacyFirstTimeCardEdge(input) };
-  const fromEdge = (top: number): number => Math.min(top - minTop, maxTop - top);
-  const best = candidates.reduce((a, b) => (fromEdge(b) < fromEdge(a) || (fromEdge(b) === fromEdge(a) && b < a) ? b : a));
-  return { kind: 'slid', topPx: best };
+  const cardWidth = resolveTextCardWidth(input.viewWidth);
+  const place = resolveTextCardPlacement({
+    viewWidth: input.viewWidth,
+    viewHeight: input.viewHeight,
+    topMin: input.noticeTop,
+    bottomInset: input.bottomInset,
+    cardWidth,
+    cardHeight: estimateTextCardHeight({ cardWidth, bodyChars: input.bodyChars, heading: true, action: input.action }),
+    keepClear: input.keepClear
+  });
+  return { topPx: place.topPx, bottomPx: place.bottomPx, covers: place.covers };
 };
 
 /**
@@ -229,11 +191,19 @@ export interface LegacyFirstTimeFrameInput {
   readonly reducedMotion: boolean;
   /** Screen y (CSS px) just under the header controls: a top card sits here. */
   readonly noticeTop: number;
+  readonly viewWidth: number;
   readonly viewHeight: number;
   readonly player: LegacyPoint | null;
   readonly goal: LegacyPoint | null;
-  /** Screen y (CSS px) of a board cell's centre, or null when the board is not laid out. */
-  readonly cellScreenY: (cell: LegacyPoint) => number | null;
+  /**
+   * A board cell's keep-clear rect on screen (CSS px), grown by `haloOfTile` of a tile on every side; null when the
+   * board is not laid out.
+   */
+  readonly cellRect: (cell: LegacyPoint, haloOfTile?: number) => TextCardRect | null;
+  /** The wraps and Switches on this board the card should leave visible (resolveTextCardMechanicCells). */
+  readonly mechanicCells?: readonly LegacyPoint[];
+  /** The coach label pill as drawn last frame (CoachMarkView.pillRect), so the card keeps clear of it. */
+  readonly coachPillRect?: TextCardRect | null;
   /** Keys of the Switches lit on this board right now (absent on a board without Switches). */
   readonly litSwitchKeys?: ReadonlySet<string>;
   /** The opened border cell to ring for a Switch that just lit (the nearer of its two). */
@@ -269,6 +239,8 @@ interface CoachState {
   readonly label: string;
   /** Null while the card is up; then the linger deadline (R4). */
   until: number | null;
+  /** True once a frame has returned this mark to draw (its pill rect is known from then on). */
+  drawn: boolean;
 }
 
 export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardControllerDeps): LegacyFirstTimeCardController => {
@@ -333,12 +305,22 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
     const notice = card.notice;
     pending = null;
     if (notice === null) return;
-    const weighted: [LegacyPoint | null, number][] = [[input.player, 3], [anchor, 2], [input.goal, 1]];
-    const points = weighted
-      .map(([cell, weight]) => ({ y: cell ? input.cellScreenY(cell) : null, weight }))
-      .filter((point): point is LegacyFirstTimeKeepPoint => point.y !== null);
-    const bottomInset = designTokens.spacingPx[3]!;
-    const spot = resolveLegacyFirstTimeCardSpot({ noticeTop: input.noticeTop, viewHeight: input.viewHeight, bottomInset, points });
+    const keepClear: (TextCardRect | null)[] = [
+      input.player ? input.cellRect(input.player, TEXT_CARD_MARKER_HALO_OF_TILE) : null,
+      input.goal ? input.cellRect(input.goal, TEXT_CARD_MARKER_HALO_OF_TILE) : null,
+      anchor ? input.cellRect(anchor) : null,
+      anchor ? input.coachPillRect ?? null : null,
+      ...(input.mechanicCells ?? []).map((cell) => input.cellRect(cell))
+    ];
+    const spot = resolveLegacyFirstTimeCardSpot({
+      viewWidth: input.viewWidth,
+      viewHeight: input.viewHeight,
+      noticeTop: input.noticeTop,
+      bottomInset: designTokens.spacingPx[3]!,
+      bodyChars: notice.body.length,
+      action: notice.actionLabel !== undefined,
+      keepClear
+    });
     const props: LegacyFirstTimeNoticeProps = {
       title: notice.marker,
       heading: notice.heading,
@@ -346,8 +328,8 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       body: notice.body,
       tone: 'info',
       actionLabel: notice.actionLabel,
-      topPx: spot.kind === 'slid' ? spot.topPx : input.noticeTop,
-      bottomPx: spot.kind === 'edge' && spot.edge === 'bottom' ? bottomInset : undefined,
+      topPx: spot.topPx,
+      bottomPx: spot.bottomPx,
       reducedMotion: input.reducedMotion,
       onDismiss: onNoticeDismiss
     };
@@ -366,7 +348,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
     if (card === null) return;
     const anchor = card.coach === null ? null : resolveAnchor(card.coach.target);
     pending = { card, anchor };
-    coach = card.coach !== null && anchor !== null ? { cardId: card.id, anchor, label: card.coach.label, until: null } : null;
+    coach = card.coach !== null && anchor !== null ? { cardId: card.id, anchor, label: card.coach.label, until: null, drawn: false } : null;
   };
 
   /** A Switch went from unlit to lit since the last frame (lighting happens in the scene's frame, not on the step). */
@@ -415,7 +397,8 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       pollSwitches(s, input);
       const visible = input.playing && input.visible;
       deps.notices.setHidden(!visible);
-      if (visible) showPending(input);
+      // A card with a coach mark waits until the mark has been drawn once, so its label pill can be kept clear.
+      if (visible && (coach === null || coach.drawn)) showPending(input);
       if (shownCardId !== null && s.activeCard() !== null && visible) {
         visibleMs += dt;
         // R3: 4500 ms of the card on screen (a pause does not count), then it goes and counts as seen.
@@ -427,6 +410,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       }
       if (coach !== null && coach.until !== null && input.nowMs >= coach.until) coach = null;
       if (coach === null || !visible) return null;
+      coach.drawn = true;
       return { cardId: coach.cardId, anchor: coach.anchor, label: coach.label };
     },
     describe: () => ({
@@ -459,7 +443,7 @@ export const LEGACY_FIRST_TIME_SCENE_MEMBERS = Object.freeze([
 interface FirstTimeSceneView {
   readonly maze?: (LegacyFirstTimeMazeView & {
     readonly grid: boolean[][];
-    readonly bleedGates?: readonly LegacyBleedGate[];
+    readonly bleedGates?: LegacyBleedGate[];
   }) | null;
   readonly player?: LegacyPoint | null;
   readonly mode?: string;
@@ -570,6 +554,23 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
     const out = container.getWorldTransformMatrix().transformPoint(local.x, local.y);
     return { x: out.x, y: out.y };
   };
+  const cellRect = (cell: LegacyPoint, haloOfTile = 0): TextCardRect | null => {
+    const centre = cellScreen(cell);
+    const next = cellScreen({ x: cell.x + 1, y: cell.y });
+    if (centre === null || next === null) return null;
+    const cellPx = Math.abs(next.x - centre.x);
+    return resolveTextCardCellRect(centre, cellPx, 4 + (cellPx * haloOfTile));
+  };
+  // The wraps and Switches of the current board, worked out once per level.
+  let mechanicMaze: object | null = null;
+  let mechanicCells: readonly LegacyPoint[] = [];
+  const readMechanicCells = (maze: NonNullable<FirstTimeSceneView['maze']>): readonly LegacyPoint[] => {
+    if (maze !== mechanicMaze) {
+      mechanicMaze = maze;
+      mechanicCells = resolveTextCardMechanicCells(maze);
+    }
+    return mechanicCells;
+  };
 
   const onPostUpdate = (time: number): void => {
     const layout = view.layout ?? null;
@@ -599,10 +600,13 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       visible,
       reducedMotion,
       noticeTop,
+      viewWidth: layout?.width ?? 0,
       viewHeight: layout?.height ?? 0,
       player: view.player ?? null,
       goal: view.maze?.goal ?? null,
-      cellScreenY: (cell) => cellScreen(cell)?.y ?? null
+      cellRect,
+      mechanicCells: maze === null ? [] : readMechanicCells(maze),
+      coachPillRect: coachView.pillRect
     });
     const local = draw === null ? null : resolveCellLocal(view, draw.anchor);
     if (draw === null || local === null || !container) {
@@ -623,7 +627,9 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
         return { x: out.x, y: out.y };
       },
       minTop: noticeTop,
-      viewWidth: layout?.width ?? 0
+      viewWidth: layout?.width ?? 0,
+      icon: FIRST_TIME_CARD_ICON[draw.cardId],
+      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: view.boardTileLayer?.currentBake?.scale ?? 1 }
     });
   };
 
