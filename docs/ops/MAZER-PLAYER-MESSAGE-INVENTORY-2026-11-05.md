@@ -69,8 +69,9 @@ no feedback. `saveLegacyAccountUsername` also contains a duplicate of
 
 F5. **Dormant message code (no runtime consumer in `src/`).** `resolveLegacyOverlayToggleMessage`,
 `resolveLegacyOverlayMovementSpeedMessage`, `resolveLegacyOverlayFieldCommitMessage`,
-`LEGACY_OVERLAY_MESSAGE_COPY`, and the DOM
-`createStatusBanner` primitive (`src/ui/dom/StatusBanner.ts`, exported, tested, never mounted). The
+and `LEGACY_OVERLAY_MESSAGE_COPY`. (The DOM `createStatusBanner` primitive, `src/ui/dom/StatusBanner.ts`, was
+dormant here until 2026-11-26: H8 shards UI v1 mounts it inside the reusable in-flow notice,
+`src/ui/notice/inFlowNotice.ts`, shown only while the hazard layer is on.) The
 `source: 'overlay'` and `source: 'diagnostics'` members of `LegacyPlayerMessageSource` have no live
 producer except `'overlay'` for `Progression reset.`.
 
@@ -139,7 +140,7 @@ tone and source it would carry under the module (implied for raw strings). Kinds
 | `src/legacy-runtime/legacyLeaderboard.ts:71` | `The leaderboard is not set up yet.` | no | warning / system | parallel-mapper | Fold into the message module |
 | `src/legacy-runtime/legacyOAuthRefresh.ts:45` | `Account session refresh unavailable.` | no | n/a | technical | Synthetic HTTP body for the auth client; never rendered |
 | `src/ui/dom/MazerSwitch.ts:45` | `On` / `Off` | no | n/a | static | Primitive state label |
-| `src/ui/dom/StatusBanner.ts:16` | `Info` | no | n/a | static | Primitive tone label (component dormant, F5) |
+| `src/ui/dom/StatusBanner.ts:16` | `Info` | no | n/a | static | Primitive tone label (mounted by the in-flow notice since H8 shards UI v1; was dormant, F5) |
 | `src/ui/dom/StatusBanner.ts:19` | `Error` | no | n/a | static | Primitive tone label |
 
 `On` and `Off` share one row (the two branches of one ternary), so the table has 39 rows for 40 pinned literals.
@@ -384,6 +385,9 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyGuideContent.ts` | `Gates open and shut on a beat. Wait for the gap, then go through.` | static | Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Sentries pace a short route. A touch sends you back to your last junction.` | static | Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced |
 | `src/legacy-runtime/legacyGuideContent.ts` | `A Hunter chases you, slower than you move. It gives up after three catches.` | static | Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced |
+| `src/legacy-runtime/legacyShardHint.ts` | `Take the {} shards in order. The star stays locked until you do.` | static | First-time shard hint (H8 shards UI v1), shown in the reusable in-flow notice only while the hazard layer is on; once per player via the exposure record (introsShown) |
+| `src/legacy-runtime/legacyShardHint.ts` | `Take the shard first. The star stays locked until you do.` | static | First-time shard hint (H8 shards UI v1), shown in the reusable in-flow notice only while the hazard layer is on; once per player via the exposure record (introsShown) |
+| `src/legacy-runtime/legacyShardHint.ts` | `Star unlocked. Head for the end.` | static | Shard unlock notice (H8 shards UI v1), shown in the reusable in-flow notice after the unlock burst only while the hazard layer is on; dismisses itself |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Collect the shard first. The star stays locked until you do.` | static | Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced |
 | `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Buzzes on steps, wall bumps and wins. Silent with Reduce motion, and on iPhone.` | static | Settings sheet description under the Haptics row (MAZER-UI-026); every setting row must carry one, see docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md |
 | `src/legacy-runtime/legacySettingsSheetPlan.ts` | `Sets your level back to 1. Asks you to confirm first.` | static | Settings sheet description under the Reset progress row (MAZER-UI-026); every setting row must carry one, see docs/ui/MAZER-SETTINGS-SHEET-SPEC-2026-11-06.md |

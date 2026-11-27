@@ -110,6 +110,9 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Gates open and shut on a beat. Wait for the gap, then go through.', kind: 'static', route: 'Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced, claims pinned to the hazard manifest' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Sentries pace a short route. A touch sends you back to your last junction.', kind: 'static', route: 'Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced, claims pinned to the hazard manifest' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A Hunter chases you, slower than you move. It gives up after three catches.', kind: 'static', route: 'Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced, claims pinned to the hazard manifest' },
+  { file: 'src/legacy-runtime/legacyShardHint.ts', literal: 'Take the {} shards in order. The star stays locked until you do.', kind: 'static', route: 'First-time shard hint (H8 shards UI v1), shown in the reusable in-flow notice only while the hazard layer is on; once per player via the exposure record (introsShown)' },
+  { file: 'src/legacy-runtime/legacyShardHint.ts', literal: 'Take the shard first. The star stays locked until you do.', kind: 'static', route: 'First-time shard hint (H8 shards UI v1), shown in the reusable in-flow notice only while the hazard layer is on; once per player via the exposure record (introsShown)' },
+  { file: 'src/legacy-runtime/legacyShardHint.ts', literal: 'Star unlocked. Head for the end.', kind: 'static', route: 'Shard unlock notice (H8 shards UI v1), shown in the reusable in-flow notice after the unlock burst only while the hazard layer is on; dismisses itself' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Collect the shard first. The star stays locked until you do.', kind: 'static', route: 'Guide hazard row copy (slice H6), also the HAZ-008 intro card text; shown only while the hazard layer is on; guide-synced, claims pinned to the hazard manifest' },
   { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Buzzes on steps, wall bumps and wins. Silent with Reduce motion, and on iPhone.', kind: 'static', route: 'Settings sheet description under the Haptics row (MAZER-UI-026); every setting row must carry one' },
   { file: 'src/legacy-runtime/legacySettingsSheetPlan.ts', literal: 'Sets your level back to 1. Asks you to confirm first.', kind: 'static', route: 'Settings sheet description under the Reset progress row (MAZER-UI-026); every setting row must carry one' },
@@ -545,8 +548,8 @@ describe('message-system structure the inventory depends on', { timeout: GUARD_T
       { name: 'resolveLegacyOverlayToggleMessage', excluded: [MESSAGE_MODULE] },
       { name: 'resolveLegacyOverlayMovementSpeedMessage', excluded: [MESSAGE_MODULE] },
       { name: 'resolveLegacyOverlayFieldCommitMessage', excluded: [MESSAGE_MODULE] },
-      { name: 'LEGACY_OVERLAY_MESSAGE_COPY', excluded: [MESSAGE_MODULE] },
-      { name: 'createStatusBanner', excluded: ['src/ui/dom/StatusBanner.ts', 'src/ui/dom/index.ts', 'src/ui/feedback/feedbackPopup.ts', 'src/ui/feedback/feedbackOptionsMain.ts'] }
+      { name: 'LEGACY_OVERLAY_MESSAGE_COPY', excluded: [MESSAGE_MODULE] }
+      // createStatusBanner left this pin in H8 shards UI v1: the in-flow notice (src/ui/notice/inFlowNotice.ts) mounts it.
     ];
     for (const { name, excluded } of dormant) {
       expect(

@@ -88,13 +88,14 @@ describe('Phase 2 hazard hand-off stays dormant', () => {
     expect(offenders).toEqual([]);
   }, 60_000);
 
-  test('the draft hazard graph adapter is imported only by the H2 overlay, which only the worker job and the gate controller reach', () => {
+  test('the draft hazard graph adapter is imported only by the H2 overlay and the H8 shard run; the overlay only by the worker job and the gate controller', () => {
     const root = join(__dirname, '..', '..', 'src');
     const importers = listSource(root).filter((file) => (
       !file.endsWith('legacyHazardGraphAdapter.ts')
       && /legacyHazardGraphAdapter/.test(readFileSync(file, 'utf8'))
-    )).map((file) => file.split(/[\\/]/).pop());
-    expect(importers).toEqual(['legacyHazardOverlay.ts']);
+    )).map((file) => file.split(/[\\/]/).pop()).sort();
+    // H8 shards UI v1: the play-side shard run builds the same hazard graph to place the shards.
+    expect(importers).toEqual(['legacyHazardOverlay.ts', 'legacyShardRun.ts']);
     // Slice H3: the maze worker job runs the overlay off the main thread and the Pulse Gate controller
     // is the main-thread fallback. No scene imports it directly (the scene only sees the controller).
     const overlayImporters = listSource(root).filter((file) => (
