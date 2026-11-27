@@ -8,7 +8,7 @@
     - Pure helpers, all exported: `resolveLegacyFirstTimeShardTouch`, `resolveLegacyFirstTimeAdjacentGate`, `resolveLegacyFirstTimeOwnedHazardKinds`, `isLegacyFirstTimeCardSeenByHazardRecord`.
     - `busy()` is true while a card is pending or up.
   - `legacyHazardOnboarding.ts`: new `registryOwnedKinds`. When both labs are on, the HAZ-008 intro card is null for `shard` and `pulseGate`, and it is NOT marked in `introsShown`. Stage, allocation and maze build are unchanged.
-  - `legacyFirstTimeSession.ts`: new `isSeenElsewhere`. The host feeds it the exposure record, so `introsShown: ['shard']` (a player who already had the old shard hint) counts the Shard card as seen. The same goes for `pulseGate` and the Pulse Gate card.
+  - `legacyFirstTimeSession.ts`: new `isSeenElsewhere`. The shared scene session (`legacyFirstTimeSceneSession.ts`, which also holds the card-to-hazard-kind map) feeds it the exposure record, so the card host and the Guide use one session that knows the rule, so `introsShown: ['shard']` (a player who already had the old shard hint) counts the Shard card as seen. The same goes for `pulseGate` and the Pulse Gate card.
   - `shardPlayPresenter.ts`: new `untakenShardCell(offset)` and `holdNotices(held)`. The shard hint and unlock notices close and wait while a first-time card is up or pending, so the two never stack. On a one-shard level the pickup is also the unlock, on the same step.
   - `coachMarkView.ts`: new optional `avoid` box. The label pill moves to the other side of the ring when it would cover the player. A Pulse Gate ring is always one cell from the player.
   - `MenuScene.ts`: one-line hook that passes `registryOwnedKinds` to `createHazardOnboarding`.
