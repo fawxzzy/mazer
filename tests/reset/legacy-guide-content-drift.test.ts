@@ -268,11 +268,12 @@ describe('guide copy only names things that exist', () => {
     expect(tutorial.expectedEdgeWraps).toEqual({ horizontal: 0, vertical: 0 });
     const late = resolveLegacyProgressionDifficultyProfile(400);
     expect(late.expectedEdgeWraps.horizontal + late.expectedEdgeWraps.vertical).toBeGreaterThan(0);
-    expect(row('wrap').text).toMatch(/^Some mazes wrap /);
-    expect(row('wrap').text).toMatch(/Edge stars fill with your colour as beams hit/);
+    // First-time cards (spec section 7): the row is the wrap card's body, so it describes the step just taken.
+    expect(row('wrap').text).toMatch(/^Open edges wrap: walk off one to come back on the far side\./);
+    expect(row('wrap').text).toMatch(/Edge stars fill as beams hit/);
   });
 
-  test('Wrap gate (MAZER-L10): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
+  test('Switch (MAZER-L10 bleed gate, first-time cards D1): later mazes hide a wrap behind a ring you walk over; the board draw is the icon', () => {
     // "Later mazes": no gate before the first gate level, which sits after the first wrapped levels, and some
     // levels between it and the end of the wrap fade ask for one.
     expect(BLEED_GATE_FIRST_LEVEL).toBeGreaterThan(10);
@@ -295,11 +296,12 @@ describe('guide copy only names things that exist', () => {
     expect(resolveLegacyNavigationTarget(maze, { x: 0, y: 1 }, -1, 0)).toEqual({ x: 3, y: 1 });
     resetLegacyBleedGates(maze);
     expect(bleedGateRenderer.drawBleedGatePlan).toBeTypeOf('function');
-    expect(row('bleed-gate').text).toMatch(/dashed ring/);
+    expect(row('bleed-gate').heading).toBe('Switch');
+    expect(row('bleed-gate').text).toMatch(/^A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.$/);
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {
-    // "Some mazes wrap" is a claim about the ladder: wrap corridors from level 10, a seeded
+    // The Wrap row is only true if mazes really have open edges: wrap corridors from level 10, a seeded
     // share of every level while they fade out, none once the fade is over.
     const seeds = Array.from({ length: 200 }, (_, index) => 1337 + (index * 104729));
     const rungs = (level: number) => seeds.map((seed) => resolveGeometryBudgetWrapRungs(level, seed));
