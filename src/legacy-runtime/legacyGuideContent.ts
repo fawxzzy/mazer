@@ -299,6 +299,20 @@ const hazardGlyphIcon = (glyph: LegacyGuideGlyph, reasonId: string): LegacyGuide
 });
 
 /**
+ * A hazard whose board layer exists: the Guide row shows the board art through the mechanic icon registry
+ * (src/render/mechanicIcons.ts via legacyGuideIconRoute.ts), drawn by `boardDraw` itself.
+ */
+const hazardBoardIcon = (glyph: LegacyGuideGlyph, boardDraw: LegacyGuideDrawRef, reasonId: string): LegacyGuideIconSpec => ({
+  badge: 'circle',
+  boardDraw,
+  chipDraw: null,
+  glyph,
+  lane: null,
+  reasonId,
+  status: 'shared-with-board'
+});
+
+/**
  * Hazard rows (slice H6), in schedule order. NEVER part of LEGACY_GUIDE_ROWS: the sheet shows a
  * hazard row only while the hazard layer is on (build flag or `?lab=hazards`) AND the player has
  * met that kind AND the kind is live in play (legacyHazardOnboarding.ts decides which), so the
@@ -309,7 +323,7 @@ const hazardGlyphIcon = (glyph: LegacyGuideGlyph, reasonId: string): LegacyGuide
 export const LEGACY_GUIDE_HAZARD_ROWS: readonly LegacyGuideHazardRow[] = Object.freeze([
   {
     heading: 'Pulse Gate',
-    icon: hazardGlyphIcon('hazard-gate', 'hazard-gate-glyph-guide-local-until-board-layer'),
+    icon: hazardBoardIcon('hazard-gate', { module: 'src/render/hazardGateLayer.ts', symbol: 'drawHazardGatesToCanvasContext' }, 'hazard-gate-icon-calls-board-gate-draw'),
     id: 'hazard-gate',
     kind: 'pulseGate',
     text: 'Gates open and shut on a beat. Wait for the gap, then go through.'
@@ -330,7 +344,7 @@ export const LEGACY_GUIDE_HAZARD_ROWS: readonly LegacyGuideHazardRow[] = Object.
   },
   {
     heading: 'Shard',
-    icon: hazardGlyphIcon('hazard-shard', 'hazard-shard-glyph-guide-local-until-board-layer'),
+    icon: hazardBoardIcon('hazard-shard', { module: 'src/render/shardLook.ts', symbol: 'drawShardGem' }, 'hazard-shard-icon-calls-board-gem-draw'),
     id: 'hazard-shard',
     kind: 'shard',
     text: 'Take the shards in order. The star stays locked until you do.'

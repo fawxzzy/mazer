@@ -108,7 +108,7 @@ const LEGACY_OFF_SCALE_SIZES_PX = [1, 9, 13, 15, 18] as const;
  * only unmounted kit parts and the options pages use today; gameModeOptions.css is the mode-select proposal page.
  */
 const LEGACY_OFF_SCALE_REM_PX: Readonly<Record<string, readonly number[]>> = {
-  'src/ui/dom/primitives.css': [11.2, 12.48, 12.8, 13.6, 14.4, 15.2],
+  'src/ui/dom/primitives.css': [12.48, 12.8, 13.6, 14.4, 15.2],
   'src/ui/gameModeOptions/gameModeOptions.css': [11.2, 12.48, 13.12, 13.6, 14.4, 15.2, 17.6, 21.6, 24, 83.2]
 };
 

@@ -187,12 +187,7 @@
 }
 
 .mazer-feedback__banner {
-  border-color: var(--mazer-token-color-line-normal);
   font: 400 0.875rem/1.3 var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
-}
-
-.mazer-feedback__banner.mazer-status-banner--success {
-  border-color: var(--mazer-token-color-semantic-energy);
 }
 
 .mazer-feedback__actions {

@@ -20,12 +20,7 @@ import {
   SHARD_LOOK
 } from '../../src/render/shardLook';
 import { resolveShardHudAlpha, SHARD_HUD } from '../../src/render/shardSceneLayer';
-import {
-  resolveShardHudFrame,
-  resolveShardNoticeEdge,
-  SHARD_NOTICE_CLEAR_BOTTOM_PX,
-  SHARD_NOTICE_CLEAR_TOP_PX
-} from '../../src/render/shardPlayPresenter';
+import { resolveShardHudFrame } from '../../src/render/shardPlayPresenter';
 import { designTokens } from '../../src/theme/tokens';
 
 /*
@@ -148,35 +143,8 @@ describe('HUD chip frame', () => {
   });
 });
 
-describe('notice placement', () => {
-  const top = 80;
-  const view = 844;
-  const inTop = top + SHARD_NOTICE_CLEAR_TOP_PX - 1;
-  const middle = view / 2;
-  const inBottom = view - SHARD_NOTICE_CLEAR_BOTTOM_PX + 1;
-
-  test('stays at the top unless something it must not hide sits in the band under its top', () => {
-    expect(resolveShardNoticeEdge([null, null], top, view)).toBe('top');
-    expect(resolveShardNoticeEdge([top + SHARD_NOTICE_CLEAR_TOP_PX, middle], top, view)).toBe('top');
-    expect(resolveShardNoticeEdge([middle, inBottom], top, view)).toBe('top');
-  });
-
-  test('goes to the bottom when the top band is taken and the bottom band is free', () => {
-    expect(resolveShardNoticeEdge([inTop, middle], top, view)).toBe('bottom');
-    expect(resolveShardNoticeEdge([middle, inTop], top, view)).toBe('bottom');
-    // The bottom band is the shorter one: a banner hides less there than at the top, where the coach label sits.
-    expect(SHARD_NOTICE_CLEAR_BOTTOM_PX).toBeLessThan(SHARD_NOTICE_CLEAR_TOP_PX);
-    expect(resolveShardNoticeEdge([view - SHARD_NOTICE_CLEAR_BOTTOM_PX - 1, inTop], top, view)).toBe('bottom');
-  });
-
-  test('when both bands hide something it hides the less important thing (later in the list)', () => {
-    expect(resolveShardNoticeEdge([inTop, inBottom], top, view)).toBe('bottom');
-    expect(resolveShardNoticeEdge([inBottom, inTop], top, view)).toBe('top');
-    // Shard mid-screen, star under the top, player at the bottom: hide the player, keep the caged star in view.
-    expect(resolveShardNoticeEdge([middle, inTop, inBottom], top, view)).toBe('bottom');
-    expect(resolveShardNoticeEdge([middle, null, inBottom, inTop], top, view)).toBe('top');
-  });
-});
+// Notice placement moved to the shared text card rule (src/render/textCardPlacement.ts), pinned by
+// tests/render/text-card-placement.test.ts (rich-text skin, 2026-11-27).
 
 describe('coach mark (reusable)', () => {
   test('pulse is still under reduced motion and breathes otherwise', () => {
