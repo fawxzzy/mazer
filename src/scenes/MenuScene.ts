@@ -2776,10 +2776,10 @@ export class MenuScene extends Phaser.Scene {
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, subscribeServiceWorkerCacheWarning((message) => this.pushLegacyPlayerMessage(message)));
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.shards?.destroy();
-      this.shards = null;
       this.uiTransitionGhost?.release();
       this.uiTransitionGhost = null;
+      this.shards?.destroy();
+      this.shards = null;
       // The CanvasTexture is registered in the game-level TextureManager,
       // which outlives this scene instance -- unlike a plain Graphics
       // object or Image (which Phaser destroys along with the scene), a
