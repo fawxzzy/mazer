@@ -1,0 +1,35 @@
+/*
+ * Help tab options page. No colour literal: colours come from the shared tokens (the dark neon theme remaps them). The
+ * drop-down panel copies the real geometry and colours from menuDropdownArt.ts: near-opaque canvas fill, info-cyan keyline,
+ * lit row tint plus a left bar. Fonts are the shipped ones (Space Grotesk, Oxanium).
+ */
+.hp-stage { align-content: start; background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--mazer-token-color-brand-mint) 18%, transparent), transparent 70%), var(--mazer-token-color-bg-canvas); border: 1px solid var(--mazer-token-color-line-subtle); border-radius: var(--mazer-token-radius-sheet); display: grid; gap: 10px; padding: 12px; }
+.hp-menu-wrap { display: grid; gap: 6px; justify-items: end; min-height: 120px; }
+.hp-burger { align-items: center; display: inline-flex; height: 44px; justify-content: center; width: 44px; }
+.hp-panel { background: color-mix(in srgb, var(--mazer-token-color-bg-canvas) 94%, transparent); border: 1px solid color-mix(in srgb, var(--mazer-token-color-semantic-info) 62%, transparent); border-radius: 10px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--mazer-token-color-semantic-info) 10%, transparent), 0 0 8px color-mix(in srgb, var(--mazer-token-color-semantic-info) 5%, transparent); padding: 6px 0; }
+.hp-row { align-items: center; display: flex; font-size: 15px; gap: 8px; height: 44px; margin: 0 4px; padding: 0 10px 0 12px; position: relative; }
+.hp-row.is-lit { background: color-mix(in srgb, var(--mazer-token-color-semantic-info) 13%, transparent); border-radius: 7px; }
+.hp-row.is-lit::before { background: var(--mazer-token-color-semantic-info); border-radius: 2px; bottom: 8px; content: ""; left: 0; position: absolute; top: 8px; width: 3px; }
+.hp-row-label { flex: 1 1 auto; margin-left: 6px; }
+.hp-row-state { color: var(--mazer-token-color-text-muted); }
+
+.hp-sheet { background: var(--mazer-token-color-bg-panel); border: 1px solid var(--mazer-token-color-line-active); border-radius: var(--mazer-token-radius-sheet); display: grid; gap: 10px; padding: 12px; }
+.hp-sheet-head { align-items: center; display: flex; justify-content: space-between; }
+.hp-sheet-head b { font-size: 1rem; }
+.hp-lede { font-size: 1rem; margin: 4px 0; }
+.hp-faq { border-bottom: 1px solid var(--mazer-token-color-line-subtle); padding: 6px 0; }
+.hp-faq summary { cursor: pointer; font-size: .875rem; min-height: 32px; padding: 6px 0; }
+.hp-faq p { color: var(--mazer-token-color-text-muted); font-size: .875rem; line-height: 1.4; margin: 0 0 6px; }
+.hp-links { display: grid; gap: 8px; }
+.hp-facts { display: grid; gap: 2px 12px; grid-template-columns: auto 1fr; margin: 0; }
+.hp-facts dt { color: var(--mazer-token-color-text-muted); }
+.hp-facts dd { margin: 0; }
+
+.hp-form { display: grid; gap: 10px; }
+.hp-label { color: var(--mazer-token-color-text-muted); font-size: .875rem; }
+.hp-textarea { min-height: 96px; resize: vertical; width: 100%; }
+.hp-counter { color: var(--mazer-token-color-text-muted); font-size: .75rem; justify-self: end; }
+.hp-attach { align-items: flex-start; display: flex; font-size: .875rem; gap: 8px; }
+.hp-attach input { accent-color: var(--mazer-token-color-brand-mint); height: 20px; margin: 0; width: 20px; }
+.hp-notice { display: grid; }
+.hp-notice:empty { display: none; }
