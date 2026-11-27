@@ -320,8 +320,8 @@ describe('tail route-target schedule', () => {
   });
 });
 
-describe('dormant: nothing outside the hazards barrel imports the shard modules', () => {
-  test('no src file outside src/mazer-core/hazards references shards or shardSolvability', () => {
+describe('shard modules are reached only through the H8 run state', () => {
+  test('outside src/mazer-core/hazards only legacyShardRun.ts (H8 shards UI v1, flag-gated) references the shard placement', () => {
     const offenders: string[] = [];
     const walk = (dir: string): void => {
       for (const name of readdirSync(dir)) {
@@ -336,6 +336,6 @@ describe('dormant: nothing outside the hazards barrel imports the shard modules'
       }
     };
     walk(join(process.cwd(), 'src'));
-    expect(offenders).toEqual([]);
+    expect(offenders.map((path) => path.split(/[\\/]/).pop())).toEqual(['legacyShardRun.ts']);
   });
 });

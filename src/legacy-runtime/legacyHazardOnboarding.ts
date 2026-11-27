@@ -42,7 +42,7 @@ export const HAZARD_EXPOSURE_STORAGE_KEY = 'mazer.hazard-exposure.v1';
  * Kinds drawn in play today. H3 wires the Pulse Gate; H4/H5/H8 append theirs. Order does not matter
  * (everything below re-sorts by the schedule).
  */
-export const HAZARD_ONBOARDING_LIVE_KINDS: readonly HazardUnitKind[] = Object.freeze(['pulseGate']);
+export const HAZARD_ONBOARDING_LIVE_KINDS: readonly HazardUnitKind[] = Object.freeze(['pulseGate', 'shard']);
 
 /** How long a card / pip stays up if the player does not move first (the first move dismisses the card). */
 export const HAZARD_INTRO_CARD_SHOW_MS = 4500;
@@ -228,8 +228,12 @@ export interface HazardOnboardingOptions {
 }
 
 export interface HazardOnboarding {
-  /** Resolves and marks the level-start moments (writes the record only when something shows). */
-  levelStart(level: unknown): HazardLevelMoments;
+  /**
+   * Resolves and marks the level-start moments (writes the record only when something shows). An intro whose kind is
+   * in `withheldKinds` is neither shown nor marked (e.g. the shard hint on a level whose shards did not place), so it
+   * still shows the first time that kind really appears.
+   */
+  levelStart(level: unknown, options?: { readonly withheldKinds?: readonly HazardUnitKind[] }): HazardLevelMoments;
   /** Advances the stage on a first-encounter clear; never lowers it. */
   levelCleared(level: unknown): void;
   /** The stage to build `level` with (for the overlay's `exposureStage`). */
@@ -249,15 +253,17 @@ export const createHazardOnboarding = (options: HazardOnboardingOptions): Hazard
     writeHazardExposureRecord(options.resolveStorage(), next);
   };
   return {
-    levelStart(level) {
+    levelStart(level, startOptions) {
       const record = read();
-      const moments = resolveHazardLevelMoments({
+      const resolved = resolveHazardLevelMoments({
         enabled: true,
         level,
         record,
         saturationLevel: options.saturationLevel,
         liveKinds
       });
+      const withheld = resolved.introCard !== null && startOptions?.withheldKinds?.includes(resolved.introCard.kind) === true;
+      const moments = withheld ? { ...resolved, introCard: null } : resolved;
       const next = markHazardMomentsShown(record, moments);
       if (next !== record) {
         write(next);

@@ -1,0 +1,49 @@
+/*
+ * In-flow notice (reusable): one calm kit StatusBanner floating over the top of the play view, under the header
+ * controls. Tokens only (no colour literal). It never blocks the board: only the banner itself takes pointer input.
+ */
+
+.mazer-inflow-notice-host {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  padding: 0 max(var(--mazer-token-spacing-16), env(safe-area-inset-right, 0px)) 0 max(var(--mazer-token-spacing-16), env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  position: fixed;
+  right: 0;
+  /* Above the game canvas and the accessibility surface (30), below the feedback popup (45) and boot error (50). */
+  z-index: 40;
+}
+
+.mazer-inflow-notice {
+  box-shadow: 0 var(--mazer-token-spacing-4) var(--mazer-token-spacing-16) color-mix(in srgb, var(--mazer-token-color-bg-canvas) 70%, transparent);
+  font: 400 var(--mazer-token-legacy-font-size-body)/1.35 var(--mazer-token-font-ui);
+  max-width: 360px;
+  opacity: 0;
+  pointer-events: auto;
+  transform: translateY(calc(-1 * var(--mazer-token-spacing-8)));
+  transition:
+    opacity var(--mazer-token-motion-duration-base) var(--mazer-token-motion-ease-standard),
+    transform var(--mazer-token-motion-duration-base) var(--mazer-token-motion-ease-standard);
+  width: 100%;
+}
+
+.mazer-inflow-notice--bottom {
+  transform: translateY(var(--mazer-token-spacing-8));
+}
+
+.mazer-inflow-notice--open {
+  opacity: 1;
+  transform: none;
+}
+
+.mazer-inflow-notice--reduced {
+  transform: none;
+  transition: opacity var(--mazer-token-motion-reduced-crossfade) linear;
+}
+
+.mazer-inflow-notice__title {
+  font-weight: 600;
+  margin-right: var(--mazer-token-spacing-4);
+}

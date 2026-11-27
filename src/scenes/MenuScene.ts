@@ -165,6 +165,8 @@ import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import { paintGuideGlossarySheet, resetGuideGlossarySelection } from '../legacy-runtime/legacyGuideGlossaryPainter';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
 import { HazardMomentView } from '../render/hazardMomentRenderer';
+import { ShardPlayPresenter } from '../render/shardPlayPresenter';
+import { isShardIntroCard, seedHazardPreviewStorage } from '../legacy-runtime/legacyShardHint';
 import {
   HAZARD_EXPOSURE_STORAGE_KEY,
   HAZARD_INTRO_CARD_SHOW_MS,
@@ -1944,6 +1946,8 @@ export class MenuScene extends Phaser.Scene {
   // Pulse Gates (slice H3): created only with the layer flag on, so flag off never reaches any of it.
   private hazardGates: LegacyHazardGateController | null = null;
   private hazardGateView: HazardGateCanvasView | null = null;
+  // Shards (H8 UI v1, shardPlayPresenter.ts): built only with the layer flag on, like the gates above.
+  private shards: ShardPlayPresenter | null = null;
   private hazardGateImage: Phaser.GameObjects.Image | null = null;
   private hazardGateTextureKey: string | null = null;
   private hazardGateEjecting = false;
@@ -2578,6 +2582,9 @@ export class MenuScene extends Phaser.Scene {
     this.presenceView = null;
     this.goalBeaconGraphics = this.add.graphics();
     this.titleGraphics = this.add.graphics();
+    this.shards = this.hazardLab?.runtime
+      ? new ShardPlayPresenter(this, { depth: LEGACY_HAZARD_MOMENT_DEPTH, crisp: (text) => this.applyLegacyUiTextCrispness(text) })
+      : null;
     this.boardZoomContainer.add([
       // First child = lowest depth: the diamonds sit under the board, the title,
       // the header icons and every other menu element.
@@ -2596,6 +2603,8 @@ export class MenuScene extends Phaser.Scene {
       // Pulse Gate layer (slice H3): its own canvas over the trail and glow, under the crisp cast. Flag on only.
       ...(this.hazardGateImage ? [this.hazardGateImage] : []),
       this.startPinwheelLayer.image,
+      // Shards (H8): gems, cage ring, gather and coach ring, under the crisp cast. Flag on only.
+      ...(this.shards ? this.shards.boardObjects : []),
       this.boardDynamicGraphics,
       this.titleGraphics
     ]);
@@ -2769,6 +2778,8 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.uiTransitionGhost?.release();
       this.uiTransitionGhost = null;
+      this.shards?.destroy();
+      this.shards = null;
       // The CanvasTexture is registered in the game-level TextureManager,
       // which outlives this scene instance -- unlike a plain Graphics
       // object or Image (which Phaser destroys along with the scene), a
@@ -3694,6 +3705,9 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.hazardGateView) {
       this.drawLegacyHazardGateLayer();
+    }
+    if (this.shards && this.drawLegacyShardLayer(time)) {
+      this.boardDynamicDirty = true;
     }
     if (this.hudDirty || shouldDrawDynamicBoard) {
       this.drawHud(time);
@@ -7624,6 +7638,14 @@ export class MenuScene extends Phaser.Scene {
       playerLevel: parseLegacyHazardLevel(resolveLegacyGenerationTrack(this.progressionState, 'play').level),
       workerOverlay: takeLegacyMazeHazardOverlay(this.maze, level, exposureStage)
     });
+    // Shards ride the same build inputs and the gates live in play, so the placed route is the one play checks.
+    this.shards?.install(this.maze, {
+      mode: this.mode === 'play' ? 'play' : 'menu',
+      level,
+      saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL,
+      exposureStage,
+      specs: gates.liveGateSpecs()
+    }, () => performance.now());
   }
 
   private createLegacyHazardGateCanvas(): void {
@@ -7674,8 +7696,61 @@ export class MenuScene extends Phaser.Scene {
     }
     return {
       worldClock: describeHazardLabClock(this.hazardLab),
-      ...(this.hazardGates ? { pulseGates: this.hazardGates.describe() } : {})
+      ...(this.hazardGates ? { pulseGates: this.hazardGates.describe() } : {}),
+      ...(this.shards ? { shards: this.shards.describe() } : {})
     };
+  }
+
+  // H8 shards: the step landed on `point`. Collect sound on each shard; the unlock moment is drawn by the layer.
+  private noteLegacyShardArrival(point: LegacyPoint): void {
+    const arrival = this.shards?.arrive(point, this.time.now) ?? null;
+    if (arrival === null) {
+      return;
+    }
+    this.playLegacySoundEffect(resolveHazardAudioSound('hazard.shard.collected'));
+    this.boardDynamicDirty = true;
+    this.hudDirty = true;
+  }
+
+  // Once per frame with the layer on. Returns true when the end star's look changed (caged <-> open).
+  private drawLegacyShardLayer(time: number): boolean {
+    const shards = this.shards;
+    if (!shards) {
+      return false;
+    }
+    const layout = this.hazardGateLayout;
+    const origin = this.boardTileLayer.snappedOrigin ?? { x: layout.mazeLeft, y: layout.mazeTop };
+    const matrix = this.boardZoomContainer.getWorldTransformMatrix();
+    return shards.frame({
+      nowMs: time,
+      reducedMotion: this.prefersLegacyReducedMotion(),
+      layout: {
+        originX: origin.x,
+        originY: origin.y,
+        tileSize: layout.tileSize,
+        backingScale: this.resolveBoardTileBackingScale(),
+        alpha: this.mode === 'play' ? layout.alpha : 0
+      },
+      goal: this.maze?.goal ?? null,
+      player: this.mode === 'play' ? this.player : null,
+      // The chip takes the free leading header slot; the presenter resolves the frame from these.
+      header: {
+        height: this.layout.height,
+        hudHeight: this.layout.lanes.hud?.height ?? 64,
+        hudTop: this.layout.lanes.hud?.top ?? 0,
+        safeArea: this.layout.headerSafeInset,
+        sizeScale: this.layout.headerIconScale,
+        width: this.layout.width
+      },
+      // The open menu dropdown counts too: the DOM notice would otherwise sit over it.
+      hudVisible: this.mode === 'play' && this.overlay === 'none' && !this.menuDropdown.isOpen(),
+      toScreen: (p) => {
+        const out = matrix.transformPoint(p.x, p.y);
+        return { x: out.x, y: out.y };
+      },
+      viewWidth: this.layout.width,
+      viewHeight: this.layout.height
+    });
   }
 
   private resetLegacyWorldTurnHost(): void {
@@ -7759,8 +7834,12 @@ export class MenuScene extends Phaser.Scene {
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
+    if (this.shards) {
+      this.noteLegacyShardArrival(nextStep.player);
+    }
 
-    if (nextStep.reachedGoal) {
+    // A locked end star (H8 shards not all taken) is a plain tile: standing on it does not finish the level.
+    if (nextStep.reachedGoal && this.shards?.goalLocked !== true) {
       const firstGoalArrival = this.playCompletedAtMs === null;
       this.playCompletedAtMs ??= this.time.now;
       if (firstGoalArrival) {
@@ -10795,7 +10874,13 @@ export class MenuScene extends Phaser.Scene {
     context.opacity = Math.min(1, alpha);
     const phase = time !== undefined ? resolveMenuBlinkPhase(time, LEGACY_MENU_BLINK_PULSE_MS, this.prefersLegacyReducedMotion()) : 0;
     const backingScale = this.resolveBoardTileBackingScale();
-    if (kind === 'goal') {
+    // H8: a locked star is caged (still, dimmed, no beacon); after the unlock it turns from the unlock instant.
+    const shardGoal = kind === 'goal' ? this.shards?.goalMarker(time ?? 0, this.prefersLegacyReducedMotion()) ?? null : null;
+    const goalClockMs = shardGoal === null ? (time ?? 0) : shardGoal.clockMs;
+    if (shardGoal !== null) {
+      context.opacity = Math.min(1, alpha * shardGoal.opacity);
+    }
+    if (kind === 'goal' && (shardGoal === null || shardGoal.beacon)) {
       drawGoalBeacon(underContext, {
         goal: point,
         tileSize,
@@ -10836,15 +10921,15 @@ export class MenuScene extends Phaser.Scene {
       goal: kind === 'goal' ? point : undefined,
       startTile: endpointTiles.start,
       goalTile: endpointTiles.goal,
-      phase,
+      phase: shardGoal?.still === true ? 0 : phase,
       reducedMotion: this.prefersLegacyReducedMotion(),
       // The slow spin (goalStarSpin.ts): from the shared scene clock; 0 (tip up, static) under Reduce Motion.
-      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
+      goalStarRotation: kind === 'goal' ? resolveGoalStarRotation(goalClockMs, this.prefersLegacyReducedMotion()) : 0,
       // MAZER-VIS-053: the start spiral turns on the SAME clock and period as the star (in phase), and the star's border is
       // the shared border colour of the edge diamonds (same function, same trail head, same reduced-motion rule).
       startSpiralRotation: kind === 'start' ? resolveStartSpiralRotation(time ?? 0, this.prefersLegacyReducedMotion()) : 0,
       // L5 (endpointTileSkins.ts): the default skins (Seed spiral, Twin stars) animate on the same scene clock.
-      endpointTimeMs: time ?? 0,
+      endpointTimeMs: kind === 'goal' ? goalClockMs : time ?? 0,
       endpointBorderColor: resolveSharedBorderColor(this.trailPaletteHead, time ?? 0, this.prefersLegacyReducedMotion())
     };
     // Chip: the star / play arrow straight onto the baked tile (no pad, no badge: nothing is painted under the trail
@@ -11012,11 +11097,11 @@ export class MenuScene extends Phaser.Scene {
       this.hazardOnboardingFor = this.hazardLab;
       this.hazardOnboarding = createHazardOnboarding({
         enabled: this.hazardLab?.state.enabled === true,
-        resolveStorage: () => createLegacyAuthScopedStorage(
-          this.resolveBrowserLocalStorage(),
-          HAZARD_EXPOSURE_STORAGE_KEY,
-          this.authSnapshot
-        ),
+        resolveStorage: () => {
+          const storage = createLegacyAuthScopedStorage(this.resolveBrowserLocalStorage(), HAZARD_EXPOSURE_STORAGE_KEY, this.authSnapshot);
+          // Level Preview has no history: read it as a player who reached the previewed level by the schedule (H8).
+          return this.levelPreviewLevel === null ? storage : seedHazardPreviewStorage(storage, HAZARD_EXPOSURE_STORAGE_KEY, this.levelPreviewLevel);
+        },
         saturationLevel: GEOMETRY_BUDGET_SATURATION_LEVEL
       });
     }
@@ -11047,12 +11132,18 @@ export class MenuScene extends Phaser.Scene {
     // Built once per scene while the layer is on (never while off), so a card costs only its model and two setText calls.
     const view = this.resolveHazardMomentView();
     const startedAt = performance.now();
-    const moments = onboarding.levelStart(this.progressionState.tracks.player.level);
-    if (moments.introCard !== null) {
+    // H8: no placed shards (failed placement or none this level) = the shard hint is not shown, so it is not spent.
+    const moments = onboarding.levelStart(this.progressionState.tracks.player.level, {
+      withheldKinds: this.shards?.active === true ? [] : ['shard']
+    });
+    // H8: the shard's first-time moment is the in-flow notice plus the coach mark, not the card.
+    if (isShardIntroCard(moments.introCard)) {
+      this.shards?.requestFirstHint();
+    } else if (moments.introCard !== null) {
       view.showCard(moments.introCard, HAZARD_INTRO_CARD_SHOW_MS);
     }
     const cardShowMs = moments.introCard === null ? null : Math.round((performance.now() - startedAt) * 1000) / 1000;
-    if (moments.introCard !== null) {
+    if (moments.introCard !== null && !isShardIntroCard(moments.introCard)) {
       this.hazardMomentCardAnchor = copyPoint(this.player);
       this.playLegacySoundEffect(resolveHazardAudioSound('hazard.intro'));
     }
@@ -11071,6 +11162,7 @@ export class MenuScene extends Phaser.Scene {
 
   private noteHazardMomentsLevelCleared(): void {
     this.hazardMomentView?.dismissCard();
+    this.shards?.levelEnded();
     this.resolveHazardOnboarding()?.levelCleared(this.progressionState.tracks.player.level);
   }
 
@@ -14675,6 +14767,8 @@ export class MenuScene extends Phaser.Scene {
     if (result.nextPlayer !== null) {
       // MAZER-L10: a new attempt: every bleed gate goes dark and its path hides again.
       resetLegacyBleedGates(this.maze);
+      // H8: the shards go back too, the star locks again, and the shard notice and coach mark close.
+      this.shards?.restartAttempt();
       this.boardPathDirty = true;
       this.player = result.nextPlayer;
       this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);

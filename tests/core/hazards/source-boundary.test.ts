@@ -29,11 +29,11 @@ describe('hazard source boundary (DRAFT, dormant)', () => {
     }
   });
 
-  test('the legacy adapter, the H2 overlay, the H3 Pulse Gate controller and the H6 onboarding are the only legacy-runtime files that mention the hazard graph', () => {
+  test('the legacy adapter, the H2 overlay, the H3 Pulse Gate controller, the H6 onboarding and the H8 shard run and hint are the only legacy-runtime files that mention the hazard graph', () => {
     const legacy = new URL('../../../src/legacy-runtime/', import.meta.url);
     const mentions = readdirSync(legacy)
       .filter((entry) => entry.endsWith('.ts'))
       .filter((entry) => /mazer-core\/hazards/.test(read(new URL(entry, legacy))));
-    expect(mentions).toEqual(['legacyHazardGateController.ts', 'legacyHazardGraphAdapter.ts', 'legacyHazardOnboarding.ts', 'legacyHazardOverlay.ts']);
+    expect(mentions).toEqual(['legacyHazardGateController.ts', 'legacyHazardGraphAdapter.ts', 'legacyHazardOnboarding.ts', 'legacyHazardOverlay.ts', 'legacyShardHint.ts', 'legacyShardRun.ts']);
   });
 });
