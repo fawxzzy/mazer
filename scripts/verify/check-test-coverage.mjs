@@ -44,12 +44,15 @@ export const workflowCommands = () => {
     // the chunk that ends one job also holds the next job's header, so the job is updated after each chunk is read.
     const chunks = text.split(/\n\s*- name:/);
     const lastJobIn = (chunk) => [...chunk.matchAll(/^ {2}([A-Za-z0-9_-]+):[ \t]*$/gm)].at(-1)?.[1];
+    let chromiumInstalled = false;
     let job = lastJobIn(chunks[0].slice(Math.max(0, chunks[0].search(/^jobs:[ \t]*$/m))));
     for (const step of chunks.slice(1)) {
       const stepJob = job;
       job = lastJobIn(step) ?? job;
       const runAt = step.search(/\n\s*run:/);
       if (runAt < 0) continue;
+      const afterChromium = chromiumInstalled;
+      if (/playwright install/.test(step.slice(runAt))) chromiumInstalled = true;
       const body = step
         .slice(runAt)
         .replace(/\\\r?\n/g, ' ')
@@ -67,7 +70,7 @@ export const workflowCommands = () => {
             operands.push(tokens[i].replace(/\/$/, ''));
           }
         }
-        if (operands.length > 0) commands.push({ workflow: name, job: stepJob, operands, excludes });
+        if (operands.length > 0) commands.push({ workflow: name, job: stepJob, operands, excludes, afterChromium });
       }
       for (const runner of body.matchAll(/scripts\/verify\/(run-[a-z-]+-required-tests\.mjs)/g)) {
         const extra = runnerExtraFiles(runner[1]);
@@ -89,14 +92,22 @@ export const workflowCommands = () => {
 
 const matches = (file, operand) => file === operand || file.startsWith(`${operand}/`);
 
+/** Exclusion category for files that launch Playwright Chromium: excluded from the folder runs, run once after the install step. */
+export const BROWSER_CATEGORY = 'run after browser install';
+
 export const analyze = () => {
   const files = listTestFiles();
   const commands = workflowCommands();
   const runs = new Map(files.map((f) => [f, []]));
+  // Runs that are NOT inside the required job after the Chromium install step (only matter for browser-category files).
+  const misplacedRuns = new Map(files.map((f) => [f, []]));
   commands.forEach((cmd, index) => {
     for (const file of files) {
       if (cmd.excludes.includes(file)) continue;
-      if (cmd.operands.some((op) => matches(file, op))) runs.get(file).push(`${cmd.workflow}#${index}${cmd.runner ? `(${cmd.runner})` : ''}`);
+      if (cmd.operands.some((op) => matches(file, op))) {
+        runs.get(file).push(`${cmd.workflow}#${index}${cmd.runner ? `(${cmd.runner})` : ''}`);
+        if (!(cmd.workflow === REQUIRED_CHECK_WORKFLOW && cmd.job === REQUIRED_CHECK_JOB && cmd.afterChromium)) misplacedRuns.get(file).push(`${cmd.workflow}#${index}`);
+      }
     }
   });
   const exclusions = existsSync(EXCLUSIONS) ? JSON.parse(readFileSync(EXCLUSIONS, 'utf8')) : { files: {} };
@@ -108,7 +119,10 @@ export const analyze = () => {
     files,
     notRun,
     unaccounted: notRun.filter((f) => !(f in excluded)),
-    staleExclusions: Object.keys(excluded).filter((f) => !files.includes(f) || runs.get(f).length > 0),
+    // A browser-category entry is stale when the file is gone or NOTHING runs it; every other entry is stale when CI runs it.
+    staleExclusions: Object.keys(excluded).filter((f) => !files.includes(f) || (excluded[f]?.category === BROWSER_CATEGORY ? runs.get(f).length === 0 : runs.get(f).length > 0)),
+    // A browser-category file must run only inside job verify, in a step after the Playwright install step.
+    browserMisplaced: Object.entries(excluded).filter(([f, e]) => e?.category === BROWSER_CATEGORY && files.includes(f) && misplacedRuns.get(f).length > 0).map(([f]) => f),
     badReasons: Object.entries(excluded).filter(([, e]) => typeof e?.reason !== 'string' || e.reason.trim().length < 8 || /[\r\n]/.test(e.reason) || !e.category).map(([f]) => f),
     // Folders that required-tests-lib.mjs says run whole must be an operand of some workflow command.
     missingFolders: FOLDER_RUNS.filter((folder) => !commands.some((c) => c.operands.includes(folder))),
@@ -142,7 +156,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   const problems = [];
   for (const f of a.unaccounted) problems.push(`${f}: no CI step runs it and it is not in config/ci-test-exclusions.json (add it to a folder step, or exclude it with a one-line reason)`);
-  for (const f of a.staleExclusions) problems.push(`${f}: on the exclusion list but the file is gone or CI now runs it (remove the entry)`);
+  for (const f of a.staleExclusions) problems.push(`${f}: on the exclusion list but the file is gone, or CI runs it (remove the entry), or it is a "run after browser install" entry that no CI step runs`);
+  for (const f of a.browserMisplaced) problems.push(`${f}: category "${BROWSER_CATEGORY}" but a run is not inside job "${REQUIRED_CHECK_JOB}" after the "playwright install" step`);
   for (const f of a.badReasons) problems.push(`${f}: exclusion reason must be one line of at least 8 characters`);
   for (const f of a.missingFolders) problems.push(`${f}: listed in FOLDER_RUNS (scripts/verify/required-tests-lib.mjs) but no workflow command runs it whole`);
   for (const f of a.unlistedFolders) problems.push(`${f}: ${REQUIRED_CHECK_WORKFLOW} runs this folder whole but it is not in FOLDER_RUNS (scripts/verify/required-tests-lib.mjs), so npm test would skip it`);
