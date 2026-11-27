@@ -57,7 +57,7 @@ describe('guide sheet plan', () => {
   );
 
   test('a tall desktop shows the whole guide; 320x568 scrolls and keeps Got it pinned', () => {
-    // 1400 tall: with the Wrap gate row (MAZER-L10), the Menu row (L6) and the In a maze row the whole list needs ~1330 px (1100 before).
+    // 1400 tall: with the Switch row (MAZER-L10), the Menu row (L6) and the In a maze row the whole list needs ~1330 px (1100 before).
     const wide = buildLegacyGuideSheetPlan({ height: 1400,itemHeights: MEASURED_HEIGHTS, width: 1280 });
     expect(wide.scrollable).toBe(false);
     expect(wide.maxScrollOffset).toBe(0);
