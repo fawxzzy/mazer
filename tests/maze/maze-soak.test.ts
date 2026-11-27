@@ -1,3 +1,5 @@
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
 
 import { advanceDemoWalker, createDemoWalkerState } from '../../src/domain/ai';
@@ -23,8 +25,26 @@ interface MemorySample {
   arrayBuffers: number;
 }
 
+// The heap-band assertions below only mean something when every sample is taken right after a full collection. A vitest
+// worker thread is not started with --expose-gc, so `globalThis.gc` is undefined there and the samples were raw heap sizes that
+// swing by tens of MB between collections (the "final returned near the lower band" check then failed with no real growth).
+// Expose the collector from inside the test process instead: this changes how the heap is measured, not what is asserted.
+const resolveCollector = (): (() => void) | undefined => {
+  const exposed = (globalThis as { gc?: () => void }).gc;
+  if (exposed) {
+    return exposed;
+  }
+  try {
+    setFlagsFromString('--expose-gc');
+    return runInNewContext('gc') as () => void;
+  } catch {
+    return undefined;
+  }
+};
+const collector = resolveCollector();
+
 const maybeCollect = (): void => {
-  (globalThis as { gc?: () => void }).gc?.();
+  collector?.();
 };
 
 const yieldToRunner = async (): Promise<void> => {
@@ -77,6 +97,11 @@ const createPathMembership = (pathIndices: Uint32Array, tileCount: number): Uint
 test(
   'soak: repeated seeded generation and reset cycles hold invariants',
   async () => {
+    // Without a working collector every sample is a raw heap size and the band checks below fail confusingly: say so first.
+    expect(
+      typeof collector,
+      'maze-soak could not expose the garbage collector (no globalThis.gc and v8.setFlagsFromString failed); heap samples would be raw sizes'
+    ).toBe('function');
     const memorySamples: MemorySample[] = [];
     let state = {
       processCount: 7,

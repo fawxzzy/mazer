@@ -153,7 +153,7 @@ jobs:
       # check, so a red test here blocks the merge (a separate job would not, unless the ruleset named it too). About
       # 30 seconds of test time. Not run here:
       # - the files named in the steps above (each runs once);
-      # - the files in config/ci-test-exclusions.json (needs browser / fails on main), enforced by check-test-coverage.mjs.
+      # - the files in config/ci-test-exclusions.json (needs the Chromium install: run after it; or cannot run in CI), enforced by check-test-coverage.mjs.
       - name: Verify the remaining tests folders
         run: >-
           npx --no-install vitest run
@@ -179,7 +179,6 @@ jobs:
           --exclude tests/scenes/menu-intent-runtime.test.ts
           --exclude tests/analysis/live-auth-persistence-soak.test.mjs
           --exclude tests/ui/dom-settings-primitives.test.ts
-          --exclude tests/maze/maze-soak.test.ts
           --pool=threads
           --maxWorkers=4
 
@@ -192,6 +191,16 @@ jobs:
 
       - name: Install Chromium for the bounded trail-corner raster check
         run: npx playwright install --with-deps chromium
+
+      # The two tests that launch Playwright Chromium (a loopback server / real layout). They are excluded from the folder run
+      # above and run here, after the browser exists, in the same required job. check-test-coverage.mjs enforces the order.
+      - name: Verify the tests that need Playwright Chromium
+        run: >-
+          npx --no-install vitest run
+          tests/analysis/live-auth-persistence-soak.test.mjs
+          tests/ui/dom-settings-primitives.test.ts
+          --pool=threads
+          --maxWorkers=2
 
       - name: Verify Wave 4D-A trail corner raster (bounded, all four orientations)
         run: node ./scripts/analysis/verify-trail-corner-raster.mjs --skip-build

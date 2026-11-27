@@ -1,11 +1,10 @@
 {
-  "_comment": "Test files under tests/ that no CI step runs, each with a one-line reason. Checked by scripts/verify/check-test-coverage.mjs (CI step 'Check every test file is run once or excluded'); the same files are skipped by `npm test` so local and CI run the same set. Categories: needs browser, needs network, needs live auth, long soak, local fixture, fails on main.",
+  "_comment": "Test files under tests/ that no CI step runs, each with a one-line reason. Checked by scripts/verify/check-test-coverage.mjs (CI step 'Check every test file is run once or excluded'); the same files are skipped by `npm test` so local and CI run the same set. Categories: needs browser, needs network, needs live auth, run after browser install, local sibling checkout, local fixture.",
   "files": {
-    "tests/analysis/live-auth-persistence-soak.test.mjs": { "category": "needs browser", "reason": "launches Playwright Chromium against a loopback server; the browser is only installed later in the Verify job" },
-    "tests/ui/dom-settings-primitives.test.ts": { "category": "needs browser", "reason": "launches Playwright Chromium to measure real layout; the browser is only installed later in the Verify job" },
-    "tests/maze/maze-soak.test.ts": { "category": "fails on main", "reason": "fails on main: AssertionError: expected false to be true (tests/maze/maze-soak.test.ts:181, heap-band check; also a soak, run by npm run test:soak)" },
-    "tests/playbook-adoption-evidence.test.mjs": { "category": "fails on main", "reason": "fails on main: ENOENT reading playbook/exports/playbook.contract.example.v1.json (reads a sibling local Playbook checkout)" },
-    "tests/playbook-verification-report.test.mjs": { "category": "fails on main", "reason": "fails on main: ENOENT reading schemas/atlas.playbook.verification.report.v1.json (reads a local ATLAS schemas folder)" }
+    "tests/analysis/live-auth-persistence-soak.test.mjs": { "category": "run after browser install", "reason": "launches Playwright Chromium against a loopback server; excluded from the folder run, run by the step after the Chromium install in job verify" },
+    "tests/ui/dom-settings-primitives.test.ts": { "category": "run after browser install", "reason": "launches Playwright Chromium to measure real layout; excluded from the folder run, run by the step after the Chromium install in job verify" },
+    "tests/playbook-adoption-evidence.test.mjs": { "category": "local sibling checkout", "reason": "compares the Mazer export with the live contract in the sibling ../playbook checkout (exports/playbook.contract.example.v1.json), which a CI checkout of this repo does not have" },
+    "tests/playbook-verification-report.test.mjs": { "category": "local sibling checkout", "reason": "validates the report against the ATLAS root schema (../../schemas/atlas.playbook.verification.report.v1.json), which is owned by the ATLAS repo and absent from a CI checkout of this repo" }
   },
   "tests": {
     "tests/reset/legacy-reset.test.ts": {
