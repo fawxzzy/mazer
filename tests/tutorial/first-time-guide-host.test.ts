@@ -148,7 +148,7 @@ describe('first-time Guide with Help on: "All tips" lives in Help (MAZER-ONB-001
   });
 
   it('Help offers "All tips" only while the first-time flag is on and something is hidden', () => {
-    expect(isLegacyFirstTimeGuideAllTipsAvailable(sceneWith('').scene)).toBe(false);
+    expect(isLegacyFirstTimeGuideAllTipsAvailable(sceneWith('?lab=off').scene)).toBe(false);
     const { scene, meet } = sceneWith('?lab=firsttime');
     expect(isLegacyFirstTimeGuideAllTipsAvailable(scene)).toBe(true);
     meet('mechanic.wrap');
