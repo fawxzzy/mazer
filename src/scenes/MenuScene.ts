@@ -14401,7 +14401,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // Help (MAZER-ONB-001 family): the sheet over whichever menu it came from. "All tips" is offered only while the
-  // first-time Guide hides tips; the shard answer only while shards can appear (the hazard layer, ?lab=hazards).
+  // first-time Guide hides tips; the shard answer only while shards can appear (the hazard layer is on).
   private openLegacyHelp(): void {
     const opened = this.helpLauncher.open({ gameMode: this.mode, level: this.progressionState.tracks.player.level }, {
       allTipsLabel: isLegacyFirstTimeGuideAllTipsAvailable(this) ? LEGACY_FIRST_TIME_GUIDE_LABELS.allTips : null,
