@@ -45,8 +45,8 @@ afterEach(() => {
 });
 
 describe('first-time Guide (slice 4)', () => {
-  it('flag off: no options, and the model is the same object shape as today (no new keys)', () => {
-    const { scene, model } = sceneWith('');
+  it('flag off (?lab=off kill switch): no options, and the model is the same object shape as today (no new keys)', () => {
+    const { scene, model } = sceneWith('?lab=off');
     expect(resolveLegacyFirstTimeGuideSheetOptions(scene)).toBeUndefined();
     const sheet = model();
     expect(sheet.rows).toBe(LEGACY_GUIDE_ROWS);

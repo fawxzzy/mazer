@@ -25,13 +25,12 @@
 //    changes nothing about the geometry gate.
 
 import { resolveContinuousDifficulty } from './legacyGeometryBudget';
-import { HAZARD_LAYER_BUILD_DEFAULT } from './legacyHazardLayerFlag';
 
 // The switch. Slice H1 replaced the literal `LEGACY_HAZARD_LAYER_ENABLED = false` with
 // `resolveHazardLayerEnabled()` (legacyHazardLayerFlag.ts: build constant, default false, plus the
-// `?lab=hazards` lab switch). This dormant hand-off still reports the BUILD default only: it is
-// replaced by the generation overlay in slice H2 and is imported by no runtime module.
-const LEGACY_HAZARD_LAYER_ENABLED = HAZARD_LAYER_BUILD_DEFAULT;
+// `?lab=hazards` lab switch). This dormant hand-off is a historical contract record: it stays `false` (the
+// live layer is the generation overlay from slice H2) and is imported by no runtime module.
+const LEGACY_HAZARD_LAYER_ENABLED = false as const;
 
 export const LEGACY_PHASE2_FEATURE_REGISTRY = Object.freeze({
   hazards: Object.freeze({

@@ -29,8 +29,8 @@ const throwingStorage = {
 };
 
 describe('resolveHazardLayerEnabled (roadmap slice H1)', () => {
-  test('the build default is a literal false and the bare call is false outside a browser', () => {
-    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+  test('the build default is on (H9, 2026-11-28) and the bare call is false outside a browser', () => {
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(true);
     expect(resolveHazardLayerEnabled()).toBe(false);
     expect(resolveHazardLayerEnabled({})).toBe(false);
   });

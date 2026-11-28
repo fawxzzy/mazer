@@ -43,10 +43,14 @@ const wrap = resolveFirstTimeCard('mechanic.wrap');
 const sw = resolveFirstTimeCard('mechanic.switch');
 
 describe('?lab=firsttime flag', () => {
-  it('is off by default in the build, in node, and with no lab switch', () => {
-    expect(FIRST_TIME_CARDS_BUILD_DEFAULT).toBe(false);
+  it('is on by default in the browser build (2026-11-28), off in node with no window, and ?lab=off is a kill switch', () => {
+    expect(FIRST_TIME_CARDS_BUILD_DEFAULT).toBe(true);
     expect(resolveFirstTimeCardsEnabled()).toBe(false);
     expect(resolveFirstTimeCardsState({ search: '', storage: new SpyStorage() })).toEqual({ enabled: false, source: 'off', preview: false });
+    const browser = { buildDefault: FIRST_TIME_CARDS_BUILD_DEFAULT };
+    expect(resolveFirstTimeCardsState({ ...browser, search: '', storage: new SpyStorage() })).toEqual({ enabled: true, source: 'build', preview: false });
+    expect(resolveFirstTimeCardsState({ ...browser, search: '?lab=off', storage: new SpyStorage() })).toEqual({ enabled: false, source: 'off', preview: false });
+    expect(resolveFirstTimeCardsState({ search: '', storage: new SpyStorage(), buildDefault: false })).toEqual({ enabled: false, source: 'off', preview: false });
   });
 
   it('turns on with ?lab=firsttime, remembers it, and ?lab=off forgets it', () => {

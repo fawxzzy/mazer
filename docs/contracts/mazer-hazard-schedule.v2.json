@@ -11,7 +11,7 @@
     "signedWords": "locked-gate chance 30% at L100 rising to 100% at L283 (curve A), plus hazard manifest v2"
   },
   "flag": {
-    "buildDefaultEnabled": false,
+    "buildDefaultEnabled": true,
     "labSwitch": "?lab=hazards",
     "note": "Slice H1 replaces the dormant literal LEGACY_HAZARD_LAYER_ENABLED with resolveHazardLayerEnabled(); slice H9 flips the build default after the owner's phone sign-off. This manifest enables nothing."
   },

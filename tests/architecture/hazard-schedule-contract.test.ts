@@ -59,7 +59,7 @@ describe('MAZER-HAZ-002 hazard schedule manifest v1 (slice H0)', () => {
 
   test('the validator rejects a broken manifest, so the check above is not vacuous', () => {
     const broken = JSON.parse(JSON.stringify(manifest));
-    broken.flag.buildDefaultEnabled = true;
+    broken.flag.buildDefaultEnabled = false;
     delete broken.caps.gates;
     broken.extra = 1;
     expect(validate(schema, broken).length).toBeGreaterThanOrEqual(3);
@@ -126,8 +126,8 @@ describe('MAZER-HAZ-002 hazard schedule manifest v1 (slice H0)', () => {
     expect(doc).toContain('docs/contracts/mazer-hazard-schedule.v1.json');
   });
 
-  test('signing the contract wires nothing: the dormant switch stays off', () => {
-    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+  test('the build default is on (slice H9, 2026-11-28); no window (node) still resolves off', () => {
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(true);
     expect(resolveHazardLayerEnabled()).toBe(false);
     expect(manifest.flag.buildDefaultEnabled).toBe(HAZARD_LAYER_BUILD_DEFAULT);
     expect(manifest.status).toBe('signed-not-wired');
