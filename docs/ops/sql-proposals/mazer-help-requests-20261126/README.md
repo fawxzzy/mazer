@@ -114,6 +114,7 @@ After a rollback that kept rows, `apply.sql` refuses to run again (`MAZER_HELP_P
 - Guest rows survive account deletion by design: a guest row has no `user_id`, so nothing links it to an account that is later deleted. Deleting a person's guest messages on request is a manual owner statement by email address.
 
 ## Client plan (NOT built in this lane)
+Built 2026-11-28 in the Help client UI lane (`src/ui/help/`, `src/legacy-runtime/legacyHelpSubmit.ts`, behind `?lab=help`, build default off); see `docs/playbook-notes/2026-11-28-help-client-ui.md`. The plan below is kept as written.
 - RPC: `client.rpc('mazer_submit_help_request_v1', { p_email, p_message, p_build_id, p_player_level, p_game_mode })` on the client bound to the mazer schema (`getLegacyAuthClient`, as `legacyFeedbackSubmit.ts` does). Signed-out players call it with the anon key (the same client without a session); signed-in players' JWT gives `auth.uid()`. Context: `p_build_id` from `legacyBuildId.ts`, level and mode from the current run, all optional.
 - Placement A: "Help" row with the lifebuoy icon after Guide. View A "Short answers": three short FAQ rows and a primary "Contact us" button. Form C "Email first": "Your email" (type email, hint "We reply here."), "Message" (textarea; raise `maxLength` from the options page's 500 to 2000 to match the server), Send disabled until the message has text. Pre-fill nothing; never store the typed email on the device beyond the open form.
 - Result vocabulary like feedback: saved / rate_limited / offline / failed. Every notice goes through the in-flow status banner (`createStatusBanner`), never inline red text.
@@ -137,3 +138,4 @@ After a rollback that kept rows, `apply.sql` refuses to run again (`MAZER_HELP_P
 
 ## Open question for the client lane
 1. What the "Contact us" fallback shows when the form is rate limited (an address or link outside this form). The client PR needs it; nothing in this SQL depends on it.
+   Answered 2026-11-28: the address fawxzzy@gmail.com (Zac approved), shown as "You can also email us:" with a mailto link on every rate-limited answer (and on a generic failure).
