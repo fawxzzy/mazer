@@ -1,6 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { LEGACY_MAIN_MENU_ROW_IDS, LEGACY_PLAY_MENU_ROW_IDS, LEGACY_SHARED_MENU_ROW_IDS } from '../../src/legacy-runtime/legacyMenuRows';
+import {
+  LEGACY_HELP_MENU_ROW_ID,
+  LEGACY_MAIN_MENU_ROW_IDS,
+  LEGACY_PLAY_MENU_ROW_IDS,
+  LEGACY_SHARED_MENU_ROW_IDS
+} from '../../src/legacy-runtime/legacyMenuRows';
 import { BUTTON_ICON_HUD_TEXTURE_IDS, isButtonIconId } from '../../src/render/buttonIcons';
 import {
   MENU_ROW_ICON_SOURCES,
@@ -10,7 +15,8 @@ import {
 
 // MAZER-UI-095/096/097: one icon registry for both Menu dropdowns, every glyph from the C Star Dust set.
 describe('menu row icons (menuRowIcons.ts)', () => {
-  const allIds = [...new Set([...LEGACY_MAIN_MENU_ROW_IDS, ...LEGACY_PLAY_MENU_ROW_IDS])];
+  // The flagged Help row (legacyMenuRows.ts) sits on both screens, outside the const lists.
+  const allIds = [...new Set([...LEGACY_MAIN_MENU_ROW_IDS, ...LEGACY_PLAY_MENU_ROW_IDS, LEGACY_HELP_MENU_ROW_ID])];
 
   test('every row of either dropdown has exactly one icon source, and the shared rows draw the same icon on both', () => {
     expect(Object.keys(MENU_ROW_ICON_SOURCES).sort()).toEqual([...allIds].sort());
@@ -41,6 +47,7 @@ describe('menu row icons (menuRowIcons.ts)', () => {
     expect(resolveMenuRowVectorIconId('sound', { soundEnabled: false })).toBe('soundOff');
     expect(resolveMenuRowVectorIconId('reset-level', { soundEnabled: false })).toBe('reset');
     expect(resolveMenuRowVectorIconId('main-menu', { soundEnabled: true })).toBe('home');
+    expect(resolveMenuRowVectorIconId('help', { soundEnabled: true })).toBe('lifebuoy');
     for (const id of ['settings', 'profile', 'leaderboard'] as const) {
       expect(resolveMenuRowVectorIconId(id, { soundEnabled: true }), id).toBeNull();
     }

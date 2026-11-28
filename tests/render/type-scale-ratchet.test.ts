@@ -181,9 +181,10 @@ describe('type scale source ratchet (shipped src + index.html)', () => {
     expect(offScale).toEqual(expected);
   });
 
-  test('the rating popup and the mode select hold no off-scale font size at all', () => {
+  test('the rating popup, the mode select and the Help sheet hold no off-scale font size at all', () => {
     const sizes = collectCssRemSizes();
-    for (const file of ['src/ui/feedback/feedbackPopup.css', 'src/ui/modeSelect/modeSelect.css']) {
+    expect(sizes.has('src/ui/help/help.css')).toBe(true);
+    for (const file of ['src/ui/feedback/feedbackPopup.css', 'src/ui/modeSelect/modeSelect.css', 'src/ui/help/help.css']) {
       expect([...(sizes.get(file) ?? [])].filter((px) => !TYPE_SCALE_SIZES_PX.includes(px)), file).toEqual([]);
     }
   });

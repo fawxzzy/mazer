@@ -1,0 +1,224 @@
+/*
+ * Help sheet (MAZER-ONB-001 family). Shared tokens and the kit primitives only (src/ui/dom/primitives.css); the panel and
+ * the answers wear the neon edge text skin (numbers in src/ui/skin/neonTextSkin.ts: opaque void fill, accent rim, outer
+ * glow, inner wash, Oxanium kicker and heading). The scrim is the rating popup's (.mazer-feedback-scrim, feedbackPopup.css)
+ * so key isolation and the z-index are shared. Every font size is on the type scale (docs/ui/MAZER-TYPE-SCALE.md).
+ */
+
+.mazer-help,
+.mazer-help * {
+  box-sizing: border-box;
+}
+
+.mazer-help:focus {
+  outline: none;
+}
+
+.mazer-help[hidden],
+.mazer-help [hidden] {
+  display: none !important;
+}
+
+.mazer-help {
+  --mazer-neon-accent: var(--mazer-token-color-semantic-info);
+  /* The kit field label sits in a notch cut from the panel fill. */
+  --mazer-control-notch-background: var(--mazer-token-color-bg-canvas);
+  background: var(--mazer-token-color-bg-canvas);
+  border: 0;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1.5px var(--mazer-neon-accent),
+    0 0 22px color-mix(in srgb, var(--mazer-neon-accent) 30%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--mazer-neon-accent) 12%, transparent),
+    0 10px 24px color-mix(in srgb, var(--mazer-token-color-bg-canvas) 60%, transparent);
+  color: var(--mazer-token-color-text-primary);
+  display: grid;
+  font-family: var(--mazer-token-font-ui, "Space Grotesk", ui-sans-serif, system-ui, sans-serif);
+  gap: var(--mazer-token-spacing-16, 16px);
+  /* A short screen (a phone on its side) scrolls the sheet instead of clipping it. */
+  max-height: 100%;
+  max-width: 380px;
+  overflow-y: auto;
+  padding: var(--mazer-token-spacing-20, 20px);
+  width: 100%;
+}
+
+.mazer-help > *,
+.mazer-help__answers > *,
+.mazer-help__form > *,
+.mazer-help__fields > * {
+  min-width: 0;
+}
+
+.mazer-help__head {
+  align-items: start;
+  display: flex;
+  gap: var(--mazer-token-spacing-12, 12px);
+  justify-content: space-between;
+}
+
+.mazer-help__heading {
+  display: grid;
+  gap: var(--mazer-token-spacing-4, 4px);
+  min-width: 0;
+}
+
+.mazer-help__kicker {
+  color: color-mix(in srgb, var(--mazer-neon-accent) 70%, var(--mazer-token-color-text-muted));
+  font: 600 0.75rem/1.1 "Oxanium", var(--mazer-token-font-ui);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* The title look is the shared .mazer-sheet-title (primitives.css); this only trims its margin. */
+.mazer-help__title {
+  margin: 0;
+  min-width: 0;
+}
+
+.mazer-help__close {
+  flex: none;
+}
+
+.mazer-help__answers,
+.mazer-help__form,
+.mazer-help__fields {
+  display: grid;
+  gap: var(--mazer-token-spacing-16, 16px);
+}
+
+.mazer-help__faq-list {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+/* Each answer is a small neon card: the question is the Oxanium heading, the answer the body line. */
+.mazer-help__faq {
+  background: var(--mazer-token-color-bg-canvas);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--mazer-neon-accent) 55%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--mazer-neon-accent) 10%, transparent);
+  padding: 0 var(--mazer-token-spacing-12, 12px);
+}
+
+.mazer-help__faq[open] {
+  box-shadow:
+    0 0 0 1.5px var(--mazer-neon-accent),
+    0 0 14px color-mix(in srgb, var(--mazer-neon-accent) 24%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--mazer-neon-accent) 12%, transparent);
+}
+
+.mazer-help__question {
+  align-items: center;
+  color: var(--mazer-token-color-text-primary);
+  cursor: pointer;
+  display: flex;
+  font: 700 1rem/1.1 "Oxanium", var(--mazer-token-font-ui);
+  gap: var(--mazer-token-spacing-8, 8px);
+  justify-content: space-between;
+  letter-spacing: 0.04em;
+  list-style: none;
+  min-height: var(--mazer-token-touch-target-min, 44px);
+  padding: var(--mazer-token-spacing-8, 8px) 0;
+}
+
+.mazer-help__question::-webkit-details-marker {
+  display: none;
+}
+
+/* A small chevron in the accent colour (no glyph font: two borders). */
+.mazer-help__question::after {
+  border-bottom: 2px solid var(--mazer-neon-accent);
+  border-right: 2px solid var(--mazer-neon-accent);
+  content: "";
+  flex: none;
+  height: 8px;
+  margin-right: 4px;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+  width: 8px;
+}
+
+.mazer-help__faq[open] > .mazer-help__question::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.mazer-help__faq[open] > .mazer-help__question {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--mazer-neon-accent) 75%, transparent);
+}
+
+.mazer-help__question:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info);
+  outline-offset: 2px;
+}
+
+.mazer-help__answer,
+.mazer-help__all-tips-lede,
+.mazer-help__contact {
+  color: var(--mazer-token-color-text-muted);
+  font: 400 0.875rem/1.36 var(--mazer-token-font-ui);
+  margin: 0;
+}
+
+.mazer-help__answer {
+  padding: 0 0 var(--mazer-token-spacing-12, 12px);
+}
+
+.mazer-help__all-tips {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+/* The kit field labels and hints on the type scale inside Help (the kit's own sizes predate the scale). */
+.mazer-help .mazer-field__label {
+  font: 500 0.75rem/1 var(--mazer-token-font-ui);
+}
+
+.mazer-help .mazer-field__description {
+  font: 400 0.75rem/1.35 var(--mazer-token-font-ui);
+}
+
+.mazer-help__textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.mazer-help__counter {
+  color: var(--mazer-token-color-text-muted);
+  font: 400 0.75rem/1 var(--mazer-token-font-ui);
+  justify-self: end;
+  margin-top: calc(-1 * var(--mazer-token-spacing-8, 8px));
+}
+
+.mazer-help__notice-slot {
+  display: grid;
+}
+
+.mazer-help__notice-slot:empty {
+  display: none;
+}
+
+.mazer-help__contact-link {
+  color: var(--mazer-neon-accent);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mazer-help__contact-link:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info);
+  outline-offset: 2px;
+}
+
+.mazer-help__actions {
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mazer-help__question::after {
+    transition: none;
+  }
+}

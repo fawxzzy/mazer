@@ -64,6 +64,7 @@ interface InventoryEntry {
 }
 
 const MENU = 'src/scenes/MenuScene.ts';
+const HELP = 'src/ui/help/helpState.ts';
 
 /**
  * The pinned inventory. `literal` is the exact string value; `{}` stands for a
@@ -75,6 +76,18 @@ const MENU = 'src/scenes/MenuScene.ts';
 // cards read every visible line from src/brand/authSurfaceCopy.ts (the approved copy matrix, outside the scan dirs),
 // so they have no rows here; tests/reset/auth-surface-copy-lint.test.ts fails on any of their text outside it.
 const PINNED_INVENTORY: readonly InventoryEntry[] = [
+  // Help sheet (MAZER-ONB-001 family, `?lab=help`, build default off): the HELP_COPY table and the short answers.
+  { file: HELP, literal: 'We reply here.', kind: 'static', route: 'Help form hint under the email field (email-first form C); shown only while the Help flag is on' },
+  { file: HELP, literal: 'See every Guide tip, even the ones you have not met yet.', kind: 'static', route: 'Help "All tips" lede (the button moved from the Guide foot); shown only while the first-time Guide hides tips and the Help flag is on' },
+  { file: HELP, literal: 'Sent. Thank you, we will reply by email.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on' },
+  { file: HELP, literal: 'Check your email address and try again.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (also the client-side email check, which sends nothing)' },
+  { file: HELP, literal: 'Write a message first.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on' },
+  { file: HELP, literal: 'Your message is too long. Keep it under 2000 characters.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (the textarea also caps at 2000)' },
+  { file: HELP, literal: 'Could not send. Check your connection and try again.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (offline and failed; failed also shows the Contact us email)' },
+  { file: HELP, literal: 'You have sent a few messages already. Try again in {}.', kind: 'raw-status', route: 'Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (rate_limited; the Contact us email line is always shown with it)' },
+  { file: HELP, literal: 'Progress saves to this device. Sign in from Profile to keep it across devices.', kind: 'static', route: 'Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off)' },
+  { file: HELP, literal: 'Take every shard in order. The next one pulses; the star opens when all are taken.', kind: 'static', route: 'Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off) (only while shards can appear, the hazard layer)' },
+  { file: HELP, literal: 'Open the menu and set Sound to On. Your phone silent switch can also mute the game.', kind: 'static', route: 'Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off)' },
   { file: MENU, literal: 'Progression reset.', kind: 'routed-inline', route: 'move copy into LEGACY_PROGRESSION_MESSAGE_COPY; id progression.player.reset already routed' },
   { file: MENU, literal: 'Runtime diagnostics authenticated fixture.', kind: 'fixture', route: 'none (QA fixture)' },
   { file: 'src/boot/accessibilitySurface.ts', literal: 'Touch and drag anywhere to move through the maze. With a keyboard, use Arrow keys or WASD to move, Enter to start, O for settings, P to pause or resume, and Escape to close a dialog.', kind: 'static', route: 'none (static a11y description)' },
@@ -97,6 +110,8 @@ const PINNED_INVENTORY: readonly InventoryEntry[] = [
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit.', kind: 'static', route: 'Guide (How to play) Wrap row copy, also the first-time wrap card body (read from the row, spec R2; once per account in the in-flow notice behind ?lab=firsttime, default off); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.', kind: 'static', route: 'Guide (How to play) Switch row copy (MAZER-L10 bleed gate, heading "Switch" per first-time cards D1), also the first-time Switch card body (read from the row; once per account in the in-flow notice behind ?lab=firsttime, default off); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'The dot and number at the top left show how many players are online right now.', kind: 'static', route: 'Guide (How to play) sheet row copy for the menu online counter (MAZER-UI-024; no longer beside an icon since L6); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Top right: Settings (Dark mode), Guide, Help, Sound, Profile, Leaderboard.', kind: 'static', route: 'Guide Menu row copy while the Help flag is on (?lab=help, build default off; LEGACY_GUIDE_HELP_MENU_ROW replaces the Menu row); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
+  { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Help in the Menu has quick answers to common questions and a form to write to us.', kind: 'static', route: 'Guide Help row copy while the Help flag is on (?lab=help, build default off; LEGACY_GUIDE_HELP_ROW); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Top right: Settings (Dark mode), Guide, Sound, Profile, Leaderboard.', kind: 'static', route: 'Guide (How to play) sheet row copy for the main-menu dropdown button (L6; no Feedback row since 2026-11-25, the rating offers itself on main-menu entry); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyGuideContent.ts', literal: 'Endless mode: clears show your time and level. Harder mazes add shortcuts and loops.', kind: 'static', route: 'Guide (How to play) sheet row copy; unrendered until the Settings wiring lane; updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md' },
   { file: 'src/legacy-runtime/legacyControlHint.ts', literal: 'Touch and drag anywhere to move.', kind: 'static', route: 'level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows' },
@@ -174,7 +189,8 @@ const UNSCANNED_FILES: readonly string[] = [
   'src/legacy-runtime/legacyEndlessProgression.ts'
 ];
 
-const SCAN_DIRS: readonly string[] = ['src/boot', 'src/legacy-runtime', 'src/ui/dom'];
+// src/ui/help (MAZER-ONB-001 family): the Help sheet's copy table (helpState.ts HELP_COPY) is player-facing, so it is pinned.
+const SCAN_DIRS: readonly string[] = ['src/boot', 'src/legacy-runtime', 'src/ui/dom', 'src/ui/help'];
 const SINK_CALLS: ReadonlySet<string> = new Set(['createAuthInfoText', 'createAuthAccountSummaryCard', 'setText']);
 const MESSAGE_PROPERTY_NAMES: ReadonlySet<string> = new Set(['error', 'info', 'copy', 'helper', 'message']);
 const TEXT_SINK_MEMBERS: ReadonlySet<string> = new Set(['textContent', 'innerText']);

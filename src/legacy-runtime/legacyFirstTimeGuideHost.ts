@@ -6,11 +6,15 @@
  *   sheet is exactly today's), else the rows to hide (Wrap and Switch until met), the rows with a "New" pill, and the
  *   foot actions.
  * - `runLegacyFirstTimeGuideFootAction(scene, id)` from the foot buttons: "All tips" shows every row until the Guide
- *   closes (the Help tab is not on main, so the link sits at the Guide foot, spec section 7); "Show tips again" clears
+ *   closes (spec section 7 puts it in Help; while the Help flag is off it sits at the Guide foot); "Show tips again" clears
  *   this account's seen record (session.showTipsAgain: the cards show again and the rows hide again, as after a
  *   progress reset; the level-1 device hint is untouched).
  * - `noteLegacyFirstTimeGuideClosed(scene)` when the Guide closes: the rows it showed with a pill count as viewed, and
  *   "All tips" resets.
+ *
+ * Help (MAZER-ONB-001 family, `?lab=help`): with `{ allTipsInHelp: true }` the Guide foot keeps only "Show tips again",
+ * and the Help screen offers "All tips" instead: `isLegacyFirstTimeGuideAllTipsAvailable(scene)` says whether there is
+ * anything hidden to show, and `armLegacyFirstTimeGuideAllTips(scene)` makes the next Guide open with every row.
  *
  * The session is the card host's own (legacyFirstTimeSceneSession.ts), so on a preview route the Guide sees what the
  * cards wrote to the in-memory record.
@@ -34,13 +38,52 @@ interface GuideState {
 
 const guideStates = new WeakMap<object, GuideState>();
 
-/** Pure: the foot actions for this view. "All tips" only while something is hidden; "Show tips again" always. */
-export const resolveLegacyFirstTimeGuideFootActions = (hiddenCount: number): readonly LegacyGuideFootAction[] => [
-  ...(hiddenCount > 0 ? [{ id: 'all-tips' as const, label: LEGACY_FIRST_TIME_GUIDE_LABELS.allTips }] : []),
+export interface LegacyFirstTimeGuideFootOptions {
+  /** The Help flag is on: "All tips" lives in the Help screen, so the Guide foot leaves it out. Default false. */
+  readonly allTipsInHelp?: boolean;
+}
+
+/**
+ * Pure: the foot actions for this view. "All tips" only while something is hidden and Help does not carry it;
+ * "Show tips again" always.
+ */
+export const resolveLegacyFirstTimeGuideFootActions = (
+  hiddenCount: number,
+  options: LegacyFirstTimeGuideFootOptions = {}
+): readonly LegacyGuideFootAction[] => [
+  ...(hiddenCount > 0 && options.allTipsInHelp !== true
+    ? [{ id: 'all-tips' as const, label: LEGACY_FIRST_TIME_GUIDE_LABELS.allTips }]
+    : []),
   { id: 'show-tips-again', label: LEGACY_FIRST_TIME_GUIDE_LABELS.showTipsAgain }
 ];
 
-export const resolveLegacyFirstTimeGuideSheetOptions = (scene: object): LegacyGuideFirstTimeSheetOptions | undefined => {
+/**
+ * Help: is there anything for "All tips" to show? True only while the first-time flag is on and the plain view (not
+ * "All tips") hides at least one row. Reads only; writes nothing.
+ */
+export const isLegacyFirstTimeGuideAllTipsAvailable = (scene: object): boolean => {
+  const session = resolveLegacyFirstTimeSceneSession(scene);
+  const store = session.enabled ? session.store() : null;
+  if (store === null) return false;
+  const view = resolveLegacyFirstTimeGuideView({ store, showAll: false });
+  return view !== null && view.hiddenRowIds.size > 0;
+};
+
+/** Help's "All tips": the next Guide open shows every row (until that Guide closes, as the foot button did). */
+export const armLegacyFirstTimeGuideAllTips = (scene: object): void => {
+  const state = guideStates.get(scene);
+  if (state === undefined) {
+    guideStates.set(scene, { showAll: true, pilled: new Set() });
+  } else {
+    state.showAll = true;
+  }
+  (scene as { uiDirty?: boolean }).uiDirty = true;
+};
+
+export const resolveLegacyFirstTimeGuideSheetOptions = (
+  scene: object,
+  footOptions: LegacyFirstTimeGuideFootOptions = {}
+): LegacyGuideFirstTimeSheetOptions | undefined => {
   const session = resolveLegacyFirstTimeSceneSession(scene);
   const store = session.enabled ? session.store() : null;
   if (store === null) return undefined;
@@ -56,7 +99,7 @@ export const resolveLegacyFirstTimeGuideSheetOptions = (scene: object): LegacyGu
     hiddenRowIds: view.hiddenRowIds,
     newRowIds: view.newRowIds,
     newPillLabel: LEGACY_FIRST_TIME_GUIDE_LABELS.newPill,
-    footActions: resolveLegacyFirstTimeGuideFootActions(view.hiddenRowIds.size)
+    footActions: resolveLegacyFirstTimeGuideFootActions(view.hiddenRowIds.size, footOptions)
   };
 };
 

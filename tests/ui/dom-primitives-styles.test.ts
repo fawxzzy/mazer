@@ -83,7 +83,14 @@ describe('Wave 2A primitive styling and isolation', () => {
       // src/ui/feedback is the proposed in-game feedback popup (docs/ui/MAZER-FEEDBACK-POPUP-PLAN-2026-11-23.md): a
       // consumer of the primitives that no shipping entry imports (tests/ui/feedback-state.test.ts pins that), so it
       // is excluded here until the popup is picked and wired through its own wave.
-      if (!entry.name.endsWith('.ts') || path.startsWith(DOM_ROOT) || path.startsWith(join(ROOT, 'src/ui/feedback'))) return [];
+      // src/ui/help is the Help sheet (MAZER-ONB-001 family, `?lab=help`): the same kind of on-demand consumer, loaded only
+      // by a dynamic import from legacyHelpLauncher.ts (tests/legacy-runtime/legacy-help-launcher.test.ts pins that).
+      if (
+        !entry.name.endsWith('.ts')
+        || path.startsWith(DOM_ROOT)
+        || path.startsWith(join(ROOT, 'src/ui/feedback'))
+        || path.startsWith(join(ROOT, 'src/ui/help'))
+      ) return [];
       return [readFileSync(path, 'utf8')];
     });
 

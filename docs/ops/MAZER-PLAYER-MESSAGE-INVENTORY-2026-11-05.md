@@ -345,6 +345,30 @@ raw auth error render site now passes the snapshot error through `resolveLegacyA
 status view-model, which maps it onto a matrix line. The toast `Code:` line is removed (the code stays in
 `technicalDetail`). The `legacyPlayerMessage.ts` failure rows are unchanged here (Wave 3B follow-up).
 
+### 4f. Help sheet copy (MAZER-ONB-001 family, 2026-11-28)
+
+The Help sheet (`src/ui/help/`, opened by the Menu's Help row right after Guide, behind `?lab=help`, build default off)
+keeps every visible line in one table, `HELP_COPY` and `HELP_FAQ_ROWS` in `src/ui/help/helpState.ts`; `src/ui/help` is
+now a scan directory of the guard. Notices use the kit status banner with tone info or success only (no red error
+text). On `rate_limited` the sheet always adds `You can also email us:` with the support address. Short labels
+(`Help`, `Contact us`, `Contact support`, `Your email`, `Message`, `Send`, `Sending`, `Try again`, `Back`, `Close`,
+the three questions) are not sentences and are not pinned one by one; the copy table is the single source. The two
+Guide rows shown while the flag is on are in section 4d.
+
+| file | String | Kind | Recommended routing |
+| --- | --- | --- | --- |
+| `src/ui/help/helpState.ts` | `We reply here.` | static | Help form hint under the email field (email-first form C); shown only while the Help flag is on |
+| `src/ui/help/helpState.ts` | `See every Guide tip, even the ones you have not met yet.` | static | Help "All tips" lede (the button moved from the Guide foot); shown only while the first-time Guide hides tips and the Help flag is on |
+| `src/ui/help/helpState.ts` | `Sent. Thank you, we will reply by email.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on |
+| `src/ui/help/helpState.ts` | `Check your email address and try again.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (also the client-side email check, which sends nothing) |
+| `src/ui/help/helpState.ts` | `Write a message first.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on |
+| `src/ui/help/helpState.ts` | `Your message is too long. Keep it under 2000 characters.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (the textarea also caps at 2000) |
+| `src/ui/help/helpState.ts` | `Could not send. Check your connection and try again.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (offline and failed; failed also shows the Contact us email) |
+| `src/ui/help/helpState.ts` | `You have sent a few messages already. Try again in {}.` | raw-status | Help form notice (HELP_COPY, in-flow banner tone info/success, never red error text); mapped from the mazer_submit_help_request_v1 result by resolveHelpResultNotice; shown only while the Help flag is on (rate_limited; the Contact us email line is always shown with it) |
+| `src/ui/help/helpState.ts` | `Progress saves to this device. Sign in from Profile to keep it across devices.` | static | Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off) |
+| `src/ui/help/helpState.ts` | `Take every shard in order. The next one pulses; the star opens when all are taken.` | static | Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off) (only while shards can appear, the hazard layer) |
+| `src/ui/help/helpState.ts` | `Open the menu and set Sound to On. Your phone silent switch can also mute the game.` | static | Help sheet short answer (view A; options page copy, owner may replace); shown only while the Help flag is on (?lab=help, build default off) |
+
 ## 9. Not verified (UNKNOWN)
 
 - Whether the legacy password submit path (`handleLegacyAuthSubmit`) is reachable in the shipped
@@ -372,6 +396,8 @@ Pure modules, not rendered until the Settings wiring lane lands (`docs/ui/MAZER-
 | `src/legacy-runtime/legacyGuideContent.ts` | `Open edges wrap: walk off one to come back on the far side. Edge stars fill as beams hit.` | static | Guide (How to play) Wrap row copy, also the first-time wrap card body (read from the row, spec R2; once per account in the in-flow notice behind ?lab=firsttime, default off); updated with the game per docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md |
 | `src/legacy-runtime/legacyGuideContent.ts` | `A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.` | static | Guide Switch row copy (MAZER-L10 bleed gate; heading "Switch" per first-time cards D1), also the first-time Switch card body (behind ?lab=firsttime); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `The dot and number at the top left show how many players are online right now.` | static | Guide row copy for the menu online counter (MAZER-UI-024; no longer beside an icon since L6); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Top right: Settings (Dark mode), Guide, Help, Sound, Profile, Leaderboard.` | static | Guide Menu row copy while the Help flag is on (`?lab=help`, build default off; LEGACY_GUIDE_HELP_MENU_ROW replaces the Menu row); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
+| `src/legacy-runtime/legacyGuideContent.ts` | `Help in the Menu has quick answers to common questions and a form to write to us.` | static | Guide Help row copy while the Help flag is on (`?lab=help`, build default off; LEGACY_GUIDE_HELP_ROW, after the In a maze row); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Top right: Settings (Dark mode), Guide, Sound, Profile, Leaderboard.` | static | Guide row copy for the main-menu dropdown button (L6, 2026-11-19; Feedback row named for signed-in players, MAZER-FB-001, 2026-11-24; row removed 2026-11-25, the rating offers itself on main-menu entry from level 50); update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyGuideContent.ts` | `Endless mode: clears show your time and level. Harder mazes add shortcuts and loops.` | static | Guide row copy; update with the game (`docs/ops/MAZER-GUIDE-UPDATE-RULE-2026-11-06.md`) |
 | `src/legacy-runtime/legacyControlHint.ts` | `Touch and drag anywhere to move.` | static | level-1 control hint (MAZER-FLOW-001); one-time, per device, non-blocking DOM line; copy follows the input actually used (touch, mouse, keys) and starts neutral on a computer; same wording as the Guide controls rows |

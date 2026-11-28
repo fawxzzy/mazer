@@ -161,9 +161,16 @@ import {
 import type { LegacyControlHintDeviceFacts } from '../legacy-runtime/legacyControlHint';
 import { isLegacyDesktopPointerDevice, isLegacyPlayLabel, resolveLegacyDesktopPlayLabelCell, resolveLegacyPlayLabel } from '../legacy-runtime/legacyPlayLabel';
 import { drawGuidePauseGlyph } from '../render/guidePauseGlyph';
+import { drawGuideHelpGlyph } from '../render/guideHelpGlyph';
 import { drawGuideSoundGlyph } from '../render/guideSoundGlyph';
 import { paintGuideGlossarySheet, resetGuideGlossarySelection } from '../legacy-runtime/legacyGuideGlossaryPainter';
-import { noteLegacyFirstTimeGuideClosed, resolveLegacyFirstTimeGuideSheetOptions } from '../legacy-runtime/legacyFirstTimeGuideHost';
+import {
+  armLegacyFirstTimeGuideAllTips,
+  isLegacyFirstTimeGuideAllTipsAvailable,
+  noteLegacyFirstTimeGuideClosed,
+  resolveLegacyFirstTimeGuideSheetOptions
+} from '../legacy-runtime/legacyFirstTimeGuideHost';
+import { LEGACY_FIRST_TIME_GUIDE_LABELS } from '../legacy-runtime/legacyFirstTimeGuide';
 import { drawGuideHazardGlyph, resolveGuideHazardAccent } from '../render/guideHazardGlyph';
 import { HazardMomentView } from '../render/hazardMomentRenderer';
 import { ShardPlayPresenter } from '../render/shardPlayPresenter';
@@ -367,6 +374,7 @@ import {
   type LegacyMenuRowId
 } from '../legacy-runtime/legacyMenuRows';
 import { createLegacyFeedbackLauncher } from '../legacy-runtime/legacyFeedbackLauncher';
+import { createLegacyHelpLauncher } from '../legacy-runtime/legacyHelpLauncher';
 import { createLegacyRatingPromptGate, type LegacyRatingPromptStep } from '../legacy-runtime/legacyRatingPrompt';
 import { LegacyMenuDropdownController, type MenuDropdownHost } from '../render/menuDropdownButtons';
 import {
@@ -1993,6 +2001,13 @@ export class MenuScene extends Phaser.Scene {
     isDarkTheme: () => this.darkModeEnabled,
     onClosed: () => { this.uiDirty = true; }
   });
+  // Help screen (MAZER-ONB-001 family, `?lab=help`, build default on in browsers): the Help row after Guide opens a DOM sheet
+  // (loaded on demand) with short answers and the email-first form. While it is open the pause surfaces behind it are
+  // not built, the same as the rating popup.
+  private readonly helpLauncher = createLegacyHelpLauncher({
+    isDarkTheme: () => this.darkModeEnabled,
+    onClosed: () => { this.uiDirty = true; }
+  });
   // MAZER-MODE-002 look D: the game-mode selector is a DOM layer over the dimmed menu canvas (loaded on demand).
   private readonly modeSelectLayer = createLegacyModeSelectLayer({ onUnavailable: () => this.startModeSelectFallback() });
   private readonly ratingPromptGate = createLegacyRatingPromptGate({ storage: () => this.resolveBrowserLocalStorage() });
@@ -2624,6 +2639,8 @@ export class MenuScene extends Phaser.Scene {
     // A restarted scene keeps its fields: re-arm the launcher the previous SHUTDOWN destroyed.
     this.feedbackLauncher.activate();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.feedbackLauncher.destroy());
+    this.helpLauncher.activate();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.helpLauncher.destroy());
     this.modeSelectLayer.activate();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.modeSelectLayer.destroy());
     this.time.delayedCall(1200, () => this.modeSelectLayer.prefetch());
@@ -11937,6 +11954,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.feedbackLauncher.isOpen()) {
       return;
     }
+    if (this.helpLauncher.isOpen()) {
+      return;
+    }
     if (this.isLegacyPlayMenuDropdownView()) {
       this.buildLegacyPlayMenuOverlay();
       return;
@@ -12462,7 +12482,10 @@ export class MenuScene extends Phaser.Scene {
       // Slice H6: met + live hazard kinds while the layer is on; [] (the unchanged sheet) while off.
       hazardKinds: this.resolveHazardOnboarding()?.guideKinds() ?? [],
       // First-time cards slice 4 (?lab=firsttime): hide-until-met rows, "New" pills, foot actions; undefined while off.
-      firstTime: resolveLegacyFirstTimeGuideSheetOptions(this)
+      // With Help on, "All tips" lives in the Help sheet, so the foot keeps only "Show tips again".
+      firstTime: resolveLegacyFirstTimeGuideSheetOptions(this, { allTipsInHelp: this.helpLauncher.isEnabled() }),
+      // Help (?lab=help): the Menu row lists Help and a Help row follows it; the unchanged rows while off.
+      help: this.helpLauncher.isEnabled()
     });
     const card = paintGuideGlossarySheet(this, model);
     this.overlayGuideBounds = createVisualRect(card.left, card.top, card.width, card.height);
@@ -12483,6 +12506,7 @@ export class MenuScene extends Phaser.Scene {
       case 'online-count': return LEGACY_PRESENCE_CHIP_FILL;
       case 'menu-burger': return MENU_DROPDOWN_ACCENT;
       case 'menu-pause': return MENU_DROPDOWN_ACCENT;
+      case 'help-lifebuoy': return MENU_DROPDOWN_ACCENT;
       case 'sound-speaker': return cyberArcadeMaterial.rail.cyan;
       case 'hazard-gate':
       case 'hazard-sentry':
@@ -12649,6 +12673,10 @@ export class MenuScene extends Phaser.Scene {
       case 'menu-pause':
         // The in-maze row: the icon set's pause bars, so it does not repeat the burger the Menu row shows.
         drawGuidePauseGlyph(graphics, centerX, centerY, badgeRadius * 0.9, MENU_DROPDOWN_FOREGROUND);
+        return;
+      case 'help-lifebuoy':
+        // The Menu's Help row icon (lifebuoy), so the Guide and the Menu show the same thing.
+        drawGuideHelpGlyph(graphics, centerX, centerY, badgeRadius * 0.9, MENU_DROPDOWN_FOREGROUND);
         return;
       case 'sound-speaker':
         drawGuideSoundGlyph(graphics, centerX, centerY, badgeRadius * 0.9, accentColor);
@@ -14347,6 +14375,9 @@ export class MenuScene extends Phaser.Scene {
           this.uiDirty = true;
         }
         return;
+      case 'help':
+        this.openLegacyHelp();
+        return;
       case 'sound':
         this.applyOverlayToggleFieldChange('soundEnabled');
         this.uiDirty = true;
@@ -14364,8 +14395,45 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private isLegacyPlayMenuDropdownView(): boolean {
-    return this.mode === 'play' && this.overlay === 'pause' && this.playMenuView === 'menu' && !this.settingsGuideOpen
+    return this.mode === 'play' && this.overlay === 'pause' && this.playMenuView === 'menu' && !this.helpLauncher.isOpen()
+      && !this.settingsGuideOpen
       && !this.feedbackLauncher.isOpen();
+  }
+
+  // Help (MAZER-ONB-001 family): the sheet over whichever menu it came from. "All tips" is offered only while the
+  // first-time Guide hides tips; the shard answer only while shards can appear (the hazard layer is on).
+  private openLegacyHelp(): void {
+    const opened = this.helpLauncher.open({ gameMode: this.mode, level: this.progressionState.tracks.player.level }, {
+      allTipsLabel: isLegacyFirstTimeGuideAllTipsAvailable(this) ? LEGACY_FIRST_TIME_GUIDE_LABELS.allTips : null,
+      includeShards: (this.resolveHazardOnboarding()?.guideKinds() ?? []).includes('shard'),
+      onAllTips: () => this.openLegacyGuideWithAllTips()
+    });
+    if (opened) {
+      this.uiDirty = true;
+    }
+  }
+
+  // Help's "All tips" (moved from the Guide foot): the sheet is already gone; arm every tip, then open the Guide the way
+  // this screen's Guide row does (its Close comes back to the same menu).
+  private openLegacyGuideWithAllTips(): void {
+    armLegacyFirstTimeGuideAllTips(this);
+    if (this.mode === 'play') {
+      if (this.overlay !== 'pause') {
+        return;
+      }
+      this.settingsGuideOpen = true;
+      this.guideOpenedFromMenu = true;
+      this.resetLegacyOverlayScrollState();
+      this.uiDirty = true;
+      return;
+    }
+    this.dispatchUiBridgeCommand({ type: 'NAVIGATE', surface: 'settings' }, () => this.openOverlay('options'));
+    if (this.overlay === 'options') {
+      this.settingsGuideOpen = true;
+      this.guideOpenedFromMenu = true;
+      this.resetLegacyOverlayScrollState();
+      this.uiDirty = true;
+    }
   }
 
   // Rating prompt (Zac, 2026-11-25): on main-menu entry only, signed in, idle menu, from level 50; the decision and the
@@ -14393,7 +14461,8 @@ export class MenuScene extends Phaser.Scene {
     return this.mode === 'menu'
       && this.levelPreviewLevel === null
       && this.overlay === 'none'
-      && !this.menuDropdown.isOpen();
+      && !this.menuDropdown.isOpen()
+      && !this.helpLauncher.isOpen();
   }
 
   private openLegacyFeedback(offer: Extract<LegacyRatingPromptStep, { action: 'offer' }>): void {
@@ -14427,6 +14496,7 @@ export class MenuScene extends Phaser.Scene {
           resetPending: hasPendingLegacyResetRequest(this.pendingResetRequest),
           runCompleted: this.playCompletedAtMs !== null
         }),
+        helpAvailable: this.helpLauncher.isEnabled(),
         soundEnabled: this.settings.soundEnabled
       }),
       panelWidth: LEGACY_PLAY_MENU_PANEL_WIDTH_PX,
@@ -14455,6 +14525,9 @@ export class MenuScene extends Phaser.Scene {
         this.guideOpenedFromMenu = true;
         this.resetLegacyOverlayScrollState();
         this.uiDirty = true;
+        return;
+      case 'help':
+        this.openLegacyHelp();
         return;
       case 'sound':
         this.applyOverlayToggleFieldChange('soundEnabled');
@@ -14498,6 +14571,7 @@ export class MenuScene extends Phaser.Scene {
     // Visual glyph stays 32-40px; the touch target is grown to the 44px floor (legacyHitTarget.ts).
     const hit = resolveLegacyMinHitRect(frame, this.layout);
     const items = buildLegacyMenuRows('main', {
+      helpAvailable: this.helpLauncher.isEnabled(),
       profileAvailable: this.authSnapshot.status !== 'unavailable',
       soundEnabled: this.settings.soundEnabled
     });

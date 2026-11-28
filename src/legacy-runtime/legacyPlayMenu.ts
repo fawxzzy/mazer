@@ -6,6 +6,7 @@
  *
  *   Settings     opens the existing in-game Settings sheet (now only Reduce Motion, Haptics, the floating anchor)
  *   Guide        opens the Guide (moved out of Settings)
+ *   (Help)       only while the Help flag is on (legacyHelpFlag.ts): opens the Help screen; the run stays paused
  *   Sound        tap to toggle; the row shows On / Off and the panel stays open (moved out of Settings)
  *   Reset level  puts you back at this maze's start (the existing reset-player path); two taps after a move
  *   Main menu    leaves the run (moved out of Settings); two taps after a move, as before
@@ -21,6 +22,7 @@
  */
 import type { LegacyMenuDropdownItem } from './legacyMenuDropdown';
 import {
+  LEGACY_HELP_MENU_ROW_ID,
   LEGACY_MENU_RESET_ARMED_LABEL,
   LEGACY_MENU_ROW_LABELS,
   LEGACY_MENU_ROW_PANEL_WIDTH_PX,
@@ -42,13 +44,16 @@ import {
 // same Settings / Guide / Sound rows first. These names are the in-game view of it.
 export { LEGACY_PLAY_MENU_ROW_IDS, type LegacyPlayMenuRowId };
 
+/** Every row the in-game Menu can show: the list plus the flagged Help row (legacyMenuRows.ts). */
+const LEGACY_PLAY_MENU_ALL_ROW_IDS: readonly LegacyPlayMenuRowId[] = [...LEGACY_PLAY_MENU_ROW_IDS, LEGACY_HELP_MENU_ROW_ID];
+
 export const LEGACY_PLAY_MENU_LABELS: Readonly<Record<LegacyPlayMenuRowId, string>> = Object.freeze(
-  Object.fromEntries(LEGACY_PLAY_MENU_ROW_IDS.map((id) => [id, LEGACY_MENU_ROW_LABELS[id]])) as Record<LegacyPlayMenuRowId, string>
+  Object.fromEntries(LEGACY_PLAY_MENU_ALL_ROW_IDS.map((id) => [id, LEGACY_MENU_ROW_LABELS[id]])) as Record<LegacyPlayMenuRowId, string>
 );
 
 /** Names published to visual QA (stable while a row's label changes to its armed text). */
 export const LEGACY_PLAY_MENU_SEMANTIC_ACTIONS: Readonly<Record<LegacyPlayMenuRowId, string>> = Object.freeze(
-  Object.fromEntries(LEGACY_PLAY_MENU_ROW_IDS.map((id) => [id, LEGACY_MENU_ROW_SEMANTIC_ACTIONS[id]])) as Record<LegacyPlayMenuRowId, string>
+  Object.fromEntries(LEGACY_PLAY_MENU_ALL_ROW_IDS.map((id) => [id, LEGACY_MENU_ROW_SEMANTIC_ACTIONS[id]])) as Record<LegacyPlayMenuRowId, string>
 );
 
 /** The closed in-game toggle (the button that replaced the Settings cog). */
@@ -69,6 +74,8 @@ export interface LegacyPlayMenuRowsInput {
   readonly resetAvailable: boolean;
   readonly resetArmed: boolean;
   readonly quitArmed: boolean;
+  /** The Help row right after Guide (the Help flag). Default false. */
+  readonly helpAvailable?: boolean;
 }
 
 export const buildLegacyPlayMenuRows = (
