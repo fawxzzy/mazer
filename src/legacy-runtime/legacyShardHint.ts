@@ -5,6 +5,11 @@
  *
  * Show-once rides the existing hazard exposure record: the shard's intro card IS the hint (`introsShown` marks it), so
  * it shows the first time the player meets shards and never again, and the Guide's Shard row appears from then on.
+ *
+ * With first-time cards on too (`?lab=firsttime`, spec docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md R5), this
+ * hint is absorbed by the registry's `mechanic.locked-gate` card (legacyFirstTimeHost.ts): hazard onboarding returns no
+ * shard intro card, so this notice and its coach mark never show; the card fires on the first shard pickup or locked-star
+ * step instead, and `introsShown: ['shard']` (a player who already had this hint) counts that card as seen.
  * The level shards start at is never written here: it comes from the hazard schedule (HAZARD_INTRO_SCHEDULE entry plus
  * the curve-A lock roll, manifest v2: the first lock level, 102).
  *

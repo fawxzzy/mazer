@@ -282,7 +282,7 @@ export type LegacyGuideHazardKind = 'pulseGate' | 'sentry' | 'hunter' | 'shard';
 
 export type LegacyGuideHazardRowId = 'hazard-gate' | 'hazard-sentry' | 'hazard-hunter' | 'hazard-shard';
 
-/** A Guide row for one hazard kind (slice H6). Its heading and text are also the kind's intro card. */
+/** A Guide row for one hazard kind (slice H6). Its heading and text are also the kind's intro card (or first-time card). */
 export interface LegacyGuideHazardRow extends LegacyGuideRow {
   id: LegacyGuideHazardRowId;
   kind: LegacyGuideHazardKind;
@@ -317,7 +317,11 @@ const hazardBoardIcon = (glyph: LegacyGuideGlyph, boardDraw: LegacyGuideDrawRef,
  * hazard row only while the hazard layer is on (build flag or `?lab=hazards`) AND the player has
  * met that kind AND the kind is live in play (legacyHazardOnboarding.ts decides which), so the
  * flag-off Guide is unchanged. The same heading and text are the kind's one-line intro card, so
- * the card and the Guide cannot disagree. Each claim is pinned to the signed schedule manifest by
+ * the card and the Guide cannot disagree. With first-time cards on too (`?lab=firsttime`), the
+ * Pulse Gate and Shard rows are instead the body of the first-time `mechanic.pulse-gate` and
+ * `mechanic.locked-gate` cards (legacyFirstTimeCards.ts reads them; R2/R5 of
+ * docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md), pinned by
+ * tests/reset/legacy-guide-content-drift.test.ts. Each claim is pinned to the signed schedule manifest by
  * tests/reset/legacy-hazard-onboarding.test.ts.
  */
 export const LEGACY_GUIDE_HAZARD_ROWS: readonly LegacyGuideHazardRow[] = Object.freeze([

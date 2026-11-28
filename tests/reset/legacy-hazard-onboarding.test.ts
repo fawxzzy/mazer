@@ -165,6 +165,37 @@ describe('level moments: intro cards and tier pips', () => {
     expect(moments.tierPip).toBeNull();
   });
 
+  test('R5 (first-time cards on): no intro card for a registry-owned kind, and nothing is marked in introsShown', () => {
+    const shardLevel = record({ stage: 3, introsShown: ['pulseGate', 'sentry', 'hunter'] });
+    const owned = ['pulseGate', 'shard'] as const;
+    // Without the option (cards off): today's cards at L10 (Pulse Gate) and L102 (the first shard lock, manifest v2).
+    expect(resolveHazardLevelMoments({ enabled: true, level: 10, record: record(), saturationLevel: SATURATION }).introCard?.kind)
+      .toBe('pulseGate');
+    expect(resolveHazardLevelMoments({ enabled: true, level: 102, record: shardLevel, saturationLevel: SATURATION }).introCard?.kind)
+      .toBe('shard');
+    // With it: neither card; the allocation (what the maze builds) is the same object shape and first encounter.
+    const gate = resolveHazardLevelMoments({ enabled: true, level: 10, record: record(), saturationLevel: SATURATION, registryOwnedKinds: owned });
+    expect(gate.introCard).toBeNull();
+    expect(gate.tierPip).toBeNull();
+    expect(gate.allocation?.firstEncounter).toBe('pulseGate');
+    const shard = resolveHazardLevelMoments({ enabled: true, level: 102, record: shardLevel, saturationLevel: SATURATION, registryOwnedKinds: owned });
+    expect(shard.introCard).toBeNull();
+    expect(shard.allocation?.firstEncounter).toBe('shard');
+    // A kind the registry does not own keeps its card.
+    expect(resolveHazardLevelMoments({
+      enabled: true, level: 10, record: record(), saturationLevel: SATURATION, registryOwnedKinds: ['shard']
+    }).introCard?.kind).toBe('pulseGate');
+    // Through createHazardOnboarding: nothing written at the intro level, so introsShown keeps meaning "had the old card".
+    const storage = memoryStorage();
+    const live = createHazardOnboarding({ enabled: true, resolveStorage: () => storage, saturationLevel: SATURATION, registryOwnedKinds: owned })!;
+    expect(live.levelStart(10).introCard).toBeNull();
+    expect(storage.data.has(HAZARD_EXPOSURE_STORAGE_KEY)).toBe(false);
+    expect(live.record().introsShown).toEqual([]);
+    // The stage still advances on the clear, so the Guide row appears from then on.
+    live.levelCleared(10);
+    expect(live.guideKinds()).toEqual(['pulseGate']);
+  });
+
   test('tier pips: at the 36/51 tail steps, only for a live unit, never twice, never on an intro', () => {
     const met = record({ stage: 4, introsShown: [...ALL_KINDS] });
     const at = (level: number, rec = met, liveKinds: readonly string[] = ['pulseGate']) => resolveHazardLevelMoments({

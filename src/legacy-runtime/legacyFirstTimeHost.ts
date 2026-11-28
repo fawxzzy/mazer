@@ -19,6 +19,7 @@
  * the heading and the mechanic icon; the coach pill shows the same icon.
  */
 import type Phaser from 'phaser';
+import type { HazardUnitKind } from './legacyHazardOnboarding';
 import { centerOfCell } from '../render/boardTileBake';
 import { DEFAULT_BOARD_TILE_STYLE } from '../render/boardTileStyle';
 import { CoachMarkView } from '../render/coachMarkView';
@@ -46,12 +47,16 @@ import {
 import {
   FIRST_TIME_AUTO_DISMISS_MS,
   FIRST_TIME_COACH_LINGER_MS,
+  LEGACY_FIRST_TIME_LIVE_CARD_IDS,
   type FirstTimeCard,
   type FirstTimeCardId,
+  type FirstTimeCoachTarget,
   type FirstTimeTouchKind
 } from './legacyFirstTimeCards';
+import { resolveFirstTimeCardsEnabled } from './legacyFirstTimeFlag';
 import {
   forgetLegacyFirstTimeSceneSession,
+  LEGACY_FIRST_TIME_HAZARD_KIND,
   resolveLegacyFirstTimeSceneScope,
   resolveLegacyFirstTimeSceneSession
 } from './legacyFirstTimeSceneSession';
@@ -193,6 +198,92 @@ export const isLegacyFirstTimeBackstep = (
 ): boolean => previous !== null && samePoint(previous.to, from) && samePoint(previous.from, to);
 
 /* ------------------------------------------------------------------ */
+/* Hazard cards (slices 7 and 8): shards and Pulse Gates               */
+/* ------------------------------------------------------------------ */
+
+// The card -> hazard kind map and the R5 seen rule live with the shared scene session (legacyFirstTimeSceneSession.ts),
+// which feeds the rule to the one session the card host and the Guide share.
+export { LEGACY_FIRST_TIME_HAZARD_KIND, isLegacyFirstTimeCardSeenByHazardRecord } from './legacyFirstTimeSceneSession';
+
+/**
+ * Pure: the hazard kinds whose intro card hazard onboarding must not show (R5): the live registry cards' kinds while
+ * both the hazard layer and first-time cards are on, else none (so hazard onboarding behaves exactly as before).
+ * The first-time flag is only read when the hazard layer is on.
+ */
+export const resolveLegacyFirstTimeOwnedHazardKinds = (
+  hazardsOn: boolean,
+  cardsOn: () => boolean = resolveFirstTimeCardsEnabled,
+  liveCardIds: readonly FirstTimeCardId[] = LEGACY_FIRST_TIME_LIVE_CARD_IDS
+): readonly HazardUnitKind[] => {
+  if (!hazardsOn || !cardsOn()) return [];
+  return liveCardIds.flatMap((id) => {
+    const kind = LEGACY_FIRST_TIME_HAZARD_KIND[id];
+    return kind === undefined ? [] : [kind];
+  });
+};
+
+/** The shard run facts the host reads (a structural slice of src/render/shardPlayPresenter.ts). */
+export interface LegacyFirstTimeShardView {
+  readonly goalLocked: boolean;
+  untakenShardCell(offset?: number): LegacyPoint | null;
+  /** The shard cards step aside while a first-time card is up or pending (two text cards never stack). */
+  holdNotices?(held: boolean): void;
+}
+
+/** The Pulse Gate facts the host reads (a structural slice of LegacyHazardGateController). */
+export interface LegacyFirstTimeGateView {
+  readonly gateCount: number;
+  readonly mode: string | null;
+  gateX(index: number): number;
+  gateY(index: number): number;
+}
+
+/** What else the board holds on this step (absent while the hazard layer is off). */
+export interface LegacyFirstTimeStepContext {
+  /** Read BEFORE the step's shard arrival is noted (MenuScene calls the hook first). */
+  readonly shards?: LegacyFirstTimeShardView | null;
+  readonly gates?: LegacyFirstTimeGateView | null;
+}
+
+/**
+ * Pure (slice 7): the Shard card's touch on a step to `to`, read before the arrival is noted. Landing on the next
+ * shard is a pickup (the coach rings the shard after it, none after the last); landing on the still-locked star is a
+ * locked-star step (the coach rings the next shard). Null when the star is open or the step touched neither.
+ */
+export const resolveLegacyFirstTimeShardTouch = (
+  shards: LegacyFirstTimeShardView,
+  to: LegacyPoint,
+  goal: LegacyPoint | null | undefined
+): { readonly touch: 'shard-pickup' | 'locked-star-step'; readonly next: LegacyPoint | null } | null => {
+  if (!shards.goalLocked) return null;
+  const next = shards.untakenShardCell(0);
+  if (samePoint(to, next)) return { touch: 'shard-pickup', next: shards.untakenShardCell(1) };
+  if (samePoint(to, goal)) return { touch: 'locked-star-step', next };
+  return null;
+};
+
+/**
+ * Pure (slice 8): the Pulse Gate the player just moved next to (one cell away on a row or column, or onto it), the
+ * nearest when there are several; null off play or when none is that close. A move next to a gate is the touch, so
+ * the card fires before the gate can block the player.
+ */
+export const resolveLegacyFirstTimeAdjacentGate = (gates: LegacyFirstTimeGateView, to: LegacyPoint): LegacyPoint | null => {
+  if (gates.mode !== 'play') return null;
+  let best: LegacyPoint | null = null;
+  let bestDistance = 2;
+  for (let index = 0; index < gates.gateCount; index += 1) {
+    const x = gates.gateX(index);
+    const y = gates.gateY(index);
+    const distance = Math.abs(x - to.x) + Math.abs(y - to.y);
+    if (distance < bestDistance) {
+      best = { x, y };
+      bestDistance = distance;
+    }
+  }
+  return best;
+};
+
+/* ------------------------------------------------------------------ */
 /* Controller: no Phaser, no DOM (the scene binding below feeds it)    */
 /* ------------------------------------------------------------------ */
 
@@ -241,8 +332,14 @@ export interface LegacyFirstTimeCardControllerDeps {
 }
 
 export interface LegacyFirstTimeCardController {
-  /** An accepted play step from `from` to `to` on `level` (the maze object). */
-  step(from: LegacyPoint, to: LegacyPoint, level: object & Pick<LegacyFirstTimeMazeView, 'width' | 'height'>, nowMs: number): void;
+  /** An accepted play step from `from` to `to` on `level` (the maze object); `context` = its shards and Pulse Gates. */
+  step(
+    from: LegacyPoint,
+    to: LegacyPoint,
+    level: object & LegacyFirstTimeMazeView,
+    nowMs: number,
+    context?: LegacyFirstTimeStepContext
+  ): void;
   /** Once per frame. Returns the coach mark to draw, or null. */
   frame(input: LegacyFirstTimeFrameInput): LegacyFirstTimeCoachDraw | null;
   /**
@@ -251,6 +348,8 @@ export interface LegacyFirstTimeCardController {
    */
   queueTouch(kind: FirstTimeTouchKind): void;
   describe(): { activeCardId: FirstTimeCardId | null; pendingCardId: FirstTimeCardId | null; coach: LegacyFirstTimeCoachDraw | null };
+  /** True while a card is on screen or waiting to show (other text cards hold off meanwhile). */
+  busy(): boolean;
   destroy(): void;
 }
 
@@ -408,7 +507,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
   };
 
   return {
-    step: (from, to, current, nowMs) => {
+    step: (from, to, current, nowMs, context) => {
       if (destroyed) return;
       lastNowMs = nowMs;
       const s = ensureSession();
@@ -422,13 +521,30 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
           lingerCoach(nowMs);
         }
       }
+      // Every mechanic this one step touched, with the cell its coach mark rings; the session picks by priority (S1).
       const touches: FirstTimeTouchKind[] = [];
-      if (isLegacyFirstTimeWrapStep(from, to, current)) touches.push('wrap-step');
+      const anchors = new Map<FirstTimeCoachTarget, LegacyPoint | null>();
+      if (isLegacyFirstTimeWrapStep(from, to, current)) {
+        // The wrap card rings the open edge cell the player walked off.
+        touches.push('wrap-step');
+        anchors.set('wrapped-edge-cell', { x: from.x, y: from.y });
+      }
+      // The trail tip has no ring.
       if (isLegacyFirstTimeBackstep(lastStep, from, to)) touches.push('trail-backstep');
       lastStep = { from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y } };
+      const shard = context?.shards ? resolveLegacyFirstTimeShardTouch(context.shards, to, current.goal) : null;
+      if (shard !== null) {
+        // The Shard card (absorbing the shards-lane hint, R5) rings the next untaken shard.
+        touches.push(shard.touch);
+        anchors.set('next-untaken-shard', shard.next);
+      }
+      const gate = context?.gates ? resolveLegacyFirstTimeAdjacentGate(context.gates, to) : null;
+      if (gate !== null) {
+        touches.push('pulse-gate-adjacent');
+        anchors.set('touched-pulse-gate', gate);
+      }
       if (touches.length === 0) return;
-      // The wrap card rings the open edge cell the player walked off; the trail tip has no ring.
-      fire(s, touches, nowMs, (target) => (target === 'wrapped-edge-cell' ? { x: from.x, y: from.y } : null));
+      fire(s, touches, nowMs, (target) => anchors.get(target as FirstTimeCoachTarget) ?? null);
     },
     queueTouch: (kind) => {
       if (!destroyed) queuedTouches.push(kind);
@@ -468,6 +584,7 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
       pendingCardId: pending?.card.id ?? null,
       coach: coach === null ? null : { cardId: coach.cardId, anchor: coach.anchor, label: coach.label }
     }),
+    busy: () => !destroyed && (pending !== null || shownCardId !== null),
     destroy: () => {
       destroyed = true;
       pending = null;
@@ -488,7 +605,8 @@ export const createLegacyFirstTimeCardController = (deps: LegacyFirstTimeCardCon
  */
 export const LEGACY_FIRST_TIME_SCENE_MEMBERS = Object.freeze([
   'maze', 'player', 'mode', 'overlay', 'menuDropdown', 'authSnapshot', 'layout', 'boardZoomContainer', 'boardTileLayer',
-  'boardDynamicGraphics', 'resolveBrowserLocalStorage', 'prefersLegacyReducedMotion', 'applyLegacyUiTextCrispness'
+  'boardDynamicGraphics', 'resolveBrowserLocalStorage', 'prefersLegacyReducedMotion', 'applyLegacyUiTextCrispness',
+  'shards', 'hazardGates', 'hazardOnboarding'
 ] as const);
 
 interface FirstTimeSceneView {
@@ -514,6 +632,10 @@ interface FirstTimeSceneView {
     readonly snappedOrigin: { x: number; y: number } | null;
   } | null;
   readonly boardDynamicGraphics?: Phaser.GameObjects.GameObject | null;
+  /** Hazard layer only (null while it is off): the shard run, the Pulse Gates and the exposure record (R5). */
+  readonly shards?: LegacyFirstTimeShardView | null;
+  readonly hazardGates?: LegacyFirstTimeGateView | null;
+  readonly hazardOnboarding?: { record(): { readonly introsShown: readonly HazardUnitKind[] } } | null;
   resolveBrowserLocalStorage?(): TutorialStorage | undefined;
   prefersLegacyReducedMotion?(): boolean;
   applyLegacyUiTextCrispness?(text: Phaser.GameObjects.Text): Phaser.GameObjects.Text;
@@ -526,7 +648,10 @@ const COACH_ACCENT: Readonly<Partial<Record<FirstTimeCardId, number>>> = Object.
   'mechanic.wrap': phaserMaterialAliases['semantic.info'],
   'mechanic.switch': phaserMaterialAliases['semantic.info'],
   // The goal ring takes the end star's own colour (the goal icon's accent), so it reads as "these stars".
-  'level-1.goal': MECHANIC_ICON_ACCENT.goal
+  'level-1.goal': MECHANIC_ICON_ACCENT.goal,
+  // The hazard cards ring in their icon's accent: the shard gold the shards-lane coach used, the Pulse Gate colour.
+  'mechanic.locked-gate': MECHANIC_ICON_ACCENT['locked-star'],
+  'mechanic.pulse-gate': MECHANIC_ICON_ACCENT['pulse-gate']
 });
 
 interface SceneHost {
@@ -631,6 +756,8 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       mechanicCells: maze === null ? [] : readMechanicCells(maze),
       coachPillRect: coachView.pillRect
     });
+    // One text card at a time: the shard cards (unlock notice) wait while a first-time card is up or pending.
+    view.shards?.holdNotices?.(controller.busy());
     const local = draw === null ? null : resolveCellLocal(view, draw.anchor);
     if (draw === null || local === null || !container) {
       coachView.draw(null);
@@ -652,7 +779,9 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
       minTop: noticeTop,
       viewWidth: layout?.width ?? 0,
       icon: FIRST_TIME_CARD_ICON[draw.cardId],
-      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: view.boardTileLayer?.currentBake?.scale ?? 1 }
+      iconEnv: { boardTileStyle: DEFAULT_BOARD_TILE_STYLE, devicePixelRatio: view.boardTileLayer?.currentBake?.scale ?? 1 },
+      // The pill never sits on the player (a Pulse Gate ring is always one cell from them).
+      avoid: view.player ? cellRect(view.player, TEXT_CARD_MARKER_HALO_OF_TILE) : null
     });
   };
 
@@ -670,7 +799,7 @@ const installSceneHost = (scene: Phaser.Scene): SceneHost | null => {
     step: (from, to) => {
       const maze = view.maze;
       if (!maze || view.mode !== 'play') return;
-      controller.step(from, to, maze, scene.time.now);
+      controller.step(from, to, maze, scene.time.now, { shards: view.shards ?? null, gates: view.hazardGates ?? null });
     },
     queueTouch: (kind) => controller.queueTouch(kind)
   };

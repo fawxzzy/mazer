@@ -21,6 +21,7 @@ import {
   resolveGeometryBudgetWrapRungs
 } from '../../src/legacy-runtime/legacyGeometryBudget';
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
+import { resolveFirstTimeCard } from '../../src/legacy-runtime/legacyFirstTimeCards';
 import { BLEED_GATE_FIRST_LEVEL, isBleedGateLevel } from '../../src/legacy-runtime/legacyBleedGates';
 import { resetLegacyBleedGates, syncLegacyBleedGatePassOver } from '../../src/legacy-runtime/legacyBleedGateState';
 import { GEOMETRY_BUDGET_WRAP_FADE_TO_LEVEL as GATE_WRAP_FADE_TO_LEVEL } from '../../src/legacy-runtime/legacyGeometryBudget';
@@ -299,6 +300,19 @@ describe('guide copy only names things that exist', () => {
     expect(bleedGateRenderer.drawBleedGatePlan).toBeTypeOf('function');
     expect(row('bleed-gate').heading).toBe('Switch');
     expect(row('bleed-gate').text).toMatch(/^A Switch is the pale tile with a dashed ring. Walk onto it to open a hidden wrap.$/);
+  });
+
+  test('Shard and Pulse Gate (first-time cards slices 7 and 8): the hazard rows are the card bodies, word for word', () => {
+    // The card reads its body from the Guide hazard row (spec R2), so a Guide edit is a card edit: pin both together.
+    const hazard = (kind: string) => LEGACY_GUIDE_HAZARD_ROWS.find((entry) => entry.kind === kind)!;
+    const shard = resolveFirstTimeCard('mechanic.locked-gate').notice;
+    expect(shard.heading).toBe(hazard('shard').heading);
+    expect(shard.body).toBe(hazard('shard').text);
+    expect(hazard('shard').text).toBe('Take the shards in order. The star stays locked until you do.');
+    const gate = resolveFirstTimeCard('mechanic.pulse-gate').notice;
+    expect(gate.heading).toBe(hazard('pulseGate').heading);
+    expect(gate.body).toBe(hazard('pulseGate').text);
+    expect(hazard('pulseGate').text).toBe('Gates open and shut on a beat. Wait for the gap, then go through.');
   });
 
   test('Wrap: the ladder really gives some mazes a wrap corridor (never early, fading out to none, never all of a level while it fades)', () => {

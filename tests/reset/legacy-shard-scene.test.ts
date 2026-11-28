@@ -304,4 +304,34 @@ describe('ShardPlayPresenter state (paint layers stubbed)', () => {
     p.frame(frameInput(maze, true));
     expect(log.filter((entry) => entry.startsWith('hidden:'))).toEqual(['hidden:false', 'hidden:true', 'hidden:false']);
   });
+
+  test('first-time Shard card hooks: untakenShardCell walks the order; holdNotices closes and defers the shard notices', () => {
+    const { maze, options } = placed();
+    const { host, log } = fakeNotices();
+    const p = presenter(host);
+    expect(p.untakenShardCell()).toBeNull(); // nothing installed
+    p.install(maze, options);
+    const cells = p.describe().cells;
+    expect(p.untakenShardCell()).toEqual(cells[0]);
+    expect(p.untakenShardCell(1)).toEqual(cells[1] ?? null);
+    expect(p.untakenShardCell(-1)).toBeNull();
+    expect(p.untakenShardCell(cells.length)).toBeNull();
+    p.arrive(cells[0]!, 0);
+    expect(p.untakenShardCell()).toEqual(cells[1] ?? null);
+    // A first-time card is up: the hint waits (no stacking), and an open shard notice is closed.
+    p.requestFirstHint();
+    const closesBefore = log.filter((entry) => entry === 'close:*').length;
+    p.holdNotices(true);
+    p.frame(frameInput(maze, true));
+    expect(host.isOpen(SHARD_HINT_KEYS.first)).toBe(false);
+    expect(log.filter((entry) => entry === 'close:*')).toHaveLength(closesBefore + 1);
+    p.holdNotices(true); // no change, no second close
+    expect(log.filter((entry) => entry === 'close:*')).toHaveLength(closesBefore + 1);
+    p.holdNotices(false);
+    p.frame(frameInput(maze, true));
+    expect(host.isOpen(SHARD_HINT_KEYS.first)).toBe(true);
+    for (const cell of cells.slice(1)) p.arrive(cell, 0);
+    expect(p.goalLocked).toBe(false);
+    expect(p.untakenShardCell()).toBeNull();
+  });
 });

@@ -38,6 +38,11 @@ export interface LegacyFirstTimeSessionOptions {
   /** Auth scope of the record: `user:<id>` or `guest` (resolveLegacyAuthStorageScope). */
   readonly scope: string;
   readonly liveCardIds?: readonly FirstTimeCardId[];
+  /**
+   * Another record that also counts a card as seen (R5): the host passes the hazard exposure record's `introsShown`, so
+   * a player who already had the old shard hint or Pulse Gate intro card never sees that mechanic's card again.
+   */
+  readonly isSeenElsewhere?: (card: FirstTimeCard) => boolean;
   readonly buildDefault?: boolean;
   readonly now?: () => string;
 }
@@ -111,7 +116,8 @@ export const createLegacyFirstTimeSession = (options: LegacyFirstTimeSessionOpti
     startLevel: (nowMs) => applyDismiss(beginFirstTimeLevel(state, nowMs)),
     touch: (touches, nowMs) => {
       const store = getStore();
-      const result = decideFirstTimeTouch(state, { touches, nowMs, liveCardIds, isSeen: (card) => store.isSeen(card.token) });
+      const isSeen = (card: FirstTimeCard): boolean => store.isSeen(card.token) || options.isSeenElsewhere?.(card) === true;
+      const result = decideFirstTimeTouch(state, { touches, nowMs, liveCardIds, isSeen });
       for (const id of result.met) store.markMet(id);
       state = result.state;
       return result.fire;

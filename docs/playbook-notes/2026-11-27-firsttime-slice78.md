@@ -1,0 +1,32 @@
+# 2026-11-27 - First-time cards slices 7 and 8: Shard and Pulse Gate cards (behind ?lab=hazards&lab=firsttime)
+
+- WHAT changed:
+  - `legacyFirstTimeCards.ts`: `mechanic.locked-gate` (Shard) and `mechanic.pulse-gate` join the live card ids. Bodies stay read from the Guide hazard rows (spec R2).
+  - `legacyFirstTimeHost.ts`: two new touches on the step hook.
+    - Shard: the first shard pickup, or the first step onto the locked star. The coach ring goes on the next untaken shard ("Take this next"). There is no ring when the pickup opened the star.
+    - Pulse Gate: the first move one cell from a gate on a row or column (play mode only). The ring goes on that gate ("Wait for the gap").
+    - Pure helpers, all exported: `resolveLegacyFirstTimeShardTouch`, `resolveLegacyFirstTimeAdjacentGate`, `resolveLegacyFirstTimeOwnedHazardKinds`, `isLegacyFirstTimeCardSeenByHazardRecord`.
+    - `busy()` is true while a card is pending or up.
+  - `legacyHazardOnboarding.ts`: new `registryOwnedKinds`. When both labs are on, the HAZ-008 intro card is null for `shard` and `pulseGate`, and it is NOT marked in `introsShown`. Stage, allocation and maze build are unchanged.
+  - `legacyFirstTimeSession.ts`: new `isSeenElsewhere`. The shared scene session (`legacyFirstTimeSceneSession.ts`, which also holds the card-to-hazard-kind map) feeds it the exposure record, so the card host and the Guide use one session that knows the rule, so `introsShown: ['shard']` (a player who already had the old shard hint) counts the Shard card as seen. The same goes for `pulseGate` and the Pulse Gate card.
+  - `shardPlayPresenter.ts`: new `untakenShardCell(offset)` and `holdNotices(held)`. The shard hint and unlock notices close and wait while a first-time card is up or pending, so the two never stack. On a one-shard level the pickup is also the unlock, on the same step.
+  - `coachMarkView.ts`: new optional `avoid` box. The label pill moves to the other side of the ring when it would cover the player. A Pulse Gate ring is always one cell from the player.
+  - `MenuScene.ts`: one-line hook that passes `registryOwnedKinds` to `createHazardOnboarding`.
+- WHY:
+  - Spec docs/design/MAZER-FIRST-TIME-CARDS-SPEC-2026-11-26.md, sections 4, 5 and 9; slices 7 and 8.
+  - R5: one card per mechanic, never twice. The registry card absorbs the shard hint and the HAZ-008 card.
+  - Caps S1 (one per level) and S3 (two per session) hold across all four live cards.
+- Rule: when a registry card owns a hazard kind, the old onboarding path neither shows nor marks it. `introsShown` then keeps one meaning ("had the old card") and can serve as the seen-elsewhere signal.
+- Failure Mode: two `LegacyInFlowNoticeHost` instances (shard presenter, first-time host) do not know about each other. Without `holdNotices` the unlock notice and the Shard card both open on a one-shard pickup.
+- Flag off: with no `?lab=firsttime`, `registryOwnedKinds` is `[]` and the flag is not read while hazards are off. With no `avoid`, the pill places exactly as before. Hazards-only play keeps the HAZ-008 card (real-UI capture).
+- Evidence:
+  - Tests:
+    - `tests/tutorial/first-time-host.test.ts`: touches, cards, rings, once-only, S1/S3, R5 seen
+    - `tests/tutorial/first-time-cards.test.ts`
+    - `tests/reset/legacy-hazard-onboarding.test.ts`: registryOwnedKinds
+    - `tests/reset/legacy-shard-scene.test.ts`: untakenShardCell, holdNotices
+    - `tests/reset/legacy-shard-ui.test.ts`: pill avoid
+    - drift pin in `tests/reset/legacy-guide-content-drift.test.ts`
+    - message inventory routes
+  - Real-UI captures, chromium + webkit at 390x844@3, of the live MenuScene driven by `__MAZER_QA__` moves: L10 Pulse Gate card and ring (pill clear of the player); L102 Shard card on the first pickup and on a first step onto the locked star (ring and "Take this next" on the next shard); hazards-only L10 HAZ-008 card unchanged.
+- Status: source only, not merged, not deployed, nothing checked on a real phone.

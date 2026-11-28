@@ -5,8 +5,10 @@
  *
  * Flag off: the session is inert (store() null) and reads no scene storage; the flag itself is read once per scene.
  */
+import type { HazardUnitKind } from './legacyHazardOnboarding';
 import type { TutorialStorage } from '../tutorial/tutorialAckStore';
 import { resolveLegacyAuthStorageScope } from './legacyAuth';
+import type { FirstTimeCardId } from './legacyFirstTimeCards';
 import { createLegacyFirstTimeSession, type LegacyFirstTimeSession } from './legacyFirstTimeSession';
 import { mergeLegacyFirstTimeGuestRecord } from './legacyFirstTimeStore';
 
@@ -14,7 +16,27 @@ import { mergeLegacyFirstTimeGuestRecord } from './legacyFirstTimeStore';
 export interface LegacyFirstTimeSessionSceneView {
   readonly authSnapshot?: { userId?: string | null } | null;
   resolveBrowserLocalStorage?(): TutorialStorage | undefined;
+  /** The hazard exposure record (auth-scoped); null/absent while the hazard layer is off. */
+  readonly hazardOnboarding?: { record(): { readonly introsShown: readonly HazardUnitKind[] } } | null;
 }
+
+/**
+ * The hazard kind each registry card absorbed (R5, slices 7 and 8): hazard onboarding's own intro card for that kind is
+ * suppressed while cards are on, and the kind in the exposure record's `introsShown` counts the card as seen.
+ */
+export const LEGACY_FIRST_TIME_HAZARD_KIND: Readonly<Partial<Record<FirstTimeCardId, HazardUnitKind>>> = Object.freeze({
+  'mechanic.locked-gate': 'shard',
+  'mechanic.pulse-gate': 'pulseGate'
+});
+
+/** Pure (R5): the old hazard path already introduced this card's mechanic (the shard hint or a Pulse Gate intro card). */
+export const isLegacyFirstTimeCardSeenByHazardRecord = (
+  cardId: FirstTimeCardId,
+  introsShown: readonly HazardUnitKind[] | null | undefined
+): boolean => {
+  const kind = LEGACY_FIRST_TIME_HAZARD_KIND[cardId];
+  return kind !== undefined && introsShown?.includes(kind) === true;
+};
 
 const readWindowSearch = (): string => (typeof window === 'undefined' ? '' : window.location.search);
 const readDeviceStorage = (): TutorialStorage | null => {
@@ -46,7 +68,9 @@ export const resolveLegacyFirstTimeSceneSession = (scene: object): LegacyFirstTi
     search: readWindowSearch(),
     deviceStorage: readDeviceStorage(),
     resolveSceneStorage: () => view.resolveBrowserLocalStorage?.(),
-    scope
+    scope,
+    // R5: the old shard hint / Pulse Gate intro card in the (auth-scoped) hazard exposure record counts as seen.
+    isSeenElsewhere: (card) => isLegacyFirstTimeCardSeenByHazardRecord(card.id, view.hazardOnboarding?.record().introsShown)
   });
   if (session.enabled && !session.preview) {
     const storage = view.resolveBrowserLocalStorage?.();
