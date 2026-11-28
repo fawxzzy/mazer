@@ -4592,11 +4592,21 @@
             "repo": "fawxzzy/mazer",
             "number": 628,
             "mergedSha": "d55da749"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 733,
+            "mergedSha": "70618acd62cde0d124968be590163f6d61d270fc"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 735,
+            "mergedSha": "75e312353dbdb5bd0681402022ecc9230fc552b6"
           }
         ],
         "headless": true,
         "deviceChecked": false,
-        "deployedBuild": "fawxzzy-mazer-pakov2avo"
+        "deployedBuild": "mq816qc0q"
       },
       "blocker": null,
       "verify": [],
@@ -4628,7 +4638,18 @@
       "filesHint": []
     },
     "MAZER-HAZ-011": {
-      "evidence": null,
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 733,
+            "mergedSha": "70618acd62cde0d124968be590163f6d61d270fc"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "mq816qc0q"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,
@@ -5727,6 +5748,49 @@
     },
     "MAZER-DOC-020": {
       "evidence": null,
+      "blocker": null,
+      "verify": [],
+      "lane": null,
+      "filesHint": []
+    },
+    "MAZER-ONB-001": {
+      "evidence": {
+        "prs": [
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 737,
+            "mergedSha": "a49e75f36ee4fda20dd8728d2abceb426de3b470"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 738,
+            "mergedSha": "957c85322f8efb11ae89380dde156f78c2443cb4"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 740,
+            "mergedSha": "eb81b0a07f1d1ce93d23e5d26bcadc7aaef35850"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 741,
+            "mergedSha": "f6b9e4dff564c01e5d3ccacab5b9469e5c18efbe"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 742,
+            "mergedSha": "4e7877085a2a01095b8f5066db1c341bb00b448c"
+          },
+          {
+            "repo": "fawxzzy/mazer",
+            "number": 743,
+            "mergedSha": "ad5c5b764413e6fdc845aaca18ed502f8e66db57"
+          }
+        ],
+        "headless": true,
+        "deviceChecked": false,
+        "deployedBuild": "hpb5fetqa"
+      },
       "blocker": null,
       "verify": [],
       "lane": null,

@@ -4,21 +4,21 @@
   "boardId": "discordos:project-feedback:mazer",
   "owner": "mazer",
   "state": "active",
-  "updatedAt": "2026-11-27T01:04:07.000Z",
+  "updatedAt": "2026-11-28T00:12:35.000Z",
   "provenance": {
     "immutableParent": "182d86a062b74d720c521e7451153d6e51257b19",
     "immutableParentTree": "450915cc55f2949bbfe66bd9c53c0a63eff2783c",
-    "stableIdentityCount": 340,
+    "stableIdentityCount": 341,
     "researchCandidateImportCount": 0,
     "discordosRole": "provenance-and-board-identity-only",
-    "openCardCount": 123,
+    "openCardCount": 124,
     "completedCardCount": 85,
     "deferredCardCount": 24,
     "harvest": "2026-11-10 owner-requested backfill: cards harvested from the owner tracker, final audit ledger, the previous board reconciliation, merged and open pull requests, chat closeouts and project notes; internal-only and unevidenced items were left out.",
     "boardSync": {
-      "at": "2026-11-27T01:04:07.000Z",
-      "appliedEventCount": 562,
-      "lastEventId": "c14f5bd601b0"
+      "at": "2026-11-28T00:12:35.000Z",
+      "appliedEventCount": 572,
+      "lastEventId": "0ef90aa1e1e8"
     },
     "archivedCardCount": 108
   },
@@ -5069,11 +5069,11 @@
     {
       "id": "MAZER-HAZ-009",
       "status": "review",
-      "updatedAt": "2026-11-16T07:54:38.000Z",
+      "updatedAt": "2026-11-27T08:31:33.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-009",
       "title": "Shards core for hazard levels",
-      "description": "Pure solver, locked-star and tail-route target module for the Shards hazard, unwired and behind the hazard lab flag.",
+      "description": "Pure solver, locked-star and tail-route target module for the Shards hazard, unwired and behind the hazard lab flag. Board update 2026-11-27: Shards core now live behind ?lab=hazards via PR 733; flag stays off by default PR #733 merged (70618acd). Deployed: production build mq816qc0q. Checked only in headless Chromium, not on a real phone. Board update 2026-11-27: PR 735 merged: shards place on every level L60-L1000 (was 983 of 3764 failed), headless only, not device-checked, not yet deployed PR #735 merged (75e31235). Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
@@ -5119,12 +5119,12 @@
     },
     {
       "id": "MAZER-HAZ-011",
-      "status": "planning",
-      "updatedAt": "2026-11-16T14:26:23.000Z",
+      "status": "review",
+      "updatedAt": "2026-11-27T07:06:16.000Z",
       "sourceId": "mazer-owner-work-registry",
       "sourceRef": "config/mazer-owner-work-registry.json#MAZER-HAZ-011",
       "title": "Wire Shards and Hunter into play behind the lab flag",
-      "description": "H5 Hunter and H8 Shards cores are merged but not called by play. Wire them behind ?lab=hazards after Zac's phone sign-off of Pulse Gate, with Shards from level 291 as recommended for the placement contract.",
+      "description": "H5 Hunter and H8 Shards cores are merged but not called by play. Wire them behind ?lab=hazards after Zac's phone sign-off of Pulse Gate, with Shards from level 291 as recommended for the placement contract. Board update 2026-11-27: Shards UI v1 live behind ?lab=hazards: HUD chip, caged star, unlock burst, first hint PR #733 merged (70618acd). Deployed: production build mq816qc0q. Checked only in headless Chromium, not on a real phone.",
       "cardType": "feature",
       "priority": "low",
       "dependencies": [],
@@ -6164,6 +6164,23 @@
         "Both rank passages state the removal and cite PR 722",
         "Leaderboard positions are still described",
         "Docs checks pass"
+      ]
+    },
+    {
+      "id": "MAZER-ONB-001",
+      "status": "review",
+      "updatedAt": "2026-11-28T00:12:35.000Z",
+      "sourceId": "mazer-owner-work-registry",
+      "sourceRef": "config/mazer-owner-work-registry.json#MAZER-ONB-001",
+      "title": "First-time cards for every mechanic",
+      "description": "One card per mechanic on first interaction (Wrap, Switch, Shard, Pulse Gate, level-1 tips), themed text skin, Guide rows hidden until met, All tips and Show tips again. Behind ?lab=firsttime. Board update 2026-11-28: PR 742 merged: Guide rows hidden until met with New pill, All tips and Show tips again, level-1 hint as neon card with Reach these coach and trail tip; flag firsttime; headless only PR #742 merged (4e787708). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-28: PR 743 merged: Shard and Pulse Gate first-time cards behind hazards plus firsttime flags, old hint and intro suppressed while cards on; headless only PR #743 merged (ad5c5b76). Merged, not deployed. Checked only in headless Chromium, not on a real phone. Board update 2026-11-28: Deployed first-time cards batch PRs 735 737 738 740 741 742 743 live on mazer.fawxzzy.com, features behind lab flags, headless only Deployed: production build hpb5fetqa. Checked only in headless Chromium, not on a real phone.",
+      "cardType": "feature",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptanceCriteria": [
+        "Each mechanic card fires once on first interaction, caps 1 per level and 2 per session",
+        "Cards never cover the player, goal or active wrap",
+        "Flag off draws nothing and previews write nothing"
       ]
     }
   ]
