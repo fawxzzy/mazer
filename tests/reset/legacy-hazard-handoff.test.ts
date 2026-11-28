@@ -19,8 +19,8 @@ const listSource = (directory: string): string[] => readdirSync(directory).flatM
 });
 
 describe('Phase 2 hazard hand-off stays dormant', () => {
-  test('the build default is a literal false (no lab switch set) and the registry is frozen and off', () => {
-    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+  test('the build default is on (H9) but the bare call is false outside a browser, and the dormant registry is frozen and off', () => {
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(true);
     expect(resolveHazardLayerEnabled()).toBe(false);
     expect(LEGACY_PHASE2_FEATURE_REGISTRY.hazards.enabled).toBe(false);
     expect(LEGACY_PHASE2_FEATURE_REGISTRY.hazards.status).toBe('dormant-awaiting-product-contract');
