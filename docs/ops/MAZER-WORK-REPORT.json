@@ -3,25 +3,25 @@
   "generatedFrom": {
     "registry": "config/mazer-owner-work-registry.json",
     "ledger": "config/mazer-work-ledger.json",
-    "registryUpdatedAt": "2026-11-27T01:04:07.000Z",
+    "registryUpdatedAt": "2026-11-28T00:12:35.000Z",
     "boardSync": {
-      "at": "2026-11-27T01:04:07.000Z",
-      "appliedEventCount": 562,
-      "lastEventId": "c14f5bd601b0"
+      "at": "2026-11-28T00:12:35.000Z",
+      "appliedEventCount": 572,
+      "lastEventId": "0ef90aa1e1e8"
     }
   },
   "counters": {
-    "total": 340,
-    "open": 123,
+    "total": 341,
+    "open": 124,
     "completed": 193,
     "deferred": 24,
     "buckets": {
       "needs-you": 32,
-      "in-review": 70,
+      "in-review": 72,
       "blocked": 8,
       "ready": 1,
       "in-progress": 1,
-      "unclassified": 11,
+      "unclassified": 10,
       "deferred": 24,
       "completed": 193
     },
@@ -3184,6 +3184,14 @@
       "note": "Merged and deployed; kept in review for the open crossfade criterion (MAZER-MOTION-005) and the two judgement calls. Headless only."
     },
     {
+      "id": "MAZER-ONB-001",
+      "title": "First-time cards for every mechanic",
+      "status": "review",
+      "priority": "medium",
+      "prs": "#737, #738, #740, #741, #742, #743",
+      "note": ""
+    },
+    {
       "id": "MAZER-PERF-012",
       "title": "Cheaper menu: no backdrop fill and slower star redraw",
       "status": "review",
@@ -3380,7 +3388,15 @@
       "title": "Shards core for hazard levels",
       "status": "review",
       "priority": "low",
-      "prs": "#628",
+      "prs": "#628, #733, #735",
+      "note": ""
+    },
+    {
+      "id": "MAZER-HAZ-011",
+      "title": "Wire Shards and Hunter into play behind the lab flag",
+      "status": "review",
+      "priority": "low",
+      "prs": "#733",
       "note": ""
     },
     {
@@ -3786,13 +3802,6 @@
     {
       "id": "MAZER-HAZ-010",
       "title": "Unify H4 and H5 rewind into one path",
-      "status": "planning",
-      "priority": "low",
-      "lane": null
-    },
-    {
-      "id": "MAZER-HAZ-011",
-      "title": "Wire Shards and Hunter into play behind the lab flag",
       "status": "planning",
       "priority": "low",
       "lane": null
@@ -4944,7 +4953,7 @@
       "sub": null
     },
     "MAZER-HAZ-011": {
-      "bucket": "unclassified",
+      "bucket": "in-review",
       "sub": null
     },
     "MAZER-FLOW-019": {
@@ -5185,6 +5194,10 @@
     },
     "MAZER-DOC-020": {
       "bucket": "unclassified",
+      "sub": null
+    },
+    "MAZER-ONB-001": {
+      "bucket": "in-review",
       "sub": null
     }
   }
