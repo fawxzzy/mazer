@@ -16,3 +16,5 @@
   - Real browser (chromium + webkit, 390x844 and 412x915) with `?lab=help` and the dev fixture: answers, form, sent, limited (Contact us shown), failed, dark mode, Help from the in-game Menu (Level Preview), the Guide's Help tile, and flag off (no Help row in either Menu). Nothing was sent to production.
 - Failure Mode (found in the review-fix loop): a status banner with its own "Try again" button squeezed the failure message into a one-word column at 390px. Fix: the banner carries no button; after a failed or offline send the Send button itself reads "Try again" (pinned in `tests/ui/help-state.test.ts`).
 - Status: source only, flag off by default, not merged, not deployed, nothing checked on a real phone.
+
+- Update 2026-11-28 (coordinator): `HELP_SCREEN_BUILD_DEFAULT` flipped to true in this PR on Zac's order to turn everything on ("turn this shit on"). Browser only (no `window` stays off); `?lab=off` forces it off for that load. Not phone-checked.

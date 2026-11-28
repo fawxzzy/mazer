@@ -1,6 +1,6 @@
 // Help screen flag (MAZER-ONB-001 family, Help client UI). Same shape as legacyFirstTimeFlag.ts.
 //
-// The Help row is on when EITHER the build constant says so (default false; the coordinator flips it after review)
+// The Help row is on when EITHER the build constant says so (default true since 2026-11-28, browser only)
 // OR the lab switch is on. The lab switch is `?lab=help`, remembered in localStorage (`mazer.lab.help.v1`) so the
 // installed app keeps it; `?lab=off` clears it (the same word that clears the other labs). Labs can ride one URL as
 // repeated params: `?lab=firsttime&lab=help`.
@@ -8,7 +8,7 @@
 // Level Preview (`?previewLevel=N`) writes nothing to the device: on a preview route the query is honoured for this
 // load but the switch is never remembered or cleared.
 //
-// With the flag off nothing changes: no Help row in either Menu, the Guide keeps today's Menu line and its foot keeps
+// With the flag off (`?lab=off`, or node) nothing changes: no Help row in either Menu, the Guide keeps today's Menu line and its foot keeps
 // "All tips". The only key this module ever reads is its own lab key.
 //
 // Pure: no Phaser, no DOM globals. Every storage access is inside try/catch: a failure just means "not remembered",
@@ -17,7 +17,7 @@
 import { isLegacyLevelPreviewRoute } from './legacyLevelPreview';
 
 /** The build default. A literal `false` type: flipping it is a deliberate source change. */
-export const HELP_SCREEN_BUILD_DEFAULT = false as const;
+export const HELP_SCREEN_BUILD_DEFAULT = true as const;
 
 export const HELP_LAB_QUERY_PARAM = 'lab';
 export const HELP_LAB_QUERY_ON = 'help';
@@ -87,7 +87,8 @@ const writeStoredLab = (storage: HelpScreenResolveOptions['storage'], on: boolea
 
 /** Full resolution. Remembers the lab switch when the URL asks, except on a Level Preview route. */
 export const resolveHelpScreenState = (options: HelpScreenResolveOptions = {}): HelpScreenState => {
-  const buildDefault = options.buildDefault ?? HELP_SCREEN_BUILD_DEFAULT;
+  // On in a browser build by default (2026-11-28, owner's say-so); with no `window` (node) it stays off.
+  const buildDefault = options.buildDefault ?? (typeof window !== 'undefined' ? HELP_SCREEN_BUILD_DEFAULT : false);
   const params = toSearchParams(options.search);
   const preview = isLegacyLevelPreviewRoute(params);
   const labValues = params.getAll(HELP_LAB_QUERY_PARAM);
@@ -101,7 +102,8 @@ export const resolveHelpScreenState = (options: HelpScreenResolveOptions = {}): 
   } else {
     labOn = readStoredLab(options.storage);
   }
-  const source: HelpScreenSource = buildDefault ? 'build' : (labOn ? 'lab' : 'off');
+  const forcedOff = labValues.includes(HELP_LAB_QUERY_OFF);
+  const source: HelpScreenSource = forcedOff ? 'off' : (buildDefault ? 'build' : (labOn ? 'lab' : 'off'));
   return { enabled: source !== 'off', source, preview };
 };
 

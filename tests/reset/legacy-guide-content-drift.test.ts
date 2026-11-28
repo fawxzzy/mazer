@@ -534,8 +534,8 @@ describe('the scene paints exactly what the guide data declares', () => {
 describe('Help rows (MAZER-ONB-001 family, only while the Help flag is on)', () => {
   const withHelp = buildLegacyGuideSheetModel('menu', { help: true }).rows;
 
-  test('flag off: the sheet is exactly the unchanged rows (the build default is off)', () => {
-    expect(HELP_SCREEN_BUILD_DEFAULT).toBe(false);
+  test('flag off: the sheet is exactly the unchanged rows (the build default is on in browsers, off in node)', () => {
+    expect(HELP_SCREEN_BUILD_DEFAULT).toBe(true);
     expect(buildLegacyGuideSheetModel('menu').rows).toBe(LEGACY_GUIDE_ROWS);
     expect(buildLegacyGuideSheetModel('pause', { help: false }).rows).toBe(LEGACY_GUIDE_ROWS);
     expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'help')).toBe(false);

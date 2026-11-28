@@ -31,8 +31,8 @@ const memoryStorage = (initial: Record<string, string> = {}): HelpFlagStorage & 
 };
 
 describe('help flag', () => {
-  it('the build default is a literal false, so the shipped build shows no Help row', () => {
-    expect(HELP_SCREEN_BUILD_DEFAULT).toBe(false);
+  it('the build default is on (2026-11-28) but node with no window resolves off', () => {
+    expect(HELP_SCREEN_BUILD_DEFAULT).toBe(true);
     expect(resolveHelpScreenEnabled({})).toBe(false);
     expect(resolveHelpScreenEnabled()).toBe(false);
   });
