@@ -11,7 +11,7 @@
  *   in a game   + Reset level, Main menu                       (the dropdown IS the pause: its X is Resume)
  *
  * Help (MAZER-ONB-001 family, Zac's placement pick A, 2026-11-26): while the Help flag is on (legacyHelpFlag.ts,
- * `?lab=help`, build default off) BOTH screens show a Help row right after Guide. It is kept out of the const lists
+ * `?lab=help`, build default on in browsers) BOTH screens show a Help row right after Guide. It is kept out of the const lists
  * below on purpose, so with the flag off every list, label set and order is exactly as before.
  *
  * Play-only rules (reset availability, two-tap arming, back steps) live in legacyPlayMenu.ts.

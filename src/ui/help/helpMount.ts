@@ -78,7 +78,10 @@ export const mountHelpPopup = (options: HelpMountOptions): HelpMountHandle => {
       close();
       options.onAllTips?.();
     },
-    onClose: close,
+    // Close is ignored while a send is in flight, so a player never reopens and sends the same message twice.
+    onClose: () => {
+      if (popup.getDraft().phase !== 'sending') close();
+    },
     onSubmit: (draft) => {
       void options.submit(draft).then(
         (result) => result,
@@ -90,7 +93,12 @@ export const mountHelpPopup = (options: HelpMountOptions): HelpMountHandle => {
     }
   }, doc);
 
-  installFeedbackKeyIsolation(scrim, { onEscape: close, onTab: (event) => {
+  // Escape never throws away a typed draft or a send in flight (same rule as a backdrop tap); the Close button still works.
+  installFeedbackKeyIsolation(scrim, { onEscape: () => {
+    const draft = popup.getDraft();
+    const typed = draft.email.trim().length > 0 || draft.message.trim().length > 0;
+    if (draft.phase !== 'sending' && !typed) close();
+  }, onTab: (event) => {
     const items = Array.from(popup.root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isVisible);
     if (items.length === 0) return;
     const first = items[0];

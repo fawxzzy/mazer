@@ -16,7 +16,7 @@
 
 import { isLegacyLevelPreviewRoute } from './legacyLevelPreview';
 
-/** The build default. A literal `false` type: flipping it is a deliberate source change. */
+/** The build default. A literal `true` type: flipping it is a deliberate source change. */
 export const HELP_SCREEN_BUILD_DEFAULT = true as const;
 
 export const HELP_LAB_QUERY_PARAM = 'lab';
@@ -109,7 +109,7 @@ export const resolveHelpScreenState = (options: HelpScreenResolveOptions = {}): 
 
 /**
  * Is the Help screen on? With no options it reads the real `window.location.search` and `window.localStorage` when
- * they exist (guarded), and is `false` in node and in every build where the lab switch was never set.
+ * they exist (guarded), and is `false` in node, and `true` in a browser unless `?lab=off`.
  */
 export const resolveHelpScreenEnabled = (options?: HelpScreenResolveOptions): boolean => {
   if (options !== undefined) {

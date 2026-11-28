@@ -2001,7 +2001,7 @@ export class MenuScene extends Phaser.Scene {
     isDarkTheme: () => this.darkModeEnabled,
     onClosed: () => { this.uiDirty = true; }
   });
-  // Help screen (MAZER-ONB-001 family, `?lab=help`, build default off): the Help row after Guide opens a DOM sheet
+  // Help screen (MAZER-ONB-001 family, `?lab=help`, build default on in browsers): the Help row after Guide opens a DOM sheet
   // (loaded on demand) with short answers and the email-first form. While it is open the pause surfaces behind it are
   // not built, the same as the rating popup.
   private readonly helpLauncher = createLegacyHelpLauncher({

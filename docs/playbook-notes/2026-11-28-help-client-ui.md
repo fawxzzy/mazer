@@ -1,9 +1,9 @@
-# 2026-11-28 - Help screen client UI (placement A, short answers + Contact us, email-first form), behind `?lab=help`
+# 2026-11-28 - Help screen client UI (placement A, short answers + Contact us, email-first form), on by default since 2026-11-28 (`?lab=off` per-load kill; was behind `?lab=help`)
 
 - WHAT changed:
   - New Help sheet in the real app (`src/ui/help/`: `helpState.ts` pure rules and copy, `helpPopup.ts` kit DOM, `helpMount.ts` scrim + focus, `help.css` neon edge skin). It loads on demand through `src/legacy-runtime/legacyHelpLauncher.ts` (dynamic import, nothing joins the boot bundle).
   - Send path `src/legacy-runtime/legacyHelpSubmit.ts`: the live RPC `mazer_submit_help_request_v1` on the shared client, signed in or not (anon key without a session). Every answer maps to one calm in-flow notice; `rate_limited` ALWAYS adds "You can also email us:" with fawxzzy@gmail.com (Zac approved 2026-11-28). Dev fixture: `?runtimeDiagnostics=1&helpFixture=saved|limited|failed|offline|bad_email|too_long` (never reaches the network).
-  - Flag `src/legacy-runtime/legacyHelpFlag.ts` (same shape as `legacyFirstTimeFlag.ts`): `HELP_SCREEN_BUILD_DEFAULT = false`, `?lab=help` remembered as `mazer.lab.help.v1`, `?lab=off` clears it, Level Preview writes nothing.
+  - Flag `src/legacy-runtime/legacyHelpFlag.ts` (same shape as `legacyFirstTimeFlag.ts`): `HELP_SCREEN_BUILD_DEFAULT = true` (flipped 2026-11-28; was false when built), `?lab=help` remembered as `mazer.lab.help.v1`, `?lab=off` clears it, Level Preview writes nothing.
   - Menu: a "Help" row (lifebuoy icon) right after Guide. The row model is shared (`legacyMenuRows.ts`), so it is in BOTH Menus (main menu and in a game). Flag off: every row list is exactly as before.
   - Guide: with the flag on, the Menu row names Help after Guide and a Help row (guide-local lifebuoy, `src/render/guideHelpGlyph.ts`) follows "In a maze". The first-time Guide foot's "All tips" moves into Help (shown only while tips are hidden); "Show tips again" stays at the Guide foot.
   - Message inventory: `src/ui/help` is a scan directory of `tests/reset/legacy-player-message-inventory.test.ts`; Help copy pinned there and in `docs/ops/MAZER-PLAYER-MESSAGE-INVENTORY-2026-11-05.md` section 4f.

@@ -3,7 +3,7 @@
  * scene hands in what it knows (level, mode, whether "All tips" has anything to show) and callbacks.
  *
  * Help is for every player, signed in or not (the RPC takes the anon key too), so there is no auth gate here. The row
- * only exists while the Help flag is on (legacyHelpFlag.ts: `?lab=help`, build default off); isEnabled() answers that
+ * only exists while the Help flag is on (legacyHelpFlag.ts: `?lab=help`, build default on in browsers); isEnabled() answers that
  * once per scene life. The sheet, its CSS and the kit load on demand (a dynamic import): nothing joins the boot bundle.
  */
 import { buildHelpPayload, type HelpDraft, type HelpSubmitResult } from '../ui/help/helpState';

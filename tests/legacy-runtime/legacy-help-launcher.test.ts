@@ -147,4 +147,10 @@ describe('help stays out of the boot bundle (source pins)', () => {
   it('Help is open to every player: no auth gate in the launcher', () => {
     expect(launcher).not.toMatch(/getAuthSnapshot|authenticated/);
   });
+
+  it('Close and Escape never end a send in flight, and Escape never drops a typed draft (no duplicate rows)', () => {
+    const mount = read('src/ui/help/helpMount.ts');
+    expect(mount).toContain("if (popup.getDraft().phase !== 'sending') close();");
+    expect(mount).toMatch(/onEscape: \(\) => \{[\s\S]*?draft\.phase !== 'sending' && !typed\) close\(\);/);
+  });
 });
