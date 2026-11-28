@@ -6,6 +6,9 @@ import { resolveHumanKeyboardActionKind } from '../../src/input-human/keyboard';
 import {
   LEGACY_GUIDE_CLOSE_LABEL,
   LEGACY_GUIDE_HAZARD_ROWS,
+  LEGACY_GUIDE_HELP_MENU_ROW,
+  LEGACY_GUIDE_HELP_ROW,
+  LEGACY_GUIDE_ROWS_WITH_HELP,
   LEGACY_GUIDE_KEY_BINDINGS,
   LEGACY_GUIDE_PENDING_ROWS,
   LEGACY_GUIDE_ROWS,
@@ -39,6 +42,8 @@ import * as boardTileBake from '../../src/render/boardTileBake';
 import * as edgeMarkers from '../../src/render/edgeMarkers';
 import * as menuDropdownArt from '../../src/render/menuDropdownArt';
 import { LEGACY_MENU_DROPDOWN_ITEMS } from '../../src/legacy-runtime/legacyMenuDropdown';
+import { buildLegacyMenuRows } from '../../src/legacy-runtime/legacyMenuRows';
+import { HELP_SCREEN_BUILD_DEFAULT } from '../../src/legacy-runtime/legacyHelpFlag';
 import { LEGACY_PLAY_MENU_LABELS, LEGACY_PLAY_MENU_ROW_IDS } from '../../src/legacy-runtime/legacyPlayMenu';
 import * as sparkPlayerSkin from '../../src/render/sparkPlayerSkin';
 
@@ -453,7 +458,8 @@ describe('the scene paints exactly what the guide data declares', () => {
     const drawn = [...icon.matchAll(/case '([a-z-]+)':/g)].map((m) => m[1]).sort();
     // Slice H6: the hazard rows (shown only while the hazard layer is on) are drawn by the same method.
     // Every row has its own glyph (the Menu and In a maze rows no longer share the burger); the set is deduplicated anyway.
-    const declared = [...new Set([...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph))].sort();
+    // The Help row (shown only while the Help flag is on) is drawn by the same method.
+    const declared = [...new Set([...LEGACY_GUIDE_ROWS_WITH_HELP, ...LEGACY_GUIDE_HAZARD_ROWS].map((r) => r.icon.glyph))].sort();
     expect(drawn).toEqual(declared);
   });
 
@@ -500,7 +506,7 @@ describe('the scene paints exactly what the guide data declares', () => {
   test('the scene holds no guide copy of its own: rows come from the data, headings and text both', () => {
     const guide = method('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
     const painter = read('src/legacy-runtime/legacyGuideGlossaryPainter.ts');
-    for (const r of [...LEGACY_GUIDE_ROWS, ...LEGACY_GUIDE_HAZARD_ROWS]) {
+    for (const r of [...LEGACY_GUIDE_ROWS_WITH_HELP, ...LEGACY_GUIDE_HAZARD_ROWS]) {
       expect(MENU_SCENE, r.id).not.toContain(r.text);
       expect(guide).not.toContain(`'${r.heading}'`);
     }
@@ -522,6 +528,70 @@ describe('the scene paints exactly what the guide data declares', () => {
     expect(MENU_SCENE).not.toContain('createLegacyOptionsGuideHeaderButton');
     expect(MENU_SCENE).not.toContain('overlayGuideExpanded');
     expect(MENU_SCENE).not.toMatch(/'begin at gold'|'reach the star'|'touch and drag anywhere'/);
+  });
+});
+
+describe('Help rows (MAZER-ONB-001 family, only while the Help flag is on)', () => {
+  const withHelp = buildLegacyGuideSheetModel('menu', { help: true }).rows;
+
+  test('flag off: the sheet is exactly the unchanged rows (the build default is off)', () => {
+    expect(HELP_SCREEN_BUILD_DEFAULT).toBe(false);
+    expect(buildLegacyGuideSheetModel('menu').rows).toBe(LEGACY_GUIDE_ROWS);
+    expect(buildLegacyGuideSheetModel('pause', { help: false }).rows).toBe(LEGACY_GUIDE_ROWS);
+    expect(LEGACY_GUIDE_ROWS.some((r) => r.id === 'help')).toBe(false);
+    expect(row('menu').text).not.toMatch(/\bhelp\b/i);
+  });
+
+  test('flag on: the Menu row names Help and a Help row follows "In a maze"; nothing else moves', () => {
+    expect(withHelp.map((r) => r.id)).toEqual(['goal', 'start', 'you', 'move', 'trail', 'wrap', 'bleed-gate', 'levels', 'online', 'menu', 'menu-play', 'help', 'sound']);
+    expect(withHelp.find((r) => r.id === 'menu')).toBe(LEGACY_GUIDE_HELP_MENU_ROW);
+    expect(withHelp.find((r) => r.id === 'help')).toBe(LEGACY_GUIDE_HELP_ROW);
+    expect(buildLegacyGuideSheetModel('pause', { help: true }).rows).toBe(withHelp);
+    for (const r of withHelp.filter((r) => r.id !== 'menu' && r.id !== 'help')) {
+      expect(r, r.id).toBe(row(r.id));
+    }
+    // The hazard rows still come last while both layers are on.
+    const both = buildLegacyGuideSheetModel('menu', { hazardKinds: ['shard'], help: true }).rows;
+    expect(both.slice(0, withHelp.length)).toEqual(withHelp);
+    expect(both.at(-1)?.id).toBe('hazard-shard');
+  });
+
+  test('the Help Menu row names every row the main Menu shows with Help on, in the same words, and keeps Dark mode', () => {
+    const items = buildLegacyMenuRows('main', { helpAvailable: true, soundEnabled: true });
+    expect(items.map((item) => item.id)).toContain('help');
+    for (const item of items) {
+      expect(LEGACY_GUIDE_HELP_MENU_ROW.text, item.id).toContain(item.label);
+    }
+    expect(LEGACY_GUIDE_HELP_MENU_ROW.text).toMatch(/Settings \(Dark mode\)/);
+    expect(LEGACY_GUIDE_HELP_MENU_ROW.text).toMatch(/top right/i);
+    // Help sits right after Guide in the copy, as in the Menu (placement A).
+    expect(LEGACY_GUIDE_HELP_MENU_ROW.text).toContain('Guide, Help,');
+  });
+
+  test('the Help copy keeps the caps and the Guide vocabulary rules (no Close, no rank, no Feedback)', () => {
+    for (const r of [LEGACY_GUIDE_HELP_MENU_ROW, LEGACY_GUIDE_HELP_ROW]) {
+      expect(r.heading.length, r.id).toBeLessThanOrEqual(12);
+      expect(r.text.length, r.id).toBeLessThanOrEqual(90);
+      expect(r.text, r.id).not.toMatch(/close|rank|feedback|teleport|skill|\bexit\b|compass|\bgold\b/i);
+    }
+    // The row says what the sheet really has: short answers and a form (helpState.ts copy).
+    expect(LEGACY_GUIDE_HELP_ROW.text).toMatch(/Menu/);
+    expect(LEGACY_GUIDE_HELP_ROW.text).toMatch(/answers/);
+    expect(LEGACY_GUIDE_HELP_ROW.text).toMatch(/form/);
+  });
+
+  test('the Help icon is guide-local and draws the Menu row icon (lifebuoy) through guideHelpGlyph.ts', () => {
+    expect(LEGACY_GUIDE_HELP_ROW.icon.status).toBe('guide-local');
+    expect(LEGACY_GUIDE_HELP_ROW.icon.glyph).toBe('help-lifebuoy');
+    const glyph = read('src/render/guideHelpGlyph.ts');
+    expect(glyph).toContain("drawButtonIconGraphics(graphics, 'lifebuoy',");
+    expect(MENU_SCENE).toMatch(/case 'help-lifebuoy':\n\s+\/\/[^\n]*\n\s+drawGuideHelpGlyph\(/);
+  });
+
+  test('the scene feeds the flag to the Guide model, and "All tips" moves to Help with it', () => {
+    const guide = sceneMethod('private buildLegacyGuideSheetOverlay(context: LegacySettingsContext): void');
+    expect(guide).toContain('help: this.helpLauncher.isEnabled()');
+    expect(guide).toContain('resolveLegacyFirstTimeGuideSheetOptions(this, { allTipsInHelp: this.helpLauncher.isEnabled() })');
   });
 });
 

@@ -16,6 +16,7 @@ import {
  *   Profile      profile   (baked HUD texture; main menu only)
  *   Leaderboard  leaderboard (baked HUD texture; main menu only)
  *   Guide        guide     (Graphics)
+ *   Help         lifebuoy  (Graphics; both screens, only while the Help flag is on)
  *   Sound        soundOn / soundOff by the current setting (Graphics; Sound off has no spark, per the set)
  *   Reset level  reset     (Graphics; in-game only)
  *   Main menu    home      (Graphics; in-game only)
@@ -33,6 +34,7 @@ export type MenuRowIconSource =
 
 export const MENU_ROW_ICON_SOURCES: Readonly<Record<LegacyMenuRowId, MenuRowIconSource>> = Object.freeze({
   guide: { iconId: 'guide', kind: 'vector' },
+  help: { iconId: 'lifebuoy', kind: 'vector' },
   leaderboard: { hudIcon: 'leaderboard', kind: 'hud' },
   'main-menu': { iconId: 'home', kind: 'vector' },
   profile: { hudIcon: 'profile', kind: 'hud' },

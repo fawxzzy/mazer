@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LEGACY_FIRST_TIME_CARDS } from '../../src/legacy-runtime/legacyFirstTimeCards';
 import { LEGACY_FIRST_TIME_GUIDE_LABELS } from '../../src/legacy-runtime/legacyFirstTimeGuide';
 import {
+  armLegacyFirstTimeGuideAllTips,
+  isLegacyFirstTimeGuideAllTipsAvailable,
   noteLegacyFirstTimeGuideClosed,
   resolveLegacyFirstTimeGuideFootActions,
   resolveLegacyFirstTimeGuideSheetOptions,
@@ -131,5 +133,52 @@ describe('first-time Guide (slice 4)', () => {
     expect(resolveLegacyFirstTimeGuideFootActions(0).map((action) => action.label)).toEqual([LEGACY_FIRST_TIME_GUIDE_LABELS.showTipsAgain]);
     expect(resolveLegacyFirstTimeGuideFootActions(2).map((action) => action.label))
       .toEqual([LEGACY_FIRST_TIME_GUIDE_LABELS.allTips, LEGACY_FIRST_TIME_GUIDE_LABELS.showTipsAgain]);
+    // Help on (`?lab=help`): "All tips" moves into the Help screen; "Show tips again" stays at the Guide foot.
+    expect(resolveLegacyFirstTimeGuideFootActions(2, { allTipsInHelp: true }).map((action) => action.id)).toEqual(['show-tips-again']);
+    expect(resolveLegacyFirstTimeGuideFootActions(2, { allTipsInHelp: false }).map((action) => action.id)).toEqual(['all-tips', 'show-tips-again']);
+  });
+});
+
+describe('first-time Guide with Help on: "All tips" lives in Help (MAZER-ONB-001 family)', () => {
+  it('the Guide foot keeps only "Show tips again" while rows are hidden', () => {
+    const { scene } = sceneWith('?lab=firsttime');
+    const options = resolveLegacyFirstTimeGuideSheetOptions(scene, { allTipsInHelp: true });
+    expect(options?.hiddenRowIds.size).toBe(2);
+    expect(options?.footActions.map((action) => action.id)).toEqual(['show-tips-again']);
+  });
+
+  it('Help offers "All tips" only while the first-time flag is on and something is hidden', () => {
+    expect(isLegacyFirstTimeGuideAllTipsAvailable(sceneWith('').scene)).toBe(false);
+    const { scene, meet } = sceneWith('?lab=firsttime');
+    expect(isLegacyFirstTimeGuideAllTipsAvailable(scene)).toBe(true);
+    meet('mechanic.wrap');
+    meet('mechanic.switch');
+    expect(isLegacyFirstTimeGuideAllTipsAvailable(scene)).toBe(false);
+  });
+
+  it('arming from Help opens the next Guide with every row, no pill and no write; closing resets it', () => {
+    const { scene, storage } = sceneWith('?lab=firsttime');
+    const helpModel = () => buildLegacyGuideSheetModel('menu', {
+      firstTime: resolveLegacyFirstTimeGuideSheetOptions(scene, { allTipsInHelp: true }),
+      help: true
+    });
+    armLegacyFirstTimeGuideAllTips(scene);
+    expect(scene.uiDirty).toBe(true);
+    const sheet = helpModel();
+    expect(ids(sheet.rows)).toContain('wrap');
+    expect(ids(sheet.rows)).toContain('bleed-gate');
+    expect(ids(sheet.rows)).toContain('help');
+    expect([...(sheet.newRowIds ?? [])]).toEqual([]);
+    expect(sheet.footActions?.map((action) => action.id)).toEqual(['show-tips-again']);
+    noteLegacyFirstTimeGuideClosed(scene);
+    expect(ids(helpModel().rows)).not.toContain('wrap');
+    expect(storage.data.get(resolveFirstTimeSeenStorageKey('guest'))).toBeUndefined();
+  });
+
+  it('arming while a Guide state exists just turns "All tips" on', () => {
+    const { scene, model } = sceneWith('?lab=firsttime');
+    model();
+    armLegacyFirstTimeGuideAllTips(scene);
+    expect(ids(model().rows)).toEqual(ids(LEGACY_GUIDE_ROWS));
   });
 });

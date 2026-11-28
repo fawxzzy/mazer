@@ -10,6 +10,10 @@
  *   main menu   + Profile, Leaderboard                         (no pause: its X just closes)
  *   in a game   + Reset level, Main menu                       (the dropdown IS the pause: its X is Resume)
  *
+ * Help (MAZER-ONB-001 family, Zac's placement pick A, 2026-11-26): while the Help flag is on (legacyHelpFlag.ts,
+ * `?lab=help`, build default off) BOTH screens show a Help row right after Guide. It is kept out of the const lists
+ * below on purpose, so with the flag off every list, label set and order is exactly as before.
+ *
  * Play-only rules (reset availability, two-tap arming, back steps) live in legacyPlayMenu.ts.
  */
 import type { LegacyMenuDropdownItem } from './legacyMenuDropdown';
@@ -26,12 +30,17 @@ export const LEGACY_SHARED_MENU_ROW_IDS = ['settings', 'guide', 'sound'] as cons
 export const LEGACY_MAIN_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'profile', 'leaderboard'] as const;
 export const LEGACY_PLAY_MENU_ROW_IDS = [...LEGACY_SHARED_MENU_ROW_IDS, 'reset-level', 'main-menu'] as const;
 
-export type LegacyMainMenuRowId = (typeof LEGACY_MAIN_MENU_ROW_IDS)[number];
-export type LegacyPlayMenuRowId = (typeof LEGACY_PLAY_MENU_ROW_IDS)[number];
+/** The Help row (both screens, right after Guide) while the Help flag is on. */
+export const LEGACY_HELP_MENU_ROW_ID = 'help' as const;
+export type LegacyHelpMenuRowId = typeof LEGACY_HELP_MENU_ROW_ID;
+
+export type LegacyMainMenuRowId = (typeof LEGACY_MAIN_MENU_ROW_IDS)[number] | LegacyHelpMenuRowId;
+export type LegacyPlayMenuRowId = (typeof LEGACY_PLAY_MENU_ROW_IDS)[number] | LegacyHelpMenuRowId;
 export type LegacyMenuRowId = LegacyMainMenuRowId | LegacyPlayMenuRowId;
 
 export const LEGACY_MENU_ROW_LABELS: Readonly<Record<LegacyMenuRowId, string>> = Object.freeze({
   guide: 'Guide',
+  help: 'Help',
   leaderboard: 'Leaderboard',
   'main-menu': 'Main menu',
   profile: 'Profile',
@@ -46,6 +55,7 @@ export const LEGACY_MENU_ROW_LABELS: Readonly<Record<LegacyMenuRowId, string>> =
  */
 export const LEGACY_MENU_ROW_SEMANTIC_ACTIONS: Readonly<Record<LegacyMenuRowId, string>> = Object.freeze({
   guide: 'Guide',
+  help: 'Help',
   leaderboard: 'Leaderboard',
   'main-menu': 'Main menu',
   profile: 'Account',
@@ -67,13 +77,15 @@ export interface LegacyMenuRowsState {
   readonly soundEnabled: boolean;
   /** Main menu: Profile is dropped while the account service is unavailable. Default true. */
   readonly profileAvailable?: boolean;
+  /** Both screens: the Help row right after Guide (the Help flag, legacyHelpFlag.ts). Default false. */
+  readonly helpAvailable?: boolean;
   /** In a game: Reset level is drawn dim and ignores taps when false. Default true. */
   readonly resetAvailable?: boolean;
   readonly resetArmed?: boolean;
   readonly quitArmed?: boolean;
 }
 
-type LegacyRowAvailability = Pick<LegacyMenuRowsState, 'profileAvailable'>;
+type LegacyRowAvailability = Pick<LegacyMenuRowsState, 'profileAvailable' | 'helpAvailable'>;
 export function resolveLegacyMenuRowIds(screen: 'main', state?: LegacyRowAvailability): readonly LegacyMainMenuRowId[];
 export function resolveLegacyMenuRowIds(screen: 'play', state?: LegacyRowAvailability): readonly LegacyPlayMenuRowId[];
 export function resolveLegacyMenuRowIds(
@@ -81,7 +93,11 @@ export function resolveLegacyMenuRowIds(
   state: LegacyRowAvailability = {}
 ): readonly LegacyMenuRowId[] {
   const ids: readonly LegacyMenuRowId[] = screen === 'play' ? LEGACY_PLAY_MENU_ROW_IDS : LEGACY_MAIN_MENU_ROW_IDS;
-  return ids.filter((id) => id !== 'profile' || screen === 'play' || state.profileAvailable !== false);
+  const shown = ids.filter((id) => id !== 'profile' || screen === 'play' || state.profileAvailable !== false);
+  if (state.helpAvailable !== true) {
+    return shown;
+  }
+  return shown.flatMap((id): LegacyMenuRowId[] => (id === 'guide' ? [id, LEGACY_HELP_MENU_ROW_ID] : [id]));
 }
 
 const buildRow = <TId extends LegacyMenuRowId>(id: TId, state: LegacyMenuRowsState): LegacyMenuDropdownItem<TId> => {

@@ -36,6 +36,7 @@ export type LegacyGuideGlyph =
   | 'menu-burger'
   | 'menu-pause'
   | 'sound-speaker'
+  | 'help-lifebuoy'
   | 'hazard-gate'
   | 'hazard-sentry'
   | 'hazard-hunter'
@@ -70,7 +71,7 @@ export interface LegacyGuideIconSpec {
 }
 
 export interface LegacyGuideRow {
-  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'menu' | 'menu-play' | 'sound' | LegacyGuideHazardRowId;
+  id: 'goal' | 'start' | 'you' | 'move' | 'trail' | 'wrap' | 'bleed-gate' | 'levels' | 'online' | 'menu' | 'menu-play' | 'sound' | 'help' | LegacyGuideHazardRowId;
   heading: string;
   text: string;
   icon: LegacyGuideIconSpec;
@@ -274,6 +275,40 @@ export const LEGACY_GUIDE_ROWS: readonly LegacyGuideRow[] = Object.freeze([
 ]);
 
 /**
+ * Help screen (MAZER-ONB-001 family; only while the Help flag is on, legacyHelpFlag.ts). With the flag on the Menu row
+ * names the Help row too, and a Help row follows "In a maze". With the flag off neither is used and the sheet is
+ * exactly LEGACY_GUIDE_ROWS.
+ */
+export const LEGACY_GUIDE_HELP_MENU_ROW: LegacyGuideRow = Object.freeze({
+  ...LEGACY_GUIDE_ROWS.find((row) => row.id === 'menu')!,
+  text: 'Top right: Settings (Dark mode), Guide, Help, Sound, Profile, Leaderboard.'
+});
+
+export const LEGACY_GUIDE_HELP_ROW: LegacyGuideRow = Object.freeze<LegacyGuideRow>({
+  heading: 'Help',
+  icon: {
+    badge: 'circle',
+    boardDraw: null,
+    chipDraw: null,
+    glyph: 'help-lifebuoy',
+    lane: null,
+    reasonId: 'help-lifebuoy-guide-local-shares-menu-row-icon',
+    status: 'guide-local'
+  },
+  id: 'help',
+  text: 'Help in the Menu has quick answers to common questions and a form to write to us.'
+});
+
+/** The Guide rows while the Help flag is on: the Menu row names Help, and the Help row follows "In a maze". */
+export const LEGACY_GUIDE_ROWS_WITH_HELP: readonly LegacyGuideRow[] = Object.freeze(
+  LEGACY_GUIDE_ROWS.flatMap((row): LegacyGuideRow[] => {
+    if (row.id === 'menu') return [LEGACY_GUIDE_HELP_MENU_ROW];
+    if (row.id === 'menu-play') return [row, LEGACY_GUIDE_HELP_ROW];
+    return [row];
+  })
+);
+
+/**
  * The hazard kinds, spelled locally so the Guide data stays free of the hazard core (the source boundary
  * test pins which legacy files may import it). tests/reset/legacy-hazard-onboarding.test.ts pins this list
  * to the signed schedule's units, in order.
@@ -437,6 +472,8 @@ export interface LegacyGuideFirstTimeSheetOptions {
  * (the hazard layer off) returns LEGACY_GUIDE_ROWS itself, so the flag-off sheet is unchanged.
  * `firstTime` (first-time cards slice 4, `?lab=firsttime` only) leaves out the hidden rows and adds the "New" pills and
  * the foot actions; omitted, nothing about the model changes (same rows object, no extra keys).
+ * `help` (the Help flag, legacyHelpFlag.ts) swaps in LEGACY_GUIDE_ROWS_WITH_HELP; false or omitted, the rows are
+ * LEGACY_GUIDE_ROWS itself.
  */
 export const buildLegacyGuideSheetModel = (
   context: LegacyGuideContext,
@@ -444,11 +481,13 @@ export const buildLegacyGuideSheetModel = (
     hasKeyboard?: boolean;
     hazardKinds?: readonly LegacyGuideHazardKind[];
     firstTime?: LegacyGuideFirstTimeSheetOptions;
+    help?: boolean;
   } = {}
 ): LegacyGuideSheetModel => {
   const hazardKinds = options.hazardKinds ?? [];
   const hazardRows = LEGACY_GUIDE_HAZARD_ROWS.filter((row) => hazardKinds.includes(row.kind));
-  const rows: readonly LegacyGuideRow[] = hazardRows.length === 0 ? LEGACY_GUIDE_ROWS : [...LEGACY_GUIDE_ROWS, ...hazardRows];
+  const baseRows = options.help === true ? LEGACY_GUIDE_ROWS_WITH_HELP : LEGACY_GUIDE_ROWS;
+  const rows: readonly LegacyGuideRow[] = hazardRows.length === 0 ? baseRows : [...baseRows, ...hazardRows];
   const model: LegacyGuideSheetModel = {
     closeLabel: LEGACY_GUIDE_CLOSE_LABEL,
     context,
