@@ -1,8 +1,8 @@
 // First-time cards flag (first-time cards spec, slice 1, P5). Same shape as the hazard layer flag
 // module (kept out of its name here: tests/reset/legacy-hazard-handoff.test.ts pins who may reference it).
 //
-// The system is on when EITHER the build constant says so (default false; flipping it is a later,
-// separate step after a phone check) OR the lab switch is on. The lab switch is `?lab=firsttime`,
+// The system is on in a browser build by default (since 2026-11-28, Zac: "do everything you recommend, get it
+// deployed"). `?lab=off` turns it off for that load only (a per-load kill switch, not remembered). The lab switch is `?lab=firsttime`,
 // remembered in localStorage (`mazer.lab.firsttime.v1`) so the installed app keeps it; `?lab=off`
 // clears it (the same word that clears the hazard lab). Both labs can ride one URL as repeated
 // params: `?lab=hazards&lab=firsttime` (keep `hazards` first: the hazard flag reads the first `lab`).
@@ -19,8 +19,8 @@
 
 import { isLegacyLevelPreviewRoute } from './legacyLevelPreview';
 
-/** The build default. A literal `false` type: flipping it is a deliberate source change. */
-export const FIRST_TIME_CARDS_BUILD_DEFAULT = false as const;
+/** The build default (on since 2026-11-28). A literal type: flipping it is a deliberate source change. */
+export const FIRST_TIME_CARDS_BUILD_DEFAULT = true as const;
 
 export const FIRST_TIME_LAB_QUERY_PARAM = 'lab';
 export const FIRST_TIME_LAB_QUERY_ON = 'firsttime';
@@ -90,7 +90,9 @@ const writeStoredLab = (storage: FirstTimeCardsResolveOptions['storage'], on: bo
 
 /** Full resolution. Remembers the lab switch when the URL asks, except on a Level Preview route. */
 export const resolveFirstTimeCardsState = (options: FirstTimeCardsResolveOptions = {}): FirstTimeCardsState => {
-  const buildDefault = options.buildDefault ?? FIRST_TIME_CARDS_BUILD_DEFAULT;
+  // The build default only means something in a browser: with no `window` (node, unit tests of other systems) nothing
+  // can be drawn, so the system stays off unless a caller passes `buildDefault` or the lab switch itself.
+  const buildDefault = options.buildDefault ?? (typeof window !== 'undefined' ? FIRST_TIME_CARDS_BUILD_DEFAULT : false);
   const params = toSearchParams(options.search);
   const preview = isLegacyLevelPreviewRoute(params);
   const labValues = params.getAll(FIRST_TIME_LAB_QUERY_PARAM);
@@ -104,7 +106,8 @@ export const resolveFirstTimeCardsState = (options: FirstTimeCardsResolveOptions
   } else {
     labOn = readStoredLab(options.storage);
   }
-  const source: FirstTimeCardsSource = buildDefault ? 'build' : (labOn ? 'lab' : 'off');
+  const forcedOff = labValues.includes(FIRST_TIME_LAB_QUERY_OFF);
+  const source: FirstTimeCardsSource = forcedOff ? 'off' : (buildDefault ? 'build' : (labOn ? 'lab' : 'off'));
   return { enabled: source !== 'off', source, preview };
 };
 
