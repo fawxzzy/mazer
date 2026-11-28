@@ -28,7 +28,7 @@
       "additionalProperties": false,
       "required": ["buildDefaultEnabled", "labSwitch", "note"],
       "properties": {
-        "buildDefaultEnabled": { "const": false },
+        "buildDefaultEnabled": { "const": true },
         "labSwitch": { "type": "string" },
         "note": { "type": "string" }
       }

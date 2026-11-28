@@ -31,8 +31,8 @@ describe('MAZER-HAZ-002 hazard contract phase 1 is signed and still enables noth
     expect(contract).not.toContain('P0 DRAFT');
   });
 
-  test('signing enables nothing: the layer is off and level 1 and the plateau edge owe no hazard', () => {
-    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(false);
+  test('the build default is on (H9, 2026-11-28); node with no window is off, and level 1 and the plateau edge owe no hazard', () => {
+    expect(HAZARD_LAYER_BUILD_DEFAULT).toBe(true);
     expect(resolveHazardLayerEnabled()).toBe(false);
     for (const level of [1, 2, GEOMETRY_BUDGET_SATURATION_LEVEL]) {
       expect(resolveLegacyHazardHandoff(level)).toMatchObject({ hazardBudgetLevels: 0, hazardsActive: false, obstacles: [], enemies: [] });

@@ -1,7 +1,7 @@
 // Hazard layer flag (roadmap slice H1). Replaces the retired dormant literal switch (a constant `false`).
 //
-// The layer is on when EITHER the build constant says so (default false; slice H9 flips it after
-// the owner's phone sign-off) OR the lab switch is on. The lab switch is `?lab=hazards`, remembered
+// The layer is on in a browser build by default (slice H9 flipped 2026-11-28 on the owner's say-so, no phone check
+// first) OR when the lab switch is on. `?lab=off` turns it off for that load and clears the remembered switch. The lab switch is `?lab=hazards`, remembered
 // in localStorage so the installed app keeps it; `?lab=off` clears it. It works on preview and
 // production, and only ever turns the layer ON for the person who set it.
 //
@@ -18,8 +18,8 @@
 // Pure: no Phaser, no DOM globals. Every storage access is inside try/catch (private mode, blocked
 // storage, quota, a hostile stub): a failure just means "not remembered", never a throw at boot.
 
-/** The build default. A literal `false` type: flipping it is a deliberate source change (slice H9). */
-export const HAZARD_LAYER_BUILD_DEFAULT = false as const;
+/** The build default (on since 2026-11-28, slice H9). A literal type: flipping it is a deliberate source change. */
+export const HAZARD_LAYER_BUILD_DEFAULT = true as const;
 
 export const HAZARD_LAB_QUERY_PARAM = 'lab';
 export const HAZARD_LAB_QUERY_ON = 'hazards';
@@ -102,7 +102,9 @@ const writeStoredLab = (storage: HazardLayerResolveOptions['storage'], on: boole
 
 /** Full resolution. Writes the lab switch to storage when the URL asks (guarded). */
 export const resolveHazardLayerState = (options: HazardLayerResolveOptions = {}): HazardLayerState => {
-  const buildDefault = options.buildDefault ?? HAZARD_LAYER_BUILD_DEFAULT;
+  // The build default only means something in a browser: with no `window` (node, unit tests of other systems) the layer
+  // stays off unless a caller passes `buildDefault` or the lab switch.
+  const buildDefault = options.buildDefault ?? (typeof window !== 'undefined' ? HAZARD_LAYER_BUILD_DEFAULT : false);
   const params = toSearchParams(options.search);
   const labParam = params.get(HAZARD_LAB_QUERY_PARAM);
   let labOn: boolean;
@@ -115,7 +117,7 @@ export const resolveHazardLayerState = (options: HazardLayerResolveOptions = {})
   } else {
     labOn = readStoredLab(options.storage);
   }
-  const source: HazardLayerSource = buildDefault ? 'build' : (labOn ? 'lab' : 'off');
+  const source: HazardLayerSource = labParam === HAZARD_LAB_QUERY_OFF ? 'off' : (buildDefault ? 'build' : (labOn ? 'lab' : 'off'));
   return {
     enabled: source !== 'off',
     source,
